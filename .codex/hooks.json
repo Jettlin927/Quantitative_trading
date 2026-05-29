@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "^(apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .codex/hooks/post_tool_use_check.py",
+            "commandWindows": "python .codex\\hooks\\post_tool_use_check.py",
+            "timeout": 300,
+            "statusMessage": "Running changed-file checks"
+          }
+        ]
+      }
+    ]
+  }
+}

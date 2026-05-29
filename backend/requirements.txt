@@ -1,0 +1,7 @@
+fastapi==0.128.0
+uvicorn[standard]==0.38.0
+SQLAlchemy==2.0.44
+psycopg[binary]==3.2.13
+pydantic==2.12.5
+tushare==1.4.24
+pandas==2.3.3
