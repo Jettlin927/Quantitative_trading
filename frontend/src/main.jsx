@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   CandlestickSeries,
@@ -17,20 +17,28 @@ import {
   Database,
   Download,
   Filter,
+  FolderPlus,
   Gauge,
+  Layers3,
   LineChart,
   Play,
+  Plus,
   RefreshCw,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   TrendingUp,
+  Trash2,
   UploadCloud,
 } from "lucide-react";
 import "./styles.css";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:18000").replace(/\/$/, "");
 const FORM_SCHEMA_VERSION = "2026-05-29-research-desk";
+const MARKET_SYNC_MIN_ROWS = 5000;
+const SYNC_PROGRESS_TARGET_KEY = "qt-sync-progress-target";
+const MARKET_BACKTEST_JOB_KEY = "qt-market-backtest-job";
+const STOCK_POOL_KEY = "qt-active-stock-pool";
 
 const DEFAULT_FORM = {
   formSchemaVersion: FORM_SCHEMA_VERSION,
@@ -84,12 +92,16 @@ const DEFAULT_SCREEN_FILTERS = {
   industry: "",
   market: "",
   technical: "all",
+  rank_by: "fundamental",
   limit: "60",
 };
 
 const TABS = [
   ["screen", "选股池", Filter],
+  ["quant", "量化全景", BarChart3],
   ["lab", "策略实验", SlidersHorizontal],
+  ["baseline", "组合基线", ShieldCheck],
+  ["analysis", "质量诊断", Gauge],
   ["review", "AI复盘", Bot],
 ];
 
@@ -104,6 +116,13 @@ const TECHNICAL_OPTIONS = [
   ["rsi-neutral", "RSI健康"],
   ["volume-breakout", "放量"],
   ["ma-cross", "均线金叉"],
+];
+
+const RANK_OPTIONS = [
+  ["fundamental", "基本面榜"],
+  ["composite", "综合榜"],
+  ["technical", "技术榜"],
+  ["valuation", "估值榜"],
 ];
 
 const ENTRY_PRESETS = [
@@ -157,19 +176,128 @@ function App() {
   const [status, setStatus] = useState({ text: "等待连接 API", tone: "muted" });
   const [screenFilters, setScreenFilters] = useState(() => ({ ...DEFAULT_SCREEN_FILTERS, q: form.stockName || form.tsCode }));
   const [screenResults, setScreenResults] = useState([]);
+  const [stockPools, setStockPools] = useState([]);
+  const [activePoolId, setActivePoolId] = useState(getInitialStockPoolId);
+  const [activePool, setActivePool] = useState(null);
   const [selectedStock, setSelectedStock] = useState(null);
   const [newsItems, setNewsItems] = useState([]);
+  const [newsMessage, setNewsMessage] = useState("");
   const [result, setResult] = useState(null);
+  const [marketResult, setMarketResult] = useState(null);
+  const [baselineStrategy, setBaselineStrategy] = useState(null);
+  const [baselineError, setBaselineError] = useState("");
+  const [qualityAnalysis, setQualityAnalysis] = useState(null);
   const [bars, setBars] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(null);
+  const [syncProgressTarget, setSyncProgressTarget] = useState(getInitialSyncProgressTarget);
+  const [syncProgressPolling, setSyncProgressPolling] = useState(false);
+  const [marketBacktestJob, setMarketBacktestJob] = useState(getInitialMarketBacktestJob);
   const [sourceLabel, setSourceLabel] = useState("数据库未载入");
+  const [researchRuns, setResearchRuns] = useState([]);
+  const [selectedResearchRunId, setSelectedResearchRunId] = useState("");
+  const [researchRun, setResearchRun] = useState(null);
+  const [researchRunError, setResearchRunError] = useState("");
   const initialFormRef = useRef(form);
 
   const rows = result?.rows?.length ? result.rows : bars;
   const latestBar = rows.length ? rows[rows.length - 1] : null;
   const profile = selectedStock || buildFallbackProfile(form);
   const symbolTitle = profile?.name ? `${profile.name} · ${profile.ts_code}` : form.tsCode;
-  const metrics = useMemo(() => buildMetrics(result, rows), [result, rows]);
+  const metrics = useMemo(() => (marketResult ? buildMarketMetrics(marketResult) : buildMetrics(result, rows)), [marketResult, result, rows]);
+  const marketBacktestJobId = marketBacktestJob?.jobId || "";
+  const marketBacktestActive = ["queued", "running"].includes(marketBacktestJob?.status);
+  const activePoolMemberCodes = useMemo(() => new Set((activePool?.members || []).map((item) => item.ts_code)), [activePool]);
+  const activeTab = TABS.find(([key]) => key === view);
+
+  const loadExecutableStrategy = useCallback(async (showView = true) => {
+    try {
+      const data = await apiFetch("/api/strategies/executable/cross-section-strength-risk8");
+      setBaselineStrategy(data);
+      setBaselineError("");
+      if (showView) {
+        setView("baseline");
+        setStatus({ text: `已载入组合基线：${data.label}`, tone: "good" });
+      }
+    } catch (error) {
+      setBaselineError(error.message);
+      if (showView) setStatus({ text: `组合基线载入失败：${error.message}`, tone: "bad" });
+    }
+  }, []);
+
+  const loadResearchRun = useCallback(async (runId, showStatus = false) => {
+    if (!runId) return null;
+    try {
+      const data = await apiFetch(`/api/research/runs/${encodeURIComponent(runId)}`);
+      setResearchRun(data);
+      setSelectedResearchRunId(data.runId || runId);
+      setResearchRunError("");
+      if (showStatus) setStatus({ text: `已载入研究运行：${data.runId || runId}`, tone: "good" });
+      return data;
+    } catch (error) {
+      setResearchRunError(error.message);
+      if (showStatus) setStatus({ text: `研究运行载入失败：${error.message}`, tone: "bad" });
+      return null;
+    }
+  }, []);
+
+  const refreshResearchRuns = useCallback(
+    async (preferredRunId = "", showStatus = false) => {
+      try {
+        const data = await apiFetch("/api/research/runs?limit=160");
+        const runs = data.runs || [];
+        setResearchRuns(runs);
+        const nextRunId = preferredRunId && runs.some((item) => item.runId === preferredRunId) ? preferredRunId : runs[0]?.runId;
+        if (nextRunId) {
+          await loadResearchRun(nextRunId, showStatus);
+        } else {
+          setResearchRun(null);
+          setResearchRunError("docs/research/runs 下没有可读取的 results.json");
+        }
+        if (showStatus) setStatus({ text: `已刷新研究运行目录：${runs.length} 条`, tone: "good" });
+      } catch (error) {
+        setResearchRunError(error.message);
+        if (showStatus) setStatus({ text: `研究运行目录读取失败：${error.message}`, tone: "bad" });
+      }
+    },
+    [loadResearchRun],
+  );
+
+  const fetchSyncProgress = useCallback(
+    async (target) => {
+      const params = new URLSearchParams({
+        target,
+        start_date: form.startDate,
+        end_date: form.endDate,
+        min_existing_rows: String(MARKET_SYNC_MIN_ROWS),
+      });
+      return apiFetch(`/api/tushare/sync-progress?${params.toString()}`);
+    },
+    [form.startDate, form.endDate],
+  );
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadBaseline() {
+      try {
+        const data = await apiFetch("/api/strategies/executable/cross-section-strength-risk8");
+        if (!ignore) {
+          setBaselineStrategy(data);
+          setBaselineError("");
+        }
+      } catch (error) {
+        if (!ignore) setBaselineError(error.message);
+      }
+    }
+    loadBaseline();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    void refreshResearchRuns("", false);
+  }, [refreshResearchRuns]);
 
   useEffect(() => {
     let ignore = false;
@@ -193,6 +321,121 @@ function App() {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadPools() {
+      try {
+        const pools = await apiFetch("/api/stock-pools");
+        if (ignore) return;
+        setStockPools(pools);
+        if (!pools.length) {
+          setActivePoolId(0);
+          return;
+        }
+        const saved = getInitialStockPoolId();
+        const nextPool = pools.find((pool) => pool.id === saved) || pools[0];
+        setActivePoolId(nextPool.id);
+      } catch {
+        if (!ignore) setStockPools([]);
+      }
+    }
+    loadPools();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activePoolId) {
+      setActivePool(null);
+      localStorage.removeItem(STOCK_POOL_KEY);
+      return undefined;
+    }
+    localStorage.setItem(STOCK_POOL_KEY, String(activePoolId));
+    let ignore = false;
+    async function loadPoolDetail() {
+      try {
+        const pool = await apiFetch(`/api/stock-pools/${activePoolId}`);
+        if (!ignore) setActivePool(pool);
+      } catch (error) {
+        if (!ignore) {
+          setActivePool(null);
+          setStatus({ text: error.message, tone: "bad" });
+        }
+      }
+    }
+    loadPoolDetail();
+    return () => {
+      ignore = true;
+    };
+  }, [activePoolId]);
+
+  useEffect(() => {
+    if (!syncProgressTarget) return undefined;
+    let ignore = false;
+    async function refreshProgress() {
+      try {
+        const data = await fetchSyncProgress(syncProgressTarget);
+        if (!ignore) setSyncProgress(data);
+      } catch (error) {
+        if (!ignore) {
+          setSyncProgress((current) => ({
+            ...(current?.target === syncProgressTarget ? current : { target: syncProgressTarget, label: syncTargetLabel(syncProgressTarget) }),
+            status: "error",
+            error: error.message,
+          }));
+        }
+      }
+    }
+    refreshProgress();
+    if (!syncProgressPolling) {
+      return () => {
+        ignore = true;
+      };
+    }
+    const intervalId = window.setInterval(refreshProgress, 3000);
+    return () => {
+      ignore = true;
+      window.clearInterval(intervalId);
+    };
+  }, [fetchSyncProgress, syncProgressPolling, syncProgressTarget]);
+
+  useEffect(() => {
+    if (!marketBacktestJobId || !marketBacktestActive) return undefined;
+    let ignore = false;
+    async function refreshMarketJob() {
+      try {
+        const data = await apiFetch(`/api/backtests/market/jobs/${marketBacktestJobId}`);
+        if (ignore) return;
+        setMarketBacktestJob(data);
+        if (data.status === "ok" && data.result) {
+          localStorage.removeItem(MARKET_BACKTEST_JOB_KEY);
+          const scopeName = data.result.scope?.poolName || "全市场";
+          setMarketResult(data.result);
+          setResult(null);
+          setSourceLabel(`${data.result.scope?.poolId ? "POOL" : "MARKET"}:${data.result.summary.tested}/${data.result.summary.candidates}`);
+          setStatus({ text: `${scopeName}验证完成：测试 ${data.result.summary.tested} 只，正收益 ${data.result.summary.winners} 只`, tone: "good" });
+          setView((current) => (current === "quant" ? "quant" : "lab"));
+        } else if (data.status === "failed") {
+          localStorage.removeItem(MARKET_BACKTEST_JOB_KEY);
+          setStatus({ text: data.error || data.message || "全市场验证失败", tone: "bad" });
+        }
+      } catch (error) {
+        if (!ignore) {
+          localStorage.removeItem(MARKET_BACKTEST_JOB_KEY);
+          setMarketBacktestJob((current) => ({ ...(current || { jobId: marketBacktestJobId }), status: "failed", message: error.message, error: error.message }));
+          setStatus({ text: error.message, tone: "bad" });
+        }
+      }
+    }
+    refreshMarketJob();
+    const intervalId = window.setInterval(refreshMarketJob, 2000);
+    return () => {
+      ignore = true;
+      window.clearInterval(intervalId);
+    };
+  }, [marketBacktestActive, marketBacktestJobId]);
 
   async function checkApi() {
     await withBusy(async () => {
@@ -233,11 +476,48 @@ function App() {
   async function syncDaily() {
     await withBusy(async () => {
       const req = getDataRequest(form);
-      setStatus({ text: `正在同步 ${req.ts_code} 日线...`, tone: "muted" });
+      setStatus({ text: `正在同步 ${req.ts_code} 单票日线...`, tone: "muted" });
       const data = await apiFetch("/api/tushare/sync-daily", { method: "POST", body: JSON.stringify(req) });
       updateForm("tsCode", data.ts_code);
       setStatus({ text: `${data.ts_code} 日线同步完成：${data.rows_upserted} 条`, tone: "good" });
       await loadBars(false, data.ts_code);
+    });
+  }
+
+  async function syncMarketDaily() {
+    await withBusy(async () => {
+      if (new Date(form.endDate) < new Date(form.startDate)) throw new Error("结束日期不能早于开始日期。");
+      if (!confirmMarketSync("全市场日线")) return;
+      const progressTarget = "daily";
+      activateSyncProgress(progressTarget);
+      setSyncProgressPolling(true);
+      void refreshSyncProgress(progressTarget).catch(() => null);
+      setResult(null);
+      setMarketResult(null);
+      setStatus({ text: "正在补齐全市场日线，已完整的交易日会跳过...", tone: "muted" });
+      try {
+        const data = await apiFetch("/api/tushare/sync-market-daily", {
+          method: "POST",
+          body: JSON.stringify({
+            start_date: form.startDate,
+            end_date: form.endDate,
+            max_trade_dates: 0,
+            skip_existing: true,
+            min_existing_rows: MARKET_SYNC_MIN_ROWS,
+          }),
+        });
+        const failedCount = data.failed_dates?.length || 0;
+        const skippedCount = data.skipped_trade_dates || 0;
+        setSourceLabel(`MARKET-D:${data.rows_upserted}`);
+        setStatus({
+          text: `日线补齐完成：同步 ${data.trade_dates} 日，跳过 ${skippedCount} 日，${data.rows_upserted} 条${failedCount ? `，失败 ${failedCount} 日` : ""}`,
+          tone: failedCount ? "bad" : "good",
+        });
+        await runScreener(false);
+      } finally {
+        setSyncProgressPolling(false);
+        void refreshSyncProgress(progressTarget).catch(() => null);
+      }
     });
   }
 
@@ -253,6 +533,40 @@ function App() {
       });
       await refreshSelectedFundamentals(data.ts_code);
       await runScreener(false);
+    });
+  }
+
+  async function syncMarketDailyBasic() {
+    await withBusy(async () => {
+      if (new Date(form.endDate) < new Date(form.startDate)) throw new Error("结束日期不能早于开始日期。");
+      if (!confirmMarketSync("全市场每日估值")) return;
+      const progressTarget = "daily_basic";
+      activateSyncProgress(progressTarget);
+      setSyncProgressPolling(true);
+      void refreshSyncProgress(progressTarget).catch(() => null);
+      setStatus({ text: "正在补齐全市场每日估值，已完整的交易日会跳过...", tone: "muted" });
+      try {
+        const data = await apiFetch("/api/tushare/sync-market-daily-basic", {
+          method: "POST",
+          body: JSON.stringify({
+            start_date: form.startDate,
+            end_date: form.endDate,
+            max_trade_dates: 0,
+            skip_existing: true,
+            min_existing_rows: MARKET_SYNC_MIN_ROWS,
+          }),
+        });
+        const failedCount = data.failed_dates?.length || 0;
+        const skippedCount = data.skipped_trade_dates || 0;
+        setStatus({
+          text: `估值补齐完成：同步 ${data.trade_dates} 日，跳过 ${skippedCount} 日，${data.rows_upserted} 条${failedCount ? `，失败 ${failedCount} 日` : ""}`,
+          tone: failedCount ? "bad" : "good",
+        });
+        await runScreener(false);
+      } finally {
+        setSyncProgressPolling(false);
+        void refreshSyncProgress(progressTarget).catch(() => null);
+      }
     });
   }
 
@@ -298,7 +612,85 @@ function App() {
       if (normalizedKeyword && !/^[0-9A-Z.]+$/i.test(normalizedKeyword)) params.set("q", normalizedKeyword);
       const data = await apiFetch(`/api/news/trends?${params.toString()}`);
       setNewsItems(data.items || []);
-      setStatus({ text: data.items?.length ? `消息面已刷新：${data.items.length} 条` : "消息面暂无匹配热点", tone: data.items?.length ? "good" : "muted" });
+      setNewsMessage(data.message || "");
+      setStatus({ text: data.message || (data.items?.length ? `消息面已刷新：${data.items.length} 条` : "消息面暂无返回"), tone: data.items?.length ? "good" : "muted" });
+    });
+  }
+
+  async function runQualityAnalysis() {
+    await withBusy(async () => {
+      const req = getDataRequest(form);
+      const params = new URLSearchParams({
+        start_date: req.start_date,
+        end_date: req.end_date,
+        use_ai: "true",
+      });
+      setStatus({ text: `正在运行 ${req.ts_code} 多Agent质量诊断...`, tone: "muted" });
+      const data = await apiFetch(`/api/stocks/${encodeURIComponent(req.ts_code)}/quality-analysis?${params.toString()}`);
+      setQualityAnalysis(data);
+      setStatus({ text: `${data.name || data.symbol} 质量诊断完成：${data.rating} / ${data.score}分`, tone: data.score >= 58 ? "good" : "muted" });
+      setView("analysis");
+    });
+  }
+
+  async function refreshStockPools(preferredPoolId = activePoolId) {
+    const pools = await apiFetch("/api/stock-pools");
+    setStockPools(pools);
+    if (!pools.length) {
+      setActivePoolId(0);
+      return pools;
+    }
+    if (!pools.some((pool) => pool.id === preferredPoolId)) {
+      setActivePoolId(pools[0].id);
+    }
+    return pools;
+  }
+
+  async function createStockPool(name) {
+    await withBusy(async () => {
+      const pool = await apiFetch("/api/stock-pools", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      });
+      await refreshStockPools(pool.id);
+      setActivePoolId(pool.id);
+      setStatus({ text: `标的池已创建：${pool.name}`, tone: "good" });
+    });
+  }
+
+  async function addStocksToActivePool(tsCodes) {
+    await withBusy(async () => {
+      if (!activePoolId) throw new Error("请先创建或选择一个标的池。");
+      const codes = [...new Set(tsCodes.map((code) => code.trim()).filter(Boolean))];
+      if (!codes.length) throw new Error("请至少提供一个有效标的。");
+      const detail = await apiFetch(`/api/stock-pools/${activePoolId}/members`, {
+        method: "POST",
+        body: JSON.stringify({ ts_codes: codes }),
+      });
+      setActivePool(detail);
+      await refreshStockPools(detail.id);
+      setStatus({ text: `已更新标的池：${detail.name}（${detail.member_count} 只）`, tone: "good" });
+    });
+  }
+
+  async function removeStockFromActivePool(tsCode) {
+    await withBusy(async () => {
+      if (!activePoolId) throw new Error("请先选择一个标的池。");
+      const detail = await apiFetch(`/api/stock-pools/${activePoolId}/members/${tsCode}`, { method: "DELETE" });
+      setActivePool(detail);
+      await refreshStockPools(detail.id);
+      setStatus({ text: `已从 ${detail.name} 移除 ${tsCode}`, tone: "good" });
+    });
+  }
+
+  async function deleteActivePool() {
+    await withBusy(async () => {
+      if (!activePoolId || !activePool) throw new Error("当前没有可删除的标的池。");
+      if (!window.confirm(`删除标的池「${activePool.name}」？池内标的组合会被移除，但不会删除行情数据。`)) return;
+      await apiFetch(`/api/stock-pools/${activePoolId}`, { method: "DELETE" });
+      setActivePool(null);
+      await refreshStockPools(0);
+      setStatus({ text: `已删除标的池：${activePool.name}`, tone: "good" });
     });
   }
 
@@ -311,10 +703,44 @@ function App() {
         body: JSON.stringify({ ...req, config: buildBacktestConfig(form) }),
       });
       setResult(data);
+      setMarketResult(null);
       setBars(data.rows || []);
       setSourceLabel(`BT:${req.ts_code}`);
       setStatus({ text: `${req.ts_code} 回测完成：${data.trades.length} 笔流水`, tone: "good" });
       setView("review");
+    });
+  }
+
+  async function runMarketBacktest(options = {}) {
+    if (marketBacktestActive) {
+      setView(options?.targetView || "lab");
+      return;
+    }
+    const poolId = Number(options?.poolId || 0);
+    const poolName = options?.poolName || (poolId === activePool?.id ? activePool?.name : "");
+    const scopeLabel = poolId ? `标的池「${poolName || poolId}」` : "全市场";
+    const targetView = options?.targetView || "lab";
+    await withBusy(async () => {
+      if (new Date(form.endDate) < new Date(form.startDate)) throw new Error("结束日期不能早于开始日期。");
+      setStatus({ text: `正在创建${scopeLabel}后台验证任务...`, tone: "muted" });
+      const data = await apiFetch("/api/backtests/market/jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          start_date: form.startDate,
+          end_date: form.endDate,
+          config: buildBacktestConfig(form),
+          pool_id: poolId || null,
+          min_bars: 120,
+          max_stocks: 0,
+        }),
+      });
+      localStorage.setItem(MARKET_BACKTEST_JOB_KEY, data.jobId);
+      setMarketBacktestJob(data);
+      setResult(null);
+      setMarketResult(null);
+      setSourceLabel(`JOB:${data.jobId.slice(0, 8)}`);
+      setStatus({ text: `${scopeLabel}验证已进入后台：分批读取数据库，并发验证中...`, tone: "muted" });
+      setView(targetView);
     });
   }
 
@@ -329,7 +755,27 @@ function App() {
     }
   }
 
+  async function refreshSyncProgress(target) {
+    const data = await fetchSyncProgress(target);
+    setSyncProgress(data);
+    return data;
+  }
+
+  function activateSyncProgress(target) {
+    localStorage.setItem(SYNC_PROGRESS_TARGET_KEY, target);
+    setSyncProgressTarget(target);
+  }
+
+  function confirmMarketSync(label) {
+    const days = Math.ceil((new Date(form.endDate).getTime() - new Date(form.startDate).getTime()) / 86400000) + 1;
+    if (days <= 45) return true;
+    return window.confirm(`${label}会补齐 ${form.startDate} 到 ${form.endDate} 的全 A 数据，已完整同步的交易日会跳过。\n\n首次补齐可能需要几分钟，期间会按数据库覆盖率刷新进度。确定开始？`);
+  }
+
   function updateForm(name, value) {
+    setResult(null);
+    setMarketResult(null);
+    setQualityAnalysis(null);
     setForm((current) => ({ ...current, [name]: value }));
   }
 
@@ -338,12 +784,21 @@ function App() {
   }
 
   function applyPreset(preset) {
+    setResult(null);
+    setMarketResult(null);
     setForm((current) => ({ ...current, ...preset.config }));
     setStatus({ text: `策略预设已切换：${preset.label}`, tone: "good" });
   }
 
+  async function changeResearchRun(runId) {
+    await loadResearchRun(runId, true);
+  }
+
   async function selectCandidate(stock, load = false) {
     setSelectedStock(stock);
+    setResult(null);
+    setMarketResult(null);
+    setQualityAnalysis(null);
     setForm((current) => ({ ...current, tsCode: stock.ts_code, stockName: stock.name }));
     setSourceLabel(`标的:${stock.ts_code}`);
     setStatus({ text: `已选择 ${stock.name}（${stock.ts_code}）`, tone: "good" });
@@ -363,6 +818,11 @@ function App() {
           <div>
             <p className="eyebrow">Local Quant Research</p>
             <h1>选股与策略研究台</h1>
+            <div className="desk-header-meta">
+              <span>{activeTab?.[1] || "工作区"}</span>
+              <span>{rows.length ? `${rows.length} 根日线` : "等待行情"}</span>
+              <span>{marketBacktestActive ? "后台验证中" : sourceLabel}</span>
+            </div>
           </div>
         </div>
         <nav className="desk-tabs" aria-label="工作区">
@@ -380,25 +840,39 @@ function App() {
           <i className={`pulse ${status.tone}`} />
           <span>{status.text}</span>
         </div>
-        <TextField label="当前标的" value={form.tsCode} onChange={(value) => updateForm("tsCode", value.toUpperCase())} />
-        <TextField label="开始日期" type="date" value={form.startDate} onChange={(value) => updateForm("startDate", value)} />
-        <TextField label="结束日期" type="date" value={form.endDate} onChange={(value) => updateForm("endDate", value)} />
-        <div className="command-actions">
-          <ActionButton icon={<Activity size={16} />} label="检测API" onClick={checkApi} disabled={busy} />
-          <ActionButton icon={<RefreshCw size={16} />} label="同步列表" onClick={syncStockBasic} disabled={busy} />
-          <ActionButton icon={<UploadCloud size={16} />} label="同步日线" onClick={syncDaily} disabled={busy} />
-          <ActionButton icon={<Database size={16} />} label="同步基本面" onClick={syncFundamentals} disabled={busy} />
-          <ActionButton icon={<Database size={16} />} label="载入行情" onClick={() => withBusy(loadBars)} disabled={busy} />
-          <button className="primary-button" type="button" onClick={runBacktest} disabled={busy}>
-            <Play size={17} /> 回测并评价
-          </button>
+        <div className="command-inputs">
+          <TextField label="当前标的" value={form.tsCode} onChange={(value) => updateForm("tsCode", value.toUpperCase())} />
+          <TextField label="开始日期" type="date" value={form.startDate} onChange={(value) => updateForm("startDate", value)} />
+          <TextField label="结束日期" type="date" value={form.endDate} onChange={(value) => updateForm("endDate", value)} />
         </div>
+        <button className="primary-button command-run" type="button" onClick={runMarketBacktest} disabled={busy || marketBacktestActive}>
+          <Play size={17} /> {marketBacktestActive ? "验证中" : "全市场验证"}
+        </button>
+        <div className="operation-dock" aria-label="数据操作">
+          <ActionCluster label="连接">
+            <ActionButton icon={<Activity size={15} />} label="检测API" onClick={checkApi} disabled={busy} compact />
+            <ActionButton icon={<RefreshCw size={15} />} label="同步列表" onClick={syncStockBasic} disabled={busy} compact />
+            <ActionButton icon={<ShieldCheck size={15} />} label="组合基线" onClick={() => loadExecutableStrategy(true)} disabled={busy} compact />
+          </ActionCluster>
+          <ActionCluster label="全市场预热">
+            <ActionButton icon={<UploadCloud size={15} />} label="补齐日线" onClick={syncMarketDaily} disabled={busy} compact />
+            <ActionButton icon={<Database size={15} />} label="补齐估值" onClick={syncMarketDailyBasic} disabled={busy} compact />
+          </ActionCluster>
+          <ActionCluster label="当前标的">
+            <ActionButton icon={<UploadCloud size={15} />} label="单票日线" onClick={syncDaily} disabled={busy} compact />
+            <ActionButton icon={<Database size={15} />} label="单票基本面" onClick={syncFundamentals} disabled={busy} compact />
+            <ActionButton icon={<Database size={15} />} label="载入行情" onClick={() => withBusy(loadBars)} disabled={busy} compact />
+            <ActionButton icon={<Gauge size={15} />} label="质量诊断" onClick={runQualityAnalysis} disabled={busy} compact />
+          </ActionCluster>
+        </div>
+        <SyncProgressStrip progress={syncProgress} polling={syncProgressPolling} />
+        <MarketBacktestProgressStrip job={marketBacktestJob} />
       </section>
 
-      <section className="research-grid">
+      <section className={`research-grid ${view === "quant" || view === "baseline" ? "wide-workspace" : ""}`}>
         <aside className="context-rail">
           <FundamentalsPanel profile={profile} latestBar={latestBar} dataBars={rows.length} sourceLabel={sourceLabel} onSync={syncFundamentals} busy={busy} />
-          <StrategyBrief form={form} result={result} />
+          {view === "quant" ? <ResearchRunBrief run={researchRun} runs={researchRuns} /> : <StrategyBrief form={form} result={result} />}
           <section className="rail-panel">
             <PanelTitle icon={<Gauge size={17} />} title="指标快照" right={latestBar?.date || "无数据"} />
             <IndicatorTape bar={latestBar} />
@@ -410,11 +884,30 @@ function App() {
             <ScreenerPanel
               filters={screenFilters}
               results={screenResults}
+              pools={stockPools}
+              activePool={activePool}
+              activePoolId={activePoolId}
+              activePoolMemberCodes={activePoolMemberCodes}
               busy={busy}
+              marketBusy={marketBacktestActive}
               onFilterChange={updateScreenFilter}
               onRun={() => runScreener(true)}
               onSelect={selectCandidate}
+              onPoolSelect={(poolId) => setActivePoolId(Number(poolId) || 0)}
+              onCreatePool={createStockPool}
+              onDeletePool={deleteActivePool}
+              onAddToPool={addStocksToActivePool}
+              onAddResultsToPool={() => addStocksToActivePool(screenResults.map((stock) => stock.ts_code))}
+              onRemoveFromPool={removeStockFromActivePool}
+              onRunPoolBacktest={() => {
+                if (!activePool?.member_count) {
+                  setStatus({ text: "标的池里还没有股票。", tone: "bad" });
+                  return;
+                }
+                void runMarketBacktest({ poolId: activePool.id, poolName: activePool.name });
+              }}
               newsItems={newsItems}
+              newsMessage={newsMessage}
               onRefreshNews={refreshNews}
             />
           ) : null}
@@ -426,12 +919,34 @@ function App() {
               rows={rows}
               trades={result?.trades || []}
               result={result}
+              marketResult={marketResult}
               onChange={updateForm}
               onPreset={applyPreset}
-              onRun={runBacktest}
+              onRun={runMarketBacktest}
+              onSingleRun={runBacktest}
+              busy={busy}
+              marketBusy={marketBacktestActive}
+              marketJob={marketBacktestJob}
+            />
+          ) : null}
+
+          {view === "quant" ? (
+            <QuantCommandCenter
+              researchRuns={researchRuns}
+              selectedResearchRunId={selectedResearchRunId}
+              researchRun={researchRun}
+              researchRunError={researchRunError}
+              baselineRunId={baselineStrategy?.runId || ""}
+              onResearchRunChange={changeResearchRun}
+              onRefreshResearchRuns={() => refreshResearchRuns(selectedResearchRunId, true)}
+              onLoadBaseline={() => loadResearchRun(baselineStrategy?.runId || "", true)}
               busy={busy}
             />
           ) : null}
+
+          {view === "baseline" ? <BaselineStrategyPanel data={baselineStrategy} error={baselineError} onReload={() => loadExecutableStrategy(false)} busy={busy} /> : null}
+
+          {view === "analysis" ? <QualityAnalysisPanel analysis={qualityAnalysis} onRun={runQualityAnalysis} busy={busy} /> : null}
 
           {view === "review" ? <ReviewPanel result={result} rows={rows} symbolTitle={symbolTitle} /> : null}
         </section>
@@ -467,7 +982,44 @@ function getInitialView() {
   return TABS.some(([key]) => key === value) ? value : "screen";
 }
 
-function ScreenerPanel({ filters, results, busy, onFilterChange, onRun, onSelect, newsItems, onRefreshNews }) {
+function getInitialSyncProgressTarget() {
+  const saved = localStorage.getItem(SYNC_PROGRESS_TARGET_KEY);
+  return saved === "daily_basic" ? "daily_basic" : "daily";
+}
+
+function getInitialMarketBacktestJob() {
+  const jobId = localStorage.getItem(MARKET_BACKTEST_JOB_KEY);
+  return jobId ? { jobId, status: "running", message: "正在恢复后台验证任务", progressPct: 0, processed: 0, total: 0 } : null;
+}
+
+function getInitialStockPoolId() {
+  const saved = Number(localStorage.getItem(STOCK_POOL_KEY));
+  return Number.isFinite(saved) && saved > 0 ? saved : 0;
+}
+
+function ScreenerPanel({
+  filters,
+  results,
+  pools,
+  activePool,
+  activePoolId,
+  activePoolMemberCodes,
+  busy,
+  marketBusy,
+  onFilterChange,
+  onRun,
+  onSelect,
+  onPoolSelect,
+  onCreatePool,
+  onDeletePool,
+  onAddToPool,
+  onAddResultsToPool,
+  onRemoveFromPool,
+  onRunPoolBacktest,
+  newsItems,
+  newsMessage,
+  onRefreshNews,
+}) {
   const syncedCount = results.filter(hasFundamentalData).length;
   const strongCount = results.filter((stock) => candidateScore(stock) >= 60).length;
   return (
@@ -490,6 +1042,7 @@ function ScreenerPanel({ filters, results, busy, onFilterChange, onRun, onSelect
             ]}
           />
           <SelectField label="技术形态" value={filters.technical} onChange={(value) => onFilterChange("technical", value)} options={TECHNICAL_OPTIONS} />
+          <SelectField label="排行口径" value={filters.rank_by} onChange={(value) => onFilterChange("rank_by", value)} options={RANK_OPTIONS} />
           <TextField label="数量上限" type="number" value={filters.limit} onChange={(value) => onFilterChange("limit", value)} />
           <button className="primary-button" type="button" onClick={onRun} disabled={busy}>
             <Filter size={17} /> 筛选股票
@@ -500,14 +1053,158 @@ function ScreenerPanel({ filters, results, busy, onFilterChange, onRun, onSelect
           <SummaryCell label="已同步基本面" value={syncedCount} />
           <SummaryCell label="综合较强" value={strongCount} />
         </div>
-        <CandidateCards results={results} onSelect={onSelect} />
+        <QualityLeaderboard results={results} onSelect={onSelect} />
+        <ResearchPoolConsole
+          pools={pools}
+          activePool={activePool}
+          activePoolId={activePoolId}
+          results={results}
+          busy={busy}
+          marketBusy={marketBusy}
+          onPoolSelect={onPoolSelect}
+          onCreatePool={onCreatePool}
+          onDeletePool={onDeletePool}
+          onAddToPool={onAddToPool}
+          onAddResultsToPool={onAddResultsToPool}
+          onRemoveFromPool={onRemoveFromPool}
+          onRunPoolBacktest={onRunPoolBacktest}
+        />
+        <CandidateCards results={results} activePool={activePool} activePoolMemberCodes={activePoolMemberCodes} onSelect={onSelect} onAddToPool={onAddToPool} busy={busy} />
       </section>
-      <NewsPulsePanel items={newsItems} busy={busy} onRefresh={onRefreshNews} />
+      <NewsPulsePanel items={newsItems} message={newsMessage} busy={busy} onRefresh={onRefreshNews} />
     </section>
   );
 }
 
-function CandidateCards({ results, onSelect }) {
+function ResearchPoolConsole({
+  pools,
+  activePool,
+  activePoolId,
+  results,
+  busy,
+  marketBusy,
+  onPoolSelect,
+  onCreatePool,
+  onDeletePool,
+  onAddToPool,
+  onAddResultsToPool,
+  onRemoveFromPool,
+  onRunPoolBacktest,
+}) {
+  const [poolName, setPoolName] = useState("");
+  const [manualCodes, setManualCodes] = useState("");
+  const members = activePool?.members || [];
+  const canUsePool = Boolean(activePoolId);
+
+  async function submitPool() {
+    const name = poolName.trim();
+    if (!name) return;
+    await onCreatePool(name);
+    setPoolName("");
+  }
+
+  async function submitMembers() {
+    const codes = parseStockCodes(manualCodes);
+    if (!codes.length) return;
+    await onAddToPool(codes);
+    setManualCodes("");
+  }
+
+  return (
+    <section className="pool-console" aria-label="自选标的池">
+      <div className="pool-head">
+        <PanelTitle icon={<Layers3 size={17} />} title="自选标的池" right={activePool ? `${members.length} 只` : "未选择"} />
+        <div className="pool-actions">
+          <button className="ghost-button" type="button" onClick={onAddResultsToPool} disabled={!canUsePool || busy || !results.length}>
+            <Plus size={15} /> 候选入池
+          </button>
+          <button className="primary-button" type="button" onClick={onRunPoolBacktest} disabled={!canUsePool || !members.length || busy || marketBusy}>
+            <Play size={15} /> 验证池子
+          </button>
+        </div>
+      </div>
+      <div className="pool-form-grid">
+        <label className="field">
+          当前池
+          <select value={pools.length ? activePoolId || "" : ""} onChange={(event) => onPoolSelect(event.target.value)} disabled={!pools.length}>
+            {pools.length ? (
+              pools.map((pool) => (
+                <option key={pool.id} value={pool.id}>
+                  {pool.name}（{pool.member_count}）
+                </option>
+              ))
+            ) : (
+              <option value="">暂无池子</option>
+            )}
+          </select>
+        </label>
+        <label className="field">
+          新建池
+          <span className="inline-field">
+            <input value={poolName} placeholder="低估值反转、半导体趋势..." onChange={(event) => setPoolName(event.target.value)} />
+            <button className="icon-button" type="button" onClick={submitPool} disabled={busy || !poolName.trim()} title="新建标的池">
+              <FolderPlus size={16} />
+            </button>
+          </span>
+        </label>
+        <label className="field">
+          手动加标的
+          <span className="inline-field">
+            <input value={manualCodes} placeholder="600703.SH, 002594.SZ" onChange={(event) => setManualCodes(event.target.value)} />
+            <button className="icon-button" type="button" onClick={submitMembers} disabled={!canUsePool || busy || !manualCodes.trim()} title="加入当前池">
+              <Plus size={16} />
+            </button>
+          </span>
+        </label>
+        <button className="ghost-button danger-action" type="button" onClick={onDeletePool} disabled={!canUsePool || busy}>
+          <Trash2 size={15} /> 删除池
+        </button>
+      </div>
+      <div className="pool-member-strip">
+        {members.length ? (
+          members.map((stock) => (
+            <button key={stock.ts_code} className="pool-member-chip" type="button" onClick={() => onRemoveFromPool(stock.ts_code)} disabled={busy} title="从当前池移除">
+              <strong>{stock.ts_code}</strong>
+              <span>{stock.name}</span>
+              <Trash2 size={13} />
+            </button>
+          ))
+        ) : (
+          <span className="pool-empty">当前池暂无标的</span>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function QualityLeaderboard({ results, onSelect }) {
+  const leaders = useMemo(
+    () => [...results].sort((a, b) => (b.fundamental_score || 0) - (a.fundamental_score || 0)).slice(0, 5),
+    [results],
+  );
+  if (!leaders.length) return null;
+  return (
+    <section className="quality-board" aria-label="基本面质量排行榜">
+      <div className="quality-board-head">
+        <PanelTitle icon={<ShieldCheck size={17} />} title="基本面质量榜" right="非投资建议" />
+        <span>盈利、成长、负债、估值、流动性五维评分</span>
+      </div>
+      <div className="quality-rank-grid">
+        {leaders.map((stock, index) => (
+          <button key={stock.ts_code} className="quality-rank-card" type="button" onClick={() => onSelect(stock, true)}>
+            <em>#{index + 1}</em>
+            <strong>{stock.name}</strong>
+            <span>{stock.ts_code}</span>
+            <b className={fundamentalGradeClass(stock.fundamental_grade)}>{stock.fundamental_grade || "待同步"}</b>
+            <i>{stock.fundamental_score || 0}</i>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CandidateCards({ results, activePool, activePoolMemberCodes, onSelect, onAddToPool, busy }) {
   if (!results.length) {
     return <div className="empty-state tall">暂无候选</div>;
   }
@@ -533,6 +1230,10 @@ function CandidateCards({ results, onSelect }) {
               <ScoreBar label="技术" value={stock.technical_score || 0} />
               <ScoreBar label="基本面" value={stock.fundamental_score || 0} />
             </div>
+            <div className="quality-line">
+              <span className={fundamentalGradeClass(stock.fundamental_grade)}>{stock.fundamental_grade || "待同步"}</span>
+              <QualityBreakdown breakdown={stock.fundamental_breakdown} />
+            </div>
             <div className="factor-mini-grid">
               <FactorMini label="PE(TTM)" value={formatNumber(valuation.PE_TTM)} />
               <FactorMini label="PB" value={formatNumber(valuation.PB)} />
@@ -552,9 +1253,14 @@ function CandidateCards({ results, onSelect }) {
               <span>
                 {stock.latest_date || "无日期"} · {formatMoney(stock.close)} · {formatPercentPoint(stock.pct_chg)}
               </span>
-              <button className="row-button" type="button" onClick={() => onSelect(stock, true)}>
-                载入策略
-              </button>
+              <div className="candidate-actions">
+                <button className="row-button" type="button" onClick={() => onAddToPool([stock.ts_code])} disabled={!activePool || activePoolMemberCodes.has(stock.ts_code) || busy}>
+                  {activePoolMemberCodes.has(stock.ts_code) ? "已入池" : "入池"}
+                </button>
+                <button className="row-button" type="button" onClick={() => onSelect(stock, true)}>
+                  载入策略
+                </button>
+              </div>
             </div>
           </article>
         );
@@ -563,13 +1269,14 @@ function CandidateCards({ results, onSelect }) {
   );
 }
 
-function NewsPulsePanel({ items, busy, onRefresh }) {
+function NewsPulsePanel({ items, message, busy, onRefresh }) {
   return (
     <section className="workspace-panel news-panel">
       <PanelTitle icon={<Activity size={17} />} title="消息面" right={items.length ? `${items.length} 条` : "未刷新"} />
       <button className="ghost-button wide-action" type="button" onClick={() => onRefresh()} disabled={busy}>
         <RefreshCw size={16} /> 刷新财联社/见闻/雪球
       </button>
+      {message ? <div className="news-note">{message}</div> : null}
       {items.length ? (
         <div className="news-list">
           {items.map((item) => (
@@ -582,7 +1289,7 @@ function NewsPulsePanel({ items, busy, onRefresh }) {
           ))}
         </div>
       ) : (
-        <div className="news-empty">暂无真实消息面数据</div>
+        <div className="news-empty">{message || "暂无真实消息面数据"}</div>
       )}
     </section>
   );
@@ -608,6 +1315,21 @@ function ScoreBar({ label, value }) {
   );
 }
 
+function QualityBreakdown({ breakdown }) {
+  const entries = Object.entries(breakdown || {}).slice(0, 5);
+  if (!entries.length) return <em className="quality-empty">等待基本面</em>;
+  return (
+    <div className="quality-breakdown">
+      {entries.map(([label, value]) => (
+        <span key={label}>
+          {label}
+          <strong>{value}</strong>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function FactorMini({ label, value }) {
   return (
     <span>
@@ -617,7 +1339,7 @@ function FactorMini({ label, value }) {
   );
 }
 
-function StrategyPanel({ form, metrics, rows, trades, result, onChange, onPreset, onRun, busy }) {
+function StrategyPanel({ form, metrics, rows, trades, result, marketResult, marketJob, onChange, onPreset, onRun, onSingleRun, busy, marketBusy = false }) {
   return (
     <section className="strategy-layout">
       <section className="workspace-panel">
@@ -692,16 +1414,572 @@ function StrategyPanel({ form, metrics, rows, trades, result, onChange, onPreset
             <ToggleField label="MACD需在零轴上" checked={form.macdRequireZeroAxis} onChange={(value) => onChange("macdRequireZeroAxis", value)} />
             <ToggleField label="RSI过滤" checked={form.useRsiFilter} onChange={(value) => onChange("useRsiFilter", value)} />
           </div>
-          <button className="primary-button wide-action" type="button" onClick={onRun} disabled={busy}>
-            <Play size={17} /> 回测并生成DeepSeek评价
-          </button>
+          <div className="action-pair">
+            <button className="primary-button wide-action" type="button" onClick={onRun} disabled={busy || marketBusy}>
+              <Play size={17} /> {marketBusy ? "验证中..." : "全市场验证"}
+            </button>
+            <button className="ghost-button wide-action" type="button" onClick={onSingleRun} disabled={busy}>
+              <Bot size={16} /> 单票AI复盘
+            </button>
+          </div>
         </section>
       </section>
+
+      <MarketBacktestPanel result={marketResult} job={marketJob} />
 
       <section className="workspace-panel">
         <PanelTitle icon={<Activity size={17} />} title="交易流水" right={result ? `${result.trades.length} 笔` : "0 笔"} />
         <TradeTable trades={result?.trades || []} />
       </section>
+    </section>
+  );
+}
+
+function QuantCommandCenter({
+  researchRuns,
+  selectedResearchRunId,
+  researchRun,
+  researchRunError,
+  baselineRunId,
+  onResearchRunChange,
+  onRefreshResearchRuns,
+  onLoadBaseline,
+  busy,
+}) {
+  const run = researchRun;
+  const metrics = run?.metrics || {};
+  const allTrades = run?.allTrades?.length ? run.allTrades : run?.recentTrades || [];
+  const completedTrades = run?.completedTrades || [];
+  const headline = run?.strategy?.label || run?.label || "研究运行全景";
+  const verdict = buildResearchRunVerdict(run, researchRunError);
+  const target = getResearchTarget(run);
+  const targetPassed = researchTargetPassed(run);
+  const statusLabel = run?.spec?.statusTier || (!targetPassed && run ? "观察" : run?.status || "--");
+  const evidenceLine = run
+    ? `${run.runId} · ${run.resultFiles?.results || "docs/research/runs/.../results.json"}`
+    : researchRunError || "正在读取 docs/research/runs/ 下的研究运行证据。";
+
+  return (
+    <section className="quant-layout">
+      <section className="workspace-panel quant-hero">
+        <div>
+          <p className="eyebrow">Tab2 Research Run Panorama</p>
+          <h2>{headline}</h2>
+          <strong>{verdict}</strong>
+          <span>{evidenceLine}</span>
+        </div>
+        <div className="quant-hero-actions">
+          <label className="quant-strategy-select">
+            研究运行
+            <select value={selectedResearchRunId || run?.runId || ""} onChange={(event) => onResearchRunChange(event.target.value)} disabled={!researchRuns.length || busy}>
+              {researchRuns.length ? (
+                researchRuns.map((item) => (
+                  <option key={item.runId} value={item.runId}>
+                    {item.runId} · {item.label}
+                  </option>
+                ))
+              ) : (
+                <option value="">暂无可读运行</option>
+              )}
+            </select>
+          </label>
+          <button className="ghost-button" type="button" onClick={onRefreshResearchRuns} disabled={busy}>
+            <RefreshCw size={16} /> 刷新运行目录
+          </button>
+          <button className="ghost-button" type="button" onClick={onLoadBaseline} disabled={busy || !baselineRunId}>
+            <ShieldCheck size={16} /> 固化基线证据
+          </button>
+        </div>
+      </section>
+
+      <section className="metric-grid quant-metrics">
+        <MetricTile label="策略状态" value={statusLabel} tone={targetPassed ? "good" : "neutral"} sub={verdict} />
+        <MetricTile label="年化收益" value={formatPercent(metrics.annualizedReturn, 2)} tone={targetPassed ? "good" : "bad"} sub={`目标 ${formatPercent(target.annualized, 0)} / 三年 ${formatPercent(metrics.totalReturn, 2)}`} />
+        <MetricTile label="最大回撤" value={formatPercent(metrics.maxDrawdown, 2)} tone={metrics.maxDrawdown >= -0.1 ? "good" : "bad"} sub={`Calmar ${formatNumber(metrics.calmarRatio)}`} />
+        <MetricTile label="盈亏比" value={metrics.profitLossRatio == null ? "n/a" : `${formatNumber(metrics.profitLossRatio)}:1`} tone={metrics.profitLossRatio >= 2 ? "good" : "bad"} sub={`胜率 ${formatPercent(metrics.winRate, 1)}`} />
+        <MetricTile label="尾部风险" value={formatPercent(metrics.tailWorstReturn, 2)} tone={metrics.tailWorstReturn >= -0.1 ? "good" : "bad"} sub={`资本尾部 ${formatPercent(metrics.tailBottomPortfolioImpactPct, 2)}`} />
+        <MetricTile label="样本规模" value={formatInteger(metrics.completedTradeCount)} tone="neutral" sub={`动作 ${formatInteger(allTrades.length)}`} />
+      </section>
+
+      <div className="quant-main-grid">
+        <QuantFocusBoard run={run} />
+        <QuantGateBoard run={run} />
+      </div>
+
+      <QuantImageBoard run={run} />
+
+      <BaselineResultCoverage baseline={run} />
+
+      <BaselineFullBacktestBoard baseline={run} />
+
+      <section className="quant-ledger-grid">
+        <section className="workspace-panel">
+          <PanelTitle icon={<Activity size={17} />} title="研究运行交易动作" right={`${allTrades.length} 笔`} />
+          <TradeTable trades={allTrades} />
+        </section>
+        <CompletedTradeTable rows={completedTrades} />
+      </section>
+    </section>
+  );
+}
+
+function buildResearchRunVerdict(run, error) {
+  if (error) return "研究运行读取失败";
+  if (!run) return "等待研究运行证据";
+  const target = getResearchTarget(run);
+  const targetPassed = researchTargetPassed(run);
+  if (run.metrics?.strictTargetMet && targetPassed) return "严格目标已通过，进入复核视角";
+  if (run.metrics?.targetMet && targetPassed) return "硬门槛已通过，诊断项继续审计";
+  if (isFiniteNumber(run.metrics?.annualizedReturn) && !targetPassed) return `低于年化 ${formatPercent(target.annualized, 0)} 合格线，保留观察`;
+  if (run.spec?.statusTier) return `${run.spec.statusTier}级证据`;
+  if (run.status && run.status !== "completed") return `运行状态：${run.status}`;
+  return "未达硬门槛，保留为研究证据";
+}
+
+function getResearchTarget(run) {
+  const qualification = run?.spec?.qualificationObjective || {};
+  const annualized = Number(run?.metrics?.targetAnnualizedReturn ?? qualification.targetAnnualizedReturn ?? 0.3);
+  const total = Number(run?.metrics?.targetTotalReturn ?? qualification.targetTotalReturnOver3Years ?? (Math.pow(1 + annualized, 3) - 1));
+  return { annualized, total };
+}
+
+function researchTargetPassed(run) {
+  const metrics = run?.metrics || {};
+  const target = getResearchTarget(run);
+  if (!isFiniteNumber(metrics.annualizedReturn)) {
+    return Boolean(metrics.targetMet);
+  }
+  return metrics.annualizedReturn >= target.annualized;
+}
+
+function QuantFocusBoard({ run }) {
+  const spec = run?.spec || {};
+  const strategy = run?.strategy || {};
+  const capital = spec.capital || {};
+  const costs = spec.costs || {};
+  const entry = spec.entry || {};
+  const exit = spec.exit || {};
+  const universe = spec.universe || {};
+  const entryRisk = entry.entryRiskFilter || {};
+  const focusItems = [
+    {
+      label: "研究假设",
+      value: strategy.name || strategy.label || run?.runId || "--",
+      detail: strategy.hypothesis || "该运行未写入 hypothesis 字段，详情可回看 run 目录文档。",
+    },
+    {
+      label: "入场结构",
+      value: entry.entryMode || "未标注",
+      detail: `评分 ${entry.entryScoreMode || "--"}；趋势过滤 ${entry.useTrendFilter ? "开" : "关"}，MACD ${entry.useMacdFilter ? "开" : "关"}，RSI ${entry.useRsiFilter ? "开" : "关"}。`,
+    },
+    {
+      label: "执行压力",
+      value: `买 ${formatPercent(costs.buySlippagePct, 2)} / 卖 ${formatPercent(costs.sellSlippagePct, 2)}`,
+      detail: `跳空止损按开盘成交：${exit.stopGapFillAtOpen ? "是" : "否"}；跌停延迟：${exit.limitDownStopDelay ? "是" : "否"}。`,
+    },
+    {
+      label: "风险与样本",
+      value: `${formatPercent(capital.maxSinglePositionPct, 1)} 单票 / ${formatPercent(capital.riskPct, 1)} 风险`,
+      detail: `入场振幅上限 ${formatPercent(entryRisk.maxEntryRangePct, 1)}；上市 ${formatInteger(universe.minListDays)} 天以上，最少 ${formatInteger(universe.minBars)} 根日线。`,
+    },
+    {
+      label: "退出纪律",
+      value: `${formatPercent(exit.stopLossPct, 1)} 止损`,
+      detail: `第一止盈 ${formatPercent(exit.takeProfit1Pct, 1)}，第二止盈 ${formatPercent(exit.takeProfit2Pct, 1)}；缺口冷却 ${formatInteger(exit.gapStopMarketCooldownDays)} 日。`,
+    },
+    {
+      label: "证据链",
+      value: run?.sourceRun || "独立运行",
+      detail: run?.resultFiles?.review ? `复盘文件：${run.resultFiles.review}` : "该运行暂未提供 review.md。",
+    },
+  ];
+
+  return (
+    <section className="workspace-panel">
+      <PanelTitle icon={<ShieldCheck size={17} />} title="运行证据侧重点" right={run?.runId || "docs/research/runs"} />
+      <div className="quant-focus-grid">
+        {focusItems.map((item) => (
+          <article key={item.label} className="quant-focus-card">
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <em>{item.detail}</em>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function QuantGateBoard({ run }) {
+  const metrics = run?.metrics || {};
+  const objective = run?.objectiveGates || {};
+  const diagnostic = run?.diagnosticGates || {};
+  const entries = Object.entries({ ...objective, ...diagnostic });
+  const target = getResearchTarget(run);
+  const targetPassed = researchTargetPassed(run);
+  const gates = [
+    ["年化", `≥${formatPercent(target.annualized, 0)}`, formatPercent(metrics.annualizedReturn, 2), targetPassed],
+    ["总收益", `三年 ≥${formatPercent(target.total, 0)}`, formatPercent(metrics.totalReturn, 2), isFiniteNumber(metrics.totalReturn) && metrics.totalReturn >= target.total],
+    ["盈亏比", "≥2:1", metrics.profitLossRatio == null ? "n/a" : formatNumber(metrics.profitLossRatio), metrics.profitLossRatio >= 2],
+    ["回撤", "最大回撤 ≥-10%", formatPercent(metrics.maxDrawdown, 2), metrics.maxDrawdown >= -0.1],
+    ["尾部", "后10亏损 ≥-10%", formatPercent(metrics.tailWorstReturn, 2), metrics.tailWorstReturn >= -0.1],
+    ["交易", "样本 ≥30", formatInteger(metrics.completedTradeCount), metrics.completedTradeCount >= 30],
+  ];
+  return (
+    <section className="workspace-panel">
+      <PanelTitle icon={<CheckCircle2 size={17} />} title="研究门槛审计" right={metrics.strictTargetMet && targetPassed ? "严格通过" : targetPassed ? "目标通过" : "未通过"} />
+      <div className="quant-gate-stack">
+        {gates.map(([label, target, value, passed]) => (
+          <span key={label} className={passed ? "pass" : "fail"}>
+            <em>{label}</em>
+            <strong>{value}</strong>
+            <b>{target}</b>
+          </span>
+        ))}
+      </div>
+      <div className="gate-grid diagnostic">
+        {entries.length ? (
+          entries.map(([key, value]) => (
+            <Fragment key={key}>
+              <GatePill label={key} value={value} />
+            </Fragment>
+          ))
+        ) : (
+          <span className="empty-state">等待 objectiveGates / diagnosticGates</span>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function QuantImageBoard({ run }) {
+  const rows = run?.symbolAuditRows || run?.symbolAudit?.rows || [];
+  const distributionLabel = rows.length ? `${rows.length} 个成交标的` : "等待运行证据";
+  return (
+    <section className="quant-image-grid">
+      <section className="workspace-panel quant-image-wide">
+        <PanelTitle icon={<LineChart size={17} />} title="组合权益与回撤" right={`${run?.equityCurve?.length || 0} 个交易日`} />
+        <PortfolioEquityChart points={run?.equityCurve || []} />
+      </section>
+      <section className="workspace-panel">
+        <PanelTitle icon={<BarChart3 size={17} />} title="成交标的收益分布" right={distributionLabel} />
+        <ReturnDistributionSvg rows={rows} />
+      </section>
+      <section className="workspace-panel">
+        <PanelTitle icon={<Gauge size={17} />} title="收益-回撤散点" right="成交标的审计" />
+        <RiskScatterSvg rows={rows} />
+      </section>
+      <section className="workspace-panel quant-image-wide">
+        <PanelTitle icon={<TrendingUp size={17} />} title="收益排名曲线" right={rows.length ? "从弱到强" : "等待运行证据"} />
+        <RankedReturnSvg rows={rows} />
+      </section>
+    </section>
+  );
+}
+
+function BaselineResultCoverage({ baseline }) {
+  if (!baseline) return null;
+  const counts = baseline.resultCounts || {};
+  const spec = baseline.spec || {};
+  const window = spec.window || {};
+  const files = baseline.resultFiles || {};
+  const items = [
+    ["权益图像", formatInteger(counts.equityDays), "组合权益/回撤完整交易日"],
+    ["交易动作", formatInteger(counts.tradeActions), "买入、减仓、卖出全量流水"],
+    ["完成交易", formatInteger(counts.completedTrades), "全部已平仓交易"],
+    ["标的审计", formatInteger(counts.symbolAuditRows), "成交标的逐票收益、回撤、盈亏比"],
+    ["最终持仓", formatInteger(counts.finalPositions), "回测结束仍未平仓持仓"],
+    ["验证窗口", `${window.startDate || "--"} / ${window.endDate || "--"}`, "三年全市场复核口径"],
+  ];
+  return (
+    <section className="workspace-panel quant-coverage-panel">
+      <PanelTitle icon={<Database size={17} />} title="回测结果覆盖" right={baseline.runId || "等待证据"} />
+      <div className="quant-coverage-grid">
+        {items.map(([label, value, detail]) => (
+          <span key={label} className="quant-coverage-item">
+            <em>{label}</em>
+            <strong>{value}</strong>
+            <b>{detail}</b>
+          </span>
+        ))}
+      </div>
+      <div className="quant-file-strip">
+        <span>
+          证据 run <strong>{baseline.runId || "--"}</strong>
+        </span>
+        <span>
+          来源 run <strong>{spec.sourceEvidenceRun || "--"}</strong>
+        </span>
+        <span>
+          结果文件 <code>{files.results || "docs/research/runs/.../results.json"}</code>
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function ReturnDistributionSvg({ rows }) {
+  const values = rows.map((item) => Number(item.totalReturn)).filter((value) => Number.isFinite(value));
+  if (!values.length) return <div className="quant-image-empty">运行全市场验证后显示全量收益分布</div>;
+  const binCount = 18;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 0.01;
+  const bins = Array.from({ length: binCount }, () => 0);
+  values.forEach((value) => {
+    const index = Math.min(binCount - 1, Math.max(0, Math.floor(((value - min) / span) * binCount)));
+    bins[index] += 1;
+  });
+  const maxCount = Math.max(...bins, 1);
+  const width = 720;
+  const height = 260;
+  const gutter = 28;
+  const barGap = 4;
+  const barWidth = (width - gutter * 2) / binCount - barGap;
+  return (
+    <svg className="quant-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="全量收益分布">
+      <line x1={gutter} y1={height - gutter} x2={width - gutter} y2={height - gutter} />
+      {bins.map((count, index) => {
+        const x = gutter + index * (barWidth + barGap);
+        const barHeight = ((height - gutter * 2) * count) / maxCount;
+        const centerReturn = min + (span * (index + 0.5)) / binCount;
+        return <rect key={index} x={x} y={height - gutter - barHeight} width={barWidth} height={barHeight} className={centerReturn >= 0 ? "good" : "bad"} rx="2" />;
+      })}
+      <text x={gutter} y={height - 6}>{formatPercent(min, 0)}</text>
+      <text x={width - gutter - 46} y={height - 6}>{formatPercent(max, 0)}</text>
+    </svg>
+  );
+}
+
+function RiskScatterSvg({ rows }) {
+  const points = rows
+    .map((item) => ({ code: item.ts_code, r: Number(item.totalReturn), d: Number(item.maxDrawdown) }))
+    .filter((item) => Number.isFinite(item.r) && Number.isFinite(item.d));
+  if (!points.length) return <div className="quant-image-empty">运行全市场验证后显示收益-回撤散点</div>;
+  const width = 720;
+  const height = 260;
+  const gutter = 28;
+  const minReturn = Math.min(...points.map((item) => item.r));
+  const maxReturn = Math.max(...points.map((item) => item.r));
+  const minDrawdown = Math.min(...points.map((item) => item.d));
+  const xSpan = maxReturn - minReturn || 0.01;
+  const ySpan = 0 - minDrawdown || 0.01;
+  const zeroX = gutter + ((0 - minReturn) / xSpan) * (width - gutter * 2);
+  const targetY = gutter + ((0 - -0.1) / ySpan) * (height - gutter * 2);
+  return (
+    <svg className="quant-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="全量收益和最大回撤散点">
+      <line x1={gutter} y1={height - gutter} x2={width - gutter} y2={height - gutter} />
+      <line x1={gutter} y1={gutter} x2={gutter} y2={height - gutter} />
+      {zeroX > gutter && zeroX < width - gutter ? <line className="axis-soft" x1={zeroX} y1={gutter} x2={zeroX} y2={height - gutter} /> : null}
+      {targetY > gutter && targetY < height - gutter ? <line className="axis-warn" x1={gutter} y1={targetY} x2={width - gutter} y2={targetY} /> : null}
+      {points.map((point) => {
+        const x = gutter + ((point.r - minReturn) / xSpan) * (width - gutter * 2);
+        const y = gutter + ((0 - point.d) / ySpan) * (height - gutter * 2);
+        return <circle key={point.code} cx={x} cy={y} r="2.1" className={point.r >= 0 ? "good" : "bad"} />;
+      })}
+      <text x={gutter} y={height - 6}>{formatPercent(minReturn, 0)}</text>
+      <text x={width - gutter - 46} y={height - 6}>{formatPercent(maxReturn, 0)}</text>
+      <text x={gutter + 4} y={gutter - 8}>回撤</text>
+    </svg>
+  );
+}
+
+function RankedReturnSvg({ rows }) {
+  const values = rows.map((item) => Number(item.totalReturn)).filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
+  if (!values.length) return <div className="quant-image-empty">等待全市场验证结果</div>;
+  const width = 920;
+  const height = 260;
+  const gutter = 30;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 0.01;
+  const points = values
+    .map((value, index) => {
+      const x = gutter + (index / Math.max(values.length - 1, 1)) * (width - gutter * 2);
+      const y = height - gutter - ((value - min) / span) * (height - gutter * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const zeroY = height - gutter - ((0 - min) / span) * (height - gutter * 2);
+  return (
+    <svg className="quant-svg wide" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="全量收益排名曲线">
+      <line x1={gutter} y1={height - gutter} x2={width - gutter} y2={height - gutter} />
+      {zeroY > gutter && zeroY < height - gutter ? <line className="axis-soft" x1={gutter} y1={zeroY} x2={width - gutter} y2={zeroY} /> : null}
+      <polyline points={points} />
+      <text x={gutter} y={height - 6}>{formatPercent(min, 0)}</text>
+      <text x={width - gutter - 46} y={height - 6}>{formatPercent(max, 0)}</text>
+    </svg>
+  );
+}
+
+function BaselineFullBacktestBoard({ baseline }) {
+  if (!baseline) return null;
+  const rows = baseline.symbolAuditRows || baseline.symbolAudit?.rows || [];
+  const summary = baseline.summary || {};
+  const counts = baseline.resultCounts || {};
+  const capitalTail = baseline.tailCapitalRisk || baseline.symbolAudit?.tailCapitalRisk || {};
+  return (
+    <section className="quant-baseline-result-grid">
+      <section className="workspace-panel quant-baseline-full">
+        <PanelTitle icon={<Database size={17} />} title="研究运行标的审计" right={rows.length ? `${rows.length} 个成交标的` : "等待运行"} />
+        <div className="market-summary quant-summary">
+          <SummaryCell label="初始资金" value={formatMoney(summary.initialCash)} />
+          <SummaryCell label="最终权益" value={formatMoney(summary.finalEquity)} />
+          <SummaryCell label="全量动作" value={formatInteger(counts.tradeActions ?? baseline.allTrades?.length)} />
+          <SummaryCell label="完成交易" value={formatInteger(counts.completedTrades ?? baseline.completedTrades?.length)} />
+          <SummaryCell label="尾部资本最差" value={formatPercent(capitalTail.worstPortfolioImpactPct, 2)} />
+          <SummaryCell label="尾部资本合计" value={formatPercent(capitalTail.totalBottomPortfolioImpactPct, 2)} />
+        </div>
+        <div className="quant-panel-actions">
+          <button className="ghost-button export-button" type="button" onClick={() => downloadJson(baseline, `research-run-${baseline.runId || "latest"}`)}>
+            <Download size={16} /> 导出研究运行JSON
+          </button>
+        </div>
+        <div className="market-job-note">这里展示研究运行产生的全部成交标的审计；下方交易流水保留每一笔买入、减仓和卖出动作。</div>
+        <div className="table-wrap quant-full-result-table">
+          <table>
+            <thead>
+              <tr>
+                <th>排名</th>
+                <th>代码</th>
+                <th>名称</th>
+                <th>行业</th>
+                <th>收益</th>
+                <th>资本收益</th>
+                <th>组合影响</th>
+                <th>净盈亏</th>
+                <th>回撤</th>
+                <th>盈亏比</th>
+                <th>胜率</th>
+                <th>交易</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length ? (
+                rows.map((item, index) => (
+                  <tr key={item.ts_code}>
+                    <td>{index + 1}</td>
+                    <td>{item.ts_code}</td>
+                    <td>{item.name || "--"}</td>
+                    <td>{item.industry || "--"}</td>
+                    <td className={item.totalReturn >= 0 ? "positive" : "negative"}>{formatPercent(item.totalReturn, 2)}</td>
+                    <td className={item.capitalReturnPct >= 0 ? "positive" : "negative"}>{formatPercent(item.capitalReturnPct, 2)}</td>
+                    <td className={item.portfolioImpactPct >= 0 ? "positive" : "negative"}>{formatPercent(item.portfolioImpactPct, 2)}</td>
+                    <td className={item.netPnl >= 0 ? "positive" : "negative"}>{formatMoney(item.netPnl)}</td>
+                    <td>{formatPercent(item.maxDrawdown, 2)}</td>
+                    <td>{item.profitLossRatio == null ? "n/a" : `${formatNumber(item.profitLossRatio)}:1`}</td>
+                    <td>{formatPercent(item.winRate, 1)}</td>
+                    <td>{formatInteger(item.completedTrades ?? item.tradeCount)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="12" className="empty-state">等待组合基线全量结果</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <FinalPositionTable rows={baseline.finalPositions || []} />
+    </section>
+  );
+}
+
+function FinalPositionTable({ rows }) {
+  return (
+    <section className="workspace-panel">
+      <PanelTitle icon={<Layers3 size={17} />} title="最终持仓" right={rows.length ? `${rows.length} 个` : "已清仓"} />
+      <div className="table-wrap quant-position-table">
+        <table>
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th>行业</th>
+              <th>入场</th>
+              <th>入场价</th>
+              <th>最新价</th>
+              <th>止损</th>
+              <th>数量</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? (
+              rows.map((position) => (
+                <tr key={position.ts_code}>
+                  <td>{position.ts_code}</td>
+                  <td>{position.name || "--"}</td>
+                  <td>{position.industry || "--"}</td>
+                  <td>{position.entryDate || "--"}</td>
+                  <td>{formatMoney(position.entryPrice)}</td>
+                  <td>{formatMoney(position.lastPrice)}</td>
+                  <td>{formatMoney(position.stopPrice)}</td>
+                  <td>{formatInteger(position.shares)}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="8" className="empty-state">组合回测结束时无未平仓持仓</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function CompletedTradeTable({ rows }) {
+  return (
+    <section className="workspace-panel">
+      <PanelTitle icon={<CheckCircle2 size={17} />} title="全量完成交易" right={`${rows.length} 笔`} />
+      <div className="table-wrap quant-completed-table">
+        <table>
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th>入场</th>
+              <th>出场</th>
+              <th>入场价</th>
+              <th>出场价</th>
+              <th>净收益</th>
+              <th>末次价差</th>
+              <th>资本收益</th>
+              <th>组合影响</th>
+              <th>净盈亏</th>
+              <th>原因</th>
+              <th>成交规则</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? (
+              rows.map((trade, index) => (
+                <tr key={`${trade.ts_code}-${trade.entryDate}-${trade.exitDate}-${index}`}>
+                  <td>{trade.ts_code}</td>
+                  <td>{trade.name || "--"}</td>
+                  <td>{trade.entryDate}</td>
+                  <td>{trade.exitDate}</td>
+                  <td>{formatMoney(trade.entryPrice)}</td>
+                  <td>{formatMoney(trade.exitPrice)}</td>
+                  <td className={trade.returnPct >= 0 ? "positive" : "negative"}>{formatPercent(trade.returnPct, 2)}</td>
+                  <td className={(trade.exitPriceReturnPct ?? trade.returnPct) >= 0 ? "positive" : "negative"}>{formatPercent(trade.exitPriceReturnPct ?? trade.returnPct, 2)}</td>
+                  <td className={trade.capitalReturnPct >= 0 ? "positive" : "negative"}>{formatPercent(trade.capitalReturnPct, 2)}</td>
+                  <td className={trade.pnlPctOfEntryEquity >= 0 ? "positive" : "negative"}>{formatPercent(trade.pnlPctOfEntryEquity, 2)}</td>
+                  <td className={trade.netPnl >= 0 ? "positive" : "negative"}>{formatMoney(trade.netPnl)}</td>
+                  <td>{trade.exitReason || "--"}</td>
+                  <td>{trade.exitPriceRule || "--"}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="13" className="empty-state">暂无完成交易</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -766,6 +2044,418 @@ function ReviewPanel({ result, rows, symbolTitle }) {
   );
 }
 
+function BaselineStrategyPanel({ data, error, onReload, busy }) {
+  if (!data) {
+    return (
+      <section className="workspace-panel baseline-empty-panel">
+        <PanelTitle icon={<ShieldCheck size={17} />} title="组合基线" right="cross-section-strength-risk8" />
+        <div className="empty-state tall">
+          <button className="primary-button" type="button" onClick={onReload} disabled={busy}>
+            <RefreshCw size={17} /> 载入策略基线
+          </button>
+          {error ? <p className="llm-warning">{error}</p> : null}
+        </div>
+      </section>
+    );
+  }
+
+  const metrics = data.metrics || {};
+  const ai = data.aiAnalysis || {};
+  const spec = data.spec || {};
+  const capital = spec.capital || {};
+  const entry = spec.entry || {};
+  const exit = spec.exit || {};
+  const robustness = data.robustness || {};
+  const target = getResearchTarget(data);
+  const targetPassed = researchTargetPassed(data);
+  return (
+    <section className="baseline-layout">
+      <section className="workspace-panel baseline-hero">
+        <div>
+          <p className="eyebrow">Observation Candidate Baseline</p>
+          <h2>{data.label}</h2>
+          <strong>{ai.verdict || "等待分析"}</strong>
+          <span>{data.runId}</span>
+        </div>
+        <div className="baseline-score">
+          <span>{ai.score ?? "--"}</span>
+          <em>AI审查分</em>
+        </div>
+      </section>
+
+      <section className="metric-grid baseline-metrics">
+        <MetricTile label="总收益" value={formatPercent(metrics.totalReturn, 2)} tone={isFiniteNumber(metrics.totalReturn) && metrics.totalReturn >= target.total ? "good" : "bad"} sub={`三年目标 ${formatPercent(target.total, 0)}`} />
+        <MetricTile label="年化" value={formatPercent(metrics.annualizedReturn, 2)} tone={targetPassed ? "good" : "bad"} sub={`目标 ${formatPercent(target.annualized, 0)}`} />
+        <MetricTile label="最大回撤" value={formatPercent(metrics.maxDrawdown, 2)} tone="good" sub="目标 ≤10%" />
+        <MetricTile label="盈亏比" value={`${formatNumber(metrics.profitLossRatio)}:1`} tone="good" sub={`PF ${formatNumber(metrics.profitFactor)}`} />
+        <MetricTile label="完成交易" value={formatInteger(metrics.completedTradeCount)} tone="neutral" sub={`${formatInteger(metrics.tradeCount)} 个动作`} />
+        <MetricTile label="尾部亏损" value={formatPercent(metrics.tailWorstReturn, 2)} tone="good" sub="后10最差" />
+      </section>
+
+      <section className="workspace-panel baseline-chart-panel">
+        <PanelTitle icon={<LineChart size={17} />} title="组合收益曲线" right={`${data.equityCurve?.length || 0} 个交易日`} />
+        <PortfolioEquityChart points={data.equityCurve || []} />
+      </section>
+
+      <section className="workspace-panel baseline-ai-panel">
+        <PanelTitle icon={<Bot size={17} />} title="AI策略审查" right={ai.provider || "local"} />
+        <p className="market-fit">{ai.marketFit}</p>
+        <ul className="compact-list">
+          {(ai.summary || []).map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+        <div className="factor-grid baseline-factor-grid">
+          {(ai.factorRead || []).map((item) => (
+            <article key={item.name} className="factor-card">
+              <span>{item.name}</span>
+              <strong>{item.value}</strong>
+              <em>{item.comment}</em>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <RobustnessPanel robustness={robustness} />
+
+      <section className="baseline-columns">
+        <ReviewList title="有效证据" tone="good" items={ai.strengths || []} />
+        <ReviewList title="风险残差" tone="bad" items={ai.risks || []} />
+        <ReviewList title="下一步验证" tone="neutral" items={ai.nextChecks || []} />
+      </section>
+
+      <section className="workspace-panel baseline-spec-panel">
+        <PanelTitle icon={<SlidersHorizontal size={17} />} title="执行参数" right={spec.id || data.id} />
+        <div className="baseline-spec-grid">
+          <FactorMini label="最大持仓" value={capital.maxPositions ?? "--"} />
+          <FactorMini label="单票上限" value={formatPercent(capital.maxSinglePositionPct, 0)} />
+          <FactorMini label="行业上限" value={formatPercent(capital.maxIndustryExposurePct, 0)} />
+          <FactorMini label="每周开仓" value={capital.weeklyBuyLimit ?? "--"} />
+          <FactorMini label="入场排序" value={entry.entryPriority || "--"} />
+          <FactorMini label="买入振幅" value={formatPercent(entry.entryRiskFilter?.maxEntryRangePct, 0)} />
+          <FactorMini label="止损" value={formatPercent(exit.stopLossPct, 0)} />
+          <FactorMini label="二止" value={formatPercent(exit.takeProfit2Pct, 0)} />
+        </div>
+      </section>
+
+      <section className="workspace-panel baseline-gates-panel">
+        <PanelTitle icon={<CheckCircle2 size={17} />} title="门槛审计" right={targetPassed ? "目标已达标" : "未达标"} />
+        <div className="gate-grid">
+          {Object.entries(data.objectiveGates || {}).map(([key, value]) => (
+            <Fragment key={key}>
+              <GatePill label={key} value={value} />
+            </Fragment>
+          ))}
+        </div>
+        <div className="gate-grid diagnostic">
+          {Object.entries(data.diagnosticGates || {}).map(([key, value]) => (
+            <Fragment key={key}>
+              <GatePill label={key} value={value} />
+            </Fragment>
+          ))}
+        </div>
+      </section>
+
+      <StrategyRankTable title="收益前 10" rows={data.top10 || []} />
+      <StrategyRankTable title="收益后 10" rows={data.bottom10 || []} />
+    </section>
+  );
+}
+
+function RobustnessPanel({ robustness }) {
+  const coverage = robustness.dataCoverage || {};
+  const gates = robustness.gates || [];
+  const segments = robustness.availableSegments || [];
+  const nextActions = robustness.nextActions || [];
+  const status = robustness.status || "unknown";
+  return (
+    <section className="workspace-panel robustness-panel">
+      <PanelTitle icon={<ShieldCheck size={17} />} title="二阶段稳健性闸门" right={robustnessStatusText(status)} />
+      <div className="robustness-headline">
+        <div>
+          <strong>{robustness.verdict || "等待三年基线结果"}</strong>
+          <span>{robustness.requiredBeforeStage2 || "三年硬门槛通过后才进入长周期验证。"}</span>
+        </div>
+        <span className={`robustness-status ${robustnessStatusClass(status)}`}>{robustness.stage2Enabled ? "已触发" : "未启动"}</span>
+      </div>
+
+      <div className="robustness-data-grid">
+        <FactorMini label="本地日线起点" value={coverage.startDate || "--"} />
+        <FactorMini label="本地日线终点" value={coverage.endDate || "--"} />
+        <FactorMini label="覆盖年限" value={formatNumber(coverage.calendarYears)} />
+        <FactorMini label="交易日" value={formatInteger(coverage.tradeDateCount)} />
+        <FactorMini label="标的数" value={formatInteger(coverage.symbolCount)} />
+        <FactorMini label="记录数" value={formatInteger(coverage.rowCount)} />
+      </div>
+
+      <div className="robustness-gate-grid">
+        {gates.map((gate) => (
+          <Fragment key={gate.key}>
+            <RobustnessGateCard gate={gate} />
+          </Fragment>
+        ))}
+      </div>
+
+      <div className="robustness-split">
+        <section>
+          <h3>当前三年内部切片</h3>
+          <div className="table-wrap robustness-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>窗口</th>
+                  <th>区间</th>
+                  <th>收益</th>
+                  <th>回撤</th>
+                  <th>交易日</th>
+                </tr>
+              </thead>
+              <tbody>
+                {segments.map((item) => (
+                  <tr key={item.label}>
+                    <td>{item.label}</td>
+                    <td>{item.startDate} / {item.endDate}</td>
+                    <td className={item.returnPct >= 0 ? "positive" : "negative"}>{formatPercent(item.returnPct, 2)}</td>
+                    <td>{formatPercent(item.maxDrawdown, 2)}</td>
+                    <td>{formatInteger(item.tradeDays)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section>
+          <h3>下一步只在三年过线后执行</h3>
+          <ul className="compact-list">
+            {nextActions.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function RobustnessGateCard(props) {
+  const { gate } = props;
+  const statusClass = robustnessGateClass(gate.status);
+  return (
+    <article className={`robustness-gate ${statusClass}`}>
+      <span>
+        <CheckCircle2 size={14} />
+        {robustnessGateText(gate.status)}
+      </span>
+      <strong>{gate.label}</strong>
+      <em>{gate.value}</em>
+      <p>{gate.detail}</p>
+    </article>
+  );
+}
+
+function PortfolioEquityChart({ points }) {
+  const containerRef = useRef(null);
+  const latest = points.length ? points[points.length - 1] : null;
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+    container.replaceChildren();
+    if (!points.length) return undefined;
+
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: Math.round(container.getBoundingClientRect().height || 420),
+      autoSize: true,
+      layout: {
+        background: { color: "#0a100e" },
+        textColor: "#9fb0a8",
+        attributionLogo: false,
+        fontFamily: "Bahnschrift, Microsoft YaHei UI, sans-serif",
+      },
+      grid: {
+        vertLines: { color: "rgba(232, 239, 235, 0.055)" },
+        horzLines: { color: "rgba(232, 239, 235, 0.07)" },
+      },
+      rightPriceScale: {
+        borderColor: "rgba(232, 239, 235, 0.12)",
+      },
+      timeScale: {
+        borderColor: "rgba(232, 239, 235, 0.12)",
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 8,
+      },
+    });
+    const returnSeries = chart.addSeries(LineSeries, {
+      color: "#2ed49b",
+      lineWidth: 2,
+      title: "收益%",
+      priceFormat: { type: "custom", formatter: (value) => `${value.toFixed(1)}%` },
+    });
+    returnSeries.setData(points.map((point) => ({ time: point.date, value: Number(point.returnPct || 0) * 100 })));
+    const drawdownSeries = chart.addSeries(LineSeries, {
+      color: "#f05f50",
+      lineWidth: 1,
+      title: "回撤%",
+      priceFormat: { type: "custom", formatter: (value) => `${value.toFixed(1)}%` },
+    });
+    drawdownSeries.setData(points.map((point) => ({ time: point.date, value: Number(point.drawdown || 0) * 100 })));
+    chart.timeScale().fitContent();
+
+    return () => {
+      chart.remove();
+    };
+  }, [points]);
+
+  return (
+    <div className="portfolio-equity-shell">
+      <div className="portfolio-equity-readout">
+        <span>最新权益 <strong>{formatMoney(latest?.equity)}</strong></span>
+        <span>累计收益 <strong>{formatPercent(latest?.returnPct, 2)}</strong></span>
+        <span>当前回撤 <strong>{formatPercent(latest?.drawdown, 2)}</strong></span>
+        <span>持仓 <strong>{latest?.positions ?? "--"}</strong></span>
+      </div>
+      <div ref={containerRef} className="portfolio-equity-chart" />
+    </div>
+  );
+}
+
+function GatePill(props) {
+  const { label, value } = props;
+  return (
+    <span className={`gate-pill ${value ? "pass" : "fail"}`}>
+      <CheckCircle2 size={14} />
+      <em>{label}</em>
+      <strong>{value ? "通过" : "观察"}</strong>
+    </span>
+  );
+}
+
+function StrategyRankTable({ title, rows }) {
+  return (
+    <section className="workspace-panel baseline-rank-panel">
+      <PanelTitle icon={<BarChart3 size={17} />} title={title} right={`${rows.length} 只`} />
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th>行业</th>
+              <th>收益</th>
+              <th>回撤</th>
+              <th>盈亏比</th>
+              <th>交易</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((item) => (
+              <tr key={item.ts_code}>
+                <td>{item.ts_code}</td>
+                <td>{item.name || "--"}</td>
+                <td>{item.industry || "--"}</td>
+                <td className={item.totalReturn >= 0 ? "positive" : "negative"}>{formatPercent(item.totalReturn, 2)}</td>
+                <td>{formatPercent(item.maxDrawdown, 2)}</td>
+                <td>{item.profitLossRatio == null ? "n/a" : `${formatNumber(item.profitLossRatio)}:1`}</td>
+                <td>{item.completedTrades}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function QualityAnalysisPanel({ analysis, onRun, busy }) {
+  if (!analysis) {
+    return (
+      <section className="workspace-panel quality-empty-panel">
+        <PanelTitle icon={<Gauge size={17} />} title="多Agent质量诊断" right="技术 / 消息 / 基本面" />
+        <div className="empty-state tall">
+          <button className="primary-button" type="button" onClick={onRun} disabled={busy}>
+            <Play size={17} /> 运行当前标的诊断
+          </button>
+        </div>
+      </section>
+    );
+  }
+  const ai = analysis.ai || {};
+  return (
+    <section className="quality-analysis-layout">
+      <section className={`workspace-panel quality-decision ${ratingClass(analysis.rating)}`}>
+        <div>
+          <p className="eyebrow">Multi-Agent Research Rating</p>
+          <h2>
+            {analysis.name} <span>{analysis.symbol}</span>
+          </h2>
+          <strong>{analysis.rating}</strong>
+          <p>{analysis.consensus}</p>
+          <em>{analysis.disclaimer}</em>
+        </div>
+        <div className="decision-dials">
+          <span>
+            <strong>{analysis.score}</strong>
+            <em>质量分</em>
+          </span>
+          <span>
+            <strong>{analysis.confidence}</strong>
+            <em>置信度</em>
+          </span>
+        </div>
+      </section>
+
+      <section className="workspace-panel">
+        <PanelTitle icon={<Bot size={17} />} title="AI综合" right={ai.provider === "deepseek" ? "DeepSeek" : "本地规则"} />
+        <div className="agent-meta-row">
+          <span>状态：{ai.status || "local"}</span>
+          <span>模型：{ai.model || "--"}</span>
+          <span>日线：{analysis.dataStatus?.dailyBars || 0}</span>
+          <span>新闻：{analysis.dataStatus?.newsItems || 0}</span>
+        </div>
+        {ai.message ? <p className="llm-warning">{ai.message}</p> : null}
+      </section>
+
+      <section className="agent-grid">
+        {(analysis.agents || []).map((agent) => (
+          <article key={agent.id} className="workspace-panel agent-card">
+            <PanelTitle icon={<Activity size={17} />} title={agent.name} right={agent.rating} />
+            <div className="agent-score-line">
+              <ScoreBar label="分数" value={agent.score || 0} />
+              <ScoreBar label="置信" value={agent.confidence || 0} />
+            </div>
+            <p>{agent.summary}</p>
+            <div className="agent-columns">
+              <MiniList title="证据" items={agent.evidence || []} />
+              <MiniList title="风险" items={agent.risks || []} />
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <section className="review-columns">
+        <ReviewList title="支撑买点" tone="good" items={analysis.bullCase || []} />
+        <ReviewList title="主要风险" tone="bad" items={analysis.bearCase || []} />
+        <ReviewList title="观察清单" tone="neutral" items={analysis.watchPoints || []} />
+      </section>
+    </section>
+  );
+}
+
+function MiniList({ title, items }) {
+  return (
+    <div className="mini-list">
+      <strong>{title}</strong>
+      <ul>
+        {(items.length ? items : ["暂无"]).slice(0, 5).map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function AIEngineBadge({ analysis }) {
   const ok = analysis.llmStatus === "ok";
   const label = ok ? "DeepSeek" : "本地规则兜底";
@@ -820,8 +2510,12 @@ function FundamentalsPanel({ profile, latestBar, dataBars, sourceLabel, onSync, 
       <div className="fundamental-slot">
         <div className="fundamental-head">
           <span>基本面评分</span>
-          <strong>{synced ? profile?.fundamental_score || 0 : "未同步"}</strong>
+          <div className="fundamental-scoreline">
+            <strong>{synced ? profile?.fundamental_score || 0 : "未同步"}</strong>
+            <span className={fundamentalGradeClass(profile?.fundamental_grade)}>{profile?.fundamental_grade || "待同步"}</span>
+          </div>
         </div>
+        <QualityBreakdown breakdown={profile?.fundamental_breakdown} />
         <div className="tag-row">
           {(profile?.fundamental_tags || (synced ? [] : ["估值未同步", "财务未同步"])).slice(0, 5).map((tag) => (
             <span key={tag}>{tag}</span>
@@ -866,6 +2560,39 @@ function StrategyBrief({ form, result }) {
         <li>
           <i className={`audit-dot ${result ? "ok" : "warn"}`} />
           <span>纪律评分：{result ? `${result.disciplineScore} 分` : "等待回测"}</span>
+        </li>
+      </ul>
+    </section>
+  );
+}
+
+function ResearchRunBrief({ run, runs }) {
+  const metrics = run?.metrics || {};
+  const completedTradeCount = metrics.completedTradeCount ?? run?.resultCounts?.completedTrades;
+  const runCount = Array.isArray(runs) ? runs.length : 0;
+  const target = getResearchTarget(run);
+  const targetPassed = researchTargetPassed(run);
+  return (
+    <section className="rail-panel">
+      <PanelTitle icon={<Database size={17} />} title="研究运行索引" right={run?.runId ? `${runCount} 条` : "读取中"} />
+      <div className="strategy-stamp">
+        <strong>{run?.runId || "docs/research/runs"}</strong>
+        <span>{run?.strategy?.label || run?.label || "等待研究运行证据"}</span>
+      </div>
+      <ul className="audit-list">
+        <li>
+          <i className={`audit-dot ${targetPassed ? "ok" : "warn"}`} />
+          <span>年化目标：{targetPassed ? "通过" : "未通过/待读取"} / {formatPercent(target.annualized, 0)}</span>
+        </li>
+        <li>
+          <i className={`audit-dot ${isFiniteNumber(metrics.maxDrawdown) && metrics.maxDrawdown >= -0.1 ? "ok" : "warn"}`} />
+          <span>
+            回撤：{formatPercent(metrics.maxDrawdown, 2)} / 收益：{formatPercent(metrics.totalReturn, 2)}
+          </span>
+        </li>
+        <li>
+          <i className={`audit-dot ${isFiniteNumber(completedTradeCount) ? "ok" : "warn"}`} />
+          <span>样本：{formatInteger(completedTradeCount)} 笔完成交易</span>
         </li>
       </ul>
     </section>
@@ -917,12 +2644,84 @@ function ToggleField({ label, checked, onChange }) {
   );
 }
 
-function ActionButton({ icon, label, onClick, disabled }) {
+function ActionCluster({ label, children }) {
   return (
-    <button className="ghost-button" type="button" onClick={onClick} disabled={disabled}>
+    <div className="action-cluster">
+      <span>{label}</span>
+      <div className="action-cluster-buttons">{children}</div>
+    </div>
+  );
+}
+
+function ActionButton({ icon, label, onClick, disabled, compact = false }) {
+  return (
+    <button className={`ghost-button${compact ? " action-chip" : ""}`} type="button" onClick={onClick} disabled={disabled}>
       {icon}
       {label}
     </button>
+  );
+}
+
+function SyncProgressStrip({ progress, polling }) {
+  if (!progress) return null;
+  const pct = progress.status === "error" ? 0 : Math.round(Math.max(0, Math.min(1, Number(progress.progressPct) || 0)) * 100);
+  const latestStamp = progress.lastUpdatedAt || progress.lastRun?.createdAt;
+  return (
+    <div className={`sync-progress-strip${polling ? " active" : ""}${progress.status === "error" ? " bad" : ""}`}>
+      <div className="sync-progress-head">
+        <span>
+          <Database size={14} />
+          {progress.label || syncTargetLabel(progress.target)}覆盖
+        </span>
+        <strong>{progress.status === "error" ? "读取失败" : `${pct}%`}</strong>
+      </div>
+      <div className="sync-progress-meter" role="progressbar" aria-label="全市场数据覆盖进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct}>
+        <i style={{ "--progress": `${pct}%` }} />
+      </div>
+      <div className="sync-progress-meta">
+        {progress.status === "error" ? (
+          <span>{progress.error || "进度接口暂不可用"}</span>
+        ) : (
+          <>
+            <span>完整 {formatInteger(progress.completeDates)}/{formatInteger(progress.totalDates)} 日</span>
+            <span>稀疏 {formatInteger(progress.sparseDates)} 日</span>
+            <span>空缺 {formatInteger(progress.emptyDates)} 日</span>
+            <span>记录 {formatInteger(progress.rows)} 条</span>
+            <span>最新 {progress.latestDate || "--"} · {formatInteger(progress.latestDateRows)} 条</span>
+            <span>更新 {formatDateTime(latestStamp)}</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MarketBacktestProgressStrip({ job }) {
+  if (!job) return null;
+  const pct = Math.round(Math.max(0, Math.min(1, Number(job.progressPct) || 0)) * 100);
+  const active = ["queued", "running"].includes(job.status);
+  const bad = job.status === "failed";
+  return (
+    <div className={`sync-progress-strip backtest-progress-strip${active ? " active" : ""}${bad ? " bad" : ""}`}>
+      <div className="sync-progress-head">
+        <span>
+          <BarChart3 size={14} />
+          全市场验证
+        </span>
+        <strong>{bad ? "失败" : `${pct}%`}</strong>
+      </div>
+      <div className="sync-progress-meter" role="progressbar" aria-label="全市场回测验证进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct}>
+        <i style={{ "--progress": `${pct}%` }} />
+      </div>
+      <div className="sync-progress-meta">
+        <span>处理 {formatInteger(job.processed)}/{formatInteger(job.total)} 只</span>
+        <span>完成 {formatInteger(job.tested)} 只</span>
+        <span>跳过 {formatInteger(job.skipped)} 只</span>
+        <span>失败 {formatInteger(job.failed)} 只</span>
+        <span>并发 {formatInteger(job.workers)} · 批次 {formatInteger(job.batchSize)}</span>
+        <span>{job.message || (active ? "验证中" : "等待验证")}</span>
+      </div>
+    </div>
   );
 }
 
@@ -1167,6 +2966,72 @@ function InteractiveMarketChart({ rows, trades }) {
   );
 }
 
+function MarketBacktestPanel({ result, job }) {
+  const rows = result?.results || [];
+  const summary = result?.summary || {};
+  const scope = result?.scope || {};
+  const title = scope.poolName ? "标的池验证" : "全市场验证";
+  const emptyText = scope.poolName ? "等待标的池验证" : "等待全市场验证";
+  const jobActive = ["queued", "running"].includes(job?.status);
+  return (
+    <section className="workspace-panel">
+      <PanelTitle icon={<Database size={17} />} title={title} right={jobActive ? "后台运行中" : rows.length ? `${rows.length} 只标的` : "仅读数据库"} />
+      {scope.poolName ? <div className="market-job-note">范围：{scope.poolName}</div> : null}
+      {jobActive ? <div className="market-job-note">后台分批验证中：已处理 {formatInteger(job.processed)}/{formatInteger(job.total)} 只，页面可继续浏览。</div> : null}
+      {result ? (
+        <div className="market-summary">
+          <SummaryCell label="候选" value={summary.candidates ?? 0} />
+          <SummaryCell label="完成" value={summary.tested ?? 0} />
+          <SummaryCell label="正收益" value={summary.winners ?? 0} />
+          <SummaryCell label="中位收益" value={formatPercent(summary.medianReturn, 2)} />
+        </div>
+      ) : null}
+      <div className="table-wrap market-result-table">
+        <table>
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>代码</th>
+              <th>名称</th>
+              <th>行业</th>
+              <th>样本</th>
+              <th>收益</th>
+              <th>回撤</th>
+              <th>胜率</th>
+              <th>交易</th>
+              <th>纪律</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? (
+              rows.slice(0, 120).map((item, index) => (
+                <tr key={item.ts_code}>
+                  <td>{index + 1}</td>
+                  <td>{item.ts_code}</td>
+                  <td>{item.name}</td>
+                  <td>{item.industry || "--"}</td>
+                  <td>{item.dataBars}</td>
+                  <td className={item.totalReturn >= 0 ? "positive" : "negative"}>{formatPercent(item.totalReturn, 2)}</td>
+                  <td>{formatPercent(item.maxDrawdown, 2)}</td>
+                  <td>{formatPercent(item.winRate, 1)}</td>
+                  <td>{item.tradeCount}</td>
+                  <td>{item.disciplineScore}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="10" className="empty-state">
+                  {emptyText}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function TradeTable({ trades }) {
   return (
     <div className="table-wrap trades-table">
@@ -1174,10 +3039,14 @@ function TradeTable({ trades }) {
         <thead>
           <tr>
             <th>日期</th>
+            <th>代码</th>
+            <th>名称</th>
             <th>动作</th>
             <th>价格</th>
             <th>数量</th>
+            <th>费用</th>
             <th>现金</th>
+            <th>成交规则</th>
             <th>原因</th>
           </tr>
         </thead>
@@ -1186,18 +3055,22 @@ function TradeTable({ trades }) {
             trades.map((trade, index) => (
               <tr key={`${trade.date}-${trade.action}-${index}`}>
                 <td>{trade.date}</td>
+                <td>{trade.ts_code || "--"}</td>
+                <td>{trade.name || "--"}</td>
                 <td>
                   <span className={`trade-action ${trade.action === "买入" ? "buy" : "sell"}`}>{trade.action}</span>
                 </td>
                 <td>{formatMoney(trade.price)}</td>
                 <td>{trade.quantity}</td>
+                <td>{formatMoney(trade.fee)}</td>
                 <td>{formatMoney(trade.cash)}</td>
+                <td>{trade.priceRule || "--"}</td>
                 <td>{trade.reason}</td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan="6" className="empty-state">
+              <td colSpan="10" className="empty-state">
                 没有回测交易
               </td>
             </tr>
@@ -1225,10 +3098,28 @@ function buildMetrics(result, rows) {
   ];
 }
 
+function buildMarketMetrics(result) {
+  const summary = result?.summary || {};
+  const scopeLabel = result?.scope?.poolName ? "池内算术平均" : "全市场算术平均";
+  return [
+    { label: "测试标的", value: formatInteger(summary.tested), tone: "neutral", sub: `候选 ${formatInteger(summary.candidates)} / 跳过 ${formatInteger(summary.skipped)}` },
+    { label: "正收益占比", value: formatPercent(summary.positiveRate, 1), tone: summary.positiveRate >= 0.5 ? "good" : "bad", sub: `${formatInteger(summary.winners)} 只为正` },
+    { label: "平均收益", value: formatPercent(summary.avgReturn, 2), tone: summary.avgReturn >= 0 ? "good" : "bad", sub: scopeLabel },
+    { label: "中位收益", value: formatPercent(summary.medianReturn, 2), tone: summary.medianReturn >= 0 ? "good" : "bad", sub: "更抗极端值" },
+  ];
+}
+
 function getDataRequest(form) {
   if (!form.tsCode.trim()) throw new Error("请填写股票代码或股票名称。");
   if (new Date(form.endDate) < new Date(form.startDate)) throw new Error("结束日期不能早于开始日期。");
   return { ts_code: form.tsCode.trim().toUpperCase(), start_date: form.startDate, end_date: form.endDate };
+}
+
+function parseStockCodes(text) {
+  return text
+    .split(/[\s,，;；]+/)
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
 }
 
 function buildBacktestConfig(form) {
@@ -1317,6 +3208,49 @@ function candidateScore(stock) {
   return Math.min(100, Math.round(((stock?.technical_score || 0) * 0.55) + ((stock?.fundamental_score || 0) * 0.45)));
 }
 
+function fundamentalGradeClass(grade) {
+  const normalized = String(grade || "").toLowerCase();
+  return `quality-grade ${["a", "b", "c", "d"].includes(normalized) ? `grade-${normalized}` : "grade-pending"}`;
+}
+
+function ratingClass(rating) {
+  if (rating === "买入") return "rating-buy";
+  if (rating === "持有") return "rating-hold";
+  if (rating === "卖出") return "rating-sell";
+  return "rating-neutral";
+}
+
+function robustnessStatusText(status) {
+  if (status === "needs_longer_history") return "缺长周期数据";
+  if (status === "ready_for_stage2") return "待跑稳健性";
+  if (status === "blocked_stage1") return "三年未过线";
+  if (status === "passed") return "稳健性通过";
+  return "待判定";
+}
+
+function robustnessStatusClass(status) {
+  if (status === "passed" || status === "ready_for_stage2") return "pass";
+  if (status === "needs_longer_history") return "blocked";
+  if (status === "blocked_stage1") return "fail";
+  return "pending";
+}
+
+function robustnessGateText(status) {
+  if (status === "pass") return "通过";
+  if (status === "fail") return "失败";
+  if (status === "blocked") return "缺数据";
+  if (status === "locked") return "未启动";
+  return "待运行";
+}
+
+function robustnessGateClass(status) {
+  if (status === "pass") return "pass";
+  if (status === "fail") return "fail";
+  if (status === "blocked") return "blocked";
+  if (status === "locked") return "locked";
+  return "pending";
+}
+
 function toCandles(rows) {
   return rows
     .filter((row) => ["open", "high", "low", "close"].every((key) => isFiniteNumber(row[key])))
@@ -1329,7 +3263,7 @@ function toCandles(rows) {
     }));
 }
 
-function addLineSeries(chart, rows, key, color, title, lineWidth = 2, priceScaleId = "") {
+function addLineSeries(chart, rows, key, color, title, lineWidth = 2, priceScaleId = "right") {
   const series = chart.addSeries(LineSeries, {
     color,
     title,
@@ -1390,6 +3324,10 @@ function isFiniteNumber(value) {
   return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 }
 
+function syncTargetLabel(target) {
+  return target === "daily_basic" ? "全市场估值" : "全市场日线";
+}
+
 function formatPercent(value, digits = 2) {
   if (!isFiniteNumber(value)) return "--";
   return `${(Number(value) * 100).toFixed(digits)}%`;
@@ -1410,9 +3348,19 @@ function formatNumber(value) {
   return Number(value).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatInteger(value) {
+  if (!isFiniteNumber(value)) return "--";
+  return Number(value).toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+}
+
 function formatMarketCap(value) {
   if (!isFiniteNumber(value)) return "--";
   return `${(Number(value) / 10000).toLocaleString("zh-CN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}亿`;
+}
+
+function formatDateTime(value) {
+  if (!value) return "--";
+  return String(value).replace("T", " ").slice(0, 16);
 }
 
 function dateToday() {
@@ -1433,12 +3381,16 @@ function formatDate(date) {
 }
 
 function downloadReport(result) {
+  downloadJson(result, "backtest-report");
+}
+
+function downloadJson(result, prefix = "backtest-report") {
   if (!result) return;
   const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `backtest-report-${new Date().toISOString().slice(0, 10)}.json`;
+  anchor.download = `${prefix}-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
