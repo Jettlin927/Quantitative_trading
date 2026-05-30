@@ -33,6 +33,100 @@ def analyze_with_deepseek(local_analysis: dict[str, Any], result: dict[str, Any]
         return with_local_status(local_analysis, model, "error", f"DeepSeek 调用失败，已使用本地规则评价：{str(exc)[:180]}")
 
 
+def analyze_stock_quality_with_deepseek(local_report: dict[str, Any]) -> dict[str, Any]:
+    model = os.getenv("DEEPSEEK_MODEL", DEFAULT_DEEPSEEK_MODEL)
+    token = os.getenv("DEEPSEEK_TOKEN") or os.getenv("DEEPSEEK_API_KEY")
+    if not token:
+        return with_local_quality_status(local_report, model, "missing_token", "未配置 DEEPSEEK_TOKEN，当前显示本地多 Agent 规则诊断。")
+
+    try:
+        payload = build_quality_request_payload(model, local_report)
+        response = post_json(deepseek_endpoint(), token, payload, int(os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "25")))
+        content = response["choices"][0]["message"]["content"]
+        report = normalize_quality_ai(parse_json_object(content), local_report)
+        report["ai"] = {
+            "provider": "deepseek",
+            "model": model,
+            "status": "ok",
+            "usage": response.get("usage"),
+        }
+        return report
+    except Exception as exc:
+        return with_local_quality_status(local_report, model, "error", f"DeepSeek 调用失败，当前显示本地多 Agent 规则诊断：{str(exc)[:180]}")
+
+
+def build_quality_request_payload(model: str, local_report: dict[str, Any]) -> dict[str, Any]:
+    context = {
+        "symbol": local_report.get("symbol"),
+        "name": local_report.get("name"),
+        "dateRange": local_report.get("dateRange"),
+        "localConsensus": {
+            "rating": local_report.get("rating"),
+            "score": local_report.get("score"),
+            "confidence": local_report.get("confidence"),
+            "consensus": local_report.get("consensus"),
+            "watchPoints": local_report.get("watchPoints"),
+        },
+        "agents": local_report.get("agents", []),
+        "dataStatus": local_report.get("dataStatus", {}),
+        "latestSnapshot": local_report.get("latestSnapshot", {}),
+    }
+    return {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "你是一个A股研究工作台里的多Agent投研协调员。"
+                    "你只能依据用户提供的本地行情、基本面、新闻标题和情绪证据做研究评级。"
+                    "不要声称能预测确定收益，不要编造外部数据，不要给真实交易指令。"
+                    "评级仅可使用：买入、持有、中性、卖出。必须返回JSON对象。"
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "请综合基本面分析师、情绪分析师、新闻分析师、技术分析师的证据，"
+                    "给出研究评级、置信度、核心结论、关键支撑、主要风险和下一步观察点。"
+                    "返回字段：rating, score(0-100整数), confidence(0-100整数), consensus, "
+                    "bullCase数组, bearCase数组, watchPoints数组。"
+                    f"\n\n本地多Agent证据JSON：{json.dumps(context, ensure_ascii=False)}"
+                ),
+            },
+        ],
+        "temperature": 0.15,
+        "max_tokens": 1400,
+        "response_format": {"type": "json_object"},
+        "thinking": {"type": "disabled"},
+        "stream": False,
+    }
+
+
+def normalize_quality_ai(raw: dict[str, Any], fallback: dict[str, Any]) -> dict[str, Any]:
+    report = {**fallback}
+    rating = str(raw.get("rating") or fallback.get("rating") or "中性").strip()
+    report["rating"] = rating if rating in {"买入", "持有", "中性", "卖出"} else fallback.get("rating", "中性")
+    report["score"] = clamp_score(raw.get("score", fallback.get("score", 0)))
+    report["confidence"] = clamp_score(raw.get("confidence", fallback.get("confidence", 0)))
+    report["consensus"] = str(raw.get("consensus") or fallback.get("consensus") or "暂无足够证据。")
+    report["bullCase"] = string_list(raw.get("bullCase"), fallback.get("bullCase", []))
+    report["bearCase"] = string_list(raw.get("bearCase"), fallback.get("bearCase", []))
+    report["watchPoints"] = string_list(raw.get("watchPoints"), fallback.get("watchPoints", []))
+    return report
+
+
+def with_local_quality_status(report: dict[str, Any], model: str, status: str, message: str) -> dict[str, Any]:
+    return {
+        **report,
+        "ai": {
+            "provider": "local",
+            "model": model,
+            "status": status,
+            "message": message,
+        },
+    }
+
+
 def build_request_payload(model: str, local_analysis: dict[str, Any], result: dict[str, Any], rows: list[dict[str, Any]], cfg: dict[str, Any]) -> dict[str, Any]:
     context = {
         "strategy": {
