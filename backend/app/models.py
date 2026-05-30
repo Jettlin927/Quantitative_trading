@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, Index, Numeric, String, UniqueConstraint, func
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -105,6 +105,29 @@ class StockFinancialIndicator(Base):
     q_profit_yoy: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class StockPool(Base):
+    __tablename__ = "stock_pools"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    description: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class StockPoolMember(Base):
+    __tablename__ = "stock_pool_members"
+    __table_args__ = (
+        UniqueConstraint("pool_id", "ts_code", name="uq_stock_pool_member_pool_code"),
+        Index("ix_stock_pool_members_pool_code", "pool_id", "ts_code"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    pool_id: Mapped[int] = mapped_column(ForeignKey("stock_pools.id", ondelete="CASCADE"), index=True)
+    ts_code: Mapped[str] = mapped_column(ForeignKey("stocks.ts_code", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class DataSyncRun(Base):
