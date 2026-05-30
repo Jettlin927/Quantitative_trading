@@ -1,0 +1,89 @@
+{
+  "version": "2026-05-30.default-v1",
+  "objective": {
+    "name": "策略进化后三年全市场复核",
+    "target_total_return": 0.3,
+    "target_profit_loss_ratio": 2.0,
+    "max_abs_drawdown": 0.1,
+    "evaluation_window_years": 3,
+    "primary_scope": "post_evolution_full_market_scan",
+    "note": "每完成一次策略进化后，必须跑三年全市场逐标的复核；收益前10和收益后10都要审计，组合级共享资金回测是后续增强。"
+  },
+  "scope": {
+    "start_date": "2023-05-30",
+    "end_date": "2026-05-30",
+    "q": null,
+    "industry": null,
+    "market": null,
+    "pool_id": null,
+    "min_bars": 120,
+    "max_stocks": 0,
+    "exclude_st": true,
+    "exclude_bj": true,
+    "min_list_days": 365,
+    "min_avg_amount": 100000,
+    "min_avg_circ_mv": 300000,
+    "min_avg_turnover_rate_f": 0.5,
+    "unit_note": "min_avg_amount 使用 Tushare daily.amount 原始单位：千元；min_avg_circ_mv 使用 daily_basic.circ_mv 原始单位：万元。"
+  },
+  "capital": {
+    "initialCash": 100000,
+    "weeklyTradeLimit": 2,
+    "positionCapPct": 0.2,
+    "riskPct": 0.01,
+    "lotSize": 100
+  },
+  "costs": {
+    "commissionPct": 0.00025,
+    "stampDutyPct": 0.0005
+  },
+  "risk": {
+    "stopLossPct": 0.05,
+    "takeProfit1Pct": 0.03,
+    "takeProfit2Pct": 0.05,
+    "blockWeakMarket": true,
+    "forceStopOverridesLimit": true,
+    "blockSameDayReentry": true
+  },
+  "evaluation": {
+    "qualified_symbol_min_return": 0.3,
+    "qualified_symbol_max_abs_drawdown": 0.1,
+    "qualified_symbol_min_profit_loss_ratio": 2.0,
+    "minimum_qualified_symbols_for_full_scan": 5,
+    "minimum_completed_trades": 3,
+    "minimum_discipline_score": 0,
+    "minimum_tested_symbols_for_full_scan": 1000,
+    "tail_bottom_count": 10,
+    "tail_max_abs_loss": 0.1,
+    "tail_max_abs_drawdown": 0.1,
+    "tail_min_profit_loss_ratio": 2.0
+  },
+  "portfolio_target": {
+    "mode": "shared_capital_follow_up",
+    "initialCash": 100000,
+    "maxPositions": 3,
+    "maxSinglePositionPct": 0.18,
+    "maxIndustryPositionPct": 0.4,
+    "weeklyBuyLimit": 2,
+    "minimumCompletedTrades": 20,
+    "entryPriority": "market_breadth_then_trend_quality",
+    "maxSignalScore": 3.2,
+    "rebalanceFrequency": "daily_signal_check",
+    "completionGate": "only_after_tail_audit_and_shared_capital_backtest_pass",
+    "marketBreadthFilter": {
+      "enabled": true,
+      "usePreviousTradingDay": true,
+      "minSamples": 1000,
+      "minAboveMa20Pct": 0.45,
+      "minAboveMa60Pct": 0.35,
+      "minUpPct": 0.45
+    }
+  },
+  "data_rules": {
+    "price_and_volume_are_primary": true,
+    "fundamentals_are_filters_or_ranking_inputs": true,
+    "news_usage": "risk_tags_and_review_only",
+    "no_future_data": true,
+    "exclude_st_or_delisted_when_data_supports_it": true
+  }
+}
