@@ -22,8 +22,7 @@ def main() -> int:
     if tool_name not in {"apply_patch", "Edit", "Write"}:
         return 0
 
-    patch_text = extract_tool_text(payload.get("tool_input"))
-    changed_files = extract_changed_files(patch_text)
+    changed_files = extract_changed_files(payload.get("tool_input"))
     if not changed_files:
         return 0
 
@@ -89,16 +88,34 @@ def extract_tool_text(tool_input) -> str:
             value = tool_input.get(key)
             if isinstance(value, str):
                 return value
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, str) and item.startswith("*** Begin Patch"):
+                        return item
     return ""
 
 
-def extract_changed_files(patch_text: str) -> list[str]:
+def extract_changed_files(tool_input) -> list[str]:
     files = []
+    patch_text = extract_tool_text(tool_input)
     for match in PATCH_FILE_RE.finditer(patch_text or ""):
-        normalized = match.group(1).strip().replace("/", os.sep).replace("\\", os.sep)
-        if normalized and normalized not in files:
-            files.append(normalized)
+        add_file(files, match.group(1))
+    if isinstance(tool_input, dict):
+        for key in ("file_path", "path", "filename", "target_file"):
+            add_file(files, tool_input.get(key))
+        value = tool_input.get("files")
+        if isinstance(value, list):
+            for item in value:
+                add_file(files, item)
     return files
+
+
+def add_file(files: list[str], value) -> None:
+    if not isinstance(value, str):
+        return
+    normalized = value.strip().replace("/", os.sep).replace("\\", os.sep)
+    if normalized and normalized not in files:
+        files.append(normalized)
 
 
 def should_check(repo_root: Path, relative_path: str) -> bool:

@@ -1,0 +1,4 @@
+interface:
+  display_name: "A Share Risk8 Watchlist"
+  short_description: "按当前最优Risk8策略筛选A股观察票"
+  default_prompt: "Use $a-share-risk8-watchlist to screen the latest A-share watchlist with the current best Risk8 strategy."
