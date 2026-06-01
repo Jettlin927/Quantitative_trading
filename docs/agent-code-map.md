@@ -60,7 +60,7 @@
   - 没有 token、调用失败或 JSON 不合格时，应保留本地规则兜底。
 
 - `backend/app/main.py`
-  - FastAPI 应用入口、所有路由、同步流程、全市场后台任务、质量诊断本地 agent。
+  - FastAPI 应用入口、所有路由、同步流程、全市场后台任务、Research Job API、质量诊断本地 agent。
   - 文件较长，先用函数名定位，不要盲目大改。
 
 ## 主要 API
@@ -73,6 +73,7 @@
 - `POST /api/tushare/sync-daily`：同步单票日线。
 - `POST /api/tushare/sync-market-daily`：按交易日补齐全市场日线。
 - `POST /api/tushare/sync-fundamentals`：同步单票估值和财务指标。
+- `POST /api/tushare/sync-market-fundamentals`：按日期区间补齐全市场财务指标。
 - `POST /api/tushare/sync-market-daily-basic`：补齐全市场估值指标。
 - `GET /api/tushare/sync-progress`：查询日线或估值覆盖进度。
 - `GET /api/daily-bars`：读取单票日线并附带技术指标。
@@ -82,6 +83,11 @@
 - `POST /api/backtests/run`：单票数据库回测，默认可带 AI 复盘。
 - `POST /api/backtests/market`：同步执行全市场或池内回测。
 - `POST /api/backtests/market/jobs` 与 `GET /api/backtests/market/jobs/{job_id}`：后台回测任务和轮询进度。
+- `POST /api/research/jobs`：提交研究任务，支持 `portfolio_backtest`、`window_validation`、`trade_delta`。
+- `GET /api/research/jobs` 与 `GET /api/research/jobs/{jobId}`：查询研究任务列表和状态。
+- `POST /api/research/jobs/{jobId}/cancel`：取消排队中或运行中的研究任务。
+- `GET /api/research/jobs/{jobId}/result`：读取已完成研究任务对应的 run 详情。
+- `GET /api/research/runs...`：读取已落盘的研究 run 和阶段总览。
 
 ## 前端地图
 
@@ -89,7 +95,7 @@
   - 当前是主要应用文件，包含状态、API 调用、页面组件和图表组件。
   - 顶部常量：`API_BASE`、表单默认值、页签、技术形态选项、策略预设。
   - 关键状态：`form`、`screenResults`、`stockPools`、`result`、`marketResult`、`qualityAnalysis`、`bars`、`syncProgress`、`marketBacktestJob`。
-  - 关键动作：`syncStockBasic()`、`runScreener()`、`syncDaily()`、`syncMarketDaily()`、`syncFundamentals()`、`syncMarketDailyBasic()`、`runBacktest()`、`runMarketBacktest()`、`runQualityAnalysis()`。
+  - 关键动作：`syncStockBasic()`、`runScreener()`、`syncDaily()`、`syncMarketDaily()`、`syncFundamentals()`、`syncMarketFundamentals()`、`syncMarketDailyBasic()`、`runBacktest()`、`runMarketBacktest()`、`runQualityAnalysis()`。
 
 - `frontend/src/styles.css`
   - 工业化风控终端视觉，维护高信息密度和可扫描性。
@@ -118,6 +124,7 @@
 3. 回测评估
    - 单票：`POST /api/backtests/run`。
    - 自选池或全市场：`POST /api/backtests/market/jobs`，再轮询 job。
+   - 组合研究、滚动窗口和交易替换诊断：优先 `POST /api/research/jobs`，接口细节见 `docs/research/research-job-api.md`。
    - 默认记录总收益、最大回撤、胜率、交易数、纪律评分、tested/skipped/failed、样本区间和参数。
 
 4. 复盘反思
@@ -141,7 +148,9 @@
 2. 在 `should_enter()` 或共同过滤器中接入。
 3. 在 `normalize_config()` 设默认值。
 4. 在 `schemas.py` 和 `frontend/src/main.jsx` 暴露参数。
-5. 用单票和小样本市场回测验证，再扩大范围。
+5. 若是组合横截面因子，还要在 Research Job API 的白名单参数或研究脚本参数中接入。
+6. 改后端 Python 代码后用 `docker compose restart api` 让常驻服务加载新代码；只改参数/权重时不需要重启。
+7. 用单票和小样本市场回测验证，再通过 `/api/research/jobs` 扩大到组合全窗口、滚动窗口或交易替换诊断。
 
 新增质量诊断 agent：
 

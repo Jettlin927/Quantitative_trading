@@ -18,15 +18,23 @@ from backend.app.schemas import MarketBacktestRequest
 from scripts.research.run_portfolio_backtest import (
     apply_cost_multiplier,
     apply_entry_risk_override,
+    apply_entry_score_penalty_override,
     apply_entry_size_haircut_override,
     apply_execution_stress,
+    apply_failure_throttle_override,
+    apply_industry_state_filter_override,
     apply_cross_section_weight_override,
     apply_market_breadth_override,
+    apply_market_breadth_soft_gate_override,
+    apply_concept_cache_override,
+    apply_moneyflow_cache_override,
     apply_portfolio_override,
     build_market_breadth_payload,
     build_portfolio_rules,
     objective_target_annualized_return,
     payload_to_dict,
+    require_moneyflow_cache_for_enabled_weights,
+    require_concept_cache_for_enabled_weights,
     run_portfolio_backtest,
     summarize_portfolio,
 )
@@ -59,10 +67,97 @@ def main() -> None:
     parser.add_argument("--market-min-above-ma20-pct", type=float, default=None, help="Override portfolio_target.marketBreadthFilter.minAboveMa20Pct.")
     parser.add_argument("--market-min-above-ma60-pct", type=float, default=None, help="Override portfolio_target.marketBreadthFilter.minAboveMa60Pct.")
     parser.add_argument("--market-min-up-pct", type=float, default=None, help="Override portfolio_target.marketBreadthFilter.minUpPct.")
+    parser.add_argument("--market-soft-gate", action="store_true", help="Enable a default-off state-gated soft market-breadth entry experiment.")
+    parser.add_argument("--market-soft-min-samples", type=int, default=None, help="Minimum samples required by the soft market-breadth gate.")
+    parser.add_argument("--market-soft-min-above-ma20-pct", type=float, default=None, help="Minimum above-MA20 ratio required by the soft market-breadth gate.")
+    parser.add_argument("--market-soft-min-above-ma60-pct", type=float, default=None, help="Minimum above-MA60 ratio required by the soft market-breadth gate.")
+    parser.add_argument("--market-soft-min-up-pct", type=float, default=None, help="Minimum up ratio required by the soft market-breadth gate.")
+    parser.add_argument("--market-soft-max-base-failed-checks", type=int, default=None, help="Maximum failed hard breadth checks allowed by the soft gate.")
+    parser.add_argument("--cross-section-return20-weight", type=float, default=None, help="Override the return20-rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-return60-weight", type=float, default=None, help="Override the return60-rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-high60-weight", type=float, default=None, help="Override the high60-rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-recovery20-weight", type=float, default=None, help="Override the recovery20-rank weight in cross-section strength scoring.")
     parser.add_argument("--cross-section-volume-weight", type=float, default=None, help="Override the volume-rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-base-weight", type=float, default=None, help="Override the base score weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-industry-return20-weight", type=float, default=None, help="Override the industry average 20-day return rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-industry-relative-return20-weight", type=float, default=None, help="Override the stock-vs-industry 20-day return rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-stock-specific-breakout-quality-weight", type=float, default=None, help="Override the stock-specific breakout quality rank weight.")
+    parser.add_argument("--cross-section-stock-specific-mature-breadth-quality-weight", type=float, default=None, help="Override the stock-specific breakout rank weight gated by mature but non-euphoric market breadth.")
+    parser.add_argument("--cross-section-macd-hist-weight", type=float, default=None, help="Override the MACD histogram rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-macd-hist-delta-weight", type=float, default=None, help="Override the MACD histogram day-over-day improvement rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-boll-squeeze-weight", type=float, default=None, help="Override the BOLL squeeze rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-boll-position-weight", type=float, default=None, help="Override the BOLL position rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-boll-position-balance-weight", type=float, default=None, help="Override the balanced BOLL position rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-rsi-balance-weight", type=float, default=None, help="Override the RSI balance rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-ma-alignment-weight", type=float, default=None, help="Override the MA alignment rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-indicator-setup-weight", type=float, default=None, help="Override the MACD+BOLL+RSI setup rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-indicator-pulse-quality-weight", type=float, default=None, help="Override the MACD+BOLL+RSI setup confirmed by high-60 quality and prior-gap stability.")
+    parser.add_argument("--cross-section-indicator-confluence-quality-weight", type=float, default=None, help="Override the MACD+BOLL+RSI+MA+amount confluence rank weight.")
+    parser.add_argument("--cross-section-indicator-turn-quality-weight", type=float, default=None, help="Override the MACD-turn+BOLL-position+RSI+gap-stability composite rank weight.")
+    parser.add_argument("--cross-section-rsi-momentum-quality-weight", type=float, default=None, help="Override the RSI-level and MACD-improvement quality rank inside broad moneyflow surges.")
+    parser.add_argument("--cross-section-rsi-momentum-confirmed-quality-weight", type=float, default=None, help="Override the RSI-level and MACD-improvement quality rank inside confirmed moneyflow surges.")
+    parser.add_argument("--cross-section-turnover-rate-f-weight", type=float, default=None, help="Override the free-float turnover rank weight from daily_basic.")
+    parser.add_argument("--cross-section-volume-ratio-basic-weight", type=float, default=None, help="Override the daily_basic volume ratio rank weight.")
+    parser.add_argument("--cross-section-low-volume-ratio-basic-weight", type=float, default=None, help="Override the low daily_basic volume ratio rank weight.")
+    parser.add_argument("--cross-section-small-circ-mv-weight", type=float, default=None, help="Override the small circulating market value rank weight from daily_basic.")
+    parser.add_argument("--cross-section-prior-gap-stability-weight", type=float, default=None, help="Override the prior overnight gap stability rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-amount-ratio-weight", type=float, default=None, help="Override the amount/20-day-average amount rank weight.")
+    parser.add_argument("--cross-section-amount-efficiency20-weight", type=float, default=None, help="Override the 20-day return per amount-expansion rank weight.")
+    parser.add_argument("--cross-section-amount-efficiency-rsi-weight", type=float, default=None, help="Override the amount-efficiency confirmed by RSI-balance rank weight.")
+    parser.add_argument("--moneyflow-cache", default=None, help="Run-local JSONL moneyflow rank cache generated by build_moneyflow_cache.py.")
+    parser.add_argument("--cross-section-moneyflow-main-rank1-weight", type=float, default=None, help="Override the previous-trading-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-main-rank3-weight", type=float, default=None, help="Override the 3-day average main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-main-rank5-weight", type=float, default=None, help="Override the 5-day average main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-industry-confirm-weight", type=float, default=None, help="Override the industry-state-confirmed prior-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-rsi-confirm-weight", type=float, default=None, help="Override the RSI-confirmed prior-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-market-strong-weight", type=float, default=None, help="Override the strong-market-confirmed prior-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-market-quality-weight", type=float, default=None, help="Override the market/rsi/industry-quality confirmed prior-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-market-surge-quality-weight", type=float, default=None, help="Override the broad-upsurge/rsi/industry-quality confirmed prior-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-market-surge-strict-quality-weight", type=float, default=None, help="Override the strict broad-upsurge moneyflow quality rank that ignores zero-strength ties.")
+    parser.add_argument("--cross-section-moneyflow-market-surge-relative-quality-weight", type=float, default=None, help="Override the broad-upsurge/rsi/industry-relative-quality confirmed prior-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-market-surge-confirmed-quality-weight", type=float, default=None, help="Override the broad-upsurge moneyflow rank only when RSI and stock-vs-industry strength pass confirmation floors.")
+    parser.add_argument("--cross-section-industry-moneyflow-sum-net-rank1-weight", type=float, default=None, help="Override the prior-day industry aggregate main-moneyflow net rank weight.")
+    parser.add_argument("--concept-cache", default=None, help="Run-local JSONL concept rank cache generated by build_concept_cache.py.")
+    parser.add_argument("--cross-section-kpl-concept-count-rank1-weight", type=float, default=None, help="Override the prior-day KPL concept-count rank weight.")
     parser.add_argument("--max-entry-gap-pct", type=float, default=None, help="Override portfolio_target.entryRiskFilter.maxGapPct.")
+    parser.add_argument("--min-entry-gap-pct", type=float, default=None, help="Override portfolio_target.entryRiskFilter.minGapPct.")
     parser.add_argument("--max-entry-range-pct", type=float, default=None, help="Override portfolio_target.entryRiskFilter.maxEntryRangePct.")
     parser.add_argument("--max-intraday-return-pct", type=float, default=None, help="Override portfolio_target.entryRiskFilter.maxIntradayReturnPct.")
+    parser.add_argument("--entry-prior-volume-ratio-basic-score-penalty-threshold", type=float, default=None, help="Score-penalize entries whose prior-day daily_basic volume_ratio is above this threshold.")
+    parser.add_argument("--entry-prior-volume-ratio-basic-score-penalty", type=float, default=0.0, help="Fixed score penalty applied above the prior-day daily_basic volume_ratio threshold.")
+    parser.add_argument("--entry-volume-inefficiency-crowding-prior-volume-ratio-basic-threshold", type=float, default=None, help="Score-penalize entries with high prior-day volume_ratio and weak amount-efficiency/RSI rank.")
+    parser.add_argument("--entry-volume-inefficiency-crowding-amount-efficiency-rsi-rank-max", type=float, default=None, help="Maximum amountEfficiencyRsi rank allowed for the volume-inefficiency crowding penalty.")
+    parser.add_argument("--entry-volume-inefficiency-crowding-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to high-volume but low-efficiency crowding.")
+    parser.add_argument("--entry-industry-return-overheat-rank-threshold", type=float, default=None, help="Score-penalize entries whose industry 20-day return rank is above this threshold.")
+    parser.add_argument("--entry-industry-return-overheat-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to industry return overheat.")
+    parser.add_argument("--entry-unsupported-boll-squeeze-boll-rank-threshold", type=float, default=None, help="Score-penalize BOLL squeeze entries lacking industry moneyflow support.")
+    parser.add_argument("--entry-unsupported-boll-squeeze-industry-moneyflow-rank-max", type=float, default=None, help="Maximum industry moneyflow rank allowed for unsupported BOLL squeeze penalty.")
+    parser.add_argument("--entry-unsupported-boll-squeeze-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to unsupported BOLL squeeze.")
+    parser.add_argument("--entry-industry-moneyflow-crowding-sum-rank-threshold", type=float, default=None, help="Score-penalize entries whose prior-day industry main-moneyflow sum rank is above this threshold.")
+    parser.add_argument("--entry-industry-moneyflow-crowding-persistent-score-max", type=float, default=None, help="Score-penalize entries whose prior-day industry moneyflow persistence score is at or below this threshold.")
+    parser.add_argument("--entry-industry-moneyflow-crowding-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to high-sum but low-persistence industry moneyflow crowding.")
+    parser.add_argument("--entry-moneyflow-surge-rsi-crowding-surge-rank-threshold", type=float, default=None, help="Score-penalize entries with high market-surge moneyflow rank.")
+    parser.add_argument("--entry-moneyflow-surge-rsi-crowding-rsi-rank-threshold", type=float, default=None, help="Score-penalize entries with high RSI-balance rank inside market-surge moneyflow.")
+    parser.add_argument("--entry-moneyflow-surge-rsi-crowding-gap-threshold-pct", type=float, default=None, help="Only apply the moneyflow+RSI crowding penalty when the entry gap is at least this high.")
+    parser.add_argument("--entry-moneyflow-surge-rsi-crowding-range-threshold-pct", type=float, default=None, help="Only apply the moneyflow+RSI crowding penalty when the entry-day range is at least this high.")
+    parser.add_argument("--entry-moneyflow-surge-rsi-crowding-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to high market-surge moneyflow plus high RSI-balance crowding.")
+    parser.add_argument("--entry-indicator-confluence-moneyflow-crowding-confluence-rank-threshold", type=float, default=None, help="Score-penalize entries with high indicator-confluence rank.")
+    parser.add_argument("--entry-indicator-confluence-moneyflow-crowding-moneyflow5-rank-threshold", type=float, default=None, help="Score-penalize entries with high 5-day moneyflow rank inside high indicator confluence.")
+    parser.add_argument("--entry-indicator-confluence-moneyflow-crowding-min-gap-pct", type=float, default=None, help="Only apply the indicator-confluence moneyflow crowding penalty when entry gap is at least this value.")
+    parser.add_argument("--entry-indicator-confluence-moneyflow-crowding-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to high indicator confluence plus high 5-day moneyflow crowding.")
+    parser.add_argument("--entry-unconfirmed-gap-range-min-gap-pct", type=float, default=None, help="Score-penalize high-gap high-range entries lacking moneyflow-surge confirmation.")
+    parser.add_argument("--entry-unconfirmed-gap-range-min-range-pct", type=float, default=None, help="Minimum entry-day range for the unconfirmed gap-range penalty.")
+    parser.add_argument("--entry-unconfirmed-gap-range-max-surge-rank", type=float, default=None, help="Maximum moneyflow-surge rank allowed for the unconfirmed gap-range penalty.")
+    parser.add_argument("--entry-unconfirmed-gap-range-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to unconfirmed high-gap high-range entries.")
+    parser.add_argument("--failure-symbol-cooldown-days", type=int, default=None, help="Override repeat-loss symbol cooldown days.")
+    parser.add_argument("--failure-industry-weekly-loss-limit", type=int, default=None, help="Override weekly loss count that cools down an industry.")
+    parser.add_argument("--failure-industry-cooldown-days", type=int, default=None, help="Override industry cooldown days after the weekly loss limit is reached.")
+    parser.add_argument("--industry-state-filter", action="store_true", help="Enable pre-entry industry state filtering.")
+    parser.add_argument("--industry-state-min-samples", type=int, default=None, help="Minimum same-day industry samples required by the industry state filter.")
+    parser.add_argument("--industry-state-min-up-pct", type=float, default=None, help="Minimum same-day industry up ratio required by the industry state filter.")
+    parser.add_argument("--industry-state-min-above-ma20-pct", type=float, default=None, help="Minimum same-day industry above-MA20 ratio required by the industry state filter.")
+    parser.add_argument("--industry-state-min-above-ma60-pct", type=float, default=None, help="Minimum same-day industry above-MA60 ratio required by the industry state filter.")
+    parser.add_argument("--industry-state-min-return20-pct", type=float, default=None, help="Minimum same-day industry average 20-day return required by the industry state filter.")
     parser.add_argument("--entry-gap-size-haircut-threshold-pct", type=float, default=None, help="Reduce entry size when the entry gap is above this threshold.")
     parser.add_argument("--entry-gap-size-haircut-pct", type=float, default=0.0, help="Position-size haircut applied above the entry gap threshold.")
     parser.add_argument("--entry-range-size-haircut-threshold-pct", type=float, default=None, help="Reduce entry size when the entry-day range is above this threshold.")
@@ -88,8 +183,117 @@ def main() -> None:
         args.market_min_above_ma60_pct,
         args.market_min_up_pct,
     )
-    apply_cross_section_weight_override(context, args.cross_section_volume_weight)
-    apply_entry_risk_override(context, args.max_entry_gap_pct, args.max_entry_range_pct, args.max_intraday_return_pct)
+    apply_market_breadth_soft_gate_override(
+        context,
+        args.market_soft_gate,
+        args.market_soft_min_samples,
+        args.market_soft_min_above_ma20_pct,
+        args.market_soft_min_above_ma60_pct,
+        args.market_soft_min_up_pct,
+        args.market_soft_max_base_failed_checks,
+    )
+    apply_cross_section_weight_override(
+        context,
+        {
+            "return20": args.cross_section_return20_weight,
+            "return60": args.cross_section_return60_weight,
+            "high60": args.cross_section_high60_weight,
+            "recovery20": args.cross_section_recovery20_weight,
+            "volume": args.cross_section_volume_weight,
+            "base": args.cross_section_base_weight,
+            "industryReturn20": args.cross_section_industry_return20_weight,
+            "industryRelativeReturn20": args.cross_section_industry_relative_return20_weight,
+            "stockSpecificBreakoutQuality": args.cross_section_stock_specific_breakout_quality_weight,
+            "stockSpecificMatureBreadthQuality": args.cross_section_stock_specific_mature_breadth_quality_weight,
+            "macdHist": args.cross_section_macd_hist_weight,
+            "macdHistDelta": args.cross_section_macd_hist_delta_weight,
+            "bollSqueeze": args.cross_section_boll_squeeze_weight,
+            "bollPosition": args.cross_section_boll_position_weight,
+            "bollPositionBalance": args.cross_section_boll_position_balance_weight,
+            "rsiBalance": args.cross_section_rsi_balance_weight,
+            "maAlignment": args.cross_section_ma_alignment_weight,
+            "indicatorSetup": args.cross_section_indicator_setup_weight,
+            "indicatorPulseQuality": args.cross_section_indicator_pulse_quality_weight,
+            "indicatorConfluenceQuality": args.cross_section_indicator_confluence_quality_weight,
+            "indicatorTurnQuality": args.cross_section_indicator_turn_quality_weight,
+            "rsiMomentumQuality": args.cross_section_rsi_momentum_quality_weight,
+            "rsiMomentumConfirmedQuality": args.cross_section_rsi_momentum_confirmed_quality_weight,
+            "turnoverRateF": args.cross_section_turnover_rate_f_weight,
+            "volumeRatioBasic": args.cross_section_volume_ratio_basic_weight,
+            "lowVolumeRatioBasic": args.cross_section_low_volume_ratio_basic_weight,
+            "smallCircMv": args.cross_section_small_circ_mv_weight,
+            "priorGapStability": args.cross_section_prior_gap_stability_weight,
+            "amountRatio": args.cross_section_amount_ratio_weight,
+            "amountEfficiency20": args.cross_section_amount_efficiency20_weight,
+            "amountEfficiencyRsi": args.cross_section_amount_efficiency_rsi_weight,
+            "moneyflowMainNetRank1": args.cross_section_moneyflow_main_rank1_weight,
+            "moneyflowMainNetRank3": args.cross_section_moneyflow_main_rank3_weight,
+            "moneyflowMainNetRank5": args.cross_section_moneyflow_main_rank5_weight,
+            "moneyflowIndustryConfirm": args.cross_section_moneyflow_industry_confirm_weight,
+            "moneyflowRsiConfirm": args.cross_section_moneyflow_rsi_confirm_weight,
+            "moneyflowMarketStrong": args.cross_section_moneyflow_market_strong_weight,
+            "moneyflowMarketQuality": args.cross_section_moneyflow_market_quality_weight,
+            "moneyflowMarketSurgeQuality": args.cross_section_moneyflow_market_surge_quality_weight,
+            "moneyflowMarketSurgeStrictQuality": args.cross_section_moneyflow_market_surge_strict_quality_weight,
+            "moneyflowMarketSurgeRelativeQuality": args.cross_section_moneyflow_market_surge_relative_quality_weight,
+            "moneyflowMarketSurgeConfirmedQuality": args.cross_section_moneyflow_market_surge_confirmed_quality_weight,
+            "industryMoneyflowSumNetRank1": args.cross_section_industry_moneyflow_sum_net_rank1_weight,
+            "kplConceptCountRank1": args.cross_section_kpl_concept_count_rank1_weight,
+        },
+    )
+    apply_moneyflow_cache_override(context, args.moneyflow_cache)
+    apply_concept_cache_override(context, args.concept_cache)
+    require_moneyflow_cache_for_enabled_weights(context)
+    require_concept_cache_for_enabled_weights(context)
+    apply_entry_risk_override(context, args.max_entry_gap_pct, args.min_entry_gap_pct, args.max_entry_range_pct, args.max_intraday_return_pct)
+    apply_entry_score_penalty_override(
+        context,
+        None,
+        0.0,
+        None,
+        0.0,
+        args.entry_prior_volume_ratio_basic_score_penalty_threshold,
+        args.entry_prior_volume_ratio_basic_score_penalty,
+        args.entry_volume_inefficiency_crowding_prior_volume_ratio_basic_threshold,
+        args.entry_volume_inefficiency_crowding_amount_efficiency_rsi_rank_max,
+        args.entry_volume_inefficiency_crowding_score_penalty,
+        args.entry_industry_return_overheat_rank_threshold,
+        args.entry_industry_return_overheat_score_penalty,
+        args.entry_unsupported_boll_squeeze_boll_rank_threshold,
+        args.entry_unsupported_boll_squeeze_industry_moneyflow_rank_max,
+        args.entry_unsupported_boll_squeeze_score_penalty,
+        args.entry_industry_moneyflow_crowding_sum_rank_threshold,
+        args.entry_industry_moneyflow_crowding_persistent_score_max,
+        args.entry_industry_moneyflow_crowding_score_penalty,
+        args.entry_moneyflow_surge_rsi_crowding_surge_rank_threshold,
+        args.entry_moneyflow_surge_rsi_crowding_rsi_rank_threshold,
+        args.entry_moneyflow_surge_rsi_crowding_gap_threshold_pct,
+        args.entry_moneyflow_surge_rsi_crowding_range_threshold_pct,
+        args.entry_moneyflow_surge_rsi_crowding_score_penalty,
+        args.entry_indicator_confluence_moneyflow_crowding_confluence_rank_threshold,
+        args.entry_indicator_confluence_moneyflow_crowding_moneyflow5_rank_threshold,
+        args.entry_indicator_confluence_moneyflow_crowding_min_gap_pct,
+        args.entry_indicator_confluence_moneyflow_crowding_score_penalty,
+        args.entry_unconfirmed_gap_range_min_gap_pct,
+        args.entry_unconfirmed_gap_range_min_range_pct,
+        args.entry_unconfirmed_gap_range_max_surge_rank,
+        args.entry_unconfirmed_gap_range_score_penalty,
+    )
+    apply_failure_throttle_override(
+        context,
+        args.failure_symbol_cooldown_days,
+        args.failure_industry_weekly_loss_limit,
+        args.failure_industry_cooldown_days,
+    )
+    apply_industry_state_filter_override(
+        context,
+        args.industry_state_filter,
+        args.industry_state_min_samples,
+        args.industry_state_min_up_pct,
+        args.industry_state_min_above_ma20_pct,
+        args.industry_state_min_above_ma60_pct,
+        args.industry_state_min_return20_pct,
+    )
     apply_entry_size_haircut_override(
         context,
         args.entry_gap_size_haircut_threshold_pct,

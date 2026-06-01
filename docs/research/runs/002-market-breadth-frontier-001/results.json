@@ -1,0 +1,2506 @@
+{
+  "runId": "002-market-breadth-frontier-001",
+  "startedAt": "2026-06-01 02:33 +0800",
+  "finishedAt": "2026-06-01 02:42 +0800",
+  "strategy": {
+    "label": "MA趋势跟随-高弹性止盈-移除MACD过滤",
+    "hypothesis": "8%/16% 止盈已经出现 1 个达标样本但覆盖太窄；继续提高到 10%/20%，检验更高收益弹性是否能扩大达标样本数，同时确认最大回撤仍压在 10% 内。",
+    "config": {
+      "marketState": "normal",
+      "initialCash": 100000,
+      "weeklyTradeLimit": 2,
+      "positionCapPct": 0.2,
+      "riskPct": 0.01,
+      "stopLossPct": 0.05,
+      "takeProfit1Pct": 0.1,
+      "takeProfit2Pct": 0.2,
+      "commissionPct": 0.00025,
+      "stampDutyPct": 0.0005,
+      "lotSize": 100,
+      "bollPeriod": 20,
+      "bollDev": 2,
+      "bollTolerancePct": 0.015,
+      "bollBandwidthMaxPct": 0.08,
+      "midlineTolerancePct": 0.025,
+      "trendFastPeriod": 5,
+      "trendSlowPeriod": 10,
+      "trendLongPeriod": 20,
+      "volumeMaPeriod": 20,
+      "volumeBreakoutMultiplier": 1.08,
+      "pullbackTolerancePct": 0.025,
+      "maxMa20ExtensionPct": 0.06,
+      "minMa20ExtensionPct": 0.0,
+      "macdFastPeriod": 12,
+      "macdSlowPeriod": 26,
+      "macdSignalPeriod": 9,
+      "macdRequireZeroAxis": false,
+      "rsiPeriod": 14,
+      "rsiLowerBound": 35,
+      "rsiUpperBound": 78,
+      "kdjPeriod": 9,
+      "atrPeriod": 14,
+      "useAtrStop": false,
+      "atrStopMultiplier": 1.8,
+      "useTrendFilter": true,
+      "useMacdFilter": false,
+      "useRsiFilter": false,
+      "blockWeakMarket": true,
+      "forceStopOverridesLimit": true,
+      "blockSameDayReentry": true,
+      "minEntryMa20ExtensionPct": null,
+      "maxEntryMa20ExtensionPct": null,
+      "requireMa20AboveMa60": false,
+      "entryMode": "trend-follow",
+      "allowedEntryDates": [
+        "2023-09-05",
+        "2023-09-07",
+        "2023-10-13",
+        "2023-10-31",
+        "2023-11-02",
+        "2023-11-06",
+        "2023-11-07",
+        "2023-11-08",
+        "2023-11-14",
+        "2023-11-15",
+        "2023-11-16",
+        "2023-11-20",
+        "2023-11-21",
+        "2023-11-24",
+        "2023-11-28",
+        "2023-11-29",
+        "2024-01-02",
+        "2024-03-04",
+        "2024-03-07",
+        "2024-03-11",
+        "2024-03-12",
+        "2024-03-13",
+        "2024-03-18",
+        "2024-03-19",
+        "2024-03-21",
+        "2024-04-02",
+        "2024-04-29",
+        "2024-04-30",
+        "2024-05-07",
+        "2024-05-08",
+        "2024-05-10",
+        "2024-05-15",
+        "2024-05-17",
+        "2024-05-20",
+        "2024-05-21",
+        "2024-05-23",
+        "2024-09-25",
+        "2024-09-26",
+        "2024-09-27",
+        "2024-09-30",
+        "2024-10-08",
+        "2024-10-09",
+        "2024-10-11",
+        "2024-10-15",
+        "2024-10-17",
+        "2024-10-21",
+        "2024-10-22",
+        "2024-10-23",
+        "2024-10-24",
+        "2024-10-28",
+        "2024-10-29",
+        "2024-10-31",
+        "2024-11-01",
+        "2024-11-05",
+        "2024-11-06",
+        "2024-11-07",
+        "2024-11-08",
+        "2024-11-12",
+        "2024-11-21",
+        "2024-12-03",
+        "2024-12-06",
+        "2024-12-09",
+        "2024-12-11",
+        "2024-12-12",
+        "2024-12-13",
+        "2025-02-10",
+        "2025-02-11",
+        "2025-02-13",
+        "2025-02-17",
+        "2025-02-18",
+        "2025-02-20",
+        "2025-02-21",
+        "2025-02-24",
+        "2025-02-25",
+        "2025-02-27",
+        "2025-03-05",
+        "2025-03-06",
+        "2025-03-07",
+        "2025-03-11",
+        "2025-03-12",
+        "2025-03-13",
+        "2025-03-17",
+        "2025-03-18",
+        "2025-03-19",
+        "2025-05-07",
+        "2025-05-08",
+        "2025-05-09",
+        "2025-05-13",
+        "2025-05-15",
+        "2025-05-19",
+        "2025-05-20",
+        "2025-05-21",
+        "2025-05-30",
+        "2025-06-05",
+        "2025-06-06",
+        "2025-06-10",
+        "2025-06-12",
+        "2025-06-18",
+        "2025-06-25",
+        "2025-06-26",
+        "2025-06-30",
+        "2025-07-01",
+        "2025-07-02",
+        "2025-07-04",
+        "2025-07-08",
+        "2025-07-09",
+        "2025-07-11",
+        "2025-07-14",
+        "2025-07-15",
+        "2025-07-17",
+        "2025-07-18",
+        "2025-07-21",
+        "2025-07-22",
+        "2025-07-23",
+        "2025-07-25",
+        "2025-07-29",
+        "2025-07-30",
+        "2025-08-04",
+        "2025-08-05",
+        "2025-08-06",
+        "2025-08-07",
+        "2025-08-12",
+        "2025-08-14",
+        "2025-08-18",
+        "2025-08-19",
+        "2025-08-20",
+        "2025-08-21",
+        "2025-08-25",
+        "2025-08-26",
+        "2025-08-27",
+        "2025-08-29",
+        "2025-09-02",
+        "2025-09-09",
+        "2025-09-12",
+        "2025-09-17",
+        "2025-09-18",
+        "2025-10-09",
+        "2025-10-10",
+        "2025-10-16",
+        "2025-10-27",
+        "2025-10-28",
+        "2025-10-30",
+        "2025-11-03",
+        "2025-11-04",
+        "2025-11-06",
+        "2025-11-07",
+        "2025-11-11",
+        "2025-11-14",
+        "2025-11-18",
+        "2025-12-22",
+        "2025-12-23",
+        "2025-12-25",
+        "2025-12-26",
+        "2026-01-06",
+        "2026-01-07",
+        "2026-01-09",
+        "2026-01-12",
+        "2026-01-13",
+        "2026-01-15",
+        "2026-01-20",
+        "2026-01-22",
+        "2026-01-23",
+        "2026-01-26",
+        "2026-02-25",
+        "2026-02-26",
+        "2026-02-27",
+        "2026-03-02",
+        "2026-04-21",
+        "2026-04-23",
+        "2026-04-28",
+        "2026-04-30",
+        "2026-05-06",
+        "2026-05-07",
+        "2026-05-08",
+        "2026-05-11",
+        "2026-05-12",
+        "2026-05-14",
+        "2026-05-20"
+      ],
+      "entryScoreMode": "market_breadth_then_trend_quality",
+      "maxEntrySignalScore": 3.2,
+      "buySlippagePct": 0.001,
+      "sellSlippagePct": 0.001,
+      "stopGapFillAtOpen": true,
+      "limitDownStopDelay": true,
+      "limitBandTolerancePct": 0.002,
+      "limitUpEntryBlockPct": null,
+      "nextOpenEntry": false,
+      "nextOpenCancelGapDownPct": null,
+      "earlyExitDays": 0,
+      "earlyExitLossPct": null,
+      "earlyExitEntryLowBreak": false,
+      "gapStopMarketCooldownDays": 0,
+      "gapStopIndustryCooldownDays": 0,
+      "gapStopSymbolCooldownDays": 0,
+      "industryOvernightRiskWindowDays": 0,
+      "industryOvernightRiskGapDownPct": 0.03,
+      "industryOvernightRiskMinCount": 0,
+      "industryOvernightRiskMinRatio": 0.0,
+      "entryRiskFilter": {
+        "enabled": true,
+        "maxEntryRangePct": 0.08,
+        "maxIntradayReturnPct": 0.1,
+        "maxGapPct": 0.06,
+        "maxLowerShadowPct": null
+      }
+    },
+    "name": "trend-follow-maximum-profit-no-macd"
+  },
+  "context": {
+    "version": "2026-05-30.cross-section-strength-liquid-14pct-risk8-v1",
+    "objective": {
+      "name": "策略进化后三年全市场复核",
+      "target_total_return": 0.3,
+      "target_profit_loss_ratio": 2.0,
+      "max_abs_drawdown": 0.1,
+      "evaluation_window_years": 3,
+      "primary_scope": "post_evolution_full_market_scan",
+      "note": "每完成一次策略进化后，必须跑三年全市场逐标的复核；收益前10和收益后10都要审计，组合级共享资金回测是后续增强。"
+    },
+    "scope": {
+      "start_date": "2023-05-30",
+      "end_date": "2026-05-30",
+      "q": null,
+      "industry": null,
+      "market": null,
+      "pool_id": null,
+      "min_bars": 120,
+      "max_stocks": 0,
+      "exclude_st": true,
+      "exclude_bj": true,
+      "min_list_days": 365,
+      "min_avg_amount": 200000,
+      "min_avg_circ_mv": 500000,
+      "min_avg_turnover_rate_f": 1,
+      "unit_note": "派生实验上下文：提高全市场候选池流动性与市值阈值，用于检验尾部亏损是否来自低质量候选池。min_avg_amount 单位为千元，min_avg_circ_mv 单位为万元。"
+    },
+    "market_breadth_scope": {
+      "q": null,
+      "industry": null,
+      "market": null,
+      "pool_id": null,
+      "min_bars": 120,
+      "max_stocks": 0,
+      "exclude_st": true,
+      "exclude_bj": true,
+      "min_list_days": 365,
+      "min_avg_amount": null,
+      "min_avg_circ_mv": null,
+      "min_avg_turnover_rate_f": null,
+      "unit_note": "市场宽度使用更宽的非 ST、非北交所、上市满一年样本，只要求足够 K 线；交易候选池仍使用 scope 中的高流动性和市值过滤。"
+    },
+    "capital": {
+      "initialCash": 100000,
+      "weeklyTradeLimit": 2,
+      "positionCapPct": 0.2,
+      "riskPct": 0.01,
+      "lotSize": 100
+    },
+    "costs": {
+      "commissionPct": 0.00025,
+      "stampDutyPct": 0.0005
+    },
+    "risk": {
+      "stopLossPct": 0.05,
+      "takeProfit1Pct": 0.03,
+      "takeProfit2Pct": 0.05,
+      "blockWeakMarket": true,
+      "forceStopOverridesLimit": true,
+      "blockSameDayReentry": true
+    },
+    "evaluation": {
+      "qualified_symbol_min_return": 0.3,
+      "qualified_symbol_max_abs_drawdown": 0.1,
+      "qualified_symbol_min_profit_loss_ratio": 2.0,
+      "minimum_qualified_symbols_for_full_scan": 5,
+      "minimum_completed_trades": 3,
+      "minimum_discipline_score": 0,
+      "minimum_tested_symbols_for_full_scan": 1000,
+      "tail_bottom_count": 10,
+      "tail_max_abs_loss": 0.1,
+      "tail_max_abs_drawdown": 0.1,
+      "tail_min_profit_loss_ratio": 2.0
+    },
+    "portfolio_target": {
+      "mode": "shared_capital_follow_up",
+      "initialCash": 100000,
+      "maxPositions": 3,
+      "maxSinglePositionPct": 0.135,
+      "maxIndustryPositionPct": 0.4,
+      "weeklyBuyLimit": 2,
+      "minimumCompletedTrades": 20,
+      "entryPriority": "cross_section_strength",
+      "maxSignalScore": null,
+      "rebalanceFrequency": "daily_signal_check",
+      "completionGate": "only_after_tail_audit_and_shared_capital_backtest_pass",
+      "marketBreadthFilter": {
+        "enabled": true,
+        "usePreviousTradingDay": true,
+        "minSamples": 1000,
+        "minAboveMa20Pct": 0.45,
+        "minAboveMa60Pct": 0.35,
+        "minUpPct": 0.45
+      },
+      "repeatFailureScorePenalty": 0.75,
+      "failureThrottle": {
+        "enabled": true,
+        "lossReturnThreshold": 0,
+        "symbolCooldownDays": 20,
+        "industryWeeklyLossLimit": 2,
+        "industryCooldownDays": 10
+      },
+      "maxSingleExposurePct": 0.15,
+      "maxIndustryExposurePct": 0.4,
+      "entryRiskFilter": {
+        "enabled": true,
+        "maxEntryRangePct": 0.08,
+        "maxIntradayReturnPct": 0.1,
+        "maxGapPct": 0.06,
+        "maxLowerShadowPct": null
+      },
+      "crossSectionScoreWeights": {
+        "return20": 1.0,
+        "return60": 0.5,
+        "high60": 3.0,
+        "recovery20": 0.5,
+        "volume": 0.25,
+        "base": 0.4,
+        "macdHist": 0.25,
+        "bollSqueeze": 0.25,
+        "bollPosition": 0.0,
+        "rsiBalance": 0.5,
+        "maAlignment": 0.0,
+        "indicatorPulseQuality": 0.25,
+        "moneyflowMarketSurgeQuality": 0.25
+      },
+      "industryStateFilter": {
+        "enabled": true,
+        "minSamples": 5,
+        "minAboveMa20Pct": 0.5,
+        "minReturn20Pct": 0.0
+      }
+    },
+    "data_rules": {
+      "price_and_volume_are_primary": true,
+      "fundamentals_are_filters_or_ranking_inputs": true,
+      "news_usage": "risk_tags_and_review_only",
+      "no_future_data": true,
+      "exclude_st_or_delisted_when_data_supports_it": true
+    },
+    "strategy_overrides": {
+      "allowedEntryDates": [
+        "2023-09-05",
+        "2023-09-07",
+        "2023-10-13",
+        "2023-10-31",
+        "2023-11-02",
+        "2023-11-06",
+        "2023-11-07",
+        "2023-11-08",
+        "2023-11-14",
+        "2023-11-15",
+        "2023-11-16",
+        "2023-11-20",
+        "2023-11-21",
+        "2023-11-24",
+        "2023-11-28",
+        "2023-11-29",
+        "2024-01-02",
+        "2024-03-04",
+        "2024-03-07",
+        "2024-03-11",
+        "2024-03-12",
+        "2024-03-13",
+        "2024-03-18",
+        "2024-03-19",
+        "2024-03-21",
+        "2024-04-02",
+        "2024-04-29",
+        "2024-04-30",
+        "2024-05-07",
+        "2024-05-08",
+        "2024-05-10",
+        "2024-05-15",
+        "2024-05-17",
+        "2024-05-20",
+        "2024-05-21",
+        "2024-05-23",
+        "2024-09-25",
+        "2024-09-26",
+        "2024-09-27",
+        "2024-09-30",
+        "2024-10-08",
+        "2024-10-09",
+        "2024-10-11",
+        "2024-10-15",
+        "2024-10-17",
+        "2024-10-21",
+        "2024-10-22",
+        "2024-10-23",
+        "2024-10-24",
+        "2024-10-28",
+        "2024-10-29",
+        "2024-10-31",
+        "2024-11-01",
+        "2024-11-05",
+        "2024-11-06",
+        "2024-11-07",
+        "2024-11-08",
+        "2024-11-12",
+        "2024-11-21",
+        "2024-12-03",
+        "2024-12-06",
+        "2024-12-09",
+        "2024-12-11",
+        "2024-12-12",
+        "2024-12-13",
+        "2025-02-10",
+        "2025-02-11",
+        "2025-02-13",
+        "2025-02-17",
+        "2025-02-18",
+        "2025-02-20",
+        "2025-02-21",
+        "2025-02-24",
+        "2025-02-25",
+        "2025-02-27",
+        "2025-03-05",
+        "2025-03-06",
+        "2025-03-07",
+        "2025-03-11",
+        "2025-03-12",
+        "2025-03-13",
+        "2025-03-17",
+        "2025-03-18",
+        "2025-03-19",
+        "2025-05-07",
+        "2025-05-08",
+        "2025-05-09",
+        "2025-05-13",
+        "2025-05-15",
+        "2025-05-19",
+        "2025-05-20",
+        "2025-05-21",
+        "2025-05-30",
+        "2025-06-05",
+        "2025-06-06",
+        "2025-06-10",
+        "2025-06-12",
+        "2025-06-18",
+        "2025-06-25",
+        "2025-06-26",
+        "2025-06-30",
+        "2025-07-01",
+        "2025-07-02",
+        "2025-07-04",
+        "2025-07-08",
+        "2025-07-09",
+        "2025-07-11",
+        "2025-07-14",
+        "2025-07-15",
+        "2025-07-17",
+        "2025-07-18",
+        "2025-07-21",
+        "2025-07-22",
+        "2025-07-23",
+        "2025-07-25",
+        "2025-07-29",
+        "2025-07-30",
+        "2025-08-04",
+        "2025-08-05",
+        "2025-08-06",
+        "2025-08-07",
+        "2025-08-12",
+        "2025-08-14",
+        "2025-08-18",
+        "2025-08-19",
+        "2025-08-20",
+        "2025-08-21",
+        "2025-08-25",
+        "2025-08-26",
+        "2025-08-27",
+        "2025-08-29",
+        "2025-09-02",
+        "2025-09-09",
+        "2025-09-12",
+        "2025-09-17",
+        "2025-09-18",
+        "2025-10-09",
+        "2025-10-10",
+        "2025-10-16",
+        "2025-10-27",
+        "2025-10-28",
+        "2025-10-30",
+        "2025-11-03",
+        "2025-11-04",
+        "2025-11-06",
+        "2025-11-07",
+        "2025-11-11",
+        "2025-11-14",
+        "2025-11-18",
+        "2025-12-22",
+        "2025-12-23",
+        "2025-12-25",
+        "2025-12-26",
+        "2026-01-06",
+        "2026-01-07",
+        "2026-01-09",
+        "2026-01-12",
+        "2026-01-13",
+        "2026-01-15",
+        "2026-01-20",
+        "2026-01-22",
+        "2026-01-23",
+        "2026-01-26",
+        "2026-02-25",
+        "2026-02-26",
+        "2026-02-27",
+        "2026-03-02",
+        "2026-04-21",
+        "2026-04-23",
+        "2026-04-28",
+        "2026-04-30",
+        "2026-05-06",
+        "2026-05-07",
+        "2026-05-08",
+        "2026-05-11",
+        "2026-05-12",
+        "2026-05-14",
+        "2026-05-20"
+      ],
+      "entryScoreMode": "market_breadth_then_trend_quality",
+      "maxEntrySignalScore": 3.2
+    },
+    "market_state_source": {
+      "sourceRun": "025-portfolio-market-breadth-score-cap-32-position-3x15-rebalance",
+      "riskOnDateCount": 178,
+      "note": "allowedEntryDates uses the entry-date marketRiskOn flag from the portfolio diagnostic equity curve, based on previous trading day breadth."
+    },
+    "portfolioOverride": {
+      "maxSinglePositionPct": 0.135,
+      "note": "portfolio_target.maxSinglePositionPct was overridden before building portfolio rules."
+    },
+    "entryRiskOverride": {
+      "maxGapPct": 0.06,
+      "maxEntryRangePct": null,
+      "maxIntradayReturnPct": null,
+      "note": "portfolio_target.entryRiskFilter was overridden before building portfolio rules."
+    },
+    "execution_stress": {
+      "buySlippagePct": 0.001,
+      "sellSlippagePct": 0.001,
+      "stopGapFillAtOpen": true,
+      "limitDownStopDelay": true,
+      "limitBandTolerancePct": 0.002,
+      "limitUpEntryBlockPct": null,
+      "nextOpenEntry": false,
+      "nextOpenCancelGapDownPct": null,
+      "earlyExitDays": 0,
+      "earlyExitLossPct": null,
+      "earlyExitEntryLowBreak": false,
+      "gapStopMarketCooldownDays": 0,
+      "gapStopIndustryCooldownDays": 0,
+      "gapStopSymbolCooldownDays": 0,
+      "industryOvernightRiskWindowDays": 0,
+      "industryOvernightRiskGapDownPct": 0.03,
+      "industryOvernightRiskMinCount": 0,
+      "industryOvernightRiskMinRatio": 0.0
+    },
+    "executionStress": {
+      "buySlippagePct": 0.001,
+      "sellSlippagePct": 0.001,
+      "stopGapFillAtOpen": true,
+      "limitDownStopDelay": true,
+      "limitBandTolerancePct": 0.002,
+      "limitUpEntryBlockPct": null,
+      "nextOpenEntry": false,
+      "nextOpenCancelGapDownPct": null,
+      "earlyExitDays": 0,
+      "earlyExitLossPct": null,
+      "earlyExitEntryLowBreak": false,
+      "gapStopMarketCooldownDays": 0,
+      "gapStopIndustryCooldownDays": 0,
+      "gapStopSymbolCooldownDays": 0,
+      "industryOvernightRiskWindowDays": 0,
+      "industryOvernightRiskGapDownPct": 0.03,
+      "industryOvernightRiskMinCount": 0,
+      "industryOvernightRiskMinRatio": 0.0,
+      "note": "Execution stress was applied before building the strategy config. It changes fill prices and optional entry blocking, not entry signal semantics."
+    },
+    "crossSectionScoreWeightOverride": {
+      "indicatorPulseQuality": 0.25,
+      "moneyflowMarketSurgeQuality": 0.25,
+      "note": "Cross-section score weights were overridden before building portfolio rules."
+    },
+    "industryStateFilterOverride": {
+      "enabled": true,
+      "minSamples": 5,
+      "minUpPct": null,
+      "minAboveMa20Pct": 0.5,
+      "minAboveMa60Pct": null,
+      "minReturn20Pct": 0.0,
+      "note": "Industry state filter was overridden before building portfolio rules."
+    },
+    "moneyflowCachePath": "docs\\research\\runs\\002-moneyflow-cache-mainline-001\\moneyflow-cache.jsonl",
+    "moneyflowCacheOverride": {
+      "moneyflowCachePath": "docs\\research\\runs\\002-moneyflow-cache-mainline-001\\moneyflow-cache.jsonl",
+      "note": "Point-in-time moneyflow ranks are loaded from a run-local cache; no database schema is changed."
+    }
+  },
+  "marketPayload": {
+    "start_date": "2023-02-28",
+    "end_date": "2026-05-30",
+    "config": {
+      "marketState": "normal",
+      "initialCash": 100000,
+      "weeklyTradeLimit": 2,
+      "positionCapPct": 0.2,
+      "riskPct": 0.01,
+      "stopLossPct": 0.05,
+      "takeProfit1Pct": 0.1,
+      "takeProfit2Pct": 0.2,
+      "commissionPct": 0.00025,
+      "stampDutyPct": 0.0005,
+      "lotSize": 100,
+      "bollPeriod": 20,
+      "bollDev": 2,
+      "bollTolerancePct": 0.015,
+      "bollBandwidthMaxPct": 0.08,
+      "midlineTolerancePct": 0.025,
+      "trendFastPeriod": 5,
+      "trendSlowPeriod": 10,
+      "trendLongPeriod": 20,
+      "volumeMaPeriod": 20,
+      "volumeBreakoutMultiplier": 1.08,
+      "pullbackTolerancePct": 0.025,
+      "maxMa20ExtensionPct": 0.06,
+      "minMa20ExtensionPct": 0.0,
+      "macdFastPeriod": 12,
+      "macdSlowPeriod": 26,
+      "macdSignalPeriod": 9,
+      "macdRequireZeroAxis": false,
+      "rsiPeriod": 14,
+      "rsiLowerBound": 35,
+      "rsiUpperBound": 78,
+      "kdjPeriod": 9,
+      "atrPeriod": 14,
+      "useAtrStop": false,
+      "atrStopMultiplier": 1.8,
+      "useTrendFilter": true,
+      "useMacdFilter": false,
+      "useRsiFilter": false,
+      "blockWeakMarket": true,
+      "forceStopOverridesLimit": true,
+      "blockSameDayReentry": true,
+      "minEntryMa20ExtensionPct": null,
+      "maxEntryMa20ExtensionPct": null,
+      "requireMa20AboveMa60": false,
+      "entryMode": "trend-follow",
+      "allowedEntryDates": [
+        "2023-09-05",
+        "2023-09-07",
+        "2023-10-13",
+        "2023-10-31",
+        "2023-11-02",
+        "2023-11-06",
+        "2023-11-07",
+        "2023-11-08",
+        "2023-11-14",
+        "2023-11-15",
+        "2023-11-16",
+        "2023-11-20",
+        "2023-11-21",
+        "2023-11-24",
+        "2023-11-28",
+        "2023-11-29",
+        "2024-01-02",
+        "2024-03-04",
+        "2024-03-07",
+        "2024-03-11",
+        "2024-03-12",
+        "2024-03-13",
+        "2024-03-18",
+        "2024-03-19",
+        "2024-03-21",
+        "2024-04-02",
+        "2024-04-29",
+        "2024-04-30",
+        "2024-05-07",
+        "2024-05-08",
+        "2024-05-10",
+        "2024-05-15",
+        "2024-05-17",
+        "2024-05-20",
+        "2024-05-21",
+        "2024-05-23",
+        "2024-09-25",
+        "2024-09-26",
+        "2024-09-27",
+        "2024-09-30",
+        "2024-10-08",
+        "2024-10-09",
+        "2024-10-11",
+        "2024-10-15",
+        "2024-10-17",
+        "2024-10-21",
+        "2024-10-22",
+        "2024-10-23",
+        "2024-10-24",
+        "2024-10-28",
+        "2024-10-29",
+        "2024-10-31",
+        "2024-11-01",
+        "2024-11-05",
+        "2024-11-06",
+        "2024-11-07",
+        "2024-11-08",
+        "2024-11-12",
+        "2024-11-21",
+        "2024-12-03",
+        "2024-12-06",
+        "2024-12-09",
+        "2024-12-11",
+        "2024-12-12",
+        "2024-12-13",
+        "2025-02-10",
+        "2025-02-11",
+        "2025-02-13",
+        "2025-02-17",
+        "2025-02-18",
+        "2025-02-20",
+        "2025-02-21",
+        "2025-02-24",
+        "2025-02-25",
+        "2025-02-27",
+        "2025-03-05",
+        "2025-03-06",
+        "2025-03-07",
+        "2025-03-11",
+        "2025-03-12",
+        "2025-03-13",
+        "2025-03-17",
+        "2025-03-18",
+        "2025-03-19",
+        "2025-05-07",
+        "2025-05-08",
+        "2025-05-09",
+        "2025-05-13",
+        "2025-05-15",
+        "2025-05-19",
+        "2025-05-20",
+        "2025-05-21",
+        "2025-05-30",
+        "2025-06-05",
+        "2025-06-06",
+        "2025-06-10",
+        "2025-06-12",
+        "2025-06-18",
+        "2025-06-25",
+        "2025-06-26",
+        "2025-06-30",
+        "2025-07-01",
+        "2025-07-02",
+        "2025-07-04",
+        "2025-07-08",
+        "2025-07-09",
+        "2025-07-11",
+        "2025-07-14",
+        "2025-07-15",
+        "2025-07-17",
+        "2025-07-18",
+        "2025-07-21",
+        "2025-07-22",
+        "2025-07-23",
+        "2025-07-25",
+        "2025-07-29",
+        "2025-07-30",
+        "2025-08-04",
+        "2025-08-05",
+        "2025-08-06",
+        "2025-08-07",
+        "2025-08-12",
+        "2025-08-14",
+        "2025-08-18",
+        "2025-08-19",
+        "2025-08-20",
+        "2025-08-21",
+        "2025-08-25",
+        "2025-08-26",
+        "2025-08-27",
+        "2025-08-29",
+        "2025-09-02",
+        "2025-09-09",
+        "2025-09-12",
+        "2025-09-17",
+        "2025-09-18",
+        "2025-10-09",
+        "2025-10-10",
+        "2025-10-16",
+        "2025-10-27",
+        "2025-10-28",
+        "2025-10-30",
+        "2025-11-03",
+        "2025-11-04",
+        "2025-11-06",
+        "2025-11-07",
+        "2025-11-11",
+        "2025-11-14",
+        "2025-11-18",
+        "2025-12-22",
+        "2025-12-23",
+        "2025-12-25",
+        "2025-12-26",
+        "2026-01-06",
+        "2026-01-07",
+        "2026-01-09",
+        "2026-01-12",
+        "2026-01-13",
+        "2026-01-15",
+        "2026-01-20",
+        "2026-01-22",
+        "2026-01-23",
+        "2026-01-26",
+        "2026-02-25",
+        "2026-02-26",
+        "2026-02-27",
+        "2026-03-02",
+        "2026-04-21",
+        "2026-04-23",
+        "2026-04-28",
+        "2026-04-30",
+        "2026-05-06",
+        "2026-05-07",
+        "2026-05-08",
+        "2026-05-11",
+        "2026-05-12",
+        "2026-05-14",
+        "2026-05-20"
+      ],
+      "entryScoreMode": "market_breadth_then_trend_quality",
+      "maxEntrySignalScore": 3.2,
+      "buySlippagePct": 0.001,
+      "sellSlippagePct": 0.001,
+      "stopGapFillAtOpen": true,
+      "limitDownStopDelay": true,
+      "limitBandTolerancePct": 0.002,
+      "limitUpEntryBlockPct": null,
+      "nextOpenEntry": false,
+      "nextOpenCancelGapDownPct": null,
+      "earlyExitDays": 0,
+      "earlyExitLossPct": null,
+      "earlyExitEntryLowBreak": false,
+      "gapStopMarketCooldownDays": 0,
+      "gapStopIndustryCooldownDays": 0,
+      "gapStopSymbolCooldownDays": 0,
+      "industryOvernightRiskWindowDays": 0,
+      "industryOvernightRiskGapDownPct": 0.03,
+      "industryOvernightRiskMinCount": 0,
+      "industryOvernightRiskMinRatio": 0.0,
+      "entryRiskFilter": {
+        "enabled": true,
+        "maxEntryRangePct": 0.08,
+        "maxIntradayReturnPct": 0.1,
+        "maxGapPct": 0.06,
+        "maxLowerShadowPct": null
+      }
+    },
+    "pool_id": null,
+    "q": null,
+    "industry": null,
+    "market": null,
+    "min_bars": 120,
+    "max_stocks": 0,
+    "exclude_st": true,
+    "exclude_bj": true,
+    "min_list_days": 365,
+    "min_avg_amount": null,
+    "min_avg_circ_mv": null,
+    "min_avg_turnover_rate_f": null
+  },
+  "scope": {
+    "marketBreadthStocks": 4231,
+    "skipped": 0,
+    "dateCount": 727
+  },
+  "baseMarketRules": {
+    "enabled": true,
+    "usePreviousTradingDay": true,
+    "minSamples": 1000,
+    "minAboveMa20Pct": 0.45,
+    "minAboveMa60Pct": 0.35,
+    "minUpPct": 0.45
+  },
+  "variants": [
+    {
+      "name": "current",
+      "rules": {
+        "enabled": true,
+        "usePreviousTradingDay": true,
+        "minSamples": 1000,
+        "minAboveMa20Pct": 0.45,
+        "minAboveMa60Pct": 0.35,
+        "minUpPct": 0.45
+      }
+    },
+    {
+      "name": "lower_up_40",
+      "rules": {
+        "enabled": true,
+        "usePreviousTradingDay": true,
+        "minSamples": 1000,
+        "minAboveMa20Pct": 0.45,
+        "minAboveMa60Pct": 0.35,
+        "minUpPct": 0.4
+      }
+    },
+    {
+      "name": "lower_above20_40",
+      "rules": {
+        "enabled": true,
+        "usePreviousTradingDay": true,
+        "minSamples": 1000,
+        "minAboveMa20Pct": 0.4,
+        "minAboveMa60Pct": 0.35,
+        "minUpPct": 0.45
+      }
+    },
+    {
+      "name": "lower_above60_30",
+      "rules": {
+        "enabled": true,
+        "usePreviousTradingDay": true,
+        "minSamples": 1000,
+        "minAboveMa20Pct": 0.45,
+        "minAboveMa60Pct": 0.3,
+        "minUpPct": 0.45
+      }
+    },
+    {
+      "name": "lower_samples_800",
+      "rules": {
+        "enabled": true,
+        "usePreviousTradingDay": true,
+        "minSamples": 800,
+        "minAboveMa20Pct": 0.45,
+        "minAboveMa60Pct": 0.35,
+        "minUpPct": 0.45
+      }
+    },
+    {
+      "name": "soft_all_minus_05",
+      "rules": {
+        "enabled": true,
+        "usePreviousTradingDay": true,
+        "minSamples": 800,
+        "minAboveMa20Pct": 0.4,
+        "minAboveMa60Pct": 0.3,
+        "minUpPct": 0.4
+      }
+    }
+  ],
+  "windows": [
+    {
+      "window": {
+        "label": "Y1",
+        "kind": "annual",
+        "startDate": "2023-05-30",
+        "endDate": "2024-05-30",
+        "years": 1.002053388090349,
+        "warmupStartDate": "2023-02-28",
+        "warmupDays": 91,
+        "warmupMonths": 3
+      },
+      "baseSummary": {
+        "riskOnDays": 38,
+        "riskOffDays": 205,
+        "riskOnForward": {
+          "days": 38,
+          "fwd1": {
+            "count": 38,
+            "mean": -0.0007473907112955394,
+            "median": -0.0022198870529793434,
+            "winRate": 0.4473684210526316
+          },
+          "fwd3": {
+            "count": 38,
+            "mean": -0.003057809476089312,
+            "median": -0.0039238995578997045,
+            "winRate": 0.4473684210526316
+          },
+          "fwd5": {
+            "count": 38,
+            "mean": -0.006578646124517855,
+            "median": -0.007908894327161058,
+            "winRate": 0.42105263157894735
+          },
+          "fwd10": {
+            "count": 38,
+            "mean": -0.017288839179933874,
+            "median": -0.01642856411283812,
+            "winRate": 0.3157894736842105
+          }
+        },
+        "riskOffForward": {
+          "days": 205,
+          "fwd1": {
+            "count": 205,
+            "mean": -0.00034853060753842067,
+            "median": 8.02525736235471e-05,
+            "winRate": 0.5024390243902439
+          },
+          "fwd3": {
+            "count": 205,
+            "mean": -0.0009328034418318692,
+            "median": -0.002173208362672395,
+            "winRate": 0.4634146341463415
+          },
+          "fwd5": {
+            "count": 205,
+            "mean": -0.0017744854500064372,
+            "median": -0.003392520230138685,
+            "winRate": 0.4682926829268293
+          },
+          "fwd10": {
+            "count": 205,
+            "mean": -0.0034437600100365082,
+            "median": -0.004682159914062846,
+            "winRate": 0.44878048780487806
+          }
+        },
+        "riskOffFailedChecks": {
+          "samples": 59,
+          "aboveMa20": 155,
+          "aboveMa60": 150,
+          "upPct": 155
+        },
+        "riskOnState": {
+          "days": 38,
+          "samples": {
+            "count": 38,
+            "mean": 4228.0526315789475,
+            "median": 4228.0,
+            "winRate": 1.0
+          },
+          "aboveMa20Pct": {
+            "count": 38,
+            "mean": 0.7096959425592374,
+            "median": 0.7157317713922253,
+            "winRate": 1.0
+          },
+          "aboveMa60Pct": {
+            "count": 38,
+            "mean": 0.5482524339677928,
+            "median": 0.5679003840280537,
+            "winRate": 1.0
+          },
+          "upPct": {
+            "count": 38,
+            "mean": 0.7003694975842326,
+            "median": 0.7187280116123289,
+            "winRate": 1.0
+          }
+        },
+        "riskOffState": {
+          "days": 205,
+          "samples": {
+            "count": 205,
+            "mean": 3010.9121951219513,
+            "median": 4228.0,
+            "winRate": 0.7121951219512195
+          },
+          "aboveMa20Pct": {
+            "count": 205,
+            "mean": 0.2803922178427311,
+            "median": 0.23906360841806573,
+            "winRate": 0.7121951219512195
+          },
+          "aboveMa60Pct": {
+            "count": 205,
+            "mean": 0.2401668962736189,
+            "median": 0.2511231969732797,
+            "winRate": 0.7121951219512195
+          },
+          "upPct": {
+            "count": 205,
+            "mean": 0.28600678473690416,
+            "median": 0.22787505915759584,
+            "winRate": 0.7121951219512195
+          }
+        }
+      },
+      "frontier": [
+        {
+          "name": "current",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 38,
+          "addedDays": 0,
+          "addedSummary": {
+            "days": 0,
+            "fwd1": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd3": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd5": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd10": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            }
+          }
+        },
+        {
+          "name": "lower_up_40",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.4
+          },
+          "riskOnDays": 46,
+          "addedDays": 8,
+          "addedSummary": {
+            "days": 8,
+            "fwd1": {
+              "count": 8,
+              "mean": -0.004538857387242742,
+              "median": -0.0036285410665386,
+              "winRate": 0.375
+            },
+            "fwd3": {
+              "count": 8,
+              "mean": -0.0056325958379139125,
+              "median": -0.0013853202883063725,
+              "winRate": 0.5
+            },
+            "fwd5": {
+              "count": 8,
+              "mean": -0.0005700027582179938,
+              "median": -0.003797531304253323,
+              "winRate": 0.5
+            },
+            "fwd10": {
+              "count": 8,
+              "mean": -0.012704878184205477,
+              "median": -0.010722727931798218,
+              "winRate": 0.25
+            }
+          }
+        },
+        {
+          "name": "lower_above20_40",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.4,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 38,
+          "addedDays": 0,
+          "addedSummary": {
+            "days": 0,
+            "fwd1": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd3": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd5": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd10": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            }
+          }
+        },
+        {
+          "name": "lower_above60_30",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.3,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 44,
+          "addedDays": 6,
+          "addedSummary": {
+            "days": 6,
+            "fwd1": {
+              "count": 6,
+              "mean": -0.002886130545574123,
+              "median": -0.003296093853772061,
+              "winRate": 0.16666666666666666
+            },
+            "fwd3": {
+              "count": 6,
+              "mean": -0.004055943302678332,
+              "median": -0.003533723249627507,
+              "winRate": 0.5
+            },
+            "fwd5": {
+              "count": 6,
+              "mean": -0.0007911309538674529,
+              "median": -0.00394862822495982,
+              "winRate": 0.16666666666666666
+            },
+            "fwd10": {
+              "count": 6,
+              "mean": -0.01161700109881046,
+              "median": -0.009916122117599192,
+              "winRate": 0.3333333333333333
+            }
+          }
+        },
+        {
+          "name": "lower_samples_800",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 800,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 38,
+          "addedDays": 0,
+          "addedSummary": {
+            "days": 0,
+            "fwd1": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd3": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd5": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd10": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            }
+          }
+        },
+        {
+          "name": "soft_all_minus_05",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 800,
+            "minAboveMa20Pct": 0.4,
+            "minAboveMa60Pct": 0.3,
+            "minUpPct": 0.4
+          },
+          "riskOnDays": 53,
+          "addedDays": 15,
+          "addedSummary": {
+            "days": 15,
+            "fwd1": {
+              "count": 15,
+              "mean": -0.004013614976782792,
+              "median": -0.003935636353208426,
+              "winRate": 0.26666666666666666
+            },
+            "fwd3": {
+              "count": 15,
+              "mean": -0.005529754508058884,
+              "median": -0.0046793956655993675,
+              "winRate": 0.4666666666666667
+            },
+            "fwd5": {
+              "count": 15,
+              "mean": -0.003289431638258491,
+              "median": -0.00399061949504565,
+              "winRate": 0.3333333333333333
+            },
+            "fwd10": {
+              "count": 15,
+              "mean": -0.013572022301163146,
+              "median": -0.013352230995221199,
+              "winRate": 0.26666666666666666
+            }
+          }
+        }
+      ]
+    },
+    {
+      "window": {
+        "label": "R18-1",
+        "kind": "rolling18m",
+        "startDate": "2023-05-30",
+        "endDate": "2024-11-30",
+        "years": 1.5058179329226558,
+        "warmupStartDate": "2023-02-28",
+        "warmupDays": 91,
+        "warmupMonths": 3
+      },
+      "baseSummary": {
+        "riskOnDays": 62,
+        "riskOffDays": 304,
+        "riskOnForward": {
+          "days": 62,
+          "fwd1": {
+            "count": 62,
+            "mean": 0.004401337020854245,
+            "median": 0.002176424947726436,
+            "winRate": 0.5806451612903226
+          },
+          "fwd3": {
+            "count": 62,
+            "mean": 0.009346074288922571,
+            "median": 0.0016476424760041002,
+            "winRate": 0.532258064516129
+          },
+          "fwd5": {
+            "count": 62,
+            "mean": 0.007009467831805957,
+            "median": 0.0012183848499040463,
+            "winRate": 0.5161290322580645
+          },
+          "fwd10": {
+            "count": 62,
+            "mean": 0.00791455321534755,
+            "median": -0.0019666338052953315,
+            "winRate": 0.4838709677419355
+          }
+        },
+        "riskOffForward": {
+          "days": 304,
+          "fwd1": {
+            "count": 304,
+            "mean": -0.0004525157965694404,
+            "median": -0.00022630151006269105,
+            "winRate": 0.4934210526315789
+          },
+          "fwd3": {
+            "count": 304,
+            "mean": -0.00040316096778046434,
+            "median": -0.002090348878277284,
+            "winRate": 0.47368421052631576
+          },
+          "fwd5": {
+            "count": 304,
+            "mean": 0.001101219416576059,
+            "median": -0.003778594169176655,
+            "winRate": 0.45723684210526316
+          },
+          "fwd10": {
+            "count": 304,
+            "mean": 0.003643270249464229,
+            "median": -0.004781542583255078,
+            "winRate": 0.45723684210526316
+          }
+        },
+        "riskOffFailedChecks": {
+          "samples": 59,
+          "aboveMa20": 232,
+          "aboveMa60": 228,
+          "upPct": 216
+        },
+        "riskOnState": {
+          "days": 62,
+          "samples": {
+            "count": 62,
+            "mean": 4226.8387096774195,
+            "median": 4228.0,
+            "winRate": 1.0
+          },
+          "aboveMa20Pct": {
+            "count": 62,
+            "mean": 0.7814529082984685,
+            "median": 0.8262560769070482,
+            "winRate": 1.0
+          },
+          "aboveMa60Pct": {
+            "count": 62,
+            "mean": 0.6969612386170706,
+            "median": 0.6381920812211412,
+            "winRate": 1.0
+          },
+          "upPct": {
+            "count": 62,
+            "mean": 0.7268960859141396,
+            "median": 0.7340506870300867,
+            "winRate": 1.0
+          }
+        },
+        "riskOffState": {
+          "days": 304,
+          "samples": {
+            "count": 304,
+            "mean": 3407.2039473684213,
+            "median": 4228.0,
+            "winRate": 0.805921052631579
+          },
+          "aboveMa20Pct": {
+            "count": 304,
+            "mean": 0.3066997366442321,
+            "median": 0.26264776881599794,
+            "winRate": 0.805921052631579
+          },
+          "aboveMa60Pct": {
+            "count": 304,
+            "mean": 0.2738150789225006,
+            "median": 0.23185143062908314,
+            "winRate": 0.805921052631579
+          },
+          "upPct": {
+            "count": 304,
+            "mean": 0.3268398557778467,
+            "median": 0.2829454219754788,
+            "winRate": 0.805921052631579
+          }
+        }
+      },
+      "frontier": [
+        {
+          "name": "current",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 62,
+          "addedDays": 0,
+          "addedSummary": {
+            "days": 0,
+            "fwd1": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd3": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd5": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd10": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            }
+          }
+        },
+        {
+          "name": "lower_up_40",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.4
+          },
+          "riskOnDays": 71,
+          "addedDays": 9,
+          "addedSummary": {
+            "days": 9,
+            "fwd1": {
+              "count": 9,
+              "mean": -0.007265117648176548,
+              "median": -0.005622663192084245,
+              "winRate": 0.3333333333333333
+            },
+            "fwd3": {
+              "count": 9,
+              "mean": -0.002843855744496697,
+              "median": 0.0019087550889866226,
+              "winRate": 0.5555555555555556
+            },
+            "fwd5": {
+              "count": 9,
+              "mean": 0.005321924360655432,
+              "median": 0.007379353363286769,
+              "winRate": 0.5555555555555556
+            },
+            "fwd10": {
+              "count": 9,
+              "mean": -0.007417459113406221,
+              "median": -0.007542490346694791,
+              "winRate": 0.3333333333333333
+            }
+          }
+        },
+        {
+          "name": "lower_above20_40",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.4,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 64,
+          "addedDays": 2,
+          "addedSummary": {
+            "days": 2,
+            "fwd1": {
+              "count": 2,
+              "mean": 0.012141931382806745,
+              "median": 0.012141931382806745,
+              "winRate": 1.0
+            },
+            "fwd3": {
+              "count": 2,
+              "mean": -0.004412880762480769,
+              "median": -0.004412880762480769,
+              "winRate": 0.5
+            },
+            "fwd5": {
+              "count": 2,
+              "mean": 0.011056873037289427,
+              "median": 0.011056873037289427,
+              "winRate": 0.5
+            },
+            "fwd10": {
+              "count": 2,
+              "mean": 0.0315709715375075,
+              "median": 0.0315709715375075,
+              "winRate": 1.0
+            }
+          }
+        },
+        {
+          "name": "lower_above60_30",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.3,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 70,
+          "addedDays": 8,
+          "addedSummary": {
+            "days": 8,
+            "fwd1": {
+              "count": 8,
+              "mean": -0.0013519287904464922,
+              "median": -0.0026985268060904866,
+              "winRate": 0.25
+            },
+            "fwd3": {
+              "count": 8,
+              "mean": -0.0018618362485479222,
+              "median": 0.0006566820458219511,
+              "winRate": 0.5
+            },
+            "fwd5": {
+              "count": 8,
+              "mean": -0.003750652085409106,
+              "median": -0.005377232140620811,
+              "winRate": 0.125
+            },
+            "fwd10": {
+              "count": 8,
+              "mean": -0.008117025088579255,
+              "median": -0.009916122117599192,
+              "winRate": 0.375
+            }
+          }
+        },
+        {
+          "name": "lower_samples_800",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 800,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 62,
+          "addedDays": 0,
+          "addedSummary": {
+            "days": 0,
+            "fwd1": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd3": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd5": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd10": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            }
+          }
+        },
+        {
+          "name": "soft_all_minus_05",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 800,
+            "minAboveMa20Pct": 0.4,
+            "minAboveMa60Pct": 0.3,
+            "minUpPct": 0.4
+          },
+          "riskOnDays": 85,
+          "addedDays": 23,
+          "addedSummary": {
+            "days": 23,
+            "fwd1": {
+              "count": 23,
+              "mean": -0.0015169110788068204,
+              "median": -0.0016344189409929553,
+              "winRate": 0.43478260869565216
+            },
+            "fwd3": {
+              "count": 23,
+              "mean": 0.00328688190568266,
+              "median": 0.0019087550889866226,
+              "winRate": 0.5217391304347826
+            },
+            "fwd5": {
+              "count": 23,
+              "mean": 0.019361617945303618,
+              "median": -0.00399061949504565,
+              "winRate": 0.391304347826087
+            },
+            "fwd10": {
+              "count": 23,
+              "mean": 0.011019780532559583,
+              "median": -0.0064800132399771854,
+              "winRate": 0.43478260869565216
+            }
+          }
+        }
+      ]
+    },
+    {
+      "window": {
+        "label": "R18-2",
+        "kind": "rolling18m",
+        "startDate": "2023-11-30",
+        "endDate": "2025-05-30",
+        "years": 1.4976043805612593,
+        "warmupStartDate": "2023-08-30",
+        "warmupDays": 92,
+        "warmupMonths": 3
+      },
+      "baseSummary": {
+        "riskOnDays": 83,
+        "riskOffDays": 278,
+        "riskOnForward": {
+          "days": 83,
+          "fwd1": {
+            "count": 83,
+            "mean": 0.004209010318187647,
+            "median": 0.0027363082676124537,
+            "winRate": 0.6024096385542169
+          },
+          "fwd3": {
+            "count": 83,
+            "mean": 0.00745392920438569,
+            "median": 0.004185002994350615,
+            "winRate": 0.5421686746987951
+          },
+          "fwd5": {
+            "count": 83,
+            "mean": 0.006452353502114991,
+            "median": 0.008414741146104963,
+            "winRate": 0.5421686746987951
+          },
+          "fwd10": {
+            "count": 83,
+            "mean": 0.005099329247806807,
+            "median": 0.001968994509996296,
+            "winRate": 0.5421686746987951
+          }
+        },
+        "riskOffForward": {
+          "days": 278,
+          "fwd1": {
+            "count": 278,
+            "mean": -0.0006028802841239413,
+            "median": 0.0004105823650137348,
+            "winRate": 0.5251798561151079
+          },
+          "fwd3": {
+            "count": 278,
+            "mean": -1.092573923181838e-05,
+            "median": 0.001341485191519346,
+            "winRate": 0.5287769784172662
+          },
+          "fwd5": {
+            "count": 278,
+            "mean": 0.0019093222027063512,
+            "median": -0.0011443028045139618,
+            "winRate": 0.4892086330935252
+          },
+          "fwd10": {
+            "count": 278,
+            "mean": 0.005921036124202267,
+            "median": -0.00042866439474984966,
+            "winRate": 0.49280575539568344
+          }
+        },
+        "riskOffFailedChecks": {
+          "samples": 0,
+          "aboveMa20": 192,
+          "aboveMa60": 171,
+          "upPct": 176
+        },
+        "riskOnState": {
+          "days": 83,
+          "samples": {
+            "count": 83,
+            "mean": 4225.578313253012,
+            "median": 4226.0,
+            "winRate": 1.0
+          },
+          "aboveMa20Pct": {
+            "count": 83,
+            "mean": 0.7638002019892892,
+            "median": 0.7706508875739645,
+            "winRate": 1.0
+          },
+          "aboveMa60Pct": {
+            "count": 83,
+            "mean": 0.7052907986824329,
+            "median": 0.6334991708126037,
+            "winRate": 1.0
+          },
+          "upPct": {
+            "count": 83,
+            "mean": 0.7117302757213988,
+            "median": 0.712526639829505,
+            "winRate": 1.0
+          }
+        },
+        "riskOffState": {
+          "days": 278,
+          "samples": {
+            "count": 278,
+            "mean": 4227.093525179856,
+            "median": 4228.0,
+            "winRate": 1.0
+          },
+          "aboveMa20Pct": {
+            "count": 278,
+            "mean": 0.38496883531457743,
+            "median": 0.3188697091510996,
+            "winRate": 1.0
+          },
+          "aboveMa60Pct": {
+            "count": 278,
+            "mean": 0.36445526691479163,
+            "median": 0.29056717321140396,
+            "winRate": 1.0
+          },
+          "upPct": {
+            "count": 278,
+            "mean": 0.410678977848513,
+            "median": 0.3649174431360666,
+            "winRate": 1.0
+          }
+        }
+      },
+      "frontier": [
+        {
+          "name": "current",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 83,
+          "addedDays": 0,
+          "addedSummary": {
+            "days": 0,
+            "fwd1": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd3": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd5": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd10": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            }
+          }
+        },
+        {
+          "name": "lower_up_40",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.4
+          },
+          "riskOnDays": 91,
+          "addedDays": 8,
+          "addedSummary": {
+            "days": 8,
+            "fwd1": {
+              "count": 8,
+              "mean": -0.009868886091540895,
+              "median": -0.013530165116732884,
+              "winRate": 0.375
+            },
+            "fwd3": {
+              "count": 8,
+              "mean": -0.0006735788883935871,
+              "median": 0.006104015997278452,
+              "winRate": 0.625
+            },
+            "fwd5": {
+              "count": 8,
+              "mean": 0.00936428882424355,
+              "median": 0.006782544253206469,
+              "winRate": 0.75
+            },
+            "fwd10": {
+              "count": 8,
+              "mean": -0.004123395891488222,
+              "median": -0.0020371284204080482,
+              "winRate": 0.375
+            }
+          }
+        },
+        {
+          "name": "lower_above20_40",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.4,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 86,
+          "addedDays": 3,
+          "addedSummary": {
+            "days": 3,
+            "fwd1": {
+              "count": 3,
+              "mean": 0.01144861296918847,
+              "median": 0.01006197614195192,
+              "winRate": 1.0
+            },
+            "fwd3": {
+              "count": 3,
+              "mean": -0.0017982685385494169,
+              "median": 0.003430955909313287,
+              "winRate": 0.6666666666666666
+            },
+            "fwd5": {
+              "count": 3,
+              "mean": 0.008153019652271585,
+              "median": 0.0023453128822359024,
+              "winRate": 0.6666666666666666
+            },
+            "fwd10": {
+              "count": 3,
+              "mean": 0.0013208534704390786,
+              "median": 0.015350694686595156,
+              "winRate": 0.6666666666666666
+            }
+          }
+        },
+        {
+          "name": "lower_above60_30",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.3,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 90,
+          "addedDays": 7,
+          "addedSummary": {
+            "days": 7,
+            "fwd1": {
+              "count": 7,
+              "mean": 0.009724073812478128,
+              "median": 0.008480134723535015,
+              "winRate": 0.8571428571428571
+            },
+            "fwd3": {
+              "count": 7,
+              "mean": 0.018258102590251513,
+              "median": 0.012182370965836485,
+              "winRate": 0.7142857142857143
+            },
+            "fwd5": {
+              "count": 7,
+              "mean": 0.021928504615569472,
+              "median": 0.018600088606355786,
+              "winRate": 0.7142857142857143
+            },
+            "fwd10": {
+              "count": 7,
+              "mean": 0.03447633941875113,
+              "median": 0.0450184122479119,
+              "winRate": 0.8571428571428571
+            }
+          }
+        },
+        {
+          "name": "lower_samples_800",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 800,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 83,
+          "addedDays": 0,
+          "addedSummary": {
+            "days": 0,
+            "fwd1": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd3": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd5": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd10": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            }
+          }
+        },
+        {
+          "name": "soft_all_minus_05",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 800,
+            "minAboveMa20Pct": 0.4,
+            "minAboveMa60Pct": 0.3,
+            "minUpPct": 0.4
+          },
+          "riskOnDays": 105,
+          "addedDays": 22,
+          "addedSummary": {
+            "days": 22,
+            "fwd1": {
+              "count": 22,
+              "mean": 0.0018476464609169323,
+              "median": 0.004757994029474905,
+              "winRate": 0.6818181818181818
+            },
+            "fwd3": {
+              "count": 22,
+              "mean": 0.010902342985920969,
+              "median": 0.006407601965811777,
+              "winRate": 0.6363636363636364
+            },
+            "fwd5": {
+              "count": 22,
+              "mean": 0.03175964455200974,
+              "median": 0.012569249322323235,
+              "winRate": 0.7272727272727273
+            },
+            "fwd10": {
+              "count": 22,
+              "mean": 0.0278705538671106,
+              "median": 0.028191662802513694,
+              "winRate": 0.6363636363636364
+            }
+          }
+        }
+      ]
+    },
+    {
+      "window": {
+        "label": "Y3",
+        "kind": "annual",
+        "startDate": "2025-05-30",
+        "endDate": "2026-05-30",
+        "years": 0.999315537303217,
+        "warmupStartDate": "2025-02-28",
+        "warmupDays": 91,
+        "warmupMonths": 3
+      },
+      "baseSummary": {
+        "riskOnDays": 94,
+        "riskOffDays": 148,
+        "riskOnForward": {
+          "days": 94,
+          "fwd1": {
+            "count": 94,
+            "mean": 0.0011240744540385163,
+            "median": 0.0025468869164715757,
+            "winRate": 0.6170212765957447
+          },
+          "fwd3": {
+            "count": 94,
+            "mean": 0.003671186014117991,
+            "median": 0.005415971744467564,
+            "winRate": 0.6276595744680851
+          },
+          "fwd5": {
+            "count": 94,
+            "mean": 0.005374109870903947,
+            "median": 0.009231410649441397,
+            "winRate": 0.6382978723404256
+          },
+          "fwd10": {
+            "count": 93,
+            "mean": 0.012630555319279762,
+            "median": 0.019179119316503655,
+            "winRate": 0.6666666666666666
+          }
+        },
+        "riskOffForward": {
+          "days": 148,
+          "fwd1": {
+            "count": 147,
+            "mean": 0.0011415509468091134,
+            "median": 0.0012582067853884125,
+            "winRate": 0.564625850340136
+          },
+          "fwd3": {
+            "count": 145,
+            "mean": 0.003428706642219963,
+            "median": 0.00637370466094984,
+            "winRate": 0.6551724137931034
+          },
+          "fwd5": {
+            "count": 143,
+            "mean": 0.006578258466231636,
+            "median": 0.008096741769346027,
+            "winRate": 0.6503496503496503
+          },
+          "fwd10": {
+            "count": 139,
+            "mean": 0.01284652357440976,
+            "median": 0.015590122978372993,
+            "winRate": 0.6906474820143885
+          }
+        },
+        "riskOffFailedChecks": {
+          "samples": 0,
+          "aboveMa20": 90,
+          "aboveMa60": 36,
+          "upPct": 111
+        },
+        "riskOnState": {
+          "days": 94,
+          "samples": {
+            "count": 94,
+            "mean": 4224.244680851064,
+            "median": 4225.0,
+            "winRate": 1.0
+          },
+          "aboveMa20Pct": {
+            "count": 94,
+            "mean": 0.6562005161017789,
+            "median": 0.6532136453290299,
+            "winRate": 1.0
+          },
+          "aboveMa60Pct": {
+            "count": 94,
+            "mean": 0.6564087456236146,
+            "median": 0.6873744668815476,
+            "winRate": 1.0
+          },
+          "upPct": {
+            "count": 94,
+            "mean": 0.6382384221076217,
+            "median": 0.6320595135651799,
+            "winRate": 1.0
+          }
+        },
+        "riskOffState": {
+          "days": 148,
+          "samples": {
+            "count": 148,
+            "mean": 4224.925675675676,
+            "median": 4225.0,
+            "winRate": 1.0
+          },
+          "aboveMa20Pct": {
+            "count": 148,
+            "mean": 0.4281678969635994,
+            "median": 0.40534793745162123,
+            "winRate": 1.0
+          },
+          "aboveMa60Pct": {
+            "count": 148,
+            "mean": 0.48901405999567815,
+            "median": 0.4682843580145994,
+            "winRate": 1.0
+          },
+          "upPct": {
+            "count": 148,
+            "mean": 0.3898067511119435,
+            "median": 0.34911367804285165,
+            "winRate": 1.0
+          }
+        }
+      },
+      "frontier": [
+        {
+          "name": "current",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 94,
+          "addedDays": 0,
+          "addedSummary": {
+            "days": 0,
+            "fwd1": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd3": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd5": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd10": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            }
+          }
+        },
+        {
+          "name": "lower_up_40",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.4
+          },
+          "riskOnDays": 106,
+          "addedDays": 12,
+          "addedSummary": {
+            "days": 12,
+            "fwd1": {
+              "count": 12,
+              "mean": 0.0003337130570698047,
+              "median": 0.0008801401141176603,
+              "winRate": 0.5
+            },
+            "fwd3": {
+              "count": 12,
+              "mean": 0.00116682723721023,
+              "median": 0.005580299871791495,
+              "winRate": 0.75
+            },
+            "fwd5": {
+              "count": 12,
+              "mean": 0.009954230250662301,
+              "median": 0.011802000210316584,
+              "winRate": 0.75
+            },
+            "fwd10": {
+              "count": 12,
+              "mean": 0.003443526489614043,
+              "median": 0.006109475877273906,
+              "winRate": 0.5833333333333334
+            }
+          }
+        },
+        {
+          "name": "lower_above20_40",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.4,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 99,
+          "addedDays": 5,
+          "addedSummary": {
+            "days": 5,
+            "fwd1": {
+              "count": 5,
+              "mean": 0.0019370102499341078,
+              "median": -0.0003002417683954761,
+              "winRate": 0.4
+            },
+            "fwd3": {
+              "count": 5,
+              "mean": 0.001457022294687795,
+              "median": 0.009583441723695909,
+              "winRate": 0.6
+            },
+            "fwd5": {
+              "count": 5,
+              "mean": -0.005196192983158977,
+              "median": -0.0005449583459676171,
+              "winRate": 0.4
+            },
+            "fwd10": {
+              "count": 5,
+              "mean": -0.01422735639243727,
+              "median": -0.005977024750087465,
+              "winRate": 0.2
+            }
+          }
+        },
+        {
+          "name": "lower_above60_30",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 1000,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.3,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 95,
+          "addedDays": 1,
+          "addedSummary": {
+            "days": 1,
+            "fwd1": {
+              "count": 1,
+              "mean": 0.007705491634265152,
+              "median": 0.007705491634265152,
+              "winRate": 1.0
+            },
+            "fwd3": {
+              "count": 1,
+              "mean": 0.010450176706291493,
+              "median": 0.010450176706291493,
+              "winRate": 1.0
+            },
+            "fwd5": {
+              "count": 1,
+              "mean": -0.004325845959881713,
+              "median": -0.004325845959881713,
+              "winRate": 0.0
+            },
+            "fwd10": {
+              "count": 1,
+              "mean": 0.02606403867713408,
+              "median": 0.02606403867713408,
+              "winRate": 1.0
+            }
+          }
+        },
+        {
+          "name": "lower_samples_800",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 800,
+            "minAboveMa20Pct": 0.45,
+            "minAboveMa60Pct": 0.35,
+            "minUpPct": 0.45
+          },
+          "riskOnDays": 94,
+          "addedDays": 0,
+          "addedSummary": {
+            "days": 0,
+            "fwd1": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd3": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd5": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            },
+            "fwd10": {
+              "count": 0,
+              "mean": null,
+              "median": null,
+              "winRate": null
+            }
+          }
+        },
+        {
+          "name": "soft_all_minus_05",
+          "rules": {
+            "enabled": true,
+            "usePreviousTradingDay": true,
+            "minSamples": 800,
+            "minAboveMa20Pct": 0.4,
+            "minAboveMa60Pct": 0.3,
+            "minUpPct": 0.4
+          },
+          "riskOnDays": 113,
+          "addedDays": 19,
+          "addedSummary": {
+            "days": 19,
+            "fwd1": {
+              "count": 19,
+              "mean": 0.0007037698769460546,
+              "median": -0.0003002417683954761,
+              "winRate": 0.47368421052631576
+            },
+            "fwd3": {
+              "count": 19,
+              "mean": 0.0005810819087750504,
+              "median": 0.005982886091059393,
+              "winRate": 0.6842105263157895
+            },
+            "fwd5": {
+              "count": 19,
+              "mean": 0.0030277714586732837,
+              "median": 0.006771255192547439,
+              "winRate": 0.5789473684210527
+            },
+            "fwd10": {
+              "count": 18,
+              "mean": -0.00020835696720465302,
+              "median": -0.0017001733457220208,
+              "winRate": 0.5
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

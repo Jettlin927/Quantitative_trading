@@ -1,0 +1,2886 @@
+{
+  "runId": "002-concept-entry-edge-001",
+  "startedAt": "2026-05-31 12:27 +0800",
+  "finishedAt": "2026-05-31 12:27 +0800",
+  "sourceRun": "002-repair-indicator-ablate-ma-001",
+  "sourceCompletedTrades": 125,
+  "uniquePriorDates": 80,
+  "fetchErrors": [],
+  "perDate": [
+    {
+      "tradeDate": "2023-09-04",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2023-10-12",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2023-10-30",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2023-11-07",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2023-11-13",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2023-11-20",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2023-11-23",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2023-11-28",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2023-12-29",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-03-11",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-03-15",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-04-01",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-04-26",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-05-06",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-05-14",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-05-16",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-05-17",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-05-22",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-09-24",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-09-27",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-09-30",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-10-08",
+      "status": "fetched",
+      "rows": 0,
+      "stocks": 0
+    },
+    {
+      "tradeDate": "2024-10-14",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2090
+    },
+    {
+      "tradeDate": "2024-10-18",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2086
+    },
+    {
+      "tradeDate": "2024-10-25",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2077
+    },
+    {
+      "tradeDate": "2024-11-04",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2086
+    },
+    {
+      "tradeDate": "2024-11-11",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 1959
+    },
+    {
+      "tradeDate": "2024-11-20",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 1991
+    },
+    {
+      "tradeDate": "2024-12-02",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2141
+    },
+    {
+      "tradeDate": "2024-12-06",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2059
+    },
+    {
+      "tradeDate": "2025-02-07",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 1847
+    },
+    {
+      "tradeDate": "2025-02-17",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 1860
+    },
+    {
+      "tradeDate": "2025-02-21",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 1923
+    },
+    {
+      "tradeDate": "2025-03-04",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 1904
+    },
+    {
+      "tradeDate": "2025-03-10",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 1947
+    },
+    {
+      "tradeDate": "2025-03-14",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2021
+    },
+    {
+      "tradeDate": "2025-03-18",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2017
+    },
+    {
+      "tradeDate": "2025-05-06",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 1932
+    },
+    {
+      "tradeDate": "2025-05-12",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2093
+    },
+    {
+      "tradeDate": "2025-05-16",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2093
+    },
+    {
+      "tradeDate": "2025-05-29",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2099
+    },
+    {
+      "tradeDate": "2025-06-04",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2016
+    },
+    {
+      "tradeDate": "2025-06-05",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2006
+    },
+    {
+      "tradeDate": "2025-06-09",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2066
+    },
+    {
+      "tradeDate": "2025-06-24",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2035
+    },
+    {
+      "tradeDate": "2025-06-30",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 1920
+    },
+    {
+      "tradeDate": "2025-07-07",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2138
+    },
+    {
+      "tradeDate": "2025-07-11",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2126
+    },
+    {
+      "tradeDate": "2025-07-14",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2095
+    },
+    {
+      "tradeDate": "2025-07-18",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2044
+    },
+    {
+      "tradeDate": "2025-07-21",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2046
+    },
+    {
+      "tradeDate": "2025-07-28",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2071
+    },
+    {
+      "tradeDate": "2025-08-01",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2087
+    },
+    {
+      "tradeDate": "2025-08-05",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2149
+    },
+    {
+      "tradeDate": "2025-08-11",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2158
+    },
+    {
+      "tradeDate": "2025-08-15",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2138
+    },
+    {
+      "tradeDate": "2025-08-22",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2054
+    },
+    {
+      "tradeDate": "2025-09-01",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 1990
+    },
+    {
+      "tradeDate": "2025-09-08",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2166
+    },
+    {
+      "tradeDate": "2025-09-16",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2169
+    },
+    {
+      "tradeDate": "2025-10-09",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2004
+    },
+    {
+      "tradeDate": "2025-10-15",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2196
+    },
+    {
+      "tradeDate": "2025-10-24",
+      "status": "fetched",
+      "rows": 3000,
+      "stocks": 2154
+    },
+    {
+      "tradeDate": "2025-10-31",
+      "status": "fetched",
+      "rows": 438,
+      "stocks": 427
+    },
+    {
+      "tradeDate": "2025-11-03",
+      "status": "fetched",
+      "rows": 177,
+      "stocks": 177
+    },
+    {
+      "tradeDate": "2025-11-17",
+      "status": "fetched",
+      "rows": 302,
+      "stocks": 300
+    },
+    {
+      "tradeDate": "2025-12-22",
+      "status": "fetched",
+      "rows": 175,
+      "stocks": 174
+    },
+    {
+      "tradeDate": "2026-01-05",
+      "status": "fetched",
+      "rows": 358,
+      "stocks": 345
+    },
+    {
+      "tradeDate": "2026-01-09",
+      "status": "fetched",
+      "rows": 326,
+      "stocks": 314
+    },
+    {
+      "tradeDate": "2026-01-19",
+      "status": "fetched",
+      "rows": 580,
+      "stocks": 556
+    },
+    {
+      "tradeDate": "2026-01-23",
+      "status": "fetched",
+      "rows": 601,
+      "stocks": 551
+    },
+    {
+      "tradeDate": "2026-02-24",
+      "status": "fetched",
+      "rows": 399,
+      "stocks": 395
+    },
+    {
+      "tradeDate": "2026-02-27",
+      "status": "fetched",
+      "rows": 717,
+      "stocks": 644
+    },
+    {
+      "tradeDate": "2026-04-20",
+      "status": "fetched",
+      "rows": 547,
+      "stocks": 514
+    },
+    {
+      "tradeDate": "2026-04-27",
+      "status": "fetched",
+      "rows": 504,
+      "stocks": 476
+    },
+    {
+      "tradeDate": "2026-04-30",
+      "status": "fetched",
+      "rows": 595,
+      "stocks": 566
+    },
+    {
+      "tradeDate": "2026-05-06",
+      "status": "fetched",
+      "rows": 683,
+      "stocks": 646
+    },
+    {
+      "tradeDate": "2026-05-08",
+      "status": "fetched",
+      "rows": 715,
+      "stocks": 645
+    },
+    {
+      "tradeDate": "2026-05-11",
+      "status": "fetched",
+      "rows": 769,
+      "stocks": 707
+    },
+    {
+      "tradeDate": "2026-05-19",
+      "status": "fetched",
+      "rows": 448,
+      "stocks": 419
+    }
+  ],
+  "coverage": {
+    "samples": 125,
+    "kplMatched": 61,
+    "kplMatchedRate": 0.488
+  },
+  "overall": {
+    "all": {
+      "count": 125,
+      "avgReturnPct": 0.03614558980439426,
+      "winRate": 0.472,
+      "kplMatchedRate": 0.488,
+      "kplConceptCountRank": {
+        "avg": 0.5145197740239607,
+        "min": 0.021632251720747297,
+        "max": 0.9928298279158699
+      },
+      "kplHotMaxRank": {
+        "avg": 0.8848005931065628,
+        "min": 0.1941974730931212,
+        "max": 0.9990412272291467
+      },
+      "kplHotMeanRank": {
+        "avg": 0.8848341197185803,
+        "min": 0.1941974730931212,
+        "max": 0.9990412272291467
+      }
+    },
+    "winners": {
+      "count": 59,
+      "avgReturnPct": 0.13671182484962127,
+      "winRate": 1.0,
+      "kplMatchedRate": 0.5254237288135594,
+      "kplConceptCountRank": {
+        "avg": 0.5551564237828515,
+        "min": 0.02417235943247504,
+        "max": 0.9715799614643545
+      },
+      "kplHotMaxRank": {
+        "avg": 0.8795012858812036,
+        "min": 0.1941974730931212,
+        "max": 0.9990412272291467
+      },
+      "kplHotMeanRank": {
+        "avg": 0.8795515449545156,
+        "min": 0.1941974730931212,
+        "max": 0.9990412272291467
+      }
+    },
+    "losers": {
+      "count": 66,
+      "avgReturnPct": -0.05375452940270264,
+      "winRate": 0.0,
+      "kplMatchedRate": 0.45454545454545453,
+      "kplConceptCountRank": {
+        "avg": 0.472528569273107,
+        "min": 0.021632251720747297,
+        "max": 0.9928298279158699
+      },
+      "kplHotMaxRank": {
+        "avg": 0.8902765439061006,
+        "min": 0.4793311658151417,
+        "max": 0.9980420949583945
+      },
+      "kplHotMeanRank": {
+        "avg": 0.8902927803081139,
+        "min": 0.4793311658151417,
+        "max": 0.9980420949583945
+      }
+    },
+    "winnerMinusLoser": {
+      "kplConceptCountRank": 0.08262785450974447,
+      "kplHotMaxRank": -0.010775258024896983,
+      "kplHotMeanRank": -0.010741235353598277
+    }
+  },
+  "weakWindows": {
+    "Y1": {
+      "all": {
+        "count": 25,
+        "avgReturnPct": 0.018186411066905776,
+        "winRate": 0.4,
+        "kplMatchedRate": 0.0,
+        "kplConceptCountRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "kplHotMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "kplHotMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "winners": {
+        "count": 10,
+        "avgReturnPct": 0.12473497791222057,
+        "winRate": 1.0,
+        "kplMatchedRate": 0.0,
+        "kplConceptCountRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "kplHotMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "kplHotMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "losers": {
+        "count": 15,
+        "avgReturnPct": -0.052845966829970746,
+        "winRate": 0.0,
+        "kplMatchedRate": 0.0,
+        "kplConceptCountRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "kplHotMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "kplHotMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "winnerMinusLoser": {
+        "kplConceptCountRank": null,
+        "kplHotMaxRank": null,
+        "kplHotMeanRank": null
+      }
+    },
+    "R18-1": {
+      "all": {
+        "count": 42,
+        "avgReturnPct": 0.023377193648174595,
+        "winRate": 0.4523809523809524,
+        "kplMatchedRate": 0.19047619047619047,
+        "kplConceptCountRank": {
+          "avg": 0.6701775951579334,
+          "min": 0.0899497487437186,
+          "max": 0.9715799614643545
+        },
+        "kplHotMaxRank": {
+          "avg": 0.9299507006462928,
+          "min": 0.7673528003829584,
+          "max": 0.9971278123504069
+        },
+        "kplHotMeanRank": {
+          "avg": 0.9299507006462928,
+          "min": 0.7673528003829584,
+          "max": 0.9971278123504069
+        }
+      },
+      "winners": {
+        "count": 19,
+        "avgReturnPct": 0.1169412994707504,
+        "winRate": 1.0,
+        "kplMatchedRate": 0.2631578947368421,
+        "kplConceptCountRank": {
+          "avg": 0.7147680792384963,
+          "min": 0.24508393285371702,
+          "max": 0.9715799614643545
+        },
+        "kplHotMaxRank": {
+          "avg": 0.9723278945098146,
+          "min": 0.9405275779376499,
+          "max": 0.9971278123504069
+        },
+        "kplHotMeanRank": {
+          "avg": 0.9723278945098146,
+          "min": 0.9405275779376499,
+          "max": 0.9971278123504069
+        }
+      },
+      "losers": {
+        "count": 23,
+        "avgReturnPct": -0.05391489377047498,
+        "winRate": 0.0,
+        "kplMatchedRate": 0.13043478260869565,
+        "kplConceptCountRank": {
+          "avg": 0.5958601216903285,
+          "min": 0.0899497487437186,
+          "max": 0.9468645284825276
+        },
+        "kplHotMaxRank": {
+          "avg": 0.8593220442070898,
+          "min": 0.7673528003829584,
+          "max": 0.9412665985699693
+        },
+        "kplHotMeanRank": {
+          "avg": 0.8593220442070898,
+          "min": 0.7673528003829584,
+          "max": 0.9412665985699693
+        }
+      },
+      "winnerMinusLoser": {
+        "kplConceptCountRank": 0.11890795754816774,
+        "kplHotMaxRank": 0.11300585030272481,
+        "kplHotMeanRank": 0.11300585030272481
+      }
+    },
+    "Y3": {
+      "all": {
+        "count": 61,
+        "avgReturnPct": 0.027852319308600743,
+        "winRate": 0.4098360655737705,
+        "kplMatchedRate": 0.6065573770491803,
+        "kplConceptCountRank": {
+          "avg": 0.47168774550035814,
+          "min": 0.021632251720747297,
+          "max": 0.9869948908499768
+        },
+        "kplHotMaxRank": {
+          "avg": 0.8886873609292231,
+          "min": 0.1941974730931212,
+          "max": 0.9990412272291467
+        },
+        "kplHotMeanRank": {
+          "avg": 0.8886586561992297,
+          "min": 0.1941974730931212,
+          "max": 0.9990412272291467
+        }
+      },
+      "winners": {
+        "count": 25,
+        "avgReturnPct": 0.14547304375489198,
+        "winRate": 1.0,
+        "kplMatchedRate": 0.52,
+        "kplConceptCountRank": {
+          "avg": 0.5512767527774886,
+          "min": 0.10306807286673059,
+          "max": 0.9145299145299145
+        },
+        "kplHotMaxRank": {
+          "avg": 0.872240599505444,
+          "min": 0.1941974730931212,
+          "max": 0.9990412272291467
+        },
+        "kplHotMeanRank": {
+          "avg": 0.8721214328077397,
+          "min": 0.1941974730931212,
+          "max": 0.9990412272291467
+        }
+      },
+      "losers": {
+        "count": 36,
+        "avgReturnPct": -0.05382873933465705,
+        "winRate": 0.0,
+        "kplMatchedRate": 0.6666666666666666,
+        "kplConceptCountRank": {
+          "avg": 0.4285770332252457,
+          "min": 0.021632251720747297,
+          "max": 0.9869948908499768
+        },
+        "kplHotMaxRank": {
+          "avg": 0.8975960233671034,
+          "min": 0.4793311658151417,
+          "max": 0.9980420949583945
+        },
+        "kplHotMeanRank": {
+          "avg": 0.8976163188696201,
+          "min": 0.4793311658151417,
+          "max": 0.9980420949583945
+        }
+      },
+      "winnerMinusLoser": {
+        "kplConceptCountRank": 0.12269971955224285,
+        "kplHotMaxRank": -0.025355423861659454,
+        "kplHotMeanRank": -0.02549488606188044
+      }
+    }
+  },
+  "thresholds": {
+    "kplHotMaxRank": {
+      "kept": {
+        "count": 58,
+        "avgReturnPct": 0.041389271149760425,
+        "winRate": 0.5,
+        "kplMatchedRate": 1.0,
+        "kplConceptCountRank": {
+          "avg": 0.5228302957931488,
+          "min": 0.021632251720747297,
+          "max": 0.9928298279158699
+        },
+        "kplHotMaxRank": {
+          "avg": 0.9105507097494928,
+          "min": 0.5353141743789577,
+          "max": 0.9990412272291467
+        },
+        "kplHotMeanRank": {
+          "avg": 0.9105859704966148,
+          "min": 0.535801266439357,
+          "max": 0.9990412272291467
+        }
+      },
+      "filtered": {
+        "count": 3,
+        "avgReturnPct": 0.050375705181532254,
+        "winRate": 0.6666666666666666,
+        "kplMatchedRate": 1.0,
+        "kplConceptCountRank": {
+          "avg": 0.35384968648632564,
+          "min": 0.11936832326985601,
+          "max": 0.6384839650145773
+        },
+        "kplHotMaxRank": {
+          "avg": 0.38696500467658,
+          "min": 0.1941974730931212,
+          "max": 0.4873663751214772
+        },
+        "kplHotMeanRank": {
+          "avg": 0.38696500467658,
+          "min": 0.1941974730931212,
+          "max": 0.4873663751214772
+        }
+      }
+    },
+    "kplHotMeanRank": {
+      "kept": {
+        "count": 58,
+        "avgReturnPct": 0.041389271149760425,
+        "winRate": 0.5,
+        "kplMatchedRate": 1.0,
+        "kplConceptCountRank": {
+          "avg": 0.5228302957931488,
+          "min": 0.021632251720747297,
+          "max": 0.9928298279158699
+        },
+        "kplHotMaxRank": {
+          "avg": 0.9105507097494928,
+          "min": 0.5353141743789577,
+          "max": 0.9990412272291467
+        },
+        "kplHotMeanRank": {
+          "avg": 0.9105859704966148,
+          "min": 0.535801266439357,
+          "max": 0.9990412272291467
+        }
+      },
+      "filtered": {
+        "count": 3,
+        "avgReturnPct": 0.050375705181532254,
+        "winRate": 0.6666666666666666,
+        "kplMatchedRate": 1.0,
+        "kplConceptCountRank": {
+          "avg": 0.35384968648632564,
+          "min": 0.11936832326985601,
+          "max": 0.6384839650145773
+        },
+        "kplHotMaxRank": {
+          "avg": 0.38696500467658,
+          "min": 0.1941974730931212,
+          "max": 0.4873663751214772
+        },
+        "kplHotMeanRank": {
+          "avg": 0.38696500467658,
+          "min": 0.1941974730931212,
+          "max": 0.4873663751214772
+        }
+      }
+    },
+    "kplConceptCountRank": {
+      "kept": {
+        "count": 34,
+        "avgReturnPct": 0.05817953316799849,
+        "winRate": 0.5882352941176471,
+        "kplMatchedRate": 1.0,
+        "kplConceptCountRank": {
+          "avg": 0.7601742789773615,
+          "min": 0.5042492917847026,
+          "max": 0.9928298279158699
+        },
+        "kplHotMaxRank": {
+          "avg": 0.9063673376656861,
+          "min": 0.4873663751214772,
+          "max": 0.9971278123504069
+        },
+        "kplHotMeanRank": {
+          "avg": 0.9064131621148823,
+          "min": 0.4873663751214772,
+          "max": 0.9971278123504069
+        }
+      },
+      "filtered": {
+        "count": 27,
+        "avgReturnPct": 0.02124447090810196,
+        "winRate": 0.4074074074074074,
+        "kplMatchedRate": 1.0,
+        "kplConceptCountRank": {
+          "avg": 0.20517706408264139,
+          "min": 0.021632251720747297,
+          "max": 0.4957563654518223
+        },
+        "kplHotMaxRank": {
+          "avg": 0.8576424703284075,
+          "min": 0.1941974730931212,
+          "max": 0.9990412272291467
+        },
+        "kplHotMeanRank": {
+          "avg": 0.8576605107750889,
+          "min": 0.1941974730931212,
+          "max": 0.9990412272291467
+        }
+      }
+    }
+  },
+  "samples": [
+    {
+      "ts_code": "603178.SH",
+      "name": "圣龙股份",
+      "industry": "汽车配件",
+      "entryDate": "2023-10-13",
+      "priorDate": "2023-10-12",
+      "returnPct": 0.1976014996250936,
+      "netPnl": 2692.3230806471984,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "601666.SH",
+      "name": "平煤股份",
+      "industry": "煤炭开采",
+      "entryDate": "2023-09-05",
+      "priorDate": "2023-09-04",
+      "returnPct": 0.04406284582700501,
+      "netPnl": 558.6212980348027,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "603686.SH",
+      "name": "福龙马",
+      "industry": "环境保护",
+      "entryDate": "2023-11-08",
+      "priorDate": "2023-11-07",
+      "returnPct": -0.052845966829970864,
+      "netPnl": -726.3764508000004,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "002436.SZ",
+      "name": "兴森科技",
+      "industry": "元器件",
+      "entryDate": "2023-10-31",
+      "priorDate": "2023-10-30",
+      "returnPct": 0.15324588852786808,
+      "netPnl": 2036.8826027550003,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "600172.SH",
+      "name": "黄河旋风",
+      "industry": "矿物制品",
+      "entryDate": "2023-11-21",
+      "priorDate": "2023-11-20",
+      "returnPct": -0.052845966829970684,
+      "netPnl": -761.9333399999978,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "601699.SH",
+      "name": "潞安环能",
+      "industry": "煤炭开采",
+      "entryDate": "2023-09-05",
+      "priorDate": "2023-09-04",
+      "returnPct": 0.15483001749562603,
+      "netPnl": 1939.1901339060241,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "688025.SH",
+      "name": "杰普特",
+      "industry": "专用机械",
+      "entryDate": "2023-11-29",
+      "priorDate": "2023-11-28",
+      "returnPct": -0.05284596682997056,
+      "netPnl": -464.0385688749975,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "000503.SZ",
+      "name": "国新健康",
+      "industry": "软件服务",
+      "entryDate": "2023-11-14",
+      "priorDate": "2023-11-13",
+      "returnPct": 0.04790131217195716,
+      "netPnl": 647.4762106312519,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "002498.SZ",
+      "name": "汉缆股份",
+      "industry": "电气设备",
+      "entryDate": "2024-01-02",
+      "priorDate": "2023-12-29",
+      "returnPct": -0.05284596682997095,
+      "netPnl": -751.8800528750016,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "600566.SH",
+      "name": "济川药业",
+      "industry": "中成药",
+      "entryDate": "2023-11-24",
+      "priorDate": "2023-11-23",
+      "returnPct": -0.05284596682997062,
+      "netPnl": -672.8294688499973,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "601225.SH",
+      "name": "陕西煤业",
+      "industry": "煤炭开采",
+      "entryDate": "2024-01-02",
+      "priorDate": "2023-12-29",
+      "returnPct": 0.14770143714071488,
+      "netPnl": 1894.4209520486256,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "605117.SH",
+      "name": "德业股份",
+      "industry": "电气设备",
+      "entryDate": "2024-03-12",
+      "priorDate": "2024-03-11",
+      "returnPct": -0.05284596682997064,
+      "netPnl": -567.6403382999979,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "002085.SZ",
+      "name": "万丰奥威",
+      "industry": "汽车配件",
+      "entryDate": "2024-03-12",
+      "priorDate": "2024-03-11",
+      "returnPct": 0.15153990348566707,
+      "netPnl": 2096.74811220875,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "600418.SH",
+      "name": "江淮汽车",
+      "industry": "汽车整车",
+      "entryDate": "2024-03-18",
+      "priorDate": "2024-03-15",
+      "returnPct": -0.052845966829970836,
+      "netPnl": -698.1743348125001,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "001696.SZ",
+      "name": "宗申动力",
+      "industry": "摩托车",
+      "entryDate": "2024-04-02",
+      "priorDate": "2024-04-01",
+      "returnPct": -0.052845966829970885,
+      "netPnl": -751.7742288000009,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "002167.SZ",
+      "name": "东方锆业",
+      "industry": "小金属",
+      "entryDate": "2024-04-02",
+      "priorDate": "2024-04-01",
+      "returnPct": 0.1503277562188401,
+      "netPnl": 2162.0075650173003,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "002739.SZ",
+      "name": "儒意电影",
+      "industry": "影视音像",
+      "entryDate": "2024-03-18",
+      "priorDate": "2024-03-15",
+      "returnPct": -0.05284596682997086,
+      "netPnl": -721.9318396500003,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "002409.SZ",
+      "name": "雅克科技",
+      "industry": "半导体",
+      "entryDate": "2024-04-29",
+      "priorDate": "2024-04-26",
+      "returnPct": -0.05284596682997061,
+      "netPnl": -679.919681874997,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "002125.SZ",
+      "name": "湘潭电化",
+      "industry": "化工原料",
+      "entryDate": "2024-05-07",
+      "priorDate": "2024-05-06",
+      "returnPct": 0.15223780645747642,
+      "netPnl": 2134.4512692753233,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "002773.SZ",
+      "name": "康弘药业",
+      "industry": "化学制药",
+      "entryDate": "2024-05-07",
+      "priorDate": "2024-05-06",
+      "returnPct": -0.052845966829970746,
+      "netPnl": -758.1236732999987,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "002851.SZ",
+      "name": "麦格米特",
+      "industry": "电气设备",
+      "entryDate": "2024-05-15",
+      "priorDate": "2024-05-14",
+      "returnPct": -0.05284596682997069,
+      "netPnl": -716.958108124998,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "688578.SH",
+      "name": "艾力斯",
+      "industry": "化学制药",
+      "entryDate": "2024-04-29",
+      "priorDate": "2024-04-26",
+      "returnPct": 0.04790131217195724,
+      "netPnl": 555.1988603161026,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "000006.SZ",
+      "name": "深振业Ａ",
+      "industry": "区域地产",
+      "entryDate": "2024-05-17",
+      "priorDate": "2024-05-16",
+      "returnPct": -0.05284596682997068,
+      "netPnl": -777.1720067999977,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "002706.SZ",
+      "name": "良信股份",
+      "industry": "电气设备",
+      "entryDate": "2024-05-20",
+      "priorDate": "2024-05-17",
+      "returnPct": -0.05284596682997062,
+      "netPnl": -738.2287471999971,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "000564.SZ",
+      "name": "供销大集",
+      "industry": "百货",
+      "entryDate": "2024-05-23",
+      "priorDate": "2024-05-22",
+      "returnPct": -0.05284596682997095,
+      "netPnl": -755.5838955000017,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "000617.SZ",
+      "name": "中油资本",
+      "industry": "多元金融",
+      "entryDate": "2024-09-25",
+      "priorDate": "2024-09-24",
+      "returnPct": 0.14987100507481824,
+      "netPnl": 2122.5758034731243,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "600061.SH",
+      "name": "国投资本",
+      "industry": "证券",
+      "entryDate": "2024-09-25",
+      "priorDate": "2024-09-24",
+      "returnPct": 0.14770143714071476,
+      "netPnl": 2017.166415764499,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "601012.SH",
+      "name": "隆基绿能",
+      "industry": "电气设备",
+      "entryDate": "2024-09-30",
+      "priorDate": "2024-09-27",
+      "returnPct": -0.05284596682997071,
+      "netPnl": -743.3083027999983,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "600711.SH",
+      "name": "盛屯矿业",
+      "industry": "小金属",
+      "entryDate": "2024-10-08",
+      "priorDate": "2024-09-30",
+      "returnPct": -0.07051297208216203,
+      "netPnl": -1032.1179329999977,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "600206.SH",
+      "name": "有研新材",
+      "industry": "半导体",
+      "entryDate": "2024-10-09",
+      "priorDate": "2024-10-08",
+      "returnPct": -0.05284596682997064,
+      "netPnl": -744.1548953999973,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "002583.SZ",
+      "name": "海能达",
+      "industry": "通信设备",
+      "entryDate": "2024-10-15",
+      "priorDate": "2024-10-14",
+      "returnPct": 0.19760149962509396,
+      "netPnl": 2860.890046014003,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "kplConceptCount": 2,
+      "kplHotMax": 27406.0,
+      "kplHotMean": 27406.0,
+      "kplConceptCountRank": 0.7932024892292963,
+      "kplHotMaxRank": 0.9971278123504069,
+      "kplHotMeanRank": 0.9971278123504069
+    },
+    {
+      "ts_code": "600641.SH",
+      "name": "先导基电",
+      "industry": "半导体",
+      "entryDate": "2024-10-15",
+      "priorDate": "2024-10-14",
+      "returnPct": -0.056627707071302914,
+      "netPnl": -822.1283349999976,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "kplConceptCount": 3,
+      "kplHotMax": 682.0,
+      "kplHotMean": 682.0,
+      "kplConceptCountRank": 0.9468645284825276,
+      "kplHotMaxRank": 0.7673528003829584,
+      "kplHotMeanRank": 0.7673528003829584
+    },
+    {
+      "ts_code": "603893.SH",
+      "name": "瑞芯微",
+      "industry": "半导体",
+      "entryDate": "2024-10-21",
+      "priorDate": "2024-10-18",
+      "returnPct": -0.052845966829970774,
+      "netPnl": -510.28368964999936,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "000503.SZ",
+      "name": "国新健康",
+      "industry": "软件服务",
+      "entryDate": "2024-10-21",
+      "priorDate": "2024-10-18",
+      "returnPct": 0.1477014371407147,
+      "netPnl": 2133.9964354458734,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 2257.0,
+      "kplHotMean": 2257.0,
+      "kplConceptCountRank": 0.24508393285371702,
+      "kplHotMaxRank": 0.9405275779376499,
+      "kplHotMeanRank": 0.9405275779376499
+    },
+    {
+      "ts_code": "000021.SZ",
+      "name": "深科技",
+      "industry": "元器件",
+      "entryDate": "2024-10-28",
+      "priorDate": "2024-10-25",
+      "returnPct": 0.0039309602209211016,
+      "netPnl": 57.554298720275256,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "kplConceptCount": 3,
+      "kplHotMax": 5805.0,
+      "kplHotMean": 5805.0,
+      "kplConceptCountRank": 0.9499036608863198,
+      "kplHotMaxRank": 0.9749518304431599,
+      "kplHotMeanRank": 0.9749518304431599
+    },
+    {
+      "ts_code": "600438.SH",
+      "name": "通威股份",
+      "industry": "电气设备",
+      "entryDate": "2024-10-28",
+      "priorDate": "2024-10-25",
+      "returnPct": 0.03792129967508116,
+      "netPnl": 546.7494352319991,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "kplConceptCount": 4,
+      "kplHotMax": 7479.0,
+      "kplHotMean": 7479.0,
+      "kplConceptCountRank": 0.9715799614643545,
+      "kplHotMaxRank": 0.9816955684007708,
+      "kplHotMeanRank": 0.9816955684007708
+    },
+    {
+      "ts_code": "603366.SH",
+      "name": "日出东方",
+      "industry": "家用电器",
+      "entryDate": "2024-11-05",
+      "priorDate": "2024-11-04",
+      "returnPct": 0.19400464760079364,
+      "netPnl": 2931.5787712477013,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "300450.SZ",
+      "name": "先导智能",
+      "industry": "专用机械",
+      "entryDate": "2024-11-12",
+      "priorDate": "2024-11-11",
+      "returnPct": -0.052845966829970836,
+      "netPnl": -824.4753683250001,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "kplConceptCount": 2,
+      "kplHotMax": 4075.0,
+      "kplHotMean": 4075.0,
+      "kplConceptCountRank": 0.7507660878447395,
+      "kplHotMaxRank": 0.9412665985699693,
+      "kplHotMeanRank": 0.9412665985699693
+    },
+    {
+      "ts_code": "002031.SZ",
+      "name": "巨轮智能",
+      "industry": "汽车配件",
+      "entryDate": "2024-11-05",
+      "priorDate": "2024-11-04",
+      "returnPct": 0.0479013121719571,
+      "netPnl": 709.6339268518514,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "600292.SH",
+      "name": "XD电投水",
+      "industry": "水力发电",
+      "entryDate": "2024-11-12",
+      "priorDate": "2024-11-11",
+      "returnPct": -0.05598254096804458,
+      "netPnl": -825.8219707499975,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ]
+    },
+    {
+      "ts_code": "002354.SZ",
+      "name": "天娱数科",
+      "industry": "互联网",
+      "entryDate": "2024-11-21",
+      "priorDate": "2024-11-20",
+      "returnPct": 0.047901312171957186,
+      "netPnl": 719.8017014188026,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 5348.0,
+      "kplHotMean": 5348.0,
+      "kplConceptCountRank": 0.614070351758794,
+      "kplHotMaxRank": 0.9673366834170855,
+      "kplHotMeanRank": 0.9673366834170855
+    },
+    {
+      "ts_code": "002245.SZ",
+      "name": "蔚蓝锂芯",
+      "industry": "电气设备",
+      "entryDate": "2024-11-21",
+      "priorDate": "2024-11-20",
+      "returnPct": -0.05284596682997088,
+      "netPnl": -754.9489510500007,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 1340.0,
+      "kplHotMean": 1340.0,
+      "kplConceptCountRank": 0.0899497487437186,
+      "kplHotMaxRank": 0.8693467336683417,
+      "kplHotMeanRank": 0.8693467336683417
+    },
+    {
+      "ts_code": "603667.SH",
+      "name": "五洲新春",
+      "industry": "机械基件",
+      "entryDate": "2024-12-03",
+      "priorDate": "2024-12-02",
+      "returnPct": 0.19760149962509363,
+      "netPnl": 2627.0330588501984,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 1,
+      "kplHotMax": 8210.0,
+      "kplHotMean": 8210.0,
+      "kplConceptCountRank": 0.08224299065420561,
+      "kplHotMaxRank": 0.9817757009345794,
+      "kplHotMeanRank": 0.9817757009345794
+    },
+    {
+      "ts_code": "603002.SH",
+      "name": "宏昌电子",
+      "industry": "化工原料",
+      "entryDate": "2024-12-03",
+      "priorDate": "2024-12-02",
+      "returnPct": 0.04573174423785359,
+      "netPnl": 684.54435924875,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 1,
+      "kplHotMax": 904.0,
+      "kplHotMean": 904.0,
+      "kplConceptCountRank": 0.3771028037383178,
+      "kplHotMaxRank": 0.7602803738317757,
+      "kplHotMeanRank": 0.7602803738317757
+    },
+    {
+      "ts_code": "300007.SZ",
+      "name": "汉威科技",
+      "industry": "电器仪表",
+      "entryDate": "2024-12-09",
+      "priorDate": "2024-12-06",
+      "returnPct": 0.15483001749562608,
+      "netPnl": 2270.1655065089,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 2,
+      "kplHotMax": 1146.0,
+      "kplHotMean": 1146.0,
+      "kplConceptCountRank": 0.7108843537414966,
+      "kplHotMaxRank": 0.8401360544217688,
+      "kplHotMeanRank": 0.8401360544217688
+    },
+    {
+      "ts_code": "301018.SZ",
+      "name": "申菱环境",
+      "industry": "专用机械",
+      "entryDate": "2024-12-09",
+      "priorDate": "2024-12-06",
+      "returnPct": 0.15768144963759037,
+      "netPnl": 2297.1334971584965,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 1,
+      "kplHotMax": 461.0,
+      "kplHotMean": 461.0,
+      "kplConceptCountRank": 0.6384839650145773,
+      "kplHotMaxRank": 0.4873663751214772,
+      "kplHotMeanRank": 0.4873663751214772
+    },
+    {
+      "ts_code": "300676.SZ",
+      "name": "华大基因",
+      "industry": "医疗保健",
+      "entryDate": "2025-02-10",
+      "priorDate": "2025-02-07",
+      "returnPct": -0.0528459668299709,
+      "netPnl": -860.0322575250011,
+      "isWinner": false,
+      "windowLabels": []
+    },
+    {
+      "ts_code": "600588.SH",
+      "name": "用友网络",
+      "industry": "软件服务",
+      "entryDate": "2025-02-10",
+      "priorDate": "2025-02-07",
+      "returnPct": 0.15223780645747664,
+      "netPnl": 2451.3493760255515,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 1,
+      "kplHotMax": 12820.0,
+      "kplHotMean": 12820.0,
+      "kplConceptCountRank": 0.09317443120260022,
+      "kplHotMaxRank": 0.9794149512459371,
+      "kplHotMeanRank": 0.9794149512459371
+    },
+    {
+      "ts_code": "000967.SZ",
+      "name": "盈峰环境",
+      "industry": "环境保护",
+      "entryDate": "2025-02-18",
+      "priorDate": "2025-02-17",
+      "returnPct": -0.05284596682997069,
+      "netPnl": -863.7361001499976,
+      "isWinner": false,
+      "windowLabels": []
+    },
+    {
+      "ts_code": "603583.SH",
+      "name": "捷昌驱动",
+      "industry": "电气设备",
+      "entryDate": "2025-02-18",
+      "priorDate": "2025-02-17",
+      "returnPct": 0.19760149962509374,
+      "netPnl": 2909.9564866372,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 1,
+      "kplHotMax": 1015.0,
+      "kplHotMean": 1015.0,
+      "kplConceptCountRank": 0.5556750941366326,
+      "kplHotMaxRank": 0.9176976869284562,
+      "kplHotMeanRank": 0.9176976869284562
+    },
+    {
+      "ts_code": "002051.SZ",
+      "name": "中工国际",
+      "industry": "建筑工程",
+      "entryDate": "2025-02-24",
+      "priorDate": "2025-02-21",
+      "returnPct": -0.05284596682997075,
+      "netPnl": -849.1323777999987,
+      "isWinner": false,
+      "windowLabels": []
+    },
+    {
+      "ts_code": "000581.SZ",
+      "name": "威孚高科",
+      "industry": "汽车配件",
+      "entryDate": "2025-02-24",
+      "priorDate": "2025-02-21",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -790.7704004375009,
+      "isWinner": false,
+      "windowLabels": [],
+      "kplConceptCount": 1,
+      "kplHotMax": 1404.0,
+      "kplHotMean": 1404.0,
+      "kplConceptCountRank": 0.49375650364203955,
+      "kplHotMaxRank": 0.8257023933402705,
+      "kplHotMeanRank": 0.8257023933402705
+    },
+    {
+      "ts_code": "601177.SH",
+      "name": "杭齿前进",
+      "industry": "机械基件",
+      "entryDate": "2025-03-05",
+      "priorDate": "2025-03-04",
+      "returnPct": 0.19760149962509369,
+      "netPnl": 3296.948252197599,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 1,
+      "kplHotMax": 25756.0,
+      "kplHotMean": 25756.0,
+      "kplConceptCountRank": 0.02417235943247504,
+      "kplHotMaxRank": 0.9963215974776668,
+      "kplHotMeanRank": 0.9963215974776668
+    },
+    {
+      "ts_code": "600301.SH",
+      "name": "华锡有色",
+      "industry": "小金属",
+      "entryDate": "2025-03-05",
+      "priorDate": "2025-03-04",
+      "returnPct": 0.15483001749562614,
+      "netPnl": 2336.3605810294757,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 1,
+      "kplHotMax": 643.0,
+      "kplHotMean": 643.0,
+      "kplConceptCountRank": 0.534419337887546,
+      "kplHotMaxRank": 0.5943247503941146,
+      "kplHotMeanRank": 0.5943247503941146
+    },
+    {
+      "ts_code": "603960.SH",
+      "name": "克来机电",
+      "industry": "汽车配件",
+      "entryDate": "2025-03-17",
+      "priorDate": "2025-03-14",
+      "returnPct": -0.05284596682997109,
+      "netPnl": -918.9233552625046,
+      "isWinner": false,
+      "windowLabels": [],
+      "kplConceptCount": 1,
+      "kplHotMax": 1117.0,
+      "kplHotMean": 1117.0,
+      "kplConceptCountRank": 0.6158415841584158,
+      "kplHotMaxRank": 0.7886138613861386,
+      "kplHotMeanRank": 0.7886138613861386
+    },
+    {
+      "ts_code": "002342.SZ",
+      "name": "巨力索具",
+      "industry": "机械基件",
+      "entryDate": "2025-03-19",
+      "priorDate": "2025-03-18",
+      "returnPct": 0.19128392970144495,
+      "netPnl": 3315.6476031070015,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 2,
+      "kplHotMax": 24932.0,
+      "kplHotMean": 24932.0,
+      "kplConceptCountRank": 0.6795634920634921,
+      "kplHotMaxRank": 0.9965277777777778,
+      "kplHotMeanRank": 0.9965277777777778
+    },
+    {
+      "ts_code": "002773.SZ",
+      "name": "康弘药业",
+      "industry": "化学制药",
+      "entryDate": "2025-03-11",
+      "priorDate": "2025-03-10",
+      "returnPct": 0.1548300174956261,
+      "netPnl": 2463.32490429025,
+      "isWinner": true,
+      "windowLabels": []
+    },
+    {
+      "ts_code": "000733.SZ",
+      "name": "振华科技",
+      "industry": "元器件",
+      "entryDate": "2025-03-11",
+      "priorDate": "2025-03-10",
+      "returnPct": 0.16433479130217446,
+      "netPnl": 2533.2617024715,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 3,
+      "kplHotMax": 619.0,
+      "kplHotMean": 619.0,
+      "kplConceptCountRank": 0.9018499486125385,
+      "kplHotMaxRank": 0.565775950668037,
+      "kplHotMeanRank": 0.565775950668037
+    },
+    {
+      "ts_code": "002246.SZ",
+      "name": "北化股份",
+      "industry": "化工原料",
+      "entryDate": "2025-05-07",
+      "priorDate": "2025-05-06",
+      "returnPct": -0.05284596682997076,
+      "netPnl": -926.2252164374986,
+      "isWinner": false,
+      "windowLabels": []
+    },
+    {
+      "ts_code": "600562.SH",
+      "name": "国睿科技",
+      "industry": "通信设备",
+      "entryDate": "2025-05-13",
+      "priorDate": "2025-05-12",
+      "returnPct": -0.05284596682997072,
+      "netPnl": -939.664873962498,
+      "isWinner": false,
+      "windowLabels": [],
+      "kplConceptCount": 5,
+      "kplHotMax": 6239.0,
+      "kplHotMean": 6239.0,
+      "kplConceptCountRank": 0.9928298279158699,
+      "kplHotMaxRank": 0.9737093690248566,
+      "kplHotMeanRank": 0.9737093690248566
+    },
+    {
+      "ts_code": "600592.SH",
+      "name": "龙溪股份",
+      "industry": "机械基件",
+      "entryDate": "2025-05-07",
+      "priorDate": "2025-05-06",
+      "returnPct": 0.047901312171957,
+      "netPnl": 781.2879608283747,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 2,
+      "kplHotMax": 6454.0,
+      "kplHotMean": 6454.0,
+      "kplConceptCountRank": 0.7260486794407043,
+      "kplHotMaxRank": 0.9761781460383221,
+      "kplHotMeanRank": 0.9792853443811497
+    },
+    {
+      "ts_code": "300607.SZ",
+      "name": "拓斯达",
+      "industry": "专用机械",
+      "entryDate": "2025-05-13",
+      "priorDate": "2025-05-12",
+      "returnPct": 0.04714057852755199,
+      "netPnl": 717.810239873299,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 1,
+      "kplHotMax": 27583.0,
+      "kplHotMean": 27583.0,
+      "kplConceptCountRank": 0.22896749521988527,
+      "kplHotMaxRank": 0.9961759082217974,
+      "kplHotMeanRank": 0.9961759082217974
+    },
+    {
+      "ts_code": "600468.SH",
+      "name": "百利电气",
+      "industry": "电气设备",
+      "entryDate": "2025-05-19",
+      "priorDate": "2025-05-16",
+      "returnPct": 0.19144291245541434,
+      "netPnl": 3504.335149656603,
+      "isWinner": true,
+      "windowLabels": [],
+      "kplConceptCount": 3,
+      "kplHotMax": 6287.0,
+      "kplHotMean": 6287.0,
+      "kplConceptCountRank": 0.9168260038240917,
+      "kplHotMaxRank": 0.9717973231357553,
+      "kplHotMeanRank": 0.9717973231357553
+    },
+    {
+      "ts_code": "300255.SZ",
+      "name": "常山药业",
+      "industry": "生物制药",
+      "entryDate": "2025-05-30",
+      "priorDate": "2025-05-29",
+      "returnPct": -0.05284596682997067,
+      "netPnl": -989.1905410624968,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 4465.0,
+      "kplHotMean": 4465.0,
+      "kplConceptCountRank": 0.551954242135367,
+      "kplHotMaxRank": 0.9580552907530981,
+      "kplHotMeanRank": 0.9580552907530981
+    },
+    {
+      "ts_code": "688578.SH",
+      "name": "艾力斯",
+      "industry": "化学制药",
+      "entryDate": "2025-05-30",
+      "priorDate": "2025-05-29",
+      "returnPct": -0.05284596682997087,
+      "netPnl": -518.5379675000004,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "600259.SH",
+      "name": "中稀有色",
+      "industry": "小金属",
+      "entryDate": "2025-06-05",
+      "priorDate": "2025-06-04",
+      "returnPct": -0.052845966829970774,
+      "netPnl": -869.715160387499,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 2,
+      "kplHotMax": 6594.0,
+      "kplHotMean": 6594.0,
+      "kplConceptCountRank": 0.8823821339950372,
+      "kplHotMaxRank": 0.9687344913151364,
+      "kplHotMeanRank": 0.9687344913151364
+    },
+    {
+      "ts_code": "003040.SZ",
+      "name": "楚天龙",
+      "industry": "通信设备",
+      "entryDate": "2025-06-06",
+      "priorDate": "2025-06-05",
+      "returnPct": 0.19760149962509385,
+      "netPnl": 3698.976507626401,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 2,
+      "kplHotMax": 988.0,
+      "kplHotMean": 988.0,
+      "kplConceptCountRank": 0.8339152119700748,
+      "kplHotMaxRank": 0.7825436408977556,
+      "kplHotMeanRank": 0.7825436408977556
+    },
+    {
+      "ts_code": "002181.SZ",
+      "name": "粤传媒",
+      "industry": "出版业",
+      "entryDate": "2025-06-10",
+      "priorDate": "2025-06-09",
+      "returnPct": 0.19369995515574653,
+      "netPnl": 3701.191580764993,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "002605.SZ",
+      "name": "姚记科技",
+      "industry": "互联网",
+      "entryDate": "2025-06-10",
+      "priorDate": "2025-06-09",
+      "returnPct": -0.0528459668299707,
+      "netPnl": -1009.5616754999974,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "002080.SZ",
+      "name": "中材科技",
+      "industry": "玻璃",
+      "entryDate": "2025-05-19",
+      "priorDate": "2025-05-16",
+      "returnPct": 0.1522378064574765,
+      "netPnl": 2743.096839382899,
+      "isWinner": true,
+      "windowLabels": []
+    },
+    {
+      "ts_code": "002074.SZ",
+      "name": "国轩高科",
+      "industry": "电气设备",
+      "entryDate": "2025-06-25",
+      "priorDate": "2025-06-24",
+      "returnPct": -0.0528459668299708,
+      "netPnl": -873.5777391249994,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 31792.0,
+      "kplHotMean": 31792.0,
+      "kplConceptCountRank": 0.021632251720747297,
+      "kplHotMaxRank": 0.995575221238938,
+      "kplHotMeanRank": 0.995575221238938
+    },
+    {
+      "ts_code": "002670.SZ",
+      "name": "国盛证券",
+      "industry": "证券",
+      "entryDate": "2025-06-25",
+      "priorDate": "2025-06-24",
+      "returnPct": 0.044062845827004864,
+      "netPnl": 830.4760159696016,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 2,
+      "kplHotMax": 7088.0,
+      "kplHotMean": 7088.0,
+      "kplConceptCountRank": 0.8072763028515241,
+      "kplHotMaxRank": 0.9773844641101278,
+      "kplHotMeanRank": 0.9773844641101278
+    },
+    {
+      "ts_code": "003031.SZ",
+      "name": "中瓷电子",
+      "industry": "元器件",
+      "entryDate": "2025-07-01",
+      "priorDate": "2025-06-30",
+      "returnPct": -0.0528459668299707,
+      "netPnl": -883.0489938374976,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 4048.0,
+      "kplHotMean": 4048.0,
+      "kplConceptCountRank": 0.1422615945805107,
+      "kplHotMaxRank": 0.9421573736321001,
+      "kplHotMeanRank": 0.9421573736321001
+    },
+    {
+      "ts_code": "603936.SH",
+      "name": "博敏电子",
+      "industry": "元器件",
+      "entryDate": "2025-07-01",
+      "priorDate": "2025-06-30",
+      "returnPct": -0.05284596682997075,
+      "netPnl": -1042.5258748624983,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 1225.0,
+      "kplHotMean": 1225.0,
+      "kplConceptCountRank": 0.27253778009379886,
+      "kplHotMaxRank": 0.7962480458572173,
+      "kplHotMeanRank": 0.7962480458572173
+    },
+    {
+      "ts_code": "002716.SZ",
+      "name": "湖南白银",
+      "industry": "小金属",
+      "entryDate": "2025-07-14",
+      "priorDate": "2025-07-11",
+      "returnPct": -0.05284596682997079,
+      "netPnl": -1026.493527499999,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 2788.0,
+      "kplHotMean": 2788.0,
+      "kplConceptCountRank": 0.6734117647058824,
+      "kplHotMaxRank": 0.9308235294117647,
+      "kplHotMeanRank": 0.9308235294117647
+    },
+    {
+      "ts_code": "300393.SZ",
+      "name": "中来股份",
+      "industry": "塑料",
+      "entryDate": "2025-07-08",
+      "priorDate": "2025-07-07",
+      "returnPct": 0.04629163273697716,
+      "netPnl": 882.216551466252,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 367.0,
+      "kplHotMean": 367.0,
+      "kplConceptCountRank": 0.30369677117454374,
+      "kplHotMaxRank": 0.1941974730931212,
+      "kplHotMeanRank": 0.1941974730931212
+    },
+    {
+      "ts_code": "002645.SZ",
+      "name": "华宏科技",
+      "industry": "专用机械",
+      "entryDate": "2025-07-21",
+      "priorDate": "2025-07-18",
+      "returnPct": -0.05284596682997069,
+      "netPnl": -1000.6724531999971,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 27651.0,
+      "kplHotMean": 27651.0,
+      "kplConceptCountRank": 0.12432697014194811,
+      "kplHotMaxRank": 0.9980420949583945,
+      "kplHotMeanRank": 0.9980420949583945
+    },
+    {
+      "ts_code": "601399.SH",
+      "name": "国机重装",
+      "industry": "工程机械",
+      "entryDate": "2025-07-22",
+      "priorDate": "2025-07-21",
+      "returnPct": -0.04424896992448345,
+      "netPnl": -857.0222283000003,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 2,
+      "kplHotMax": 5018.0,
+      "kplHotMean": 5018.0,
+      "kplConceptCountRank": 0.6894865525672371,
+      "kplHotMaxRank": 0.9540342298288509,
+      "kplHotMeanRank": 0.9540342298288509
+    },
+    {
+      "ts_code": "601138.SH",
+      "name": "工业富联",
+      "industry": "通信设备",
+      "entryDate": "2025-07-08",
+      "priorDate": "2025-07-07",
+      "returnPct": 0.15483001749562622,
+      "netPnl": 2862.6656817258518,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 3909.0,
+      "kplHotMean": 3909.0,
+      "kplConceptCountRank": 0.6925596630790828,
+      "kplHotMaxRank": 0.9438465138043987,
+      "kplHotMeanRank": 0.9438465138043987
+    },
+    {
+      "ts_code": "002097.SZ",
+      "name": "山河智能",
+      "industry": "工程机械",
+      "entryDate": "2025-08-04",
+      "priorDate": "2025-08-01",
+      "returnPct": 0.19760149962509352,
+      "netPnl": 3706.099055458795,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 31446.0,
+      "kplHotMean": 31446.0,
+      "kplConceptCountRank": 0.10306807286673059,
+      "kplHotMaxRank": 0.9990412272291467,
+      "kplHotMeanRank": 0.9990412272291467
+    },
+    {
+      "ts_code": "300304.SZ",
+      "name": "云意电气",
+      "industry": "汽车配件",
+      "entryDate": "2025-07-15",
+      "priorDate": "2025-07-14",
+      "returnPct": 0.1477014371407149,
+      "netPnl": 2784.991051442601,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "000901.SZ",
+      "name": "航天科技",
+      "industry": "汽车配件",
+      "entryDate": "2025-08-06",
+      "priorDate": "2025-08-05",
+      "returnPct": 0.14770143714071468,
+      "netPnl": 2855.3848354531474,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 2,
+      "kplHotMax": 8707.0,
+      "kplHotMean": 8707.0,
+      "kplConceptCountRank": 0.7122905027932961,
+      "kplHotMaxRank": 0.984171322160149,
+      "kplHotMeanRank": 0.984171322160149
+    },
+    {
+      "ts_code": "601929.SH",
+      "name": "吉视传媒",
+      "industry": "影视音像",
+      "entryDate": "2025-08-12",
+      "priorDate": "2025-08-11",
+      "returnPct": 0.19135261544729634,
+      "netPnl": 4009.6343216580026,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 19739.0,
+      "kplHotMean": 19739.0,
+      "kplConceptCountRank": 0.2906815020862309,
+      "kplHotMaxRank": 0.9935095039406583,
+      "kplHotMeanRank": 0.9935095039406583
+    },
+    {
+      "ts_code": "002176.SZ",
+      "name": "江特电机",
+      "industry": "小金属",
+      "entryDate": "2025-08-12",
+      "priorDate": "2025-08-11",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -1111.6819078750013,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 3,
+      "kplHotMax": 13689.0,
+      "kplHotMean": 13689.0,
+      "kplConceptCountRank": 0.9304589707927677,
+      "kplHotMaxRank": 0.9870190078813167,
+      "kplHotMeanRank": 0.9870190078813167
+    },
+    {
+      "ts_code": "688261.SH",
+      "name": "东微半导",
+      "industry": "半导体",
+      "entryDate": "2025-07-29",
+      "priorDate": "2025-07-28",
+      "returnPct": 0.16433479130217435,
+      "netPnl": 2670.488271701248,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "600330.SH",
+      "name": "天通股份",
+      "industry": "专用机械",
+      "entryDate": "2025-08-18",
+      "priorDate": "2025-08-15",
+      "returnPct": -0.052845966829970635,
+      "netPnl": -1098.8771947999958,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 1036.0,
+      "kplHotMean": 1036.0,
+      "kplConceptCountRank": 0.21899859616284512,
+      "kplHotMaxRank": 0.7842770238652317,
+      "kplHotMeanRank": 0.7842770238652317
+    },
+    {
+      "ts_code": "002190.SZ",
+      "name": "成飞集成",
+      "industry": "汽车配件",
+      "entryDate": "2025-08-25",
+      "priorDate": "2025-08-22",
+      "returnPct": -0.05284596682997085,
+      "netPnl": -1135.9156210500005,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 19647.0,
+      "kplHotMean": 19647.0,
+      "kplConceptCountRank": 0.10228933268387726,
+      "kplHotMaxRank": 0.9961032635168047,
+      "kplHotMeanRank": 0.9961032635168047
+    },
+    {
+      "ts_code": "600737.SH",
+      "name": "中粮糖业",
+      "industry": "食品",
+      "entryDate": "2025-08-18",
+      "priorDate": "2025-08-15",
+      "returnPct": 0.1477014371407147,
+      "netPnl": 3161.509064238522,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 6776.0,
+      "kplHotMean": 6776.0,
+      "kplConceptCountRank": 0.17828731867103417,
+      "kplHotMaxRank": 0.9728591483387927,
+      "kplHotMeanRank": 0.9728591483387927
+    },
+    {
+      "ts_code": "002202.SZ",
+      "name": "金风科技",
+      "industry": "电气设备",
+      "entryDate": "2025-08-25",
+      "priorDate": "2025-08-22",
+      "returnPct": -0.05284596682997096,
+      "netPnl": -1106.7081763500028,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 604.0,
+      "kplHotMean": 604.0,
+      "kplConceptCountRank": 0.4486117876278617,
+      "kplHotMaxRank": 0.5353141743789577,
+      "kplHotMeanRank": 0.535801266439357
+    },
+    {
+      "ts_code": "000981.SZ",
+      "name": "山子高科",
+      "industry": "汽车配件",
+      "entryDate": "2025-09-02",
+      "priorDate": "2025-09-01",
+      "returnPct": -0.05284596682997093,
+      "netPnl": -1135.756884937502,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "601069.SH",
+      "name": "西部黄金",
+      "industry": "黄金",
+      "entryDate": "2025-09-02",
+      "priorDate": "2025-09-01",
+      "returnPct": 0.14770143714071476,
+      "netPnl": 2851.244024628999,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 3,
+      "kplHotMax": 4436.0,
+      "kplHotMean": 4281.333333333333,
+      "kplConceptCountRank": 0.9145299145299145,
+      "kplHotMaxRank": 0.9421820010055304,
+      "kplHotMeanRank": 0.9401709401709402
+    },
+    {
+      "ts_code": "600977.SH",
+      "name": "中国电影",
+      "industry": "影视音像",
+      "entryDate": "2025-09-09",
+      "priorDate": "2025-09-08",
+      "returnPct": 0.1976014996250939,
+      "netPnl": 4176.1872123972025,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 8179.0,
+      "kplHotMean": 8179.0,
+      "kplConceptCountRank": 0.5196304849884527,
+      "kplHotMaxRank": 0.981986143187067,
+      "kplHotMeanRank": 0.9824480369515012
+    },
+    {
+      "ts_code": "600699.SH",
+      "name": "均胜电子",
+      "industry": "汽车配件",
+      "entryDate": "2025-09-09",
+      "priorDate": "2025-09-08",
+      "returnPct": 0.14770143714071488,
+      "netPnl": 3194.339778630001,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 2,
+      "kplHotMax": 9096.0,
+      "kplHotMean": 8768.0,
+      "kplConceptCountRank": 0.7454965357967668,
+      "kplHotMaxRank": 0.9852193995381062,
+      "kplHotMeanRank": 0.9852193995381062
+    },
+    {
+      "ts_code": "300857.SZ",
+      "name": "协创数据",
+      "industry": "IT设备",
+      "entryDate": "2025-09-17",
+      "priorDate": "2025-09-16",
+      "returnPct": -0.05284596682997067,
+      "netPnl": -886.8057484999972,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 2,
+      "kplHotMax": 3990.0,
+      "kplHotMean": 3990.0,
+      "kplConceptCountRank": 0.7541512915129152,
+      "kplHotMaxRank": 0.9561808118081181,
+      "kplHotMeanRank": 0.9561808118081181
+    },
+    {
+      "ts_code": "002050.SZ",
+      "name": "三花智控",
+      "industry": "家用电器",
+      "entryDate": "2025-09-17",
+      "priorDate": "2025-09-16",
+      "returnPct": 0.15768144963759076,
+      "netPnl": 3307.556478726503,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 2,
+      "kplHotMax": 19708.0,
+      "kplHotMean": 19708.0,
+      "kplConceptCountRank": 0.7421586715867159,
+      "kplHotMaxRank": 0.996309963099631,
+      "kplHotMeanRank": 0.996309963099631
+    },
+    {
+      "ts_code": "600362.SH",
+      "name": "江西铜业",
+      "industry": "铜",
+      "entryDate": "2025-10-10",
+      "priorDate": "2025-10-09",
+      "returnPct": -0.08185618537312066,
+      "netPnl": -1725.2269737499955,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 2,
+      "kplHotMax": 12946.0,
+      "kplHotMean": 12946.0,
+      "kplConceptCountRank": 0.7114328507239142,
+      "kplHotMaxRank": 0.9915127309036446,
+      "kplHotMeanRank": 0.9915127309036446
+    },
+    {
+      "ts_code": "002941.SZ",
+      "name": "新疆交建",
+      "industry": "建筑工程",
+      "entryDate": "2025-10-10",
+      "priorDate": "2025-10-09",
+      "returnPct": -0.05412417740105025,
+      "netPnl": -1162.4150999999947,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 4863.0,
+      "kplHotMean": 4863.0,
+      "kplConceptCountRank": 0.4957563654518223,
+      "kplHotMaxRank": 0.9505741387918123,
+      "kplHotMeanRank": 0.9505741387918123
+    },
+    {
+      "ts_code": "601699.SH",
+      "name": "潞安环能",
+      "industry": "煤炭开采",
+      "entryDate": "2025-10-16",
+      "priorDate": "2025-10-15",
+      "returnPct": -0.052845966829970725,
+      "netPnl": -1180.0442603249976,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 957.0,
+      "kplHotMean": 957.0,
+      "kplConceptCountRank": 0.32574031890660593,
+      "kplHotMaxRank": 0.7931662870159454,
+      "kplHotMeanRank": 0.7931662870159454
+    },
+    {
+      "ts_code": "000543.SZ",
+      "name": "皖能电力",
+      "industry": "火力发电",
+      "entryDate": "2025-10-27",
+      "priorDate": "2025-10-24",
+      "returnPct": -0.05284596682997077,
+      "netPnl": -1189.9917233749984,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 466.0,
+      "kplHotMean": 466.0,
+      "kplConceptCountRank": 0.11936832326985601,
+      "kplHotMaxRank": 0.4793311658151417,
+      "kplHotMeanRank": 0.4793311658151417
+    },
+    {
+      "ts_code": "603185.SH",
+      "name": "弘元绿能",
+      "industry": "电气设备",
+      "entryDate": "2025-11-03",
+      "priorDate": "2025-10-31",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -1188.9334826250015,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "300058.SZ",
+      "name": "蓝色光标",
+      "industry": "广告包装",
+      "entryDate": "2025-11-04",
+      "priorDate": "2025-11-03",
+      "returnPct": 0.1477014371407149,
+      "netPnl": 3254.6773077819016,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "600549.SH",
+      "name": "厦门钨业",
+      "industry": "小金属",
+      "entryDate": "2025-10-27",
+      "priorDate": "2025-10-24",
+      "returnPct": -0.052845966829970656,
+      "netPnl": -1096.2315929249962,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 4,
+      "kplHotMax": 1763.0,
+      "kplHotMean": 1763.0,
+      "kplConceptCountRank": 0.9869948908499768,
+      "kplHotMaxRank": 0.8871342313051556,
+      "kplHotMeanRank": 0.8871342313051556
+    },
+    {
+      "ts_code": "603619.SH",
+      "name": "中曼石油",
+      "industry": "石油开采",
+      "entryDate": "2025-11-18",
+      "priorDate": "2025-11-17",
+      "returnPct": -0.05284596682997069,
+      "netPnl": -1187.1873853874968,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "601898.SH",
+      "name": "中煤能源",
+      "industry": "煤炭开采",
+      "entryDate": "2025-10-16",
+      "priorDate": "2025-10-15",
+      "returnPct": 0.049452643805498964,
+      "netPnl": 1118.6804652954052,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 540.0,
+      "kplHotMean": 540.0,
+      "kplConceptCountRank": 0.32300683371298405,
+      "kplHotMaxRank": 0.585876993166287,
+      "kplHotMeanRank": 0.585876993166287
+    },
+    {
+      "ts_code": "002131.SZ",
+      "name": "利欧股份",
+      "industry": "互联网",
+      "entryDate": "2026-01-06",
+      "priorDate": "2026-01-05",
+      "returnPct": 0.14770143714071488,
+      "netPnl": 3333.648485642476,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "002414.SZ",
+      "name": "高德红外",
+      "industry": "电器仪表",
+      "entryDate": "2025-12-23",
+      "priorDate": "2025-12-22",
+      "returnPct": 0.147701437140715,
+      "netPnl": 3144.945820941928,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "603882.SH",
+      "name": "金域医学",
+      "industry": "医疗保健",
+      "entryDate": "2026-01-12",
+      "priorDate": "2026-01-09",
+      "returnPct": -0.05284596682997072,
+      "netPnl": -1175.5996491749975,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "600312.SH",
+      "name": "平高电气",
+      "industry": "电气设备",
+      "entryDate": "2026-01-20",
+      "priorDate": "2026-01-19",
+      "returnPct": -0.05284596682997057,
+      "netPnl": -1243.9620016249937,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 7227.0,
+      "kplHotMean": 7227.0,
+      "kplConceptCountRank": 0.0990990990990991,
+      "kplHotMaxRank": 0.9117117117117117,
+      "kplHotMeanRank": 0.9117117117117117
+    },
+    {
+      "ts_code": "601212.SH",
+      "name": "白银有色",
+      "industry": "铜",
+      "entryDate": "2026-01-26",
+      "priorDate": "2026-01-23",
+      "returnPct": -0.05284596682997077,
+      "netPnl": -1207.4526957499984,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "002284.SZ",
+      "name": "亚太股份",
+      "industry": "汽车配件",
+      "entryDate": "2025-12-23",
+      "priorDate": "2025-12-22",
+      "returnPct": 0.14770143714071482,
+      "netPnl": 3138.7346047057,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "601179.SH",
+      "name": "中国西电",
+      "industry": "电气设备",
+      "entryDate": "2026-01-20",
+      "priorDate": "2026-01-19",
+      "returnPct": -0.052845966829970906,
+      "netPnl": -1240.522719187502,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 28963.0,
+      "kplHotMean": 28963.0,
+      "kplConceptCountRank": 0.06306306306306306,
+      "kplHotMaxRank": 0.990990990990991,
+      "kplHotMeanRank": 0.990990990990991
+    },
+    {
+      "ts_code": "301217.SZ",
+      "name": "铜冠铜箔",
+      "industry": "元器件",
+      "entryDate": "2026-02-25",
+      "priorDate": "2026-02-24",
+      "returnPct": -0.05284596682997074,
+      "netPnl": -1033.266268299998,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "601872.SH",
+      "name": "招商轮船",
+      "industry": "水运",
+      "entryDate": "2026-02-25",
+      "priorDate": "2026-02-24",
+      "returnPct": 0.15102810797300678,
+      "netPnl": 3345.6745953881255,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "000960.SZ",
+      "name": "锡业股份",
+      "industry": "小金属",
+      "entryDate": "2026-03-02",
+      "priorDate": "2026-02-27",
+      "returnPct": -0.0665343447899346,
+      "netPnl": -1300.3741730000002,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "600452.SH",
+      "name": "涪陵电力",
+      "industry": "水力发电",
+      "entryDate": "2026-03-02",
+      "priorDate": "2026-02-27",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -1236.8717886000013,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "002149.SZ",
+      "name": "西部材料",
+      "industry": "小金属",
+      "entryDate": "2026-04-21",
+      "priorDate": "2026-04-20",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -973.528577962501,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 14043.0,
+      "kplHotMean": 14043.0,
+      "kplConceptCountRank": 0.2202729044834308,
+      "kplHotMaxRank": 0.9883040935672515,
+      "kplHotMeanRank": 0.9883040935672515
+    },
+    {
+      "ts_code": "300806.SZ",
+      "name": "斯迪克",
+      "industry": "塑料",
+      "entryDate": "2026-04-21",
+      "priorDate": "2026-04-20",
+      "returnPct": 0.1976014996250935,
+      "netPnl": 4118.613284085295,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "600338.SH",
+      "name": "西藏珠峰",
+      "industry": "铅锌",
+      "entryDate": "2026-04-28",
+      "priorDate": "2026-04-27",
+      "returnPct": 0.04235686078480374,
+      "netPnl": 958.0377761954987,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "000783.SZ",
+      "name": "长江证券",
+      "industry": "证券",
+      "entryDate": "2026-05-06",
+      "priorDate": "2026-04-30",
+      "returnPct": -0.05284596682997091,
+      "netPnl": -1255.7613859875019,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "000060.SZ",
+      "name": "中金岭南",
+      "industry": "铅锌",
+      "entryDate": "2026-05-07",
+      "priorDate": "2026-05-06",
+      "returnPct": -0.052845966829970885,
+      "netPnl": -1239.8348627000014,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "300679.SZ",
+      "name": "电连技术",
+      "industry": "元器件",
+      "entryDate": "2026-04-28",
+      "priorDate": "2026-04-27",
+      "returnPct": 0.15768144963759065,
+      "netPnl": 3624.892446375201,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "002929.SZ",
+      "name": "润建股份",
+      "industry": "通信设备",
+      "entryDate": "2026-05-11",
+      "priorDate": "2026-05-08",
+      "returnPct": 0.16433479130217452,
+      "netPnl": 3832.965144133126,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ]
+    },
+    {
+      "ts_code": "600198.SH",
+      "name": "大唐电信",
+      "industry": "通信设备",
+      "entryDate": "2026-05-12",
+      "priorDate": "2026-05-11",
+      "returnPct": -0.05284596682997085,
+      "netPnl": -1229.1466311250006,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 5494.0,
+      "kplHotMean": 5494.0,
+      "kplConceptCountRank": 0.5042492917847026,
+      "kplHotMaxRank": 0.9192634560906515,
+      "kplHotMeanRank": 0.9192634560906515
+    },
+    {
+      "ts_code": "688126.SH",
+      "name": "沪硅产业",
+      "industry": "半导体",
+      "entryDate": "2026-05-20",
+      "priorDate": "2026-05-19",
+      "returnPct": -0.0528459668299707,
+      "netPnl": -1240.6814552999967,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 6636.0,
+      "kplHotMean": 6636.0,
+      "kplConceptCountRank": 0.8947368421052632,
+      "kplHotMaxRank": 0.9282296650717703,
+      "kplHotMeanRank": 0.9282296650717703
+    },
+    {
+      "ts_code": "603078.SH",
+      "name": "江化微",
+      "industry": "半导体",
+      "entryDate": "2026-05-20",
+      "priorDate": "2026-05-19",
+      "returnPct": -0.05284596682997072,
+      "netPnl": -1118.7721208999974,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "kplConceptCount": 1,
+      "kplHotMax": 5440.0,
+      "kplHotMean": 5440.0,
+      "kplConceptCountRank": 0.05263157894736842,
+      "kplHotMaxRank": 0.8995215311004785,
+      "kplHotMeanRank": 0.8995215311004785
+    }
+  ]
+}

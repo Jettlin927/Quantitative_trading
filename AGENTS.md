@@ -45,11 +45,15 @@
 
 优先建立基线再改策略。修改核心回测语义时，要说明对历史结果可比性的影响；无法保持可比时，应新建实验口径，而不是悄悄覆盖旧含义。
 
+研究任务执行默认走常驻后端 API：`portfolio_backtest`、`window_validation`、`trade_delta` 等研究任务应优先提交到 `POST /api/research/jobs`，再轮询 `/api/research/jobs/{jobId}` 和读取 `/api/research/jobs/{jobId}/result`。接口说明见 `docs/research/research-job-api.md`。不要把 `docker compose run --rm api python scripts/research/...` 当作研究主路径，避免反复创建临时容器拖慢迭代。
+
+只有在 Research Job API 不可用、需要调试脚本本身、或后端服务尚未启动时，才退回容器内命令行；优先使用 `docker compose exec -T api python scripts/research/...` 复用已运行的 `api` 容器。新增或修改因子算法/后端代码后，通常只需要 `docker compose restart api` 让服务加载新代码；只有改 Dockerfile 或依赖文件时才重建。
+
 ## 长期目标与阶段推进
 
 本项目的终极量化目标和完整阶段路线写在 `docs/research/long-term-goal.md`：年化收益率 `>= 100%`、最大回撤绝对值 `< 10%`、已完成交易盈亏比 `>= 3:1`。这是长期北极星目标，不代表当前观察级策略已经接近达成。
 
-策略研究必须按 `docs/research/stages/` 分阶段推进。当前活跃阶段以 `docs/research/stages/README.md` 和对应阶段目录为准；截至本规则更新，活跃阶段是 `001-observation-diagnosis`，目标是解释 `105/106/110` 失败窗口为什么没有稳定正期望。
+策略研究必须按 `docs/research/stages/` 分阶段推进。当前活跃阶段以 `docs/research/stages/README.md` 和对应阶段目录为准；截至本规则更新，活跃阶段是 `002-candidate-repair-30`，目标是把 `001` 已形成的失败窗口归因转成可回测修复假设，先验证年化 `>= 30%` 的阶段候选。
 
 阶段推进规则：
 

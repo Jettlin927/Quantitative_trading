@@ -1,0 +1,2166 @@
+{
+  "runId": "002-moneyflow-cache-mainline-001",
+  "startedAt": "2026-05-31 10:32 +0800",
+  "finishedAt": "2026-05-31 10:36 +0800",
+  "context": "docs/research/runs/002-repair-indicator-ablate-ma-001/context.json",
+  "strategy": "trend-follow-maximum-profit-no-macd",
+  "cachePath": "docs/research/runs/002-moneyflow-cache-mainline-001/moneyflow-cache.jsonl",
+  "lookbackDays": 5,
+  "candidateCount": 1430,
+  "entryDateCount": 178,
+  "neededPriorDateCount": 358,
+  "cachedDateCountBeforeRun": 0,
+  "fetchedDateCount": 358,
+  "errorCount": 0,
+  "fetchErrors": [],
+  "perDate": [
+    {
+      "tradeDate": "2023-08-29",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5045
+    },
+    {
+      "tradeDate": "2023-08-30",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5047
+    },
+    {
+      "tradeDate": "2023-08-31",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5047
+    },
+    {
+      "tradeDate": "2023-09-01",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5046
+    },
+    {
+      "tradeDate": "2023-09-04",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5045
+    },
+    {
+      "tradeDate": "2023-09-05",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5049
+    },
+    {
+      "tradeDate": "2023-09-06",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5050
+    },
+    {
+      "tradeDate": "2023-09-28",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5058
+    },
+    {
+      "tradeDate": "2023-10-09",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5058
+    },
+    {
+      "tradeDate": "2023-10-10",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5061
+    },
+    {
+      "tradeDate": "2023-10-11",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5060
+    },
+    {
+      "tradeDate": "2023-10-12",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5061
+    },
+    {
+      "tradeDate": "2023-10-24",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5066
+    },
+    {
+      "tradeDate": "2023-10-25",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5068
+    },
+    {
+      "tradeDate": "2023-10-26",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5068
+    },
+    {
+      "tradeDate": "2023-10-27",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5068
+    },
+    {
+      "tradeDate": "2023-10-30",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5067
+    },
+    {
+      "tradeDate": "2023-10-31",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5070
+    },
+    {
+      "tradeDate": "2023-11-01",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5072
+    },
+    {
+      "tradeDate": "2023-11-02",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5071
+    },
+    {
+      "tradeDate": "2023-11-03",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5073
+    },
+    {
+      "tradeDate": "2023-11-06",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5067
+    },
+    {
+      "tradeDate": "2023-11-07",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5069
+    },
+    {
+      "tradeDate": "2023-11-08",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5072
+    },
+    {
+      "tradeDate": "2023-11-09",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5071
+    },
+    {
+      "tradeDate": "2023-11-10",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5071
+    },
+    {
+      "tradeDate": "2023-11-13",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5073
+    },
+    {
+      "tradeDate": "2023-11-14",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5073
+    },
+    {
+      "tradeDate": "2023-11-15",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5072
+    },
+    {
+      "tradeDate": "2023-11-16",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5071
+    },
+    {
+      "tradeDate": "2023-11-17",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5072
+    },
+    {
+      "tradeDate": "2023-11-20",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5074
+    },
+    {
+      "tradeDate": "2023-11-21",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5076
+    },
+    {
+      "tradeDate": "2023-11-22",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5075
+    },
+    {
+      "tradeDate": "2023-11-23",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5076
+    },
+    {
+      "tradeDate": "2023-11-24",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5076
+    },
+    {
+      "tradeDate": "2023-11-27",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5078
+    },
+    {
+      "tradeDate": "2023-11-28",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5078
+    },
+    {
+      "tradeDate": "2023-12-25",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5085
+    },
+    {
+      "tradeDate": "2023-12-26",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5087
+    },
+    {
+      "tradeDate": "2023-12-27",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5088
+    },
+    {
+      "tradeDate": "2023-12-28",
+      "status": "fetched",
+      "rowsSaved": 1425,
+      "moneyflowRows": 5085
+    },
+    {
+      "tradeDate": "2023-12-29",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5088
+    },
+    {
+      "tradeDate": "2024-02-26",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5101
+    },
+    {
+      "tradeDate": "2024-02-27",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5102
+    },
+    {
+      "tradeDate": "2024-02-28",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5102
+    },
+    {
+      "tradeDate": "2024-02-29",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5102
+    },
+    {
+      "tradeDate": "2024-03-01",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5103
+    },
+    {
+      "tradeDate": "2024-03-04",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5103
+    },
+    {
+      "tradeDate": "2024-03-05",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5103
+    },
+    {
+      "tradeDate": "2024-03-06",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5101
+    },
+    {
+      "tradeDate": "2024-03-07",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5101
+    },
+    {
+      "tradeDate": "2024-03-08",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5101
+    },
+    {
+      "tradeDate": "2024-03-11",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5100
+    },
+    {
+      "tradeDate": "2024-03-12",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5102
+    },
+    {
+      "tradeDate": "2024-03-13",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5104
+    },
+    {
+      "tradeDate": "2024-03-14",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5104
+    },
+    {
+      "tradeDate": "2024-03-15",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5103
+    },
+    {
+      "tradeDate": "2024-03-18",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5102
+    },
+    {
+      "tradeDate": "2024-03-19",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5104
+    },
+    {
+      "tradeDate": "2024-03-20",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5105
+    },
+    {
+      "tradeDate": "2024-03-26",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5106
+    },
+    {
+      "tradeDate": "2024-03-27",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5108
+    },
+    {
+      "tradeDate": "2024-03-28",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5109
+    },
+    {
+      "tradeDate": "2024-03-29",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5108
+    },
+    {
+      "tradeDate": "2024-04-01",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5110
+    },
+    {
+      "tradeDate": "2024-04-22",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5109
+    },
+    {
+      "tradeDate": "2024-04-23",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5108
+    },
+    {
+      "tradeDate": "2024-04-24",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5109
+    },
+    {
+      "tradeDate": "2024-04-25",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5106
+    },
+    {
+      "tradeDate": "2024-04-26",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5097
+    },
+    {
+      "tradeDate": "2024-04-29",
+      "status": "fetched",
+      "rowsSaved": 1425,
+      "moneyflowRows": 5088
+    },
+    {
+      "tradeDate": "2024-04-30",
+      "status": "fetched",
+      "rowsSaved": 1425,
+      "moneyflowRows": 5052
+    },
+    {
+      "tradeDate": "2024-05-06",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5093
+    },
+    {
+      "tradeDate": "2024-05-07",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5093
+    },
+    {
+      "tradeDate": "2024-05-08",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5091
+    },
+    {
+      "tradeDate": "2024-05-09",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5092
+    },
+    {
+      "tradeDate": "2024-05-10",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5092
+    },
+    {
+      "tradeDate": "2024-05-13",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5091
+    },
+    {
+      "tradeDate": "2024-05-14",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5094
+    },
+    {
+      "tradeDate": "2024-05-15",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5095
+    },
+    {
+      "tradeDate": "2024-05-16",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5094
+    },
+    {
+      "tradeDate": "2024-05-17",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5094
+    },
+    {
+      "tradeDate": "2024-05-20",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5090
+    },
+    {
+      "tradeDate": "2024-05-21",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5093
+    },
+    {
+      "tradeDate": "2024-05-22",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5094
+    },
+    {
+      "tradeDate": "2024-09-18",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5084
+    },
+    {
+      "tradeDate": "2024-09-19",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5089
+    },
+    {
+      "tradeDate": "2024-09-20",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5089
+    },
+    {
+      "tradeDate": "2024-09-23",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5090
+    },
+    {
+      "tradeDate": "2024-09-24",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5091
+    },
+    {
+      "tradeDate": "2024-09-25",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5093
+    },
+    {
+      "tradeDate": "2024-09-26",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5094
+    },
+    {
+      "tradeDate": "2024-09-27",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5094
+    },
+    {
+      "tradeDate": "2024-09-30",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5091
+    },
+    {
+      "tradeDate": "2024-10-08",
+      "status": "fetched",
+      "rowsSaved": 1424,
+      "moneyflowRows": 5087
+    },
+    {
+      "tradeDate": "2024-10-09",
+      "status": "fetched",
+      "rowsSaved": 1424,
+      "moneyflowRows": 5087
+    },
+    {
+      "tradeDate": "2024-10-10",
+      "status": "fetched",
+      "rowsSaved": 1424,
+      "moneyflowRows": 5089
+    },
+    {
+      "tradeDate": "2024-10-11",
+      "status": "fetched",
+      "rowsSaved": 1424,
+      "moneyflowRows": 5089
+    },
+    {
+      "tradeDate": "2024-10-14",
+      "status": "fetched",
+      "rowsSaved": 1425,
+      "moneyflowRows": 5090
+    },
+    {
+      "tradeDate": "2024-10-15",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5091
+    },
+    {
+      "tradeDate": "2024-10-16",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5094
+    },
+    {
+      "tradeDate": "2024-10-17",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5097
+    },
+    {
+      "tradeDate": "2024-10-18",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5096
+    },
+    {
+      "tradeDate": "2024-10-21",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5096
+    },
+    {
+      "tradeDate": "2024-10-22",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5096
+    },
+    {
+      "tradeDate": "2024-10-23",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5093
+    },
+    {
+      "tradeDate": "2024-10-24",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5095
+    },
+    {
+      "tradeDate": "2024-10-25",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5095
+    },
+    {
+      "tradeDate": "2024-10-28",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5091
+    },
+    {
+      "tradeDate": "2024-10-29",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5092
+    },
+    {
+      "tradeDate": "2024-10-30",
+      "status": "fetched",
+      "rowsSaved": 1425,
+      "moneyflowRows": 5090
+    },
+    {
+      "tradeDate": "2024-10-31",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5092
+    },
+    {
+      "tradeDate": "2024-11-01",
+      "status": "fetched",
+      "rowsSaved": 1425,
+      "moneyflowRows": 5092
+    },
+    {
+      "tradeDate": "2024-11-04",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5093
+    },
+    {
+      "tradeDate": "2024-11-05",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5096
+    },
+    {
+      "tradeDate": "2024-11-06",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5097
+    },
+    {
+      "tradeDate": "2024-11-07",
+      "status": "fetched",
+      "rowsSaved": 1425,
+      "moneyflowRows": 5097
+    },
+    {
+      "tradeDate": "2024-11-08",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5099
+    },
+    {
+      "tradeDate": "2024-11-11",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5094
+    },
+    {
+      "tradeDate": "2024-11-14",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5096
+    },
+    {
+      "tradeDate": "2024-11-15",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5097
+    },
+    {
+      "tradeDate": "2024-11-18",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5094
+    },
+    {
+      "tradeDate": "2024-11-19",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5096
+    },
+    {
+      "tradeDate": "2024-11-20",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5100
+    },
+    {
+      "tradeDate": "2024-11-26",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5103
+    },
+    {
+      "tradeDate": "2024-11-27",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5102
+    },
+    {
+      "tradeDate": "2024-11-28",
+      "status": "fetched",
+      "rowsSaved": 1425,
+      "moneyflowRows": 5100
+    },
+    {
+      "tradeDate": "2024-11-29",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5105
+    },
+    {
+      "tradeDate": "2024-12-02",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5103
+    },
+    {
+      "tradeDate": "2024-12-03",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5103
+    },
+    {
+      "tradeDate": "2024-12-04",
+      "status": "fetched",
+      "rowsSaved": 1425,
+      "moneyflowRows": 5103
+    },
+    {
+      "tradeDate": "2024-12-05",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5106
+    },
+    {
+      "tradeDate": "2024-12-06",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5104
+    },
+    {
+      "tradeDate": "2024-12-09",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5102
+    },
+    {
+      "tradeDate": "2024-12-10",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5104
+    },
+    {
+      "tradeDate": "2024-12-11",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5105
+    },
+    {
+      "tradeDate": "2024-12-12",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5106
+    },
+    {
+      "tradeDate": "2025-01-24",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5117
+    },
+    {
+      "tradeDate": "2025-01-27",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5118
+    },
+    {
+      "tradeDate": "2025-02-05",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5120
+    },
+    {
+      "tradeDate": "2025-02-06",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5120
+    },
+    {
+      "tradeDate": "2025-02-07",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5121
+    },
+    {
+      "tradeDate": "2025-02-10",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5122
+    },
+    {
+      "tradeDate": "2025-02-11",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5121
+    },
+    {
+      "tradeDate": "2025-02-12",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5121
+    },
+    {
+      "tradeDate": "2025-02-13",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5122
+    },
+    {
+      "tradeDate": "2025-02-14",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5121
+    },
+    {
+      "tradeDate": "2025-02-17",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5125
+    },
+    {
+      "tradeDate": "2025-02-18",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5124
+    },
+    {
+      "tradeDate": "2025-02-19",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5124
+    },
+    {
+      "tradeDate": "2025-02-20",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5123
+    },
+    {
+      "tradeDate": "2025-02-21",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5125
+    },
+    {
+      "tradeDate": "2025-02-24",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5122
+    },
+    {
+      "tradeDate": "2025-02-25",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5120
+    },
+    {
+      "tradeDate": "2025-02-26",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5121
+    },
+    {
+      "tradeDate": "2025-02-27",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5119
+    },
+    {
+      "tradeDate": "2025-02-28",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5119
+    },
+    {
+      "tradeDate": "2025-03-03",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5117
+    },
+    {
+      "tradeDate": "2025-03-04",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5119
+    },
+    {
+      "tradeDate": "2025-03-05",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5118
+    },
+    {
+      "tradeDate": "2025-03-06",
+      "status": "fetched",
+      "rowsSaved": 1425,
+      "moneyflowRows": 5116
+    },
+    {
+      "tradeDate": "2025-03-07",
+      "status": "fetched",
+      "rowsSaved": 1425,
+      "moneyflowRows": 5117
+    },
+    {
+      "tradeDate": "2025-03-10",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5117
+    },
+    {
+      "tradeDate": "2025-03-11",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5120
+    },
+    {
+      "tradeDate": "2025-03-12",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5119
+    },
+    {
+      "tradeDate": "2025-03-13",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5121
+    },
+    {
+      "tradeDate": "2025-03-14",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5121
+    },
+    {
+      "tradeDate": "2025-03-17",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5116
+    },
+    {
+      "tradeDate": "2025-03-18",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5123
+    },
+    {
+      "tradeDate": "2025-04-25",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5128
+    },
+    {
+      "tradeDate": "2025-04-28",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5122
+    },
+    {
+      "tradeDate": "2025-04-29",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5096
+    },
+    {
+      "tradeDate": "2025-04-30",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5097
+    },
+    {
+      "tradeDate": "2025-05-06",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5121
+    },
+    {
+      "tradeDate": "2025-05-07",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5123
+    },
+    {
+      "tradeDate": "2025-05-08",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5124
+    },
+    {
+      "tradeDate": "2025-05-09",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5124
+    },
+    {
+      "tradeDate": "2025-05-12",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5124
+    },
+    {
+      "tradeDate": "2025-05-13",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5125
+    },
+    {
+      "tradeDate": "2025-05-14",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5125
+    },
+    {
+      "tradeDate": "2025-05-15",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5124
+    },
+    {
+      "tradeDate": "2025-05-16",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5125
+    },
+    {
+      "tradeDate": "2025-05-19",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5122
+    },
+    {
+      "tradeDate": "2025-05-20",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5128
+    },
+    {
+      "tradeDate": "2025-05-23",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5122
+    },
+    {
+      "tradeDate": "2025-05-26",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5120
+    },
+    {
+      "tradeDate": "2025-05-27",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5120
+    },
+    {
+      "tradeDate": "2025-05-28",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5118
+    },
+    {
+      "tradeDate": "2025-05-29",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5121
+    },
+    {
+      "tradeDate": "2025-05-30",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5119
+    },
+    {
+      "tradeDate": "2025-06-03",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5115
+    },
+    {
+      "tradeDate": "2025-06-04",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5121
+    },
+    {
+      "tradeDate": "2025-06-05",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5123
+    },
+    {
+      "tradeDate": "2025-06-06",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5126
+    },
+    {
+      "tradeDate": "2025-06-09",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5122
+    },
+    {
+      "tradeDate": "2025-06-10",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5128
+    },
+    {
+      "tradeDate": "2025-06-11",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5131
+    },
+    {
+      "tradeDate": "2025-06-12",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5131
+    },
+    {
+      "tradeDate": "2025-06-13",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5131
+    },
+    {
+      "tradeDate": "2025-06-16",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5134
+    },
+    {
+      "tradeDate": "2025-06-17",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5139
+    },
+    {
+      "tradeDate": "2025-06-18",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5139
+    },
+    {
+      "tradeDate": "2025-06-19",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5138
+    },
+    {
+      "tradeDate": "2025-06-20",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5140
+    },
+    {
+      "tradeDate": "2025-06-23",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5135
+    },
+    {
+      "tradeDate": "2025-06-24",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5139
+    },
+    {
+      "tradeDate": "2025-06-25",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5140
+    },
+    {
+      "tradeDate": "2025-06-26",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5142
+    },
+    {
+      "tradeDate": "2025-06-27",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5138
+    },
+    {
+      "tradeDate": "2025-06-30",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5138
+    },
+    {
+      "tradeDate": "2025-07-01",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5137
+    },
+    {
+      "tradeDate": "2025-07-02",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5136
+    },
+    {
+      "tradeDate": "2025-07-03",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5136
+    },
+    {
+      "tradeDate": "2025-07-04",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5137
+    },
+    {
+      "tradeDate": "2025-07-07",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5137
+    },
+    {
+      "tradeDate": "2025-07-08",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5137
+    },
+    {
+      "tradeDate": "2025-07-09",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5140
+    },
+    {
+      "tradeDate": "2025-07-10",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5140
+    },
+    {
+      "tradeDate": "2025-07-11",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5143
+    },
+    {
+      "tradeDate": "2025-07-14",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5140
+    },
+    {
+      "tradeDate": "2025-07-15",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5140
+    },
+    {
+      "tradeDate": "2025-07-16",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5139
+    },
+    {
+      "tradeDate": "2025-07-17",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5140
+    },
+    {
+      "tradeDate": "2025-07-18",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5139
+    },
+    {
+      "tradeDate": "2025-07-21",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5137
+    },
+    {
+      "tradeDate": "2025-07-22",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5135
+    },
+    {
+      "tradeDate": "2025-07-23",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5139
+    },
+    {
+      "tradeDate": "2025-07-24",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5138
+    },
+    {
+      "tradeDate": "2025-07-25",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5140
+    },
+    {
+      "tradeDate": "2025-07-28",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5141
+    },
+    {
+      "tradeDate": "2025-07-29",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5145
+    },
+    {
+      "tradeDate": "2025-07-30",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5145
+    },
+    {
+      "tradeDate": "2025-07-31",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5140
+    },
+    {
+      "tradeDate": "2025-08-01",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5141
+    },
+    {
+      "tradeDate": "2025-08-04",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5138
+    },
+    {
+      "tradeDate": "2025-08-05",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5139
+    },
+    {
+      "tradeDate": "2025-08-06",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5141
+    },
+    {
+      "tradeDate": "2025-08-07",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5140
+    },
+    {
+      "tradeDate": "2025-08-08",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5141
+    },
+    {
+      "tradeDate": "2025-08-11",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5143
+    },
+    {
+      "tradeDate": "2025-08-12",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5146
+    },
+    {
+      "tradeDate": "2025-08-13",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5142
+    },
+    {
+      "tradeDate": "2025-08-14",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5142
+    },
+    {
+      "tradeDate": "2025-08-15",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5141
+    },
+    {
+      "tradeDate": "2025-08-18",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5139
+    },
+    {
+      "tradeDate": "2025-08-19",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5142
+    },
+    {
+      "tradeDate": "2025-08-20",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5139
+    },
+    {
+      "tradeDate": "2025-08-21",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5142
+    },
+    {
+      "tradeDate": "2025-08-22",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5142
+    },
+    {
+      "tradeDate": "2025-08-25",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5142
+    },
+    {
+      "tradeDate": "2025-08-26",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5143
+    },
+    {
+      "tradeDate": "2025-08-27",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5144
+    },
+    {
+      "tradeDate": "2025-08-28",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5144
+    },
+    {
+      "tradeDate": "2025-08-29",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5141
+    },
+    {
+      "tradeDate": "2025-09-01",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5141
+    },
+    {
+      "tradeDate": "2025-09-02",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5142
+    },
+    {
+      "tradeDate": "2025-09-03",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5144
+    },
+    {
+      "tradeDate": "2025-09-04",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5143
+    },
+    {
+      "tradeDate": "2025-09-05",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5144
+    },
+    {
+      "tradeDate": "2025-09-08",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5145
+    },
+    {
+      "tradeDate": "2025-09-09",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5146
+    },
+    {
+      "tradeDate": "2025-09-10",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5148
+    },
+    {
+      "tradeDate": "2025-09-11",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5146
+    },
+    {
+      "tradeDate": "2025-09-12",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5149
+    },
+    {
+      "tradeDate": "2025-09-15",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5148
+    },
+    {
+      "tradeDate": "2025-09-16",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5149
+    },
+    {
+      "tradeDate": "2025-09-17",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5148
+    },
+    {
+      "tradeDate": "2025-09-24",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5147
+    },
+    {
+      "tradeDate": "2025-09-25",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5150
+    },
+    {
+      "tradeDate": "2025-09-26",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5150
+    },
+    {
+      "tradeDate": "2025-09-29",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5144
+    },
+    {
+      "tradeDate": "2025-09-30",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5147
+    },
+    {
+      "tradeDate": "2025-10-09",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5143
+    },
+    {
+      "tradeDate": "2025-10-10",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5145
+    },
+    {
+      "tradeDate": "2025-10-13",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5147
+    },
+    {
+      "tradeDate": "2025-10-14",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5147
+    },
+    {
+      "tradeDate": "2025-10-15",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5147
+    },
+    {
+      "tradeDate": "2025-10-20",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5152
+    },
+    {
+      "tradeDate": "2025-10-21",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5151
+    },
+    {
+      "tradeDate": "2025-10-22",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5151
+    },
+    {
+      "tradeDate": "2025-10-23",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5153
+    },
+    {
+      "tradeDate": "2025-10-24",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5154
+    },
+    {
+      "tradeDate": "2025-10-27",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5153
+    },
+    {
+      "tradeDate": "2025-10-28",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5153
+    },
+    {
+      "tradeDate": "2025-10-29",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5153
+    },
+    {
+      "tradeDate": "2025-10-30",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5152
+    },
+    {
+      "tradeDate": "2025-10-31",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5153
+    },
+    {
+      "tradeDate": "2025-11-03",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5154
+    },
+    {
+      "tradeDate": "2025-11-04",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5154
+    },
+    {
+      "tradeDate": "2025-11-05",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5154
+    },
+    {
+      "tradeDate": "2025-11-06",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5154
+    },
+    {
+      "tradeDate": "2025-11-07",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5155
+    },
+    {
+      "tradeDate": "2025-11-10",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5158
+    },
+    {
+      "tradeDate": "2025-11-11",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5158
+    },
+    {
+      "tradeDate": "2025-11-12",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5160
+    },
+    {
+      "tradeDate": "2025-11-13",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5159
+    },
+    {
+      "tradeDate": "2025-11-14",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5157
+    },
+    {
+      "tradeDate": "2025-11-17",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5156
+    },
+    {
+      "tradeDate": "2025-12-15",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5157
+    },
+    {
+      "tradeDate": "2025-12-16",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5159
+    },
+    {
+      "tradeDate": "2025-12-17",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5160
+    },
+    {
+      "tradeDate": "2025-12-18",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5163
+    },
+    {
+      "tradeDate": "2025-12-19",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5162
+    },
+    {
+      "tradeDate": "2025-12-22",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5158
+    },
+    {
+      "tradeDate": "2025-12-23",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5163
+    },
+    {
+      "tradeDate": "2025-12-24",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5165
+    },
+    {
+      "tradeDate": "2025-12-25",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5167
+    },
+    {
+      "tradeDate": "2025-12-26",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5166
+    },
+    {
+      "tradeDate": "2025-12-29",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5168
+    },
+    {
+      "tradeDate": "2025-12-30",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5170
+    },
+    {
+      "tradeDate": "2025-12-31",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5171
+    },
+    {
+      "tradeDate": "2026-01-05",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5171
+    },
+    {
+      "tradeDate": "2026-01-06",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5173
+    },
+    {
+      "tradeDate": "2026-01-07",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5174
+    },
+    {
+      "tradeDate": "2026-01-08",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5173
+    },
+    {
+      "tradeDate": "2026-01-09",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5172
+    },
+    {
+      "tradeDate": "2026-01-12",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5172
+    },
+    {
+      "tradeDate": "2026-01-13",
+      "status": "fetched",
+      "rowsSaved": 1425,
+      "moneyflowRows": 5165
+    },
+    {
+      "tradeDate": "2026-01-14",
+      "status": "fetched",
+      "rowsSaved": 1424,
+      "moneyflowRows": 5167
+    },
+    {
+      "tradeDate": "2026-01-15",
+      "status": "fetched",
+      "rowsSaved": 1424,
+      "moneyflowRows": 5170
+    },
+    {
+      "tradeDate": "2026-01-16",
+      "status": "fetched",
+      "rowsSaved": 1423,
+      "moneyflowRows": 5172
+    },
+    {
+      "tradeDate": "2026-01-19",
+      "status": "fetched",
+      "rowsSaved": 1424,
+      "moneyflowRows": 5173
+    },
+    {
+      "tradeDate": "2026-01-20",
+      "status": "fetched",
+      "rowsSaved": 1426,
+      "moneyflowRows": 5179
+    },
+    {
+      "tradeDate": "2026-01-21",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5176
+    },
+    {
+      "tradeDate": "2026-01-22",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5176
+    },
+    {
+      "tradeDate": "2026-01-23",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5177
+    },
+    {
+      "tradeDate": "2026-02-10",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5178
+    },
+    {
+      "tradeDate": "2026-02-11",
+      "status": "fetched",
+      "rowsSaved": 1427,
+      "moneyflowRows": 5178
+    },
+    {
+      "tradeDate": "2026-02-12",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5182
+    },
+    {
+      "tradeDate": "2026-02-13",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5180
+    },
+    {
+      "tradeDate": "2026-02-24",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5180
+    },
+    {
+      "tradeDate": "2026-02-25",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5177
+    },
+    {
+      "tradeDate": "2026-02-26",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5176
+    },
+    {
+      "tradeDate": "2026-02-27",
+      "status": "fetched",
+      "rowsSaved": 1428,
+      "moneyflowRows": 5176
+    },
+    {
+      "tradeDate": "2026-04-14",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5190
+    },
+    {
+      "tradeDate": "2026-04-15",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5188
+    },
+    {
+      "tradeDate": "2026-04-16",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5191
+    },
+    {
+      "tradeDate": "2026-04-17",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5190
+    },
+    {
+      "tradeDate": "2026-04-20",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5185
+    },
+    {
+      "tradeDate": "2026-04-21",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5190
+    },
+    {
+      "tradeDate": "2026-04-22",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5189
+    },
+    {
+      "tradeDate": "2026-04-23",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5187
+    },
+    {
+      "tradeDate": "2026-04-24",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5187
+    },
+    {
+      "tradeDate": "2026-04-27",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5185
+    },
+    {
+      "tradeDate": "2026-04-28",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5178
+    },
+    {
+      "tradeDate": "2026-04-29",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5152
+    },
+    {
+      "tradeDate": "2026-04-30",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5151
+    },
+    {
+      "tradeDate": "2026-05-06",
+      "status": "fetched",
+      "rowsSaved": 1429,
+      "moneyflowRows": 5180
+    },
+    {
+      "tradeDate": "2026-05-07",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5182
+    },
+    {
+      "tradeDate": "2026-05-08",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5180
+    },
+    {
+      "tradeDate": "2026-05-11",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5180
+    },
+    {
+      "tradeDate": "2026-05-12",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5179
+    },
+    {
+      "tradeDate": "2026-05-13",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5183
+    },
+    {
+      "tradeDate": "2026-05-14",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5183
+    },
+    {
+      "tradeDate": "2026-05-15",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5184
+    },
+    {
+      "tradeDate": "2026-05-18",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5187
+    },
+    {
+      "tradeDate": "2026-05-19",
+      "status": "fetched",
+      "rowsSaved": 1430,
+      "moneyflowRows": 5182
+    }
+  ]
+}

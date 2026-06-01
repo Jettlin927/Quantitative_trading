@@ -80,6 +80,16 @@ DEEPSEEK_TOKEN=你的_deepseek_token
 9. 在“质量诊断”查看指定标的的多 Agent 研究评级。
 10. 在“AI复盘”查看 DeepSeek 或本地规则生成的策略评价。
 
+## 策略研究主路径
+
+面向阶段化策略研究时，默认不要再用 `docker compose run --rm api python scripts/research/...` 作为主路径。当前推荐做法是先启动常驻后端，再通过 Research Job API 提交研究任务：
+
+- `POST /api/research/jobs`：提交 `portfolio_backtest`、`window_validation`、`trade_delta`。
+- `GET /api/research/jobs/{jobId}`：轮询任务状态。
+- `GET /api/research/jobs/{jobId}/result`：读取已完成任务对应的 run 结果。
+
+接口示例和参数约束见 [`docs/research/research-job-api.md`](docs/research/research-job-api.md)，当前阶段研究台账和活跃阶段说明见 [`docs/research/README.md`](docs/research/README.md)。
+
 ## 质量诊断
 
 质量诊断面向单个标的，入口在前端工作台的“质量诊断”页，也可以调用：

@@ -1,0 +1,1264 @@
+{
+  "runId": "002-concept-cache-mainline-001",
+  "startedAt": "2026-05-31 12:30 +0800",
+  "finishedAt": "2026-05-31 12:32 +0800",
+  "context": "docs/research/runs/002-repair-indicator-ablate-ma-001/context.json",
+  "strategy": "trend-follow-maximum-profit-no-macd",
+  "cachePath": "docs/research/runs/002-concept-cache-mainline-001/concept-cache.jsonl",
+  "lookbackDays": 1,
+  "candidateCount": 1430,
+  "entryDateCount": 178,
+  "neededPriorDateCount": 178,
+  "cachedDateCountBeforeRun": 0,
+  "fetchedDateCount": 178,
+  "errorCount": 0,
+  "fetchErrors": [],
+  "perDate": [
+    {
+      "tradeDate": "2023-09-04",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-09-06",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-10-12",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-10-30",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-11-01",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-11-03",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-11-06",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-11-07",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-11-13",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-11-14",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-11-15",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-11-17",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-11-20",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-11-23",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-11-27",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-11-28",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2023-12-29",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-03-01",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-03-06",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-03-08",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-03-11",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-03-12",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-03-15",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-03-18",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-03-20",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-04-01",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-04-26",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-04-29",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-05-06",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-05-07",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-05-09",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-05-14",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-05-16",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-05-17",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-05-20",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-05-22",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-09-24",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-09-25",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-09-26",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-09-27",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-09-30",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-10-08",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-10-10",
+      "status": "fetched",
+      "rowsSaved": 0,
+      "conceptRows": 0,
+      "rankedStocks": 0
+    },
+    {
+      "tradeDate": "2024-10-14",
+      "status": "fetched",
+      "rowsSaved": 806,
+      "conceptRows": 3000,
+      "rankedStocks": 2090
+    },
+    {
+      "tradeDate": "2024-10-16",
+      "status": "fetched",
+      "rowsSaved": 801,
+      "conceptRows": 3000,
+      "rankedStocks": 2086
+    },
+    {
+      "tradeDate": "2024-10-18",
+      "status": "fetched",
+      "rowsSaved": 801,
+      "conceptRows": 3000,
+      "rankedStocks": 2086
+    },
+    {
+      "tradeDate": "2024-10-21",
+      "status": "fetched",
+      "rowsSaved": 814,
+      "conceptRows": 3000,
+      "rankedStocks": 1966
+    },
+    {
+      "tradeDate": "2024-10-22",
+      "status": "fetched",
+      "rowsSaved": 826,
+      "conceptRows": 3000,
+      "rankedStocks": 1993
+    },
+    {
+      "tradeDate": "2024-10-23",
+      "status": "fetched",
+      "rowsSaved": 855,
+      "conceptRows": 3000,
+      "rankedStocks": 2046
+    },
+    {
+      "tradeDate": "2024-10-25",
+      "status": "fetched",
+      "rowsSaved": 810,
+      "conceptRows": 3000,
+      "rankedStocks": 2077
+    },
+    {
+      "tradeDate": "2024-10-28",
+      "status": "fetched",
+      "rowsSaved": 810,
+      "conceptRows": 3000,
+      "rankedStocks": 2094
+    },
+    {
+      "tradeDate": "2024-10-30",
+      "status": "fetched",
+      "rowsSaved": 794,
+      "conceptRows": 3000,
+      "rankedStocks": 2078
+    },
+    {
+      "tradeDate": "2024-10-31",
+      "status": "fetched",
+      "rowsSaved": 788,
+      "conceptRows": 3000,
+      "rankedStocks": 2007
+    },
+    {
+      "tradeDate": "2024-11-04",
+      "status": "fetched",
+      "rowsSaved": 769,
+      "conceptRows": 3000,
+      "rankedStocks": 2086
+    },
+    {
+      "tradeDate": "2024-11-05",
+      "status": "fetched",
+      "rowsSaved": 822,
+      "conceptRows": 3000,
+      "rankedStocks": 2068
+    },
+    {
+      "tradeDate": "2024-11-06",
+      "status": "fetched",
+      "rowsSaved": 809,
+      "conceptRows": 3000,
+      "rankedStocks": 2071
+    },
+    {
+      "tradeDate": "2024-11-07",
+      "status": "fetched",
+      "rowsSaved": 791,
+      "conceptRows": 3000,
+      "rankedStocks": 2107
+    },
+    {
+      "tradeDate": "2024-11-11",
+      "status": "fetched",
+      "rowsSaved": 763,
+      "conceptRows": 3000,
+      "rankedStocks": 1959
+    },
+    {
+      "tradeDate": "2024-11-20",
+      "status": "fetched",
+      "rowsSaved": 866,
+      "conceptRows": 3000,
+      "rankedStocks": 1991
+    },
+    {
+      "tradeDate": "2024-12-02",
+      "status": "fetched",
+      "rowsSaved": 829,
+      "conceptRows": 3000,
+      "rankedStocks": 2141
+    },
+    {
+      "tradeDate": "2024-12-05",
+      "status": "fetched",
+      "rowsSaved": 817,
+      "conceptRows": 3000,
+      "rankedStocks": 2167
+    },
+    {
+      "tradeDate": "2024-12-06",
+      "status": "fetched",
+      "rowsSaved": 820,
+      "conceptRows": 3000,
+      "rankedStocks": 2059
+    },
+    {
+      "tradeDate": "2024-12-10",
+      "status": "fetched",
+      "rowsSaved": 772,
+      "conceptRows": 3000,
+      "rankedStocks": 2079
+    },
+    {
+      "tradeDate": "2024-12-11",
+      "status": "fetched",
+      "rowsSaved": 782,
+      "conceptRows": 3000,
+      "rankedStocks": 2073
+    },
+    {
+      "tradeDate": "2024-12-12",
+      "status": "fetched",
+      "rowsSaved": 779,
+      "conceptRows": 3000,
+      "rankedStocks": 2048
+    },
+    {
+      "tradeDate": "2025-02-07",
+      "status": "fetched",
+      "rowsSaved": 767,
+      "conceptRows": 3000,
+      "rankedStocks": 1847
+    },
+    {
+      "tradeDate": "2025-02-10",
+      "status": "fetched",
+      "rowsSaved": 802,
+      "conceptRows": 3000,
+      "rankedStocks": 2022
+    },
+    {
+      "tradeDate": "2025-02-12",
+      "status": "fetched",
+      "rowsSaved": 802,
+      "conceptRows": 3000,
+      "rankedStocks": 1902
+    },
+    {
+      "tradeDate": "2025-02-14",
+      "status": "fetched",
+      "rowsSaved": 759,
+      "conceptRows": 3000,
+      "rankedStocks": 1914
+    },
+    {
+      "tradeDate": "2025-02-17",
+      "status": "fetched",
+      "rowsSaved": 761,
+      "conceptRows": 3000,
+      "rankedStocks": 1860
+    },
+    {
+      "tradeDate": "2025-02-19",
+      "status": "fetched",
+      "rowsSaved": 816,
+      "conceptRows": 3000,
+      "rankedStocks": 2005
+    },
+    {
+      "tradeDate": "2025-02-20",
+      "status": "fetched",
+      "rowsSaved": 811,
+      "conceptRows": 3000,
+      "rankedStocks": 1993
+    },
+    {
+      "tradeDate": "2025-02-21",
+      "status": "fetched",
+      "rowsSaved": 767,
+      "conceptRows": 3000,
+      "rankedStocks": 1923
+    },
+    {
+      "tradeDate": "2025-02-24",
+      "status": "fetched",
+      "rowsSaved": 736,
+      "conceptRows": 3000,
+      "rankedStocks": 1745
+    },
+    {
+      "tradeDate": "2025-02-26",
+      "status": "fetched",
+      "rowsSaved": 765,
+      "conceptRows": 3000,
+      "rankedStocks": 1914
+    },
+    {
+      "tradeDate": "2025-03-04",
+      "status": "fetched",
+      "rowsSaved": 783,
+      "conceptRows": 3000,
+      "rankedStocks": 1904
+    },
+    {
+      "tradeDate": "2025-03-05",
+      "status": "fetched",
+      "rowsSaved": 798,
+      "conceptRows": 3000,
+      "rankedStocks": 1827
+    },
+    {
+      "tradeDate": "2025-03-06",
+      "status": "fetched",
+      "rowsSaved": 749,
+      "conceptRows": 3000,
+      "rankedStocks": 1704
+    },
+    {
+      "tradeDate": "2025-03-10",
+      "status": "fetched",
+      "rowsSaved": 796,
+      "conceptRows": 3000,
+      "rankedStocks": 1947
+    },
+    {
+      "tradeDate": "2025-03-11",
+      "status": "fetched",
+      "rowsSaved": 792,
+      "conceptRows": 3000,
+      "rankedStocks": 1872
+    },
+    {
+      "tradeDate": "2025-03-12",
+      "status": "fetched",
+      "rowsSaved": 790,
+      "conceptRows": 3000,
+      "rankedStocks": 1967
+    },
+    {
+      "tradeDate": "2025-03-14",
+      "status": "fetched",
+      "rowsSaved": 819,
+      "conceptRows": 3000,
+      "rankedStocks": 2021
+    },
+    {
+      "tradeDate": "2025-03-17",
+      "status": "fetched",
+      "rowsSaved": 755,
+      "conceptRows": 3000,
+      "rankedStocks": 1901
+    },
+    {
+      "tradeDate": "2025-03-18",
+      "status": "fetched",
+      "rowsSaved": 778,
+      "conceptRows": 3000,
+      "rankedStocks": 2017
+    },
+    {
+      "tradeDate": "2025-05-06",
+      "status": "fetched",
+      "rowsSaved": 806,
+      "conceptRows": 3000,
+      "rankedStocks": 1932
+    },
+    {
+      "tradeDate": "2025-05-07",
+      "status": "fetched",
+      "rowsSaved": 820,
+      "conceptRows": 3000,
+      "rankedStocks": 2014
+    },
+    {
+      "tradeDate": "2025-05-08",
+      "status": "fetched",
+      "rowsSaved": 824,
+      "conceptRows": 3000,
+      "rankedStocks": 2076
+    },
+    {
+      "tradeDate": "2025-05-12",
+      "status": "fetched",
+      "rowsSaved": 812,
+      "conceptRows": 3000,
+      "rankedStocks": 2093
+    },
+    {
+      "tradeDate": "2025-05-14",
+      "status": "fetched",
+      "rowsSaved": 823,
+      "conceptRows": 3000,
+      "rankedStocks": 2060
+    },
+    {
+      "tradeDate": "2025-05-16",
+      "status": "fetched",
+      "rowsSaved": 803,
+      "conceptRows": 3000,
+      "rankedStocks": 2093
+    },
+    {
+      "tradeDate": "2025-05-19",
+      "status": "fetched",
+      "rowsSaved": 818,
+      "conceptRows": 3000,
+      "rankedStocks": 2078
+    },
+    {
+      "tradeDate": "2025-05-20",
+      "status": "fetched",
+      "rowsSaved": 800,
+      "conceptRows": 3000,
+      "rankedStocks": 2104
+    },
+    {
+      "tradeDate": "2025-05-29",
+      "status": "fetched",
+      "rowsSaved": 782,
+      "conceptRows": 3000,
+      "rankedStocks": 2099
+    },
+    {
+      "tradeDate": "2025-06-04",
+      "status": "fetched",
+      "rowsSaved": 784,
+      "conceptRows": 3000,
+      "rankedStocks": 2016
+    },
+    {
+      "tradeDate": "2025-06-05",
+      "status": "fetched",
+      "rowsSaved": 766,
+      "conceptRows": 3000,
+      "rankedStocks": 2006
+    },
+    {
+      "tradeDate": "2025-06-09",
+      "status": "fetched",
+      "rowsSaved": 791,
+      "conceptRows": 3000,
+      "rankedStocks": 2066
+    },
+    {
+      "tradeDate": "2025-06-11",
+      "status": "fetched",
+      "rowsSaved": 799,
+      "conceptRows": 3000,
+      "rankedStocks": 2041
+    },
+    {
+      "tradeDate": "2025-06-17",
+      "status": "fetched",
+      "rowsSaved": 885,
+      "conceptRows": 3000,
+      "rankedStocks": 2155
+    },
+    {
+      "tradeDate": "2025-06-24",
+      "status": "fetched",
+      "rowsSaved": 854,
+      "conceptRows": 3000,
+      "rankedStocks": 2035
+    },
+    {
+      "tradeDate": "2025-06-25",
+      "status": "fetched",
+      "rowsSaved": 824,
+      "conceptRows": 3000,
+      "rankedStocks": 2002
+    },
+    {
+      "tradeDate": "2025-06-27",
+      "status": "fetched",
+      "rowsSaved": 807,
+      "conceptRows": 3000,
+      "rankedStocks": 1907
+    },
+    {
+      "tradeDate": "2025-06-30",
+      "status": "fetched",
+      "rowsSaved": 837,
+      "conceptRows": 3000,
+      "rankedStocks": 1920
+    },
+    {
+      "tradeDate": "2025-07-01",
+      "status": "fetched",
+      "rowsSaved": 866,
+      "conceptRows": 3000,
+      "rankedStocks": 2013
+    },
+    {
+      "tradeDate": "2025-07-03",
+      "status": "fetched",
+      "rowsSaved": 867,
+      "conceptRows": 3000,
+      "rankedStocks": 2106
+    },
+    {
+      "tradeDate": "2025-07-07",
+      "status": "fetched",
+      "rowsSaved": 852,
+      "conceptRows": 3000,
+      "rankedStocks": 2138
+    },
+    {
+      "tradeDate": "2025-07-08",
+      "status": "fetched",
+      "rowsSaved": 854,
+      "conceptRows": 3000,
+      "rankedStocks": 2144
+    },
+    {
+      "tradeDate": "2025-07-10",
+      "status": "fetched",
+      "rowsSaved": 858,
+      "conceptRows": 3000,
+      "rankedStocks": 2151
+    },
+    {
+      "tradeDate": "2025-07-11",
+      "status": "fetched",
+      "rowsSaved": 856,
+      "conceptRows": 3000,
+      "rankedStocks": 2126
+    },
+    {
+      "tradeDate": "2025-07-14",
+      "status": "fetched",
+      "rowsSaved": 857,
+      "conceptRows": 3000,
+      "rankedStocks": 2095
+    },
+    {
+      "tradeDate": "2025-07-16",
+      "status": "fetched",
+      "rowsSaved": 851,
+      "conceptRows": 3000,
+      "rankedStocks": 2025
+    },
+    {
+      "tradeDate": "2025-07-17",
+      "status": "fetched",
+      "rowsSaved": 861,
+      "conceptRows": 3000,
+      "rankedStocks": 2125
+    },
+    {
+      "tradeDate": "2025-07-18",
+      "status": "fetched",
+      "rowsSaved": 842,
+      "conceptRows": 3000,
+      "rankedStocks": 2044
+    },
+    {
+      "tradeDate": "2025-07-21",
+      "status": "fetched",
+      "rowsSaved": 832,
+      "conceptRows": 3000,
+      "rankedStocks": 2046
+    },
+    {
+      "tradeDate": "2025-07-22",
+      "status": "fetched",
+      "rowsSaved": 863,
+      "conceptRows": 3000,
+      "rankedStocks": 2048
+    },
+    {
+      "tradeDate": "2025-07-24",
+      "status": "fetched",
+      "rowsSaved": 878,
+      "conceptRows": 3000,
+      "rankedStocks": 2153
+    },
+    {
+      "tradeDate": "2025-07-28",
+      "status": "fetched",
+      "rowsSaved": 862,
+      "conceptRows": 3000,
+      "rankedStocks": 2071
+    },
+    {
+      "tradeDate": "2025-07-29",
+      "status": "fetched",
+      "rowsSaved": 864,
+      "conceptRows": 3000,
+      "rankedStocks": 2144
+    },
+    {
+      "tradeDate": "2025-08-01",
+      "status": "fetched",
+      "rowsSaved": 819,
+      "conceptRows": 3000,
+      "rankedStocks": 2087
+    },
+    {
+      "tradeDate": "2025-08-04",
+      "status": "fetched",
+      "rowsSaved": 827,
+      "conceptRows": 3000,
+      "rankedStocks": 2127
+    },
+    {
+      "tradeDate": "2025-08-05",
+      "status": "fetched",
+      "rowsSaved": 840,
+      "conceptRows": 3000,
+      "rankedStocks": 2149
+    },
+    {
+      "tradeDate": "2025-08-06",
+      "status": "fetched",
+      "rowsSaved": 834,
+      "conceptRows": 3000,
+      "rankedStocks": 2136
+    },
+    {
+      "tradeDate": "2025-08-11",
+      "status": "fetched",
+      "rowsSaved": 835,
+      "conceptRows": 3000,
+      "rankedStocks": 2158
+    },
+    {
+      "tradeDate": "2025-08-13",
+      "status": "fetched",
+      "rowsSaved": 827,
+      "conceptRows": 3000,
+      "rankedStocks": 2088
+    },
+    {
+      "tradeDate": "2025-08-15",
+      "status": "fetched",
+      "rowsSaved": 840,
+      "conceptRows": 3000,
+      "rankedStocks": 2138
+    },
+    {
+      "tradeDate": "2025-08-18",
+      "status": "fetched",
+      "rowsSaved": 886,
+      "conceptRows": 3000,
+      "rankedStocks": 2125
+    },
+    {
+      "tradeDate": "2025-08-19",
+      "status": "fetched",
+      "rowsSaved": 826,
+      "conceptRows": 3000,
+      "rankedStocks": 2082
+    },
+    {
+      "tradeDate": "2025-08-20",
+      "status": "fetched",
+      "rowsSaved": 879,
+      "conceptRows": 3000,
+      "rankedStocks": 2136
+    },
+    {
+      "tradeDate": "2025-08-22",
+      "status": "fetched",
+      "rowsSaved": 856,
+      "conceptRows": 3000,
+      "rankedStocks": 2054
+    },
+    {
+      "tradeDate": "2025-08-25",
+      "status": "fetched",
+      "rowsSaved": 857,
+      "conceptRows": 3000,
+      "rankedStocks": 2099
+    },
+    {
+      "tradeDate": "2025-08-26",
+      "status": "fetched",
+      "rowsSaved": 829,
+      "conceptRows": 3000,
+      "rankedStocks": 2073
+    },
+    {
+      "tradeDate": "2025-08-28",
+      "status": "fetched",
+      "rowsSaved": 831,
+      "conceptRows": 3000,
+      "rankedStocks": 2010
+    },
+    {
+      "tradeDate": "2025-09-01",
+      "status": "fetched",
+      "rowsSaved": 840,
+      "conceptRows": 3000,
+      "rankedStocks": 1990
+    },
+    {
+      "tradeDate": "2025-09-08",
+      "status": "fetched",
+      "rowsSaved": 868,
+      "conceptRows": 3000,
+      "rankedStocks": 2166
+    },
+    {
+      "tradeDate": "2025-09-11",
+      "status": "fetched",
+      "rowsSaved": 792,
+      "conceptRows": 3000,
+      "rankedStocks": 2019
+    },
+    {
+      "tradeDate": "2025-09-16",
+      "status": "fetched",
+      "rowsSaved": 833,
+      "conceptRows": 3000,
+      "rankedStocks": 2169
+    },
+    {
+      "tradeDate": "2025-09-17",
+      "status": "fetched",
+      "rowsSaved": 808,
+      "conceptRows": 3000,
+      "rankedStocks": 2139
+    },
+    {
+      "tradeDate": "2025-09-30",
+      "status": "fetched",
+      "rowsSaved": 862,
+      "conceptRows": 3000,
+      "rankedStocks": 2053
+    },
+    {
+      "tradeDate": "2025-10-09",
+      "status": "fetched",
+      "rowsSaved": 844,
+      "conceptRows": 3000,
+      "rankedStocks": 2004
+    },
+    {
+      "tradeDate": "2025-10-15",
+      "status": "fetched",
+      "rowsSaved": 863,
+      "conceptRows": 3000,
+      "rankedStocks": 2196
+    },
+    {
+      "tradeDate": "2025-10-24",
+      "status": "fetched",
+      "rowsSaved": 813,
+      "conceptRows": 3000,
+      "rankedStocks": 2154
+    },
+    {
+      "tradeDate": "2025-10-27",
+      "status": "fetched",
+      "rowsSaved": 815,
+      "conceptRows": 3000,
+      "rankedStocks": 2130
+    },
+    {
+      "tradeDate": "2025-10-29",
+      "status": "fetched",
+      "rowsSaved": 238,
+      "conceptRows": 618,
+      "rankedStocks": 586
+    },
+    {
+      "tradeDate": "2025-10-31",
+      "status": "fetched",
+      "rowsSaved": 128,
+      "conceptRows": 438,
+      "rankedStocks": 427
+    },
+    {
+      "tradeDate": "2025-11-03",
+      "status": "fetched",
+      "rowsSaved": 80,
+      "conceptRows": 177,
+      "rankedStocks": 177
+    },
+    {
+      "tradeDate": "2025-11-05",
+      "status": "fetched",
+      "rowsSaved": 198,
+      "conceptRows": 601,
+      "rankedStocks": 566
+    },
+    {
+      "tradeDate": "2025-11-06",
+      "status": "fetched",
+      "rowsSaved": 106,
+      "conceptRows": 266,
+      "rankedStocks": 243
+    },
+    {
+      "tradeDate": "2025-11-10",
+      "status": "fetched",
+      "rowsSaved": 137,
+      "conceptRows": 282,
+      "rankedStocks": 273
+    },
+    {
+      "tradeDate": "2025-11-13",
+      "status": "fetched",
+      "rowsSaved": 107,
+      "conceptRows": 215,
+      "rankedStocks": 212
+    },
+    {
+      "tradeDate": "2025-11-17",
+      "status": "fetched",
+      "rowsSaved": 148,
+      "conceptRows": 302,
+      "rankedStocks": 300
+    },
+    {
+      "tradeDate": "2025-12-19",
+      "status": "fetched",
+      "rowsSaved": 141,
+      "conceptRows": 400,
+      "rankedStocks": 373
+    },
+    {
+      "tradeDate": "2025-12-22",
+      "status": "fetched",
+      "rowsSaved": 97,
+      "conceptRows": 175,
+      "rankedStocks": 174
+    },
+    {
+      "tradeDate": "2025-12-24",
+      "status": "fetched",
+      "rowsSaved": 161,
+      "conceptRows": 325,
+      "rankedStocks": 314
+    },
+    {
+      "tradeDate": "2025-12-25",
+      "status": "fetched",
+      "rowsSaved": 126,
+      "conceptRows": 244,
+      "rankedStocks": 241
+    },
+    {
+      "tradeDate": "2026-01-05",
+      "status": "fetched",
+      "rowsSaved": 182,
+      "conceptRows": 358,
+      "rankedStocks": 345
+    },
+    {
+      "tradeDate": "2026-01-06",
+      "status": "fetched",
+      "rowsSaved": 184,
+      "conceptRows": 417,
+      "rankedStocks": 401
+    },
+    {
+      "tradeDate": "2026-01-08",
+      "status": "fetched",
+      "rowsSaved": 181,
+      "conceptRows": 346,
+      "rankedStocks": 332
+    },
+    {
+      "tradeDate": "2026-01-09",
+      "status": "fetched",
+      "rowsSaved": 170,
+      "conceptRows": 326,
+      "rankedStocks": 314
+    },
+    {
+      "tradeDate": "2026-01-12",
+      "status": "fetched",
+      "rowsSaved": 184,
+      "conceptRows": 338,
+      "rankedStocks": 335
+    },
+    {
+      "tradeDate": "2026-01-14",
+      "status": "fetched",
+      "rowsSaved": 192,
+      "conceptRows": 360,
+      "rankedStocks": 354
+    },
+    {
+      "tradeDate": "2026-01-19",
+      "status": "fetched",
+      "rowsSaved": 263,
+      "conceptRows": 580,
+      "rankedStocks": 556
+    },
+    {
+      "tradeDate": "2026-01-21",
+      "status": "fetched",
+      "rowsSaved": 232,
+      "conceptRows": 484,
+      "rankedStocks": 459
+    },
+    {
+      "tradeDate": "2026-01-22",
+      "status": "fetched",
+      "rowsSaved": 369,
+      "conceptRows": 758,
+      "rankedStocks": 685
+    },
+    {
+      "tradeDate": "2026-01-23",
+      "status": "fetched",
+      "rowsSaved": 311,
+      "conceptRows": 601,
+      "rankedStocks": 551
+    },
+    {
+      "tradeDate": "2026-02-24",
+      "status": "fetched",
+      "rowsSaved": 171,
+      "conceptRows": 399,
+      "rankedStocks": 395
+    },
+    {
+      "tradeDate": "2026-02-25",
+      "status": "fetched",
+      "rowsSaved": 159,
+      "conceptRows": 387,
+      "rankedStocks": 369
+    },
+    {
+      "tradeDate": "2026-02-26",
+      "status": "fetched",
+      "rowsSaved": 335,
+      "conceptRows": 681,
+      "rankedStocks": 661
+    },
+    {
+      "tradeDate": "2026-02-27",
+      "status": "fetched",
+      "rowsSaved": 344,
+      "conceptRows": 717,
+      "rankedStocks": 644
+    },
+    {
+      "tradeDate": "2026-04-20",
+      "status": "fetched",
+      "rowsSaved": 263,
+      "conceptRows": 547,
+      "rankedStocks": 514
+    },
+    {
+      "tradeDate": "2026-04-22",
+      "status": "fetched",
+      "rowsSaved": 320,
+      "conceptRows": 687,
+      "rankedStocks": 662
+    },
+    {
+      "tradeDate": "2026-04-27",
+      "status": "fetched",
+      "rowsSaved": 263,
+      "conceptRows": 504,
+      "rankedStocks": 476
+    },
+    {
+      "tradeDate": "2026-04-29",
+      "status": "fetched",
+      "rowsSaved": 309,
+      "conceptRows": 593,
+      "rankedStocks": 564
+    },
+    {
+      "tradeDate": "2026-04-30",
+      "status": "fetched",
+      "rowsSaved": 311,
+      "conceptRows": 595,
+      "rankedStocks": 566
+    },
+    {
+      "tradeDate": "2026-05-06",
+      "status": "fetched",
+      "rowsSaved": 324,
+      "conceptRows": 683,
+      "rankedStocks": 646
+    },
+    {
+      "tradeDate": "2026-05-07",
+      "status": "fetched",
+      "rowsSaved": 414,
+      "conceptRows": 911,
+      "rankedStocks": 802
+    },
+    {
+      "tradeDate": "2026-05-08",
+      "status": "fetched",
+      "rowsSaved": 359,
+      "conceptRows": 715,
+      "rankedStocks": 645
+    },
+    {
+      "tradeDate": "2026-05-11",
+      "status": "fetched",
+      "rowsSaved": 376,
+      "conceptRows": 769,
+      "rankedStocks": 707
+    },
+    {
+      "tradeDate": "2026-05-13",
+      "status": "fetched",
+      "rowsSaved": 363,
+      "conceptRows": 773,
+      "rankedStocks": 705
+    },
+    {
+      "tradeDate": "2026-05-19",
+      "status": "fetched",
+      "rowsSaved": 235,
+      "conceptRows": 448,
+      "rankedStocks": 419
+    }
+  ]
+}

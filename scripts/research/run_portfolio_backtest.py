@@ -11,6 +11,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -20,6 +21,7 @@ if str(REPO_ROOT) not in sys.path:
 from backend.app.backtest_engine import calc_equity_performance_stats, calc_stop_price, enrich_rows, finite, json_safe, round_to_lot, should_enter
 from backend.app.database import SessionLocal
 from backend.app.main import query_backtest_rows_by_code, query_backtest_stocks, stock_to_market_meta
+from backend.app.models import StockDailyBar, StockDailyBasic
 from backend.app.schemas import MarketBacktestRequest
 from scripts.research.run_research_round import DEFAULT_CONTEXT_PATH, NEXT_BRIEF_PATH, RUNS_ROOT, build_market_payload, build_strategy, format_optional_percent, format_optional_ratio, now_text, read_json, summarize_tail_risk, write_json, write_text
 
@@ -41,14 +43,92 @@ def main() -> None:
     parser.add_argument("--market-min-above-ma20-pct", type=float, default=None, help="Override portfolio_target.marketBreadthFilter.minAboveMa20Pct.")
     parser.add_argument("--market-min-above-ma60-pct", type=float, default=None, help="Override portfolio_target.marketBreadthFilter.minAboveMa60Pct.")
     parser.add_argument("--market-min-up-pct", type=float, default=None, help="Override portfolio_target.marketBreadthFilter.minUpPct.")
+    parser.add_argument("--market-soft-gate", action="store_true", help="Enable a default-off state-gated soft market-breadth entry experiment.")
+    parser.add_argument("--market-soft-min-samples", type=int, default=None, help="Minimum samples required by the soft market-breadth gate.")
+    parser.add_argument("--market-soft-min-above-ma20-pct", type=float, default=None, help="Minimum above-MA20 ratio required by the soft market-breadth gate.")
+    parser.add_argument("--market-soft-min-above-ma60-pct", type=float, default=None, help="Minimum above-MA60 ratio required by the soft market-breadth gate.")
+    parser.add_argument("--market-soft-min-up-pct", type=float, default=None, help="Minimum up ratio required by the soft market-breadth gate.")
+    parser.add_argument("--market-soft-max-base-failed-checks", type=int, default=None, help="Maximum failed hard breadth checks allowed by the soft gate.")
+    parser.add_argument("--cross-section-return20-weight", type=float, default=None, help="Override the return20-rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-return60-weight", type=float, default=None, help="Override the return60-rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-high60-weight", type=float, default=None, help="Override the high60-rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-recovery20-weight", type=float, default=None, help="Override the recovery20-rank weight in cross-section strength scoring.")
     parser.add_argument("--cross-section-volume-weight", type=float, default=None, help="Override the volume-rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-base-weight", type=float, default=None, help="Override the base score weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-industry-return20-weight", type=float, default=None, help="Override the industry average 20-day return rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-industry-relative-return20-weight", type=float, default=None, help="Override the stock-vs-industry 20-day return rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-stock-specific-breakout-quality-weight", type=float, default=None, help="Override the stock-specific breakout quality rank weight.")
+    parser.add_argument("--cross-section-stock-specific-mature-breadth-quality-weight", type=float, default=None, help="Override the stock-specific breakout rank weight gated by mature but non-euphoric market breadth.")
+    parser.add_argument("--cross-section-macd-hist-weight", type=float, default=None, help="Override the MACD histogram rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-macd-hist-delta-weight", type=float, default=None, help="Override the MACD histogram day-over-day improvement rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-boll-squeeze-weight", type=float, default=None, help="Override the BOLL squeeze rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-boll-position-weight", type=float, default=None, help="Override the BOLL position rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-boll-position-balance-weight", type=float, default=None, help="Override the balanced BOLL position rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-rsi-balance-weight", type=float, default=None, help="Override the RSI balance rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-ma-alignment-weight", type=float, default=None, help="Override the MA alignment rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-indicator-setup-weight", type=float, default=None, help="Override the MACD+BOLL+RSI setup rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-indicator-pulse-quality-weight", type=float, default=None, help="Override the MACD+BOLL+RSI setup confirmed by high-60 quality and prior-gap stability.")
+    parser.add_argument("--cross-section-indicator-confluence-quality-weight", type=float, default=None, help="Override the MACD+BOLL+RSI+MA+amount confluence rank weight.")
+    parser.add_argument("--cross-section-indicator-turn-quality-weight", type=float, default=None, help="Override the MACD-turn+BOLL-position+RSI+gap-stability composite rank weight.")
+    parser.add_argument("--cross-section-rsi-momentum-quality-weight", type=float, default=None, help="Override the RSI-level and MACD-improvement quality rank inside broad moneyflow surges.")
+    parser.add_argument("--cross-section-rsi-momentum-confirmed-quality-weight", type=float, default=None, help="Override the RSI-level and MACD-improvement quality rank inside confirmed moneyflow surges.")
+    parser.add_argument("--cross-section-turnover-rate-f-weight", type=float, default=None, help="Override the free-float turnover rank weight from daily_basic.")
+    parser.add_argument("--cross-section-volume-ratio-basic-weight", type=float, default=None, help="Override the daily_basic volume ratio rank weight.")
+    parser.add_argument("--cross-section-low-volume-ratio-basic-weight", type=float, default=None, help="Override the low daily_basic volume ratio rank weight.")
+    parser.add_argument("--cross-section-small-circ-mv-weight", type=float, default=None, help="Override the small circulating market value rank weight from daily_basic.")
+    parser.add_argument("--cross-section-prior-gap-stability-weight", type=float, default=None, help="Override the prior overnight gap stability rank weight in cross-section strength scoring.")
+    parser.add_argument("--cross-section-amount-ratio-weight", type=float, default=None, help="Override the amount/20-day-average amount rank weight.")
+    parser.add_argument("--cross-section-amount-efficiency20-weight", type=float, default=None, help="Override the 20-day return per amount-expansion rank weight.")
+    parser.add_argument("--cross-section-amount-efficiency-rsi-weight", type=float, default=None, help="Override the amount-efficiency confirmed by RSI-balance rank weight.")
+    parser.add_argument("--moneyflow-cache", default=None, help="Run-local JSONL moneyflow rank cache generated by build_moneyflow_cache.py.")
+    parser.add_argument("--cross-section-moneyflow-main-rank1-weight", type=float, default=None, help="Override the previous-trading-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-main-rank3-weight", type=float, default=None, help="Override the 3-day average main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-main-rank5-weight", type=float, default=None, help="Override the 5-day average main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-industry-confirm-weight", type=float, default=None, help="Override the industry-state-confirmed prior-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-rsi-confirm-weight", type=float, default=None, help="Override the RSI-confirmed prior-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-market-strong-weight", type=float, default=None, help="Override the strong-market-confirmed prior-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-market-quality-weight", type=float, default=None, help="Override the market/rsi/industry-quality confirmed prior-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-market-surge-quality-weight", type=float, default=None, help="Override the broad-upsurge/rsi/industry-quality confirmed prior-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-market-surge-strict-quality-weight", type=float, default=None, help="Override the strict broad-upsurge moneyflow quality rank that ignores zero-strength ties.")
+    parser.add_argument("--cross-section-moneyflow-market-surge-relative-quality-weight", type=float, default=None, help="Override the broad-upsurge/rsi/industry-relative-quality confirmed prior-day main moneyflow rank weight.")
+    parser.add_argument("--cross-section-moneyflow-market-surge-confirmed-quality-weight", type=float, default=None, help="Override the broad-upsurge moneyflow rank only when RSI and stock-vs-industry strength pass confirmation floors.")
+    parser.add_argument("--cross-section-industry-moneyflow-sum-net-rank1-weight", type=float, default=None, help="Override the prior-day industry aggregate main-moneyflow net rank weight.")
+    parser.add_argument("--concept-cache", default=None, help="Run-local JSONL concept rank cache generated by build_concept_cache.py.")
+    parser.add_argument("--cross-section-kpl-concept-count-rank1-weight", type=float, default=None, help="Override the prior-day KPL concept-count rank weight.")
     parser.add_argument("--max-entry-gap-pct", type=float, default=None, help="Override portfolio_target.entryRiskFilter.maxGapPct.")
+    parser.add_argument("--min-entry-gap-pct", type=float, default=None, help="Override portfolio_target.entryRiskFilter.minGapPct.")
     parser.add_argument("--max-entry-range-pct", type=float, default=None, help="Override portfolio_target.entryRiskFilter.maxEntryRangePct.")
     parser.add_argument("--max-intraday-return-pct", type=float, default=None, help="Override portfolio_target.entryRiskFilter.maxIntradayReturnPct.")
     parser.add_argument("--entry-gap-score-penalty-threshold-pct", type=float, default=None, help="Score-penalize entries whose entry gap is above this threshold.")
     parser.add_argument("--entry-gap-score-penalty", type=float, default=0.0, help="Fixed score penalty applied above the entry gap threshold.")
     parser.add_argument("--entry-range-score-penalty-threshold-pct", type=float, default=None, help="Score-penalize entries whose entry-day range is above this threshold.")
     parser.add_argument("--entry-range-score-penalty", type=float, default=0.0, help="Fixed score penalty applied above the entry range threshold.")
+    parser.add_argument("--entry-prior-volume-ratio-basic-score-penalty-threshold", type=float, default=None, help="Score-penalize entries whose prior-day daily_basic volume_ratio is above this threshold.")
+    parser.add_argument("--entry-prior-volume-ratio-basic-score-penalty", type=float, default=0.0, help="Fixed score penalty applied above the prior-day daily_basic volume_ratio threshold.")
+    parser.add_argument("--entry-volume-inefficiency-crowding-prior-volume-ratio-basic-threshold", type=float, default=None, help="Score-penalize entries with high prior-day volume_ratio and weak amount-efficiency/RSI rank.")
+    parser.add_argument("--entry-volume-inefficiency-crowding-amount-efficiency-rsi-rank-max", type=float, default=None, help="Maximum amountEfficiencyRsi rank allowed for the volume-inefficiency crowding penalty.")
+    parser.add_argument("--entry-volume-inefficiency-crowding-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to high-volume but low-efficiency crowding.")
+    parser.add_argument("--entry-industry-return-overheat-rank-threshold", type=float, default=None, help="Score-penalize entries whose industry 20-day return rank is above this threshold.")
+    parser.add_argument("--entry-industry-return-overheat-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to industry return overheat.")
+    parser.add_argument("--entry-unsupported-boll-squeeze-boll-rank-threshold", type=float, default=None, help="Score-penalize BOLL squeeze entries lacking industry moneyflow support.")
+    parser.add_argument("--entry-unsupported-boll-squeeze-industry-moneyflow-rank-max", type=float, default=None, help="Maximum industry moneyflow rank allowed for unsupported BOLL squeeze penalty.")
+    parser.add_argument("--entry-unsupported-boll-squeeze-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to unsupported BOLL squeeze.")
+    parser.add_argument("--entry-industry-moneyflow-crowding-sum-rank-threshold", type=float, default=None, help="Score-penalize entries whose prior-day industry main-moneyflow sum rank is above this threshold.")
+    parser.add_argument("--entry-industry-moneyflow-crowding-persistent-score-max", type=float, default=None, help="Score-penalize entries whose prior-day industry moneyflow persistence score is at or below this threshold.")
+    parser.add_argument("--entry-industry-moneyflow-crowding-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to high-sum but low-persistence industry moneyflow crowding.")
+    parser.add_argument("--entry-moneyflow-surge-rsi-crowding-surge-rank-threshold", type=float, default=None, help="Score-penalize entries with high market-surge moneyflow rank.")
+    parser.add_argument("--entry-moneyflow-surge-rsi-crowding-rsi-rank-threshold", type=float, default=None, help="Score-penalize entries with high RSI-balance rank inside market-surge moneyflow.")
+    parser.add_argument("--entry-moneyflow-surge-rsi-crowding-gap-threshold-pct", type=float, default=None, help="Only apply the moneyflow+RSI crowding penalty when the entry gap is at least this high.")
+    parser.add_argument("--entry-moneyflow-surge-rsi-crowding-range-threshold-pct", type=float, default=None, help="Only apply the moneyflow+RSI crowding penalty when the entry-day range is at least this high.")
+    parser.add_argument("--entry-moneyflow-surge-rsi-crowding-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to high market-surge moneyflow plus high RSI-balance crowding.")
+    parser.add_argument("--entry-indicator-confluence-moneyflow-crowding-confluence-rank-threshold", type=float, default=None, help="Score-penalize entries with high indicator-confluence rank.")
+    parser.add_argument("--entry-indicator-confluence-moneyflow-crowding-moneyflow5-rank-threshold", type=float, default=None, help="Score-penalize entries with high 5-day moneyflow rank inside high indicator confluence.")
+    parser.add_argument("--entry-indicator-confluence-moneyflow-crowding-min-gap-pct", type=float, default=None, help="Only apply the indicator-confluence moneyflow crowding penalty when entry gap is at least this value.")
+    parser.add_argument("--entry-indicator-confluence-moneyflow-crowding-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to high indicator confluence plus high 5-day moneyflow crowding.")
+    parser.add_argument("--entry-unconfirmed-gap-range-min-gap-pct", type=float, default=None, help="Score-penalize high-gap high-range entries lacking moneyflow-surge confirmation.")
+    parser.add_argument("--entry-unconfirmed-gap-range-min-range-pct", type=float, default=None, help="Minimum entry-day range for the unconfirmed gap-range penalty.")
+    parser.add_argument("--entry-unconfirmed-gap-range-max-surge-rank", type=float, default=None, help="Maximum moneyflow-surge rank allowed for the unconfirmed gap-range penalty.")
+    parser.add_argument("--entry-unconfirmed-gap-range-score-penalty", type=float, default=0.0, help="Fixed score penalty applied to unconfirmed high-gap high-range entries.")
     parser.add_argument("--entry-gap-size-haircut-threshold-pct", type=float, default=None, help="Reduce entry size when the entry gap is above this threshold.")
     parser.add_argument("--entry-gap-size-haircut-pct", type=float, default=0.0, help="Position-size haircut applied above the entry gap threshold.")
     parser.add_argument("--entry-range-size-haircut-threshold-pct", type=float, default=None, help="Reduce entry size when the entry-day range is above this threshold.")
@@ -56,7 +136,16 @@ def main() -> None:
     parser.add_argument("--entry-intraday-size-haircut-threshold-pct", type=float, default=None, help="Reduce entry size when the intraday return is above this threshold.")
     parser.add_argument("--entry-intraday-size-haircut-pct", type=float, default=0.0, help="Position-size haircut applied above the intraday return threshold.")
     parser.add_argument("--max-prior-gap-down-60-pct", type=float, default=None, help="Block entries if the worst prior 60-day overnight down gap exceeds this absolute threshold.")
-    parser.add_argument("--max-prior-gap-down-3-count-60", type=int, default=None, help="Block entries if prior 60-day overnight gaps <= -3% exceed this count.")
+    parser.add_argument("--max-prior-gap-down-3-count-60", type=int, default=None, help="Block entries if prior 60-day overnight gaps <= -3pct exceed this count.")
+    parser.add_argument("--failure-symbol-cooldown-days", type=int, default=None, help="Override repeat-loss symbol cooldown days.")
+    parser.add_argument("--failure-industry-weekly-loss-limit", type=int, default=None, help="Override weekly loss count that cools down an industry.")
+    parser.add_argument("--failure-industry-cooldown-days", type=int, default=None, help="Override industry cooldown days after the weekly loss limit is reached.")
+    parser.add_argument("--industry-state-filter", action="store_true", help="Enable pre-entry industry state filtering.")
+    parser.add_argument("--industry-state-min-samples", type=int, default=None, help="Minimum same-day industry samples required by the industry state filter.")
+    parser.add_argument("--industry-state-min-up-pct", type=float, default=None, help="Minimum same-day industry up ratio required by the industry state filter.")
+    parser.add_argument("--industry-state-min-above-ma20-pct", type=float, default=None, help="Minimum same-day industry above-MA20 ratio required by the industry state filter.")
+    parser.add_argument("--industry-state-min-above-ma60-pct", type=float, default=None, help="Minimum same-day industry above-MA60 ratio required by the industry state filter.")
+    parser.add_argument("--industry-state-min-return20-pct", type=float, default=None, help="Minimum same-day industry average 20-day return required by the industry state filter.")
     parser.add_argument("--slippage-pct", type=float, default=0.0, help="Apply the same buy/sell slippage to portfolio executions.")
     parser.add_argument("--buy-slippage-pct", type=float, default=None, help="Override buy-side slippage for execution stress tests.")
     parser.add_argument("--sell-slippage-pct", type=float, default=None, help="Override sell-side slippage for execution stress tests.")
@@ -90,14 +179,101 @@ def main() -> None:
         args.market_min_above_ma60_pct,
         args.market_min_up_pct,
     )
-    apply_cross_section_weight_override(context, args.cross_section_volume_weight)
-    apply_entry_risk_override(context, args.max_entry_gap_pct, args.max_entry_range_pct, args.max_intraday_return_pct)
+    apply_market_breadth_soft_gate_override(
+        context,
+        args.market_soft_gate,
+        args.market_soft_min_samples,
+        args.market_soft_min_above_ma20_pct,
+        args.market_soft_min_above_ma60_pct,
+        args.market_soft_min_up_pct,
+        args.market_soft_max_base_failed_checks,
+    )
+    apply_cross_section_weight_override(
+        context,
+        {
+            "return20": args.cross_section_return20_weight,
+            "return60": args.cross_section_return60_weight,
+            "high60": args.cross_section_high60_weight,
+            "recovery20": args.cross_section_recovery20_weight,
+            "volume": args.cross_section_volume_weight,
+            "base": args.cross_section_base_weight,
+            "industryReturn20": args.cross_section_industry_return20_weight,
+            "industryRelativeReturn20": args.cross_section_industry_relative_return20_weight,
+            "stockSpecificBreakoutQuality": args.cross_section_stock_specific_breakout_quality_weight,
+            "stockSpecificMatureBreadthQuality": args.cross_section_stock_specific_mature_breadth_quality_weight,
+            "macdHist": args.cross_section_macd_hist_weight,
+            "macdHistDelta": args.cross_section_macd_hist_delta_weight,
+            "bollSqueeze": args.cross_section_boll_squeeze_weight,
+            "bollPosition": args.cross_section_boll_position_weight,
+            "bollPositionBalance": args.cross_section_boll_position_balance_weight,
+            "rsiBalance": args.cross_section_rsi_balance_weight,
+            "maAlignment": args.cross_section_ma_alignment_weight,
+            "indicatorSetup": args.cross_section_indicator_setup_weight,
+            "indicatorPulseQuality": args.cross_section_indicator_pulse_quality_weight,
+            "indicatorConfluenceQuality": args.cross_section_indicator_confluence_quality_weight,
+            "indicatorTurnQuality": args.cross_section_indicator_turn_quality_weight,
+            "rsiMomentumQuality": args.cross_section_rsi_momentum_quality_weight,
+            "rsiMomentumConfirmedQuality": args.cross_section_rsi_momentum_confirmed_quality_weight,
+            "turnoverRateF": args.cross_section_turnover_rate_f_weight,
+            "volumeRatioBasic": args.cross_section_volume_ratio_basic_weight,
+            "lowVolumeRatioBasic": args.cross_section_low_volume_ratio_basic_weight,
+            "smallCircMv": args.cross_section_small_circ_mv_weight,
+            "priorGapStability": args.cross_section_prior_gap_stability_weight,
+            "amountRatio": args.cross_section_amount_ratio_weight,
+            "amountEfficiency20": args.cross_section_amount_efficiency20_weight,
+            "amountEfficiencyRsi": args.cross_section_amount_efficiency_rsi_weight,
+            "moneyflowMainNetRank1": args.cross_section_moneyflow_main_rank1_weight,
+            "moneyflowMainNetRank3": args.cross_section_moneyflow_main_rank3_weight,
+            "moneyflowMainNetRank5": args.cross_section_moneyflow_main_rank5_weight,
+            "moneyflowIndustryConfirm": args.cross_section_moneyflow_industry_confirm_weight,
+            "moneyflowRsiConfirm": args.cross_section_moneyflow_rsi_confirm_weight,
+            "moneyflowMarketStrong": args.cross_section_moneyflow_market_strong_weight,
+            "moneyflowMarketQuality": args.cross_section_moneyflow_market_quality_weight,
+            "moneyflowMarketSurgeQuality": args.cross_section_moneyflow_market_surge_quality_weight,
+            "moneyflowMarketSurgeStrictQuality": args.cross_section_moneyflow_market_surge_strict_quality_weight,
+            "moneyflowMarketSurgeRelativeQuality": args.cross_section_moneyflow_market_surge_relative_quality_weight,
+            "moneyflowMarketSurgeConfirmedQuality": args.cross_section_moneyflow_market_surge_confirmed_quality_weight,
+            "industryMoneyflowSumNetRank1": args.cross_section_industry_moneyflow_sum_net_rank1_weight,
+            "kplConceptCountRank1": args.cross_section_kpl_concept_count_rank1_weight,
+        },
+    )
+    apply_moneyflow_cache_override(context, args.moneyflow_cache)
+    apply_concept_cache_override(context, args.concept_cache)
+    require_moneyflow_cache_for_enabled_weights(context)
+    require_concept_cache_for_enabled_weights(context)
+    apply_entry_risk_override(context, args.max_entry_gap_pct, args.min_entry_gap_pct, args.max_entry_range_pct, args.max_intraday_return_pct)
     apply_entry_score_penalty_override(
         context,
         args.entry_gap_score_penalty_threshold_pct,
         args.entry_gap_score_penalty,
         args.entry_range_score_penalty_threshold_pct,
         args.entry_range_score_penalty,
+        args.entry_prior_volume_ratio_basic_score_penalty_threshold,
+        args.entry_prior_volume_ratio_basic_score_penalty,
+        args.entry_volume_inefficiency_crowding_prior_volume_ratio_basic_threshold,
+        args.entry_volume_inefficiency_crowding_amount_efficiency_rsi_rank_max,
+        args.entry_volume_inefficiency_crowding_score_penalty,
+        args.entry_industry_return_overheat_rank_threshold,
+        args.entry_industry_return_overheat_score_penalty,
+        args.entry_unsupported_boll_squeeze_boll_rank_threshold,
+        args.entry_unsupported_boll_squeeze_industry_moneyflow_rank_max,
+        args.entry_unsupported_boll_squeeze_score_penalty,
+        args.entry_industry_moneyflow_crowding_sum_rank_threshold,
+        args.entry_industry_moneyflow_crowding_persistent_score_max,
+        args.entry_industry_moneyflow_crowding_score_penalty,
+        args.entry_moneyflow_surge_rsi_crowding_surge_rank_threshold,
+        args.entry_moneyflow_surge_rsi_crowding_rsi_rank_threshold,
+        args.entry_moneyflow_surge_rsi_crowding_gap_threshold_pct,
+        args.entry_moneyflow_surge_rsi_crowding_range_threshold_pct,
+        args.entry_moneyflow_surge_rsi_crowding_score_penalty,
+        args.entry_indicator_confluence_moneyflow_crowding_confluence_rank_threshold,
+        args.entry_indicator_confluence_moneyflow_crowding_moneyflow5_rank_threshold,
+        args.entry_indicator_confluence_moneyflow_crowding_min_gap_pct,
+        args.entry_indicator_confluence_moneyflow_crowding_score_penalty,
+        args.entry_unconfirmed_gap_range_min_gap_pct,
+        args.entry_unconfirmed_gap_range_min_range_pct,
+        args.entry_unconfirmed_gap_range_max_surge_rank,
+        args.entry_unconfirmed_gap_range_score_penalty,
     )
     apply_entry_size_haircut_override(
         context,
@@ -109,6 +285,21 @@ def main() -> None:
         args.entry_intraday_size_haircut_pct,
     )
     apply_prior_gap_risk_override(context, args.max_prior_gap_down_60_pct, args.max_prior_gap_down_3_count_60)
+    apply_failure_throttle_override(
+        context,
+        args.failure_symbol_cooldown_days,
+        args.failure_industry_weekly_loss_limit,
+        args.failure_industry_cooldown_days,
+    )
+    apply_industry_state_filter_override(
+        context,
+        args.industry_state_filter,
+        args.industry_state_min_samples,
+        args.industry_state_min_up_pct,
+        args.industry_state_min_above_ma20_pct,
+        args.industry_state_min_above_ma60_pct,
+        args.industry_state_min_return20_pct,
+    )
     apply_execution_stress(
         context,
         args.slippage_pct,
@@ -173,6 +364,7 @@ def main() -> None:
 def build_portfolio_rules(context: dict[str, Any], strategy_config: dict[str, Any]) -> dict[str, Any]:
     target = deepcopy(context.get("portfolio_target", {}))
     market_filter = target.get("marketBreadthFilter", {})
+    market_soft_gate = target.get("marketBreadthSoftGate", {})
     failure_throttle = target.get("failureThrottle", {})
     entry_risk_filter = target.get("entryRiskFilter", {})
     entry_score_penalty = target.get("entryScorePenalty", {})
@@ -199,6 +391,7 @@ def build_portfolio_rules(context: dict[str, Any], strategy_config: dict[str, An
             "maxEntryRangePct": entry_risk_filter.get("maxEntryRangePct"),
             "maxIntradayReturnPct": entry_risk_filter.get("maxIntradayReturnPct"),
             "maxGapPct": entry_risk_filter.get("maxGapPct"),
+            "minGapPct": entry_risk_filter.get("minGapPct"),
             "maxUpperShadowPct": entry_risk_filter.get("maxUpperShadowPct"),
             "maxLowerShadowPct": entry_risk_filter.get("maxLowerShadowPct"),
             "maxPriorGapDown60Pct": entry_risk_filter.get("maxPriorGapDown60Pct"),
@@ -210,6 +403,32 @@ def build_portfolio_rules(context: dict[str, Any], strategy_config: dict[str, An
             "gapPenalty": float(entry_score_penalty.get("gapPenalty", 0) or 0),
             "rangeThresholdPct": entry_score_penalty.get("rangeThresholdPct"),
             "rangePenalty": float(entry_score_penalty.get("rangePenalty", 0) or 0),
+            "priorVolumeRatioBasicThreshold": entry_score_penalty.get("priorVolumeRatioBasicThreshold"),
+            "priorVolumeRatioBasicPenalty": float(entry_score_penalty.get("priorVolumeRatioBasicPenalty", 0) or 0),
+            "volumeInefficiencyCrowdingPriorVolumeRatioBasicThreshold": entry_score_penalty.get("volumeInefficiencyCrowdingPriorVolumeRatioBasicThreshold"),
+            "volumeInefficiencyCrowdingAmountEfficiencyRsiRankMax": entry_score_penalty.get("volumeInefficiencyCrowdingAmountEfficiencyRsiRankMax"),
+            "volumeInefficiencyCrowdingPenalty": float(entry_score_penalty.get("volumeInefficiencyCrowdingPenalty", 0) or 0),
+            "industryReturnOverheatRankThreshold": entry_score_penalty.get("industryReturnOverheatRankThreshold"),
+            "industryReturnOverheatPenalty": float(entry_score_penalty.get("industryReturnOverheatPenalty", 0) or 0),
+            "unsupportedBollSqueezeBollRankThreshold": entry_score_penalty.get("unsupportedBollSqueezeBollRankThreshold"),
+            "unsupportedBollSqueezeIndustryMoneyflowRankMax": entry_score_penalty.get("unsupportedBollSqueezeIndustryMoneyflowRankMax"),
+            "unsupportedBollSqueezePenalty": float(entry_score_penalty.get("unsupportedBollSqueezePenalty", 0) or 0),
+            "industryMoneyflowCrowdingSumRankThreshold": entry_score_penalty.get("industryMoneyflowCrowdingSumRankThreshold"),
+            "industryMoneyflowCrowdingPersistentScoreMax": entry_score_penalty.get("industryMoneyflowCrowdingPersistentScoreMax"),
+            "industryMoneyflowCrowdingPenalty": float(entry_score_penalty.get("industryMoneyflowCrowdingPenalty", 0) or 0),
+            "moneyflowSurgeRsiCrowdingSurgeRankThreshold": entry_score_penalty.get("moneyflowSurgeRsiCrowdingSurgeRankThreshold"),
+            "moneyflowSurgeRsiCrowdingRsiRankThreshold": entry_score_penalty.get("moneyflowSurgeRsiCrowdingRsiRankThreshold"),
+            "moneyflowSurgeRsiCrowdingGapThresholdPct": entry_score_penalty.get("moneyflowSurgeRsiCrowdingGapThresholdPct"),
+            "moneyflowSurgeRsiCrowdingRangeThresholdPct": entry_score_penalty.get("moneyflowSurgeRsiCrowdingRangeThresholdPct"),
+            "moneyflowSurgeRsiCrowdingPenalty": float(entry_score_penalty.get("moneyflowSurgeRsiCrowdingPenalty", 0) or 0),
+            "indicatorConfluenceMoneyflowCrowdingConfluenceRankThreshold": entry_score_penalty.get("indicatorConfluenceMoneyflowCrowdingConfluenceRankThreshold"),
+            "indicatorConfluenceMoneyflowCrowdingMoneyflow5RankThreshold": entry_score_penalty.get("indicatorConfluenceMoneyflowCrowdingMoneyflow5RankThreshold"),
+            "indicatorConfluenceMoneyflowCrowdingMinGapPct": entry_score_penalty.get("indicatorConfluenceMoneyflowCrowdingMinGapPct"),
+            "indicatorConfluenceMoneyflowCrowdingPenalty": float(entry_score_penalty.get("indicatorConfluenceMoneyflowCrowdingPenalty", 0) or 0),
+            "unconfirmedGapRangeMinGapPct": entry_score_penalty.get("unconfirmedGapRangeMinGapPct"),
+            "unconfirmedGapRangeMinRangePct": entry_score_penalty.get("unconfirmedGapRangeMinRangePct"),
+            "unconfirmedGapRangeMaxSurgeRank": entry_score_penalty.get("unconfirmedGapRangeMaxSurgeRank"),
+            "unconfirmedGapRangePenalty": float(entry_score_penalty.get("unconfirmedGapRangePenalty", 0) or 0),
         },
         "entrySizeHaircut": {
             "gapThresholdPct": entry_size_haircut.get("gapThresholdPct"),
@@ -226,13 +445,61 @@ def build_portfolio_rules(context: dict[str, Any], strategy_config: dict[str, An
             "recovery20": float(cross_section_weights.get("recovery20", 1.0)),
             "volume": float(cross_section_weights.get("volume", 0.5)),
             "base": float(cross_section_weights.get("base", 0.25)),
+            "industryReturn20": float(cross_section_weights.get("industryReturn20", 0.0)),
+            "industryRelativeReturn20": float(cross_section_weights.get("industryRelativeReturn20", 0.0)),
+            "stockSpecificBreakoutQuality": float(cross_section_weights.get("stockSpecificBreakoutQuality", 0.0)),
+            "stockSpecificMatureBreadthQuality": float(cross_section_weights.get("stockSpecificMatureBreadthQuality", 0.0)),
+            "macdHist": float(cross_section_weights.get("macdHist", 0.0)),
+            "macdHistDelta": float(cross_section_weights.get("macdHistDelta", 0.0)),
+            "bollSqueeze": float(cross_section_weights.get("bollSqueeze", 0.0)),
+            "bollPosition": float(cross_section_weights.get("bollPosition", 0.0)),
+            "bollPositionBalance": float(cross_section_weights.get("bollPositionBalance", 0.0)),
+            "rsiBalance": float(cross_section_weights.get("rsiBalance", 0.0)),
+            "maAlignment": float(cross_section_weights.get("maAlignment", 0.0)),
+            "indicatorSetup": float(cross_section_weights.get("indicatorSetup", 0.0)),
+            "indicatorPulseQuality": float(cross_section_weights.get("indicatorPulseQuality", 0.0)),
+            "indicatorConfluenceQuality": float(cross_section_weights.get("indicatorConfluenceQuality", 0.0)),
+            "indicatorTurnQuality": float(cross_section_weights.get("indicatorTurnQuality", 0.0)),
+            "rsiMomentumQuality": float(cross_section_weights.get("rsiMomentumQuality", 0.0)),
+            "rsiMomentumConfirmedQuality": float(cross_section_weights.get("rsiMomentumConfirmedQuality", 0.0)),
+            "turnoverRateF": float(cross_section_weights.get("turnoverRateF", 0.0)),
+            "volumeRatioBasic": float(cross_section_weights.get("volumeRatioBasic", 0.0)),
+            "lowVolumeRatioBasic": float(cross_section_weights.get("lowVolumeRatioBasic", 0.0)),
+            "smallCircMv": float(cross_section_weights.get("smallCircMv", 0.0)),
+            "priorGapStability": float(cross_section_weights.get("priorGapStability", 0.0)),
+            "amountRatio": float(cross_section_weights.get("amountRatio", 0.0)),
+            "amountEfficiency20": float(cross_section_weights.get("amountEfficiency20", 0.0)),
+            "amountEfficiencyRsi": float(cross_section_weights.get("amountEfficiencyRsi", 0.0)),
+            "moneyflowMainNetRank1": float(cross_section_weights.get("moneyflowMainNetRank1", 0.0)),
+            "moneyflowMainNetRank3": float(cross_section_weights.get("moneyflowMainNetRank3", 0.0)),
+            "moneyflowMainNetRank5": float(cross_section_weights.get("moneyflowMainNetRank5", 0.0)),
+            "moneyflowIndustryConfirm": float(cross_section_weights.get("moneyflowIndustryConfirm", 0.0)),
+            "moneyflowRsiConfirm": float(cross_section_weights.get("moneyflowRsiConfirm", 0.0)),
+            "moneyflowMarketStrong": float(cross_section_weights.get("moneyflowMarketStrong", 0.0)),
+            "moneyflowMarketQuality": float(cross_section_weights.get("moneyflowMarketQuality", 0.0)),
+            "moneyflowMarketSurgeQuality": float(cross_section_weights.get("moneyflowMarketSurgeQuality", 0.0)),
+            "moneyflowMarketSurgeStrictQuality": float(cross_section_weights.get("moneyflowMarketSurgeStrictQuality", 0.0)),
+            "moneyflowMarketSurgeRelativeQuality": float(cross_section_weights.get("moneyflowMarketSurgeRelativeQuality", 0.0)),
+            "moneyflowMarketSurgeConfirmedQuality": float(cross_section_weights.get("moneyflowMarketSurgeConfirmedQuality", 0.0)),
+            "industryMoneyflowSumNetRank1": float(cross_section_weights.get("industryMoneyflowSumNetRank1", 0.0)),
+            "kplConceptCountRank1": float(cross_section_weights.get("kplConceptCountRank1", 0.0)),
         },
+        "moneyflowCachePath": context.get("moneyflowCachePath"),
+        "conceptCachePath": context.get("conceptCachePath"),
         "failureThrottle": {
             "enabled": bool(failure_throttle.get("enabled", False)),
             "lossReturnThreshold": float(failure_throttle.get("lossReturnThreshold", 0)),
             "symbolCooldownDays": int(failure_throttle.get("symbolCooldownDays", 20)),
             "industryWeeklyLossLimit": int(failure_throttle.get("industryWeeklyLossLimit", 2)),
             "industryCooldownDays": int(failure_throttle.get("industryCooldownDays", 10)),
+        },
+        "industryStateFilter": {
+            "enabled": bool(target.get("industryStateFilter", {}).get("enabled", False)),
+            "minSamples": int(target.get("industryStateFilter", {}).get("minSamples", 5)),
+            "minUpPct": target.get("industryStateFilter", {}).get("minUpPct"),
+            "minAboveMa20Pct": target.get("industryStateFilter", {}).get("minAboveMa20Pct"),
+            "minAboveMa60Pct": target.get("industryStateFilter", {}).get("minAboveMa60Pct"),
+            "minReturn20Pct": target.get("industryStateFilter", {}).get("minReturn20Pct"),
         },
         "marketBreadthFilter": {
             "enabled": bool(market_filter.get("enabled", False)),
@@ -241,6 +508,24 @@ def build_portfolio_rules(context: dict[str, Any], strategy_config: dict[str, An
             "minAboveMa20Pct": float(market_filter.get("minAboveMa20Pct", 0.45)),
             "minAboveMa60Pct": float(market_filter.get("minAboveMa60Pct", 0.35)),
             "minUpPct": float(market_filter.get("minUpPct", 0.45)),
+            "softGate": {
+                "enabled": bool(market_soft_gate.get("enabled", False)),
+                "minSamples": int(market_soft_gate.get("minSamples", market_filter.get("minSamples", 1000))),
+                "minAboveMa20Pct": float(market_soft_gate.get("minAboveMa20Pct", 0.40)),
+                "minAboveMa60Pct": float(market_soft_gate.get("minAboveMa60Pct", market_filter.get("minAboveMa60Pct", 0.35))),
+                "minUpPct": float(market_soft_gate.get("minUpPct", 0.40)),
+                "maxBaseFailedChecks": int(market_soft_gate.get("maxBaseFailedChecks", 1)),
+                "extendAllowedEntryDates": bool(market_soft_gate.get("extendAllowedEntryDates", True)),
+            },
+        },
+        "marketBreadthSoftGate": {
+            "enabled": bool(market_soft_gate.get("enabled", False)),
+            "minSamples": int(market_soft_gate.get("minSamples", market_filter.get("minSamples", 1000))),
+            "minAboveMa20Pct": float(market_soft_gate.get("minAboveMa20Pct", 0.40)),
+            "minAboveMa60Pct": float(market_soft_gate.get("minAboveMa60Pct", market_filter.get("minAboveMa60Pct", 0.35))),
+            "minUpPct": float(market_soft_gate.get("minUpPct", 0.40)),
+            "maxBaseFailedChecks": int(market_soft_gate.get("maxBaseFailedChecks", 1)),
+            "extendAllowedEntryDates": bool(market_soft_gate.get("extendAllowedEntryDates", True)),
         },
     }
 
@@ -329,30 +614,141 @@ def apply_market_breadth_override(
     }
 
 
-def apply_cross_section_weight_override(context: dict[str, Any], volume_weight: float | None) -> None:
-    if volume_weight is None:
+def apply_market_breadth_soft_gate_override(
+    context: dict[str, Any],
+    enabled: bool,
+    min_samples: int | None,
+    min_above_ma20_pct: float | None,
+    min_above_ma60_pct: float | None,
+    min_up_pct: float | None,
+    max_base_failed_checks: int | None,
+) -> None:
+    if min_samples is not None and min_samples < 0:
+        raise SystemExit("--market-soft-min-samples must be >= 0.")
+    if max_base_failed_checks is not None and max_base_failed_checks < 0:
+        raise SystemExit("--market-soft-max-base-failed-checks must be >= 0.")
+    pct_values = {
+        "--market-soft-min-above-ma20-pct": min_above_ma20_pct,
+        "--market-soft-min-above-ma60-pct": min_above_ma60_pct,
+        "--market-soft-min-up-pct": min_up_pct,
+    }
+    for name, value in pct_values.items():
+        if value is not None and not 0 <= value <= 1:
+            raise SystemExit(f"{name} must be in [0, 1].")
+    if not enabled and min_samples is None and max_base_failed_checks is None and all(value is None for value in pct_values.values()):
         return
-    if volume_weight < 0:
-        raise SystemExit("--cross-section-volume-weight must be >= 0.")
+
+    target = context.setdefault("portfolio_target", {})
+    soft_gate = target.setdefault("marketBreadthSoftGate", {})
+    if enabled:
+        soft_gate["enabled"] = True
+    if min_samples is not None:
+        soft_gate["minSamples"] = min_samples
+    if min_above_ma20_pct is not None:
+        soft_gate["minAboveMa20Pct"] = min_above_ma20_pct
+    if min_above_ma60_pct is not None:
+        soft_gate["minAboveMa60Pct"] = min_above_ma60_pct
+    if min_up_pct is not None:
+        soft_gate["minUpPct"] = min_up_pct
+    if max_base_failed_checks is not None:
+        soft_gate["maxBaseFailedChecks"] = max_base_failed_checks
+    context["marketBreadthSoftGateOverride"] = {
+        "enabled": enabled,
+        "minSamples": min_samples,
+        "minAboveMa20Pct": min_above_ma20_pct,
+        "minAboveMa60Pct": min_above_ma60_pct,
+        "minUpPct": min_up_pct,
+        "maxBaseFailedChecks": max_base_failed_checks,
+        "note": "portfolio_target.marketBreadthSoftGate was overridden before building portfolio rules.",
+    }
+
+
+def apply_cross_section_weight_override(context: dict[str, Any], overrides: dict[str, float | None]) -> None:
+    selected = {key: value for key, value in overrides.items() if value is not None}
+    if not selected:
+        return
+    for key, value in selected.items():
+        if value is not None and value < 0:
+            raise SystemExit(f"--cross-section-{key}-weight must be >= 0.")
     target = context.setdefault("portfolio_target", {})
     weights = target.setdefault("crossSectionScoreWeights", {})
-    weights["volume"] = volume_weight
+    weights.update(selected)
     context["crossSectionScoreWeightOverride"] = {
-        "volume": volume_weight,
-        "note": "Only the cross-section volume rank weight was overridden before building portfolio rules.",
+        **selected,
+        "note": "Cross-section score weights were overridden before building portfolio rules.",
     }
+
+
+def apply_moneyflow_cache_override(context: dict[str, Any], moneyflow_cache: str | None) -> None:
+    if not moneyflow_cache:
+        return
+    context["moneyflowCachePath"] = moneyflow_cache
+    context["moneyflowCacheOverride"] = {
+        "moneyflowCachePath": moneyflow_cache,
+        "note": "Point-in-time moneyflow ranks are loaded from a run-local cache; no database schema is changed.",
+    }
+
+
+def apply_concept_cache_override(context: dict[str, Any], concept_cache: str | None) -> None:
+    if not concept_cache:
+        return
+    context["conceptCachePath"] = concept_cache
+    context["conceptCacheOverride"] = {
+        "conceptCachePath": concept_cache,
+        "note": "Point-in-time KPL concept ranks are loaded from a run-local cache; no database schema is changed.",
+    }
+
+
+def require_moneyflow_cache_for_enabled_weights(context: dict[str, Any]) -> None:
+    weights = context.get("portfolio_target", {}).get("crossSectionScoreWeights", {})
+    enabled = [
+        key
+        for key in [
+            "moneyflowMainNetRank1",
+            "moneyflowMainNetRank3",
+            "moneyflowMainNetRank5",
+            "moneyflowIndustryConfirm",
+            "moneyflowRsiConfirm",
+            "moneyflowMarketStrong",
+            "moneyflowMarketQuality",
+            "moneyflowMarketSurgeQuality",
+            "moneyflowMarketSurgeStrictQuality",
+            "moneyflowMarketSurgeRelativeQuality",
+            "moneyflowMarketSurgeConfirmedQuality",
+            "rsiMomentumQuality",
+            "rsiMomentumConfirmedQuality",
+            "industryMoneyflowSumNetRank1",
+        ]
+        if float(weights.get(key, 0.0) or 0.0) > 0
+    ]
+    if enabled and not context.get("moneyflowCachePath"):
+        raise SystemExit(f"Moneyflow weights require --moneyflow-cache: {', '.join(enabled)}")
+
+
+def require_concept_cache_for_enabled_weights(context: dict[str, Any]) -> None:
+    weights = context.get("portfolio_target", {}).get("crossSectionScoreWeights", {})
+    enabled = [
+        key
+        for key in ["kplConceptCountRank1"]
+        if float(weights.get(key, 0.0) or 0.0) > 0
+    ]
+    if enabled and not context.get("conceptCachePath"):
+        raise SystemExit(f"Concept weights require --concept-cache: {', '.join(enabled)}")
 
 
 def apply_entry_risk_override(
     context: dict[str, Any],
     max_entry_gap_pct: float | None,
+    min_entry_gap_pct: float | None,
     max_entry_range_pct: float | None,
     max_intraday_return_pct: float | None,
 ) -> None:
-    if max_entry_gap_pct is None and max_entry_range_pct is None and max_intraday_return_pct is None:
+    if max_entry_gap_pct is None and min_entry_gap_pct is None and max_entry_range_pct is None and max_intraday_return_pct is None:
         return
     if max_entry_gap_pct is not None and not 0 <= max_entry_gap_pct < 1:
         raise SystemExit("--max-entry-gap-pct must be in [0, 1).")
+    if min_entry_gap_pct is not None and not -1 < min_entry_gap_pct < 1:
+        raise SystemExit("--min-entry-gap-pct must be in (-1, 1).")
     if max_entry_range_pct is not None and not 0 <= max_entry_range_pct < 1:
         raise SystemExit("--max-entry-range-pct must be in [0, 1).")
     if max_intraday_return_pct is not None and not 0 <= max_intraday_return_pct < 1:
@@ -362,12 +758,15 @@ def apply_entry_risk_override(
     entry_risk_filter["enabled"] = True
     if max_entry_gap_pct is not None:
         entry_risk_filter["maxGapPct"] = max_entry_gap_pct
+    if min_entry_gap_pct is not None:
+        entry_risk_filter["minGapPct"] = min_entry_gap_pct
     if max_entry_range_pct is not None:
         entry_risk_filter["maxEntryRangePct"] = max_entry_range_pct
     if max_intraday_return_pct is not None:
         entry_risk_filter["maxIntradayReturnPct"] = max_intraday_return_pct
     context["entryRiskOverride"] = {
         "maxGapPct": max_entry_gap_pct,
+        "minGapPct": min_entry_gap_pct,
         "maxEntryRangePct": max_entry_range_pct,
         "maxIntradayReturnPct": max_intraday_return_pct,
         "note": "portfolio_target.entryRiskFilter was overridden before building portfolio rules.",
@@ -380,16 +779,203 @@ def apply_entry_score_penalty_override(
     gap_penalty: float,
     range_threshold_pct: float | None,
     range_penalty: float,
+    prior_volume_ratio_basic_threshold: float | None,
+    prior_volume_ratio_basic_penalty: float,
+    volume_inefficiency_crowding_prior_volume_ratio_basic_threshold: float | None,
+    volume_inefficiency_crowding_amount_efficiency_rsi_rank_max: float | None,
+    volume_inefficiency_crowding_penalty: float,
+    industry_return_overheat_rank_threshold: float | None,
+    industry_return_overheat_penalty: float,
+    unsupported_boll_squeeze_boll_rank_threshold: float | None,
+    unsupported_boll_squeeze_industry_moneyflow_rank_max: float | None,
+    unsupported_boll_squeeze_penalty: float,
+    industry_moneyflow_crowding_sum_rank_threshold: float | None,
+    industry_moneyflow_crowding_persistent_score_max: float | None,
+    industry_moneyflow_crowding_penalty: float,
+    moneyflow_surge_rsi_crowding_surge_rank_threshold: float | None,
+    moneyflow_surge_rsi_crowding_rsi_rank_threshold: float | None,
+    moneyflow_surge_rsi_crowding_gap_threshold_pct: float | None,
+    moneyflow_surge_rsi_crowding_range_threshold_pct: float | None,
+    moneyflow_surge_rsi_crowding_penalty: float,
+    indicator_confluence_moneyflow_crowding_confluence_rank_threshold: float | None,
+    indicator_confluence_moneyflow_crowding_moneyflow5_rank_threshold: float | None,
+    indicator_confluence_moneyflow_crowding_min_gap_pct: float | None,
+    indicator_confluence_moneyflow_crowding_penalty: float,
+    unconfirmed_gap_range_min_gap_pct: float | None,
+    unconfirmed_gap_range_min_range_pct: float | None,
+    unconfirmed_gap_range_max_surge_rank: float | None,
+    unconfirmed_gap_range_penalty: float,
 ) -> None:
     if gap_threshold_pct is not None and not 0 <= gap_threshold_pct < 1:
         raise SystemExit("--entry-gap-score-penalty-threshold-pct must be in [0, 1).")
     if range_threshold_pct is not None and not 0 <= range_threshold_pct < 1:
         raise SystemExit("--entry-range-score-penalty-threshold-pct must be in [0, 1).")
+    if prior_volume_ratio_basic_threshold is not None and prior_volume_ratio_basic_threshold < 0:
+        raise SystemExit("--entry-prior-volume-ratio-basic-score-penalty-threshold must be >= 0.")
+    if (
+        volume_inefficiency_crowding_prior_volume_ratio_basic_threshold is not None
+        and volume_inefficiency_crowding_prior_volume_ratio_basic_threshold < 0
+    ):
+        raise SystemExit("--entry-volume-inefficiency-crowding-prior-volume-ratio-basic-threshold must be >= 0.")
+    if (
+        volume_inefficiency_crowding_amount_efficiency_rsi_rank_max is not None
+        and not 0 <= volume_inefficiency_crowding_amount_efficiency_rsi_rank_max <= 1
+    ):
+        raise SystemExit("--entry-volume-inefficiency-crowding-amount-efficiency-rsi-rank-max must be in [0, 1].")
+    if industry_return_overheat_rank_threshold is not None and not 0 <= industry_return_overheat_rank_threshold <= 1:
+        raise SystemExit("--entry-industry-return-overheat-rank-threshold must be in [0, 1].")
+    if (
+        unsupported_boll_squeeze_boll_rank_threshold is not None
+        and not 0 <= unsupported_boll_squeeze_boll_rank_threshold <= 1
+    ):
+        raise SystemExit("--entry-unsupported-boll-squeeze-boll-rank-threshold must be in [0, 1].")
+    if (
+        unsupported_boll_squeeze_industry_moneyflow_rank_max is not None
+        and not 0 <= unsupported_boll_squeeze_industry_moneyflow_rank_max <= 1
+    ):
+        raise SystemExit("--entry-unsupported-boll-squeeze-industry-moneyflow-rank-max must be in [0, 1].")
+    if industry_moneyflow_crowding_sum_rank_threshold is not None and not 0 <= industry_moneyflow_crowding_sum_rank_threshold <= 1:
+        raise SystemExit("--entry-industry-moneyflow-crowding-sum-rank-threshold must be in [0, 1].")
+    if industry_moneyflow_crowding_persistent_score_max is not None and not 0 <= industry_moneyflow_crowding_persistent_score_max <= 1:
+        raise SystemExit("--entry-industry-moneyflow-crowding-persistent-score-max must be in [0, 1].")
+    if moneyflow_surge_rsi_crowding_surge_rank_threshold is not None and not 0 <= moneyflow_surge_rsi_crowding_surge_rank_threshold <= 1:
+        raise SystemExit("--entry-moneyflow-surge-rsi-crowding-surge-rank-threshold must be in [0, 1].")
+    if moneyflow_surge_rsi_crowding_rsi_rank_threshold is not None and not 0 <= moneyflow_surge_rsi_crowding_rsi_rank_threshold <= 1:
+        raise SystemExit("--entry-moneyflow-surge-rsi-crowding-rsi-rank-threshold must be in [0, 1].")
+    if moneyflow_surge_rsi_crowding_gap_threshold_pct is not None and not 0 <= moneyflow_surge_rsi_crowding_gap_threshold_pct < 1:
+        raise SystemExit("--entry-moneyflow-surge-rsi-crowding-gap-threshold-pct must be in [0, 1).")
+    if moneyflow_surge_rsi_crowding_range_threshold_pct is not None and not 0 <= moneyflow_surge_rsi_crowding_range_threshold_pct < 1:
+        raise SystemExit("--entry-moneyflow-surge-rsi-crowding-range-threshold-pct must be in [0, 1).")
+    if (
+        indicator_confluence_moneyflow_crowding_confluence_rank_threshold is not None
+        and not 0 <= indicator_confluence_moneyflow_crowding_confluence_rank_threshold <= 1
+    ):
+        raise SystemExit("--entry-indicator-confluence-moneyflow-crowding-confluence-rank-threshold must be in [0, 1].")
+    if (
+        indicator_confluence_moneyflow_crowding_moneyflow5_rank_threshold is not None
+        and not 0 <= indicator_confluence_moneyflow_crowding_moneyflow5_rank_threshold <= 1
+    ):
+        raise SystemExit("--entry-indicator-confluence-moneyflow-crowding-moneyflow5-rank-threshold must be in [0, 1].")
+    if indicator_confluence_moneyflow_crowding_min_gap_pct is not None and not -1 < indicator_confluence_moneyflow_crowding_min_gap_pct < 1:
+        raise SystemExit("--entry-indicator-confluence-moneyflow-crowding-min-gap-pct must be in (-1, 1).")
+    if unconfirmed_gap_range_min_gap_pct is not None and not 0 <= unconfirmed_gap_range_min_gap_pct < 1:
+        raise SystemExit("--entry-unconfirmed-gap-range-min-gap-pct must be in [0, 1).")
+    if unconfirmed_gap_range_min_range_pct is not None and not 0 <= unconfirmed_gap_range_min_range_pct < 1:
+        raise SystemExit("--entry-unconfirmed-gap-range-min-range-pct must be in [0, 1).")
+    if unconfirmed_gap_range_max_surge_rank is not None and not 0 <= unconfirmed_gap_range_max_surge_rank <= 1:
+        raise SystemExit("--entry-unconfirmed-gap-range-max-surge-rank must be in [0, 1].")
     if gap_penalty < 0:
         raise SystemExit("--entry-gap-score-penalty must be >= 0.")
     if range_penalty < 0:
         raise SystemExit("--entry-range-score-penalty must be >= 0.")
-    if (gap_threshold_pct is None or gap_penalty == 0) and (range_threshold_pct is None or range_penalty == 0):
+    if prior_volume_ratio_basic_penalty < 0:
+        raise SystemExit("--entry-prior-volume-ratio-basic-score-penalty must be >= 0.")
+    if volume_inefficiency_crowding_penalty < 0:
+        raise SystemExit("--entry-volume-inefficiency-crowding-score-penalty must be >= 0.")
+    if industry_return_overheat_penalty < 0:
+        raise SystemExit("--entry-industry-return-overheat-score-penalty must be >= 0.")
+    if unsupported_boll_squeeze_penalty < 0:
+        raise SystemExit("--entry-unsupported-boll-squeeze-score-penalty must be >= 0.")
+    if industry_moneyflow_crowding_penalty < 0:
+        raise SystemExit("--entry-industry-moneyflow-crowding-score-penalty must be >= 0.")
+    if moneyflow_surge_rsi_crowding_penalty < 0:
+        raise SystemExit("--entry-moneyflow-surge-rsi-crowding-score-penalty must be >= 0.")
+    if indicator_confluence_moneyflow_crowding_penalty < 0:
+        raise SystemExit("--entry-indicator-confluence-moneyflow-crowding-score-penalty must be >= 0.")
+    if unconfirmed_gap_range_penalty < 0:
+        raise SystemExit("--entry-unconfirmed-gap-range-score-penalty must be >= 0.")
+    industry_moneyflow_crowding_enabled = (
+        industry_moneyflow_crowding_sum_rank_threshold is not None
+        or industry_moneyflow_crowding_persistent_score_max is not None
+        or industry_moneyflow_crowding_penalty > 0
+    )
+    volume_inefficiency_crowding_enabled = (
+        volume_inefficiency_crowding_prior_volume_ratio_basic_threshold is not None
+        or volume_inefficiency_crowding_amount_efficiency_rsi_rank_max is not None
+        or volume_inefficiency_crowding_penalty > 0
+    )
+    industry_return_overheat_enabled = (
+        industry_return_overheat_rank_threshold is not None
+        or industry_return_overheat_penalty > 0
+    )
+    unsupported_boll_squeeze_enabled = (
+        unsupported_boll_squeeze_boll_rank_threshold is not None
+        or unsupported_boll_squeeze_industry_moneyflow_rank_max is not None
+        or unsupported_boll_squeeze_penalty > 0
+    )
+    moneyflow_surge_rsi_crowding_enabled = (
+        moneyflow_surge_rsi_crowding_surge_rank_threshold is not None
+        or moneyflow_surge_rsi_crowding_rsi_rank_threshold is not None
+        or moneyflow_surge_rsi_crowding_gap_threshold_pct is not None
+        or moneyflow_surge_rsi_crowding_range_threshold_pct is not None
+        or moneyflow_surge_rsi_crowding_penalty > 0
+    )
+    indicator_confluence_moneyflow_crowding_enabled = (
+        indicator_confluence_moneyflow_crowding_confluence_rank_threshold is not None
+        or indicator_confluence_moneyflow_crowding_moneyflow5_rank_threshold is not None
+        or indicator_confluence_moneyflow_crowding_min_gap_pct is not None
+        or indicator_confluence_moneyflow_crowding_penalty > 0
+    )
+    unconfirmed_gap_range_enabled = (
+        unconfirmed_gap_range_min_gap_pct is not None
+        or unconfirmed_gap_range_min_range_pct is not None
+        or unconfirmed_gap_range_max_surge_rank is not None
+        or unconfirmed_gap_range_penalty > 0
+    )
+    if industry_moneyflow_crowding_enabled and (
+        industry_moneyflow_crowding_sum_rank_threshold is None
+        or industry_moneyflow_crowding_persistent_score_max is None
+        or industry_moneyflow_crowding_penalty == 0
+    ):
+        raise SystemExit("Industry moneyflow crowding penalty requires sum-rank threshold, persistence max, and penalty.")
+    if volume_inefficiency_crowding_enabled and (
+        volume_inefficiency_crowding_prior_volume_ratio_basic_threshold is None
+        or volume_inefficiency_crowding_amount_efficiency_rsi_rank_max is None
+        or volume_inefficiency_crowding_penalty == 0
+    ):
+        raise SystemExit("Volume inefficiency crowding penalty requires prior-volume-ratio threshold, amount-efficiency-rsi rank max, and penalty.")
+    if industry_return_overheat_enabled and (
+        industry_return_overheat_rank_threshold is None
+        or industry_return_overheat_penalty == 0
+    ):
+        raise SystemExit("Industry return overheat penalty requires rank threshold and penalty.")
+    if unsupported_boll_squeeze_enabled and (
+        unsupported_boll_squeeze_boll_rank_threshold is None
+        or unsupported_boll_squeeze_industry_moneyflow_rank_max is None
+        or unsupported_boll_squeeze_penalty == 0
+    ):
+        raise SystemExit("Unsupported BOLL squeeze penalty requires BOLL rank threshold, industry moneyflow rank max, and penalty.")
+    if moneyflow_surge_rsi_crowding_enabled and (
+        moneyflow_surge_rsi_crowding_surge_rank_threshold is None
+        or moneyflow_surge_rsi_crowding_rsi_rank_threshold is None
+        or moneyflow_surge_rsi_crowding_penalty == 0
+    ):
+        raise SystemExit("Moneyflow surge RSI crowding penalty requires surge-rank threshold, RSI-rank threshold, and penalty.")
+    if indicator_confluence_moneyflow_crowding_enabled and (
+        indicator_confluence_moneyflow_crowding_confluence_rank_threshold is None
+        or indicator_confluence_moneyflow_crowding_moneyflow5_rank_threshold is None
+        or indicator_confluence_moneyflow_crowding_penalty == 0
+    ):
+        raise SystemExit("Indicator confluence moneyflow crowding penalty requires confluence-rank threshold, moneyflow5-rank threshold, and penalty.")
+    if unconfirmed_gap_range_enabled and (
+        unconfirmed_gap_range_min_gap_pct is None
+        or unconfirmed_gap_range_min_range_pct is None
+        or unconfirmed_gap_range_max_surge_rank is None
+        or unconfirmed_gap_range_penalty == 0
+    ):
+        raise SystemExit("Unconfirmed gap-range penalty requires gap threshold, range threshold, surge-rank max, and penalty.")
+    if (
+        (gap_threshold_pct is None or gap_penalty == 0)
+        and (range_threshold_pct is None or range_penalty == 0)
+        and (prior_volume_ratio_basic_threshold is None or prior_volume_ratio_basic_penalty == 0)
+        and not volume_inefficiency_crowding_enabled
+        and not industry_return_overheat_enabled
+        and not unsupported_boll_squeeze_enabled
+        and not industry_moneyflow_crowding_enabled
+        and not moneyflow_surge_rsi_crowding_enabled
+        and not indicator_confluence_moneyflow_crowding_enabled
+        and not unconfirmed_gap_range_enabled
+    ):
         return
 
     target = context.setdefault("portfolio_target", {})
@@ -400,11 +986,71 @@ def apply_entry_score_penalty_override(
     if range_threshold_pct is not None and range_penalty > 0:
         score_penalty["rangeThresholdPct"] = range_threshold_pct
         score_penalty["rangePenalty"] = range_penalty
+    if prior_volume_ratio_basic_threshold is not None and prior_volume_ratio_basic_penalty > 0:
+        score_penalty["priorVolumeRatioBasicThreshold"] = prior_volume_ratio_basic_threshold
+        score_penalty["priorVolumeRatioBasicPenalty"] = prior_volume_ratio_basic_penalty
+    if volume_inefficiency_crowding_enabled:
+        score_penalty["volumeInefficiencyCrowdingPriorVolumeRatioBasicThreshold"] = volume_inefficiency_crowding_prior_volume_ratio_basic_threshold
+        score_penalty["volumeInefficiencyCrowdingAmountEfficiencyRsiRankMax"] = volume_inefficiency_crowding_amount_efficiency_rsi_rank_max
+        score_penalty["volumeInefficiencyCrowdingPenalty"] = volume_inefficiency_crowding_penalty
+    if industry_return_overheat_enabled:
+        score_penalty["industryReturnOverheatRankThreshold"] = industry_return_overheat_rank_threshold
+        score_penalty["industryReturnOverheatPenalty"] = industry_return_overheat_penalty
+    if unsupported_boll_squeeze_enabled:
+        score_penalty["unsupportedBollSqueezeBollRankThreshold"] = unsupported_boll_squeeze_boll_rank_threshold
+        score_penalty["unsupportedBollSqueezeIndustryMoneyflowRankMax"] = unsupported_boll_squeeze_industry_moneyflow_rank_max
+        score_penalty["unsupportedBollSqueezePenalty"] = unsupported_boll_squeeze_penalty
+    if industry_moneyflow_crowding_enabled:
+        score_penalty["industryMoneyflowCrowdingSumRankThreshold"] = industry_moneyflow_crowding_sum_rank_threshold
+        score_penalty["industryMoneyflowCrowdingPersistentScoreMax"] = industry_moneyflow_crowding_persistent_score_max
+        score_penalty["industryMoneyflowCrowdingPenalty"] = industry_moneyflow_crowding_penalty
+    if moneyflow_surge_rsi_crowding_enabled:
+        score_penalty["moneyflowSurgeRsiCrowdingSurgeRankThreshold"] = moneyflow_surge_rsi_crowding_surge_rank_threshold
+        score_penalty["moneyflowSurgeRsiCrowdingRsiRankThreshold"] = moneyflow_surge_rsi_crowding_rsi_rank_threshold
+        score_penalty["moneyflowSurgeRsiCrowdingGapThresholdPct"] = moneyflow_surge_rsi_crowding_gap_threshold_pct
+        score_penalty["moneyflowSurgeRsiCrowdingRangeThresholdPct"] = moneyflow_surge_rsi_crowding_range_threshold_pct
+        score_penalty["moneyflowSurgeRsiCrowdingPenalty"] = moneyflow_surge_rsi_crowding_penalty
+    if indicator_confluence_moneyflow_crowding_enabled:
+        score_penalty["indicatorConfluenceMoneyflowCrowdingConfluenceRankThreshold"] = indicator_confluence_moneyflow_crowding_confluence_rank_threshold
+        score_penalty["indicatorConfluenceMoneyflowCrowdingMoneyflow5RankThreshold"] = indicator_confluence_moneyflow_crowding_moneyflow5_rank_threshold
+        score_penalty["indicatorConfluenceMoneyflowCrowdingMinGapPct"] = indicator_confluence_moneyflow_crowding_min_gap_pct
+        score_penalty["indicatorConfluenceMoneyflowCrowdingPenalty"] = indicator_confluence_moneyflow_crowding_penalty
+    if unconfirmed_gap_range_enabled:
+        score_penalty["unconfirmedGapRangeMinGapPct"] = unconfirmed_gap_range_min_gap_pct
+        score_penalty["unconfirmedGapRangeMinRangePct"] = unconfirmed_gap_range_min_range_pct
+        score_penalty["unconfirmedGapRangeMaxSurgeRank"] = unconfirmed_gap_range_max_surge_rank
+        score_penalty["unconfirmedGapRangePenalty"] = unconfirmed_gap_range_penalty
     context["entryScorePenaltyOverride"] = {
         "gapThresholdPct": gap_threshold_pct,
         "gapPenalty": gap_penalty,
         "rangeThresholdPct": range_threshold_pct,
         "rangePenalty": range_penalty,
+        "priorVolumeRatioBasicThreshold": prior_volume_ratio_basic_threshold,
+        "priorVolumeRatioBasicPenalty": prior_volume_ratio_basic_penalty,
+        "volumeInefficiencyCrowdingPriorVolumeRatioBasicThreshold": volume_inefficiency_crowding_prior_volume_ratio_basic_threshold,
+        "volumeInefficiencyCrowdingAmountEfficiencyRsiRankMax": volume_inefficiency_crowding_amount_efficiency_rsi_rank_max,
+        "volumeInefficiencyCrowdingPenalty": volume_inefficiency_crowding_penalty,
+        "industryReturnOverheatRankThreshold": industry_return_overheat_rank_threshold,
+        "industryReturnOverheatPenalty": industry_return_overheat_penalty,
+        "unsupportedBollSqueezeBollRankThreshold": unsupported_boll_squeeze_boll_rank_threshold,
+        "unsupportedBollSqueezeIndustryMoneyflowRankMax": unsupported_boll_squeeze_industry_moneyflow_rank_max,
+        "unsupportedBollSqueezePenalty": unsupported_boll_squeeze_penalty,
+        "industryMoneyflowCrowdingSumRankThreshold": industry_moneyflow_crowding_sum_rank_threshold,
+        "industryMoneyflowCrowdingPersistentScoreMax": industry_moneyflow_crowding_persistent_score_max,
+        "industryMoneyflowCrowdingPenalty": industry_moneyflow_crowding_penalty,
+        "moneyflowSurgeRsiCrowdingSurgeRankThreshold": moneyflow_surge_rsi_crowding_surge_rank_threshold,
+        "moneyflowSurgeRsiCrowdingRsiRankThreshold": moneyflow_surge_rsi_crowding_rsi_rank_threshold,
+        "moneyflowSurgeRsiCrowdingGapThresholdPct": moneyflow_surge_rsi_crowding_gap_threshold_pct,
+        "moneyflowSurgeRsiCrowdingRangeThresholdPct": moneyflow_surge_rsi_crowding_range_threshold_pct,
+        "moneyflowSurgeRsiCrowdingPenalty": moneyflow_surge_rsi_crowding_penalty,
+        "indicatorConfluenceMoneyflowCrowdingConfluenceRankThreshold": indicator_confluence_moneyflow_crowding_confluence_rank_threshold,
+        "indicatorConfluenceMoneyflowCrowdingMoneyflow5RankThreshold": indicator_confluence_moneyflow_crowding_moneyflow5_rank_threshold,
+        "indicatorConfluenceMoneyflowCrowdingMinGapPct": indicator_confluence_moneyflow_crowding_min_gap_pct,
+        "indicatorConfluenceMoneyflowCrowdingPenalty": indicator_confluence_moneyflow_crowding_penalty,
+        "unconfirmedGapRangeMinGapPct": unconfirmed_gap_range_min_gap_pct,
+        "unconfirmedGapRangeMinRangePct": unconfirmed_gap_range_min_range_pct,
+        "unconfirmedGapRangeMaxSurgeRank": unconfirmed_gap_range_max_surge_rank,
+        "unconfirmedGapRangePenalty": unconfirmed_gap_range_penalty,
         "note": "portfolio_target.entryScorePenalty was overridden before building portfolio rules.",
     }
 
@@ -481,6 +1127,86 @@ def apply_prior_gap_risk_override(context: dict[str, Any], max_prior_gap_down_60
         "maxPriorGapDown60Pct": max_prior_gap_down_60_pct,
         "maxPriorGapDown3Count60": max_prior_gap_down_3_count_60,
         "note": "Prior overnight gap risk filters were overridden before building portfolio rules.",
+    }
+
+
+def apply_failure_throttle_override(
+    context: dict[str, Any],
+    symbol_cooldown_days: int | None,
+    industry_weekly_loss_limit: int | None,
+    industry_cooldown_days: int | None,
+) -> None:
+    if symbol_cooldown_days is None and industry_weekly_loss_limit is None and industry_cooldown_days is None:
+        return
+    values = {
+        "--failure-symbol-cooldown-days": symbol_cooldown_days,
+        "--failure-industry-weekly-loss-limit": industry_weekly_loss_limit,
+        "--failure-industry-cooldown-days": industry_cooldown_days,
+    }
+    for name, value in values.items():
+        if value is not None and value < 0:
+            raise SystemExit(f"{name} must be >= 0.")
+
+    target = context.setdefault("portfolio_target", {})
+    throttle = target.setdefault("failureThrottle", {})
+    throttle["enabled"] = True
+    if symbol_cooldown_days is not None:
+        throttle["symbolCooldownDays"] = symbol_cooldown_days
+    if industry_weekly_loss_limit is not None:
+        throttle["industryWeeklyLossLimit"] = industry_weekly_loss_limit
+    if industry_cooldown_days is not None:
+        throttle["industryCooldownDays"] = industry_cooldown_days
+    context["failureThrottleOverride"] = {
+        "symbolCooldownDays": symbol_cooldown_days,
+        "industryWeeklyLossLimit": industry_weekly_loss_limit,
+        "industryCooldownDays": industry_cooldown_days,
+        "note": "Failure throttle was overridden before building portfolio rules.",
+    }
+
+
+def apply_industry_state_filter_override(
+    context: dict[str, Any],
+    enabled: bool,
+    min_samples: int | None,
+    min_up_pct: float | None,
+    min_above_ma20_pct: float | None,
+    min_above_ma60_pct: float | None,
+    min_return20_pct: float | None,
+) -> None:
+    if not enabled and min_samples is None and min_up_pct is None and min_above_ma20_pct is None and min_above_ma60_pct is None and min_return20_pct is None:
+        return
+    if min_samples is not None and min_samples < 1:
+        raise SystemExit("--industry-state-min-samples must be >= 1.")
+    pct_values = {
+        "--industry-state-min-up-pct": min_up_pct,
+        "--industry-state-min-above-ma20-pct": min_above_ma20_pct,
+        "--industry-state-min-above-ma60-pct": min_above_ma60_pct,
+    }
+    for name, value in pct_values.items():
+        if value is not None and not 0 <= value <= 1:
+            raise SystemExit(f"{name} must be in [0, 1].")
+
+    target = context.setdefault("portfolio_target", {})
+    rules = target.setdefault("industryStateFilter", {})
+    rules["enabled"] = True
+    if min_samples is not None:
+        rules["minSamples"] = min_samples
+    if min_up_pct is not None:
+        rules["minUpPct"] = min_up_pct
+    if min_above_ma20_pct is not None:
+        rules["minAboveMa20Pct"] = min_above_ma20_pct
+    if min_above_ma60_pct is not None:
+        rules["minAboveMa60Pct"] = min_above_ma60_pct
+    if min_return20_pct is not None:
+        rules["minReturn20Pct"] = min_return20_pct
+    context["industryStateFilterOverride"] = {
+        "enabled": True,
+        "minSamples": min_samples,
+        "minUpPct": min_up_pct,
+        "minAboveMa20Pct": min_above_ma20_pct,
+        "minAboveMa60Pct": min_above_ma60_pct,
+        "minReturn20Pct": min_return20_pct,
+        "note": "Industry state filter was overridden before building portfolio rules.",
     }
 
 
@@ -602,14 +1328,17 @@ def run_portfolio_backtest(
     market_state_payload: MarketBacktestRequest | None = None,
 ) -> dict[str, Any]:
     stocks = [stock_to_market_meta(stock) for stock in query_backtest_stocks(db, payload)]
-    by_date, skipped = load_signal_rows(db, stocks, payload, cfg)
+    moneyflow_cache = load_moneyflow_cache(portfolio_rules.get("moneyflowCachePath"))
+    concept_cache = load_concept_cache(portfolio_rules.get("conceptCachePath"))
+    industry_moneyflow_cache = build_industry_moneyflow_cache(moneyflow_cache, stocks)
+    by_date, skipped = load_signal_rows(db, stocks, payload, cfg, moneyflow_cache, industry_moneyflow_cache, concept_cache)
     market_state_source = "trade_candidates"
     market_state_scope: dict[str, Any] | None = None
     market_state_by_date = by_date
     if market_state_payload is not None:
         market_state_source = "independent_breadth_scope"
         market_state_stocks = [stock_to_market_meta(stock) for stock in query_backtest_stocks(db, market_state_payload)]
-        market_state_by_date, market_state_skipped = load_signal_rows(db, market_state_stocks, market_state_payload, cfg)
+        market_state_by_date, market_state_skipped = load_signal_rows(db, market_state_stocks, market_state_payload, cfg, {}, {}, {})
         market_state_scope = {
             "startDate": market_state_payload.start_date.isoformat(),
             "endDate": market_state_payload.end_date.isoformat(),
@@ -638,6 +1367,7 @@ def run_portfolio_backtest(
     max_single_position_pct = 0.0
     max_industry_position_pct = 0.0
     market_states = build_market_states(market_state_by_date, portfolio_rules["marketBreadthFilter"])
+    extend_allowed_entry_dates_for_soft_gate(cfg, market_states, portfolio_rules, by_date)
     market_stats = {
         "blockedMarketDays": 0,
         "blockedMarketSignals": 0,
@@ -657,6 +1387,7 @@ def run_portfolio_backtest(
         "industryOvernightRiskActiveDays": 0,
         "industryOvernightRiskActiveIndustryDays": 0,
         "blockedIndustryOvernightRiskSignals": 0,
+        "blockedIndustryStateSignals": 0,
         "blockedOvernightBudgetSignals": 0,
         "overnightBudgetReducedEntries": 0,
         "overnightBudgetReductionShares": 0,
@@ -683,6 +1414,7 @@ def run_portfolio_backtest(
             continue
         rows_by_code = {item["stock"]["ts_code"]: item for item in day_items}
         industry_overnight_risk = update_industry_overnight_risk(industry_overnight_gap_history, day_items, cfg)
+        industry_states = build_industry_states(day_items)
         if industry_overnight_risk:
             market_stats["industryOvernightRiskActiveDays"] += 1
             market_stats["industryOvernightRiskActiveIndustryDays"] += len(industry_overnight_risk)
@@ -784,9 +1516,11 @@ def run_portfolio_backtest(
                 gap_stop_symbol_cooldowns,
                 gap_stop_industry_cooldowns,
                 industry_overnight_risk,
+                industry_states,
                 traded_symbols,
                 throttle_stats,
                 market_stats,
+                entry_market_state,
             )
             if entry_market_state["riskOn"]:
                 if gap_stop_market_cooldown_until and current_date <= gap_stop_market_cooldown_until:
@@ -836,6 +1570,9 @@ def run_portfolio_backtest(
                 "cash": cash,
                 "positions": len(positions),
                 "marketRiskOn": bool(entry_market_state["riskOn"]),
+                "marketBaseRiskOn": bool(entry_market_state.get("baseRiskOn", entry_market_state["riskOn"])),
+                "marketSoftRiskOn": bool(entry_market_state.get("softRiskOn", False)),
+                "marketBreadthFailedChecks": entry_market_state.get("failedChecks", []),
                 "marketAboveMa20Pct": entry_market_state.get("aboveMa20Pct"),
                 "marketAboveMa60Pct": entry_market_state.get("aboveMa60Pct"),
                 "marketUpPct": entry_market_state.get("upPct"),
@@ -900,19 +1637,153 @@ def payload_filters(payload: MarketBacktestRequest) -> dict[str, Any]:
     }
 
 
-def load_signal_rows(db: Session, stocks: list[dict[str, Any]], payload: MarketBacktestRequest, cfg: dict[str, Any]) -> tuple[dict[str, list[dict[str, Any]]], int]:
+def load_moneyflow_cache(path_value: Any) -> dict[str, dict[str, dict[str, float]]]:
+    if not path_value:
+        return {}
+    path = Path(str(path_value))
+    if not path.is_absolute():
+        path = REPO_ROOT / path
+    if not path.exists():
+        raise SystemExit(f"Moneyflow cache not found: {path}")
+    cache: dict[str, dict[str, dict[str, float]]] = defaultdict(dict)
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            trade_date = item.get("tradeDate")
+            ts_code = item.get("ts_code")
+            if not trade_date or not ts_code:
+                continue
+            cache[str(trade_date)][str(ts_code)] = {
+                "moneyflowMainNet": none_or_float(item.get("moneyflowMainNet")),
+                "moneyflowNetMfRank": none_or_float(item.get("moneyflowNetMfRank")),
+                "moneyflowMainNetRank": none_or_float(item.get("moneyflowMainNetRank")),
+                "moneyflowRetailNetRank": none_or_float(item.get("moneyflowRetailNetRank")),
+            }
+    return dict(cache)
+
+
+def none_or_float(value: Any) -> float | None:
+    return float(value) if finite(value) else None
+
+
+def build_industry_moneyflow_cache(
+    moneyflow_cache: dict[str, dict[str, dict[str, float]]],
+    stocks: list[dict[str, Any]],
+) -> dict[str, dict[str, dict[str, float]]]:
+    if not moneyflow_cache:
+        return {}
+    industry_by_code = {str(stock["ts_code"]): str(stock.get("industry") or "未知") for stock in stocks}
+    by_date: dict[str, dict[str, dict[str, float]]] = {}
+    for trade_date, code_metrics in moneyflow_cache.items():
+        groups: dict[str, list[dict[str, float]]] = defaultdict(list)
+        for ts_code, metrics in code_metrics.items():
+            industry = industry_by_code.get(ts_code)
+            main_net = metrics.get("moneyflowMainNet")
+            main_rank = metrics.get("moneyflowMainNetRank")
+            if industry and finite(main_net):
+                groups[industry].append(
+                    {
+                        "mainNet": float(main_net),
+                        "mainRank": float(main_rank) if finite(main_rank) else float("nan"),
+                    }
+                )
+        rows = []
+        for industry, values in groups.items():
+            main_nets = [item["mainNet"] for item in values if finite(item.get("mainNet"))]
+            main_ranks = [item["mainRank"] for item in values if finite(item.get("mainRank"))]
+            if len(main_nets) >= 3 and main_ranks:
+                rows.append(
+                    {
+                        "industry": industry,
+                        "sumMainNet": sum(main_nets),
+                        "avgMainRank": mean(main_ranks),
+                        "positiveRatio": sum(1 for value in main_nets if value > 0) / len(main_nets),
+                        "samples": len(main_nets),
+                    }
+                )
+        if not rows:
+            continue
+        for value_key, rank_key in [
+            ("sumMainNet", "industryMoneyflowSumNetRank"),
+            ("avgMainRank", "industryMoneyflowAvgRankRank"),
+            ("positiveRatio", "industryMoneyflowPositiveRatioRank"),
+        ]:
+            valid = sorted(rows, key=lambda item: item[value_key])
+            denom = max(1, len(valid) - 1)
+            for index, item in enumerate(valid):
+                item[rank_key] = index / denom
+        by_date[trade_date] = {
+            item["industry"]: {
+                "industryMoneyflowSumNetRank": item["industryMoneyflowSumNetRank"],
+                "industryMoneyflowSumNet": item["sumMainNet"],
+                "industryMoneyflowAvgRank": item["avgMainRank"],
+                "industryMoneyflowPositiveRatio": item["positiveRatio"],
+                "industryMoneyflowPersistentScore": (
+                    float(item["industryMoneyflowSumNetRank"]) * 0.4
+                    + float(item["industryMoneyflowAvgRankRank"]) * 0.3
+                    + float(item["industryMoneyflowPositiveRatioRank"]) * 0.3
+                ),
+                "industryMoneyflowSamples": item["samples"],
+            }
+            for item in rows
+        }
+    return by_date
+
+
+def load_concept_cache(path_value: Any) -> dict[str, dict[str, dict[str, float]]]:
+    if not path_value:
+        return {}
+    path = Path(str(path_value))
+    if not path.is_absolute():
+        path = REPO_ROOT / path
+    if not path.exists():
+        raise SystemExit(f"Concept cache not found: {path}")
+    cache: dict[str, dict[str, dict[str, float]]] = defaultdict(dict)
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            trade_date = item.get("tradeDate")
+            ts_code = item.get("ts_code")
+            if not trade_date or not ts_code:
+                continue
+            cache[str(trade_date)][str(ts_code)] = {
+                "kplConceptCountRank": none_or_float(item.get("kplConceptCountRank")),
+                "kplHotMaxRank": none_or_float(item.get("kplHotMaxRank")),
+                "kplHotMeanRank": none_or_float(item.get("kplHotMeanRank")),
+            }
+    return dict(cache)
+
+
+def load_signal_rows(
+    db: Session,
+    stocks: list[dict[str, Any]],
+    payload: MarketBacktestRequest,
+    cfg: dict[str, Any],
+    moneyflow_cache: dict[str, dict[str, dict[str, float]]] | None = None,
+    industry_moneyflow_cache: dict[str, dict[str, dict[str, float]]] | None = None,
+    concept_cache: dict[str, dict[str, dict[str, float]]] | None = None,
+) -> tuple[dict[str, list[dict[str, Any]]], int]:
     by_date: dict[str, list[dict[str, Any]]] = defaultdict(list)
     skipped = 0
     batch_size = 240
     for batch_start in range(0, len(stocks), batch_size):
         batch = stocks[batch_start : batch_start + batch_size]
-        bars_by_code = query_backtest_rows_by_code(db, [stock["ts_code"] for stock in batch], payload.start_date, payload.end_date)
+        ts_codes = [stock["ts_code"] for stock in batch]
+        bars_by_code = query_backtest_rows_by_code(db, ts_codes, payload.start_date, payload.end_date)
+        amount_by_code = query_amount_by_code(db, ts_codes, payload.start_date, payload.end_date)
+        daily_basic_by_code = query_daily_basic_by_code(db, ts_codes, payload.start_date, payload.end_date)
         for stock in batch:
             rows = bars_by_code.get(stock["ts_code"], [])
             if len(rows) < payload.min_bars:
                 skipped += 1
                 continue
             daily_limit_pct = infer_daily_limit_pct(stock["ts_code"])
+            amount_by_date = amount_by_code.get(stock["ts_code"], {})
+            daily_basic_by_date = daily_basic_by_code.get(stock["ts_code"], {})
             raw_rows = [
                 {
                     "ts_code": stock["ts_code"],
@@ -922,10 +1793,16 @@ def load_signal_rows(db: Session, stocks: list[dict[str, Any]], payload: MarketB
                     "low": row[3],
                     "close": row[4],
                     "volume": row[5],
+                    "amount": amount_by_date.get(row[0], float("nan")),
+                    **daily_basic_by_date.get(row[0], {}),
                 }
                 for row in rows
             ]
             enriched = enrich_rows(raw_rows, cfg)
+            attach_prior_daily_basic_features(enriched)
+            attach_amount_features(enriched)
+            attach_moneyflow_features(enriched, stock["ts_code"], stock.get("industry"), moneyflow_cache or {}, industry_moneyflow_cache or {})
+            attach_concept_features(enriched, stock["ts_code"], concept_cache or {})
             for index, row in enumerate(enriched):
                 prev = enriched[index - 1] if index else None
                 row["dailyLimitPct"] = daily_limit_pct
@@ -935,6 +1812,125 @@ def load_signal_rows(db: Session, stocks: list[dict[str, Any]], payload: MarketB
                     row["limitUpPrice"] = float(prev["close"]) * (1 + daily_limit_pct)
                 by_date[row["date"]].append({"stock": stock, "row": row, "prev": prev})
     return by_date, skipped
+
+
+def query_amount_by_code(db: Session, ts_codes: list[str], start_date: date, end_date: date) -> dict[str, dict[str, float]]:
+    if not ts_codes:
+        return {}
+    stmt = (
+        select(
+            StockDailyBar.ts_code,
+            StockDailyBar.trade_date,
+            StockDailyBar.amount,
+        )
+        .where(
+            StockDailyBar.ts_code.in_(ts_codes),
+            StockDailyBar.trade_date >= start_date,
+            StockDailyBar.trade_date <= end_date,
+        )
+        .order_by(StockDailyBar.ts_code, StockDailyBar.trade_date)
+    )
+    grouped: dict[str, dict[str, float]] = {}
+    for row in db.execute(stmt):
+        grouped.setdefault(row.ts_code, {})[row.trade_date.isoformat()] = float(row.amount) if row.amount is not None else float("nan")
+    return grouped
+
+
+def attach_amount_features(rows: list[dict[str, Any]]) -> None:
+    amounts: list[float] = []
+    for row in rows:
+        amount = float(row.get("amount")) if finite(row.get("amount")) else float("nan")
+        amounts.append(amount)
+        recent = [value for value in amounts[-20:] if finite(value)]
+        amount_ma20 = sum(recent) / len(recent) if recent else float("nan")
+        amount_ratio = amount / amount_ma20 if finite(amount) and finite(amount_ma20) and amount_ma20 > 0 else float("nan")
+        row["amountMa20"] = amount_ma20
+        row["amountRatio"] = amount_ratio
+        return20 = row.get("return20")
+        row["amountEfficiency20"] = float(return20) / max(amount_ratio, 0.5) if finite(return20) and finite(amount_ratio) and amount_ratio > 0 else float("nan")
+
+
+def attach_prior_daily_basic_features(rows: list[dict[str, Any]]) -> None:
+    previous_volume_ratio = float("nan")
+    for row in rows:
+        row["priorVolumeRatioBasic"] = previous_volume_ratio
+        current_volume_ratio = row.get("volumeRatioBasic")
+        previous_volume_ratio = float(current_volume_ratio) if finite(current_volume_ratio) else float("nan")
+
+
+def attach_moneyflow_features(
+    rows: list[dict[str, Any]],
+    ts_code: str,
+    industry: Any,
+    moneyflow_cache: dict[str, dict[str, dict[str, float]]],
+    industry_moneyflow_cache: dict[str, dict[str, dict[str, float]]],
+) -> None:
+    previous_dates: list[str] = []
+    industry_name = str(industry or "未知")
+    for row in rows:
+        main_ranks: list[float] = []
+        industry_sum_ranks: list[float] = []
+        industry_persistent_scores: list[float] = []
+        for trade_date in reversed(previous_dates):
+            metrics = moneyflow_cache.get(trade_date, {}).get(ts_code)
+            if metrics and finite(metrics.get("moneyflowMainNetRank")):
+                main_ranks.append(float(metrics["moneyflowMainNetRank"]))
+            industry_metrics = industry_moneyflow_cache.get(trade_date, {}).get(industry_name)
+            if industry_metrics and finite(industry_metrics.get("industryMoneyflowSumNetRank")):
+                industry_sum_ranks.append(float(industry_metrics["industryMoneyflowSumNetRank"]))
+            if industry_metrics and finite(industry_metrics.get("industryMoneyflowPersistentScore")):
+                industry_persistent_scores.append(float(industry_metrics["industryMoneyflowPersistentScore"]))
+            if len(main_ranks) >= 5:
+                if len(industry_sum_ranks) >= 1:
+                    break
+        row["moneyflowMainNetRank1"] = main_ranks[0] if main_ranks else float("nan")
+        row["moneyflowMainNetRank3"] = mean(main_ranks[:3]) if len(main_ranks) >= 3 else float("nan")
+        row["moneyflowMainNetRank5"] = mean(main_ranks[:5]) if len(main_ranks) >= 5 else float("nan")
+        row["industryMoneyflowSumNetRank1"] = industry_sum_ranks[0] if industry_sum_ranks else float("nan")
+        row["industryMoneyflowPersistentScore1"] = industry_persistent_scores[0] if industry_persistent_scores else float("nan")
+        previous_dates.append(row["date"])
+
+
+def attach_concept_features(rows: list[dict[str, Any]], ts_code: str, concept_cache: dict[str, dict[str, dict[str, float]]]) -> None:
+    previous_dates: list[str] = []
+    for row in rows:
+        concept_count_ranks: list[float] = []
+        for trade_date in reversed(previous_dates):
+            metrics = concept_cache.get(trade_date, {}).get(ts_code)
+            if metrics and finite(metrics.get("kplConceptCountRank")):
+                concept_count_ranks.append(float(metrics["kplConceptCountRank"]))
+            if concept_count_ranks:
+                break
+        row["kplConceptCountRank1"] = concept_count_ranks[0] if concept_count_ranks else float("nan")
+        previous_dates.append(row["date"])
+
+
+def query_daily_basic_by_code(db: Session, ts_codes: list[str], start_date: date, end_date: date) -> dict[str, dict[str, dict[str, float]]]:
+    if not ts_codes:
+        return {}
+    stmt = (
+        select(
+            StockDailyBasic.ts_code,
+            StockDailyBasic.trade_date,
+            StockDailyBasic.turnover_rate_f,
+            StockDailyBasic.volume_ratio,
+            StockDailyBasic.circ_mv,
+        )
+        .where(
+            StockDailyBasic.ts_code.in_(ts_codes),
+            StockDailyBasic.trade_date >= start_date,
+            StockDailyBasic.trade_date <= end_date,
+        )
+        .order_by(StockDailyBasic.ts_code, StockDailyBasic.trade_date)
+    )
+    grouped: dict[str, dict[str, dict[str, float]]] = {}
+    for row in db.execute(stmt):
+        grouped.setdefault(row.ts_code, {})[row.trade_date.isoformat()] = {
+            "turnoverRateF": float(row.turnover_rate_f) if row.turnover_rate_f is not None else float("nan"),
+            "volumeRatioBasic": float(row.volume_ratio) if row.volume_ratio is not None else float("nan"),
+            "circMv": float(row.circ_mv) if row.circ_mv is not None else float("nan"),
+        }
+    return grouped
 
 
 def infer_daily_limit_pct(ts_code: str) -> float:
@@ -966,19 +1962,22 @@ def build_market_states(by_date: dict[str, list[dict[str, Any]]], rules: dict[st
         above_ma20_pct = above_ma20 / samples if samples else 0
         above_ma60_pct = above_ma60 / samples if samples else 0
         up_pct = up_count / samples if samples else 0
-        risk_on = (
-            not bool(rules.get("enabled", False))
-            or (
-                samples >= int(rules["minSamples"])
-                and above_ma20_pct >= float(rules["minAboveMa20Pct"])
-                and above_ma60_pct >= float(rules["minAboveMa60Pct"])
-                and up_pct >= float(rules["minUpPct"])
-            )
-        )
+        state_values = {
+            "samples": samples,
+            "aboveMa20Pct": above_ma20_pct,
+            "aboveMa60Pct": above_ma60_pct,
+            "upPct": up_pct,
+        }
+        base_failed_checks = market_breadth_failed_checks(state_values, rules)
+        base_risk_on = not bool(rules.get("enabled", False)) or not base_failed_checks
+        soft_risk_on = market_breadth_soft_gate_ok(state_values, rules, base_failed_checks, base_risk_on)
         states[trade_date] = {
             "date": trade_date,
             "samples": samples,
-            "riskOn": risk_on,
+            "riskOn": base_risk_on or soft_risk_on,
+            "baseRiskOn": base_risk_on,
+            "softRiskOn": soft_risk_on,
+            "failedChecks": base_failed_checks,
             "aboveMa20Pct": above_ma20_pct,
             "aboveMa60Pct": above_ma60_pct,
             "upPct": up_pct,
@@ -986,11 +1985,62 @@ def build_market_states(by_date: dict[str, list[dict[str, Any]]], rules: dict[st
     return states
 
 
+def market_breadth_failed_checks(state: dict[str, Any], rules: dict[str, Any]) -> list[str]:
+    checks = []
+    if float(state.get("samples") or 0) < int(rules["minSamples"]):
+        checks.append("samples")
+    if float(state.get("aboveMa20Pct") or 0.0) < float(rules["minAboveMa20Pct"]):
+        checks.append("aboveMa20")
+    if float(state.get("aboveMa60Pct") or 0.0) < float(rules["minAboveMa60Pct"]):
+        checks.append("aboveMa60")
+    if float(state.get("upPct") or 0.0) < float(rules["minUpPct"]):
+        checks.append("upPct")
+    return checks
+
+
+def market_breadth_soft_gate_ok(state: dict[str, Any], rules: dict[str, Any], base_failed_checks: list[str], base_risk_on: bool) -> bool:
+    soft_gate = rules.get("softGate") or {}
+    if base_risk_on or not bool(soft_gate.get("enabled", False)):
+        return False
+    max_failed = int(soft_gate.get("maxBaseFailedChecks", 1))
+    return (
+        len(base_failed_checks) <= max_failed
+        and float(state.get("samples") or 0) >= int(soft_gate.get("minSamples", rules["minSamples"]))
+        and float(state.get("aboveMa20Pct") or 0.0) >= float(soft_gate.get("minAboveMa20Pct", rules["minAboveMa20Pct"]))
+        and float(state.get("aboveMa60Pct") or 0.0) >= float(soft_gate.get("minAboveMa60Pct", rules["minAboveMa60Pct"]))
+        and float(state.get("upPct") or 0.0) >= float(soft_gate.get("minUpPct", rules["minUpPct"]))
+    )
+
+
+def extend_allowed_entry_dates_for_soft_gate(
+    cfg: dict[str, Any],
+    market_states: dict[str, dict[str, Any]],
+    portfolio_rules: dict[str, Any],
+    by_date: dict[str, list[dict[str, Any]]],
+) -> None:
+    soft_gate = portfolio_rules["marketBreadthFilter"].get("softGate") or {}
+    if not bool(soft_gate.get("enabled", False)) or not bool(soft_gate.get("extendAllowedEntryDates", True)):
+        return
+    allowed_dates = set(cfg.get("allowedEntryDates") or [])
+    use_previous = bool(portfolio_rules["marketBreadthFilter"].get("usePreviousTradingDay", True))
+    previous_market_state: dict[str, Any] | None = None
+    for trade_date in sorted(by_date):
+        current_market_state = market_states.get(trade_date, default_market_state(trade_date))
+        entry_market_state = previous_market_state if use_previous and previous_market_state else current_market_state
+        if entry_market_state.get("riskOn"):
+            allowed_dates.add(trade_date)
+        previous_market_state = current_market_state
+    cfg["allowedEntryDates"] = sorted(allowed_dates)
+
+
 def default_market_state(trade_date: str) -> dict[str, Any]:
     return {
         "date": trade_date,
         "samples": 0,
         "riskOn": True,
+        "baseRiskOn": True,
+        "softRiskOn": False,
+        "failedChecks": [],
         "aboveMa20Pct": None,
         "aboveMa60Pct": None,
         "upPct": None,
@@ -1307,9 +2357,11 @@ def build_entry_signals(
     gap_stop_symbol_cooldowns: dict[str, date],
     gap_stop_industry_cooldowns: dict[str, date],
     industry_overnight_risk: set[str],
+    industry_states: dict[str, dict[str, float]],
     traded_symbols: set[str],
     throttle_stats: dict[str, int],
     market_stats: dict[str, int | float],
+    entry_market_state: dict[str, Any],
 ) -> list[dict[str, Any]]:
     signals: list[dict[str, Any]] = []
     max_distinct = portfolio_rules.get("maxDistinctSymbols")
@@ -1345,6 +2397,9 @@ def build_entry_signals(
                 market_stats["blockedRiskSignals"] += 1
                 record_blocked_risk_reason(market_stats, signal.get("reason") or "strategy_risk")
             continue
+        if not industry_state_filter_ok(industry, industry_states, portfolio_rules):
+            market_stats["blockedIndustryStateSignals"] += 1
+            continue
         risk_ok, risk_metrics, risk_reason = entry_risk_filter_ok(item["row"], item["prev"], portfolio_rules)
         if not risk_ok:
             market_stats["blockedRiskSignals"] += 1
@@ -1361,9 +2416,62 @@ def build_entry_signals(
             continue
         signals.append({**item, "score": score, "reason": signal["reason"], "knownSymbol": ts_code in traded_symbols, "riskMetrics": risk_metrics})
     if portfolio_rules.get("entryPriority") == "cross_section_strength":
-        apply_cross_section_strength_scores(signals, symbol_failure_counts, portfolio_rules)
+        apply_cross_section_strength_scores(signals, symbol_failure_counts, portfolio_rules, industry_states, entry_market_state)
     signals.sort(key=lambda item: item["score"], reverse=True)
     return signals
+
+
+def build_industry_states(day_items: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
+    stats: dict[str, dict[str, float]] = defaultdict(lambda: {"samples": 0, "up": 0, "aboveMa20": 0, "aboveMa60": 0, "return20Sum": 0.0, "return20Count": 0})
+    for item in day_items:
+        row = item["row"]
+        prev = item.get("prev")
+        industry = str(item["stock"].get("industry") or "未知")
+        bucket = stats[industry]
+        bucket["samples"] += 1
+        if prev and prev.get("close") and row.get("close") and float(row["close"]) > float(prev["close"]):
+            bucket["up"] += 1
+        if finite(row.get("ma20")) and row.get("close") and float(row["close"]) > float(row["ma20"]):
+            bucket["aboveMa20"] += 1
+        if finite(row.get("trendLongMa")) and row.get("close") and float(row["close"]) > float(row["trendLongMa"]):
+            bucket["aboveMa60"] += 1
+        if finite(row.get("return20")):
+            bucket["return20Sum"] += float(row["return20"])
+            bucket["return20Count"] += 1
+
+    result: dict[str, dict[str, float]] = {}
+    for industry, bucket in stats.items():
+        samples = float(bucket["samples"])
+        return20_count = float(bucket["return20Count"])
+        result[industry] = {
+            "samples": samples,
+            "upPct": bucket["up"] / samples if samples else 0.0,
+            "aboveMa20Pct": bucket["aboveMa20"] / samples if samples else 0.0,
+            "aboveMa60Pct": bucket["aboveMa60"] / samples if samples else 0.0,
+            "avgReturn20Pct": bucket["return20Sum"] / return20_count if return20_count else 0.0,
+        }
+    return result
+
+
+def industry_state_filter_ok(industry: str, industry_states: dict[str, dict[str, float]], portfolio_rules: dict[str, Any]) -> bool:
+    rules = portfolio_rules.get("industryStateFilter") or {}
+    if not bool(rules.get("enabled", False)):
+        return True
+    state = industry_states.get(industry)
+    if not state:
+        return False
+    checks = [
+        ("samples", "minSamples"),
+        ("upPct", "minUpPct"),
+        ("aboveMa20Pct", "minAboveMa20Pct"),
+        ("aboveMa60Pct", "minAboveMa60Pct"),
+        ("avgReturn20Pct", "minReturn20Pct"),
+    ]
+    for metric_key, threshold_key in checks:
+        threshold = rules.get(threshold_key)
+        if threshold is not None and float(state.get(metric_key) or 0) < float(threshold):
+            return False
+    return True
 
 
 def record_blocked_risk_reason(market_stats: dict[str, Any], reason: str) -> None:
@@ -1389,6 +2497,9 @@ def entry_risk_filter_ok(row: dict[str, Any], prev: dict[str, Any] | None, portf
     for key, limit in limits.items():
         if limit is not None and metrics[key] > float(limit):
             return False, metrics, key
+    min_gap = rules.get("minGapPct")
+    if min_gap is not None and metrics["gapPct"] < float(min_gap):
+        return False, metrics, "minGapPct"
     return True, metrics, None
 
 
@@ -1418,6 +2529,9 @@ def entry_risk_metrics(row: dict[str, Any], prev: dict[str, Any] | None) -> dict
         "priorGapDown60Pct": abs(float(row["minPriorGap60Pct"])) if finite(row.get("minPriorGap60Pct")) and row["minPriorGap60Pct"] < 0 else 0.0,
         "priorGapDown3Count60": float(row.get("priorGapDown3Count60") or 0),
         "priorGapDown5Count60": float(row.get("priorGapDown5Count60") or 0),
+        "priorVolumeRatioBasic": float(row.get("priorVolumeRatioBasic")) if finite(row.get("priorVolumeRatioBasic")) else float("nan"),
+        "industryMoneyflowSumNetRank1": float(row.get("industryMoneyflowSumNetRank1")) if finite(row.get("industryMoneyflowSumNetRank1")) else float("nan"),
+        "industryMoneyflowPersistentScore1": float(row.get("industryMoneyflowPersistentScore1")) if finite(row.get("industryMoneyflowPersistentScore1")) else float("nan"),
     }
 
 
@@ -1433,16 +2547,209 @@ def signal_score(row: dict[str, Any], portfolio_rules: dict[str, Any]) -> float:
     return volume_ratio + fast_gap * 10 + slow_gap * 8
 
 
-def apply_cross_section_strength_scores(signals: list[dict[str, Any]], symbol_failure_counts: dict[str, int], portfolio_rules: dict[str, Any]) -> None:
+def apply_cross_section_strength_scores(
+    signals: list[dict[str, Any]],
+    symbol_failure_counts: dict[str, int],
+    portfolio_rules: dict[str, Any],
+    industry_states: dict[str, dict[str, float]] | None = None,
+    entry_market_state: dict[str, Any] | None = None,
+) -> None:
     if not signals:
         return
+    moneyflow_market_strong_values = [moneyflow_market_strong_value(item, entry_market_state) for item in signals]
     ranks = {
         "return20": percentile_ranks(signals, lambda item: item["row"].get("return20")),
         "return60": percentile_ranks(signals, lambda item: item["row"].get("return60")),
         "high60": percentile_ranks(signals, lambda item: item["row"].get("distanceFromHigh60Pct")),
         "recovery20": percentile_ranks(signals, lambda item: item["row"].get("recoveryFromLow20Pct")),
         "volume": percentile_ranks(signals, lambda item: volume_ratio(item["row"])),
+        "industryReturn20": percentile_ranks(signals, lambda item: industry_return20_value(item, industry_states)),
+        "industryRelativeReturn20": percentile_ranks(signals, lambda item: industry_relative_return20_value(item, industry_states)),
+        "macdHist": percentile_ranks(signals, lambda item: item["row"].get("macdHist")),
+        "macdHistDelta": percentile_ranks(signals, macd_hist_delta_value),
+        "bollSqueeze": percentile_ranks(signals, lambda item: boll_squeeze_value(item["row"])),
+        "bollPosition": percentile_ranks(signals, lambda item: boll_position_value(item["row"])),
+        "bollPositionBalance": percentile_ranks(signals, lambda item: boll_position_balance_value(item["row"])),
+        "rsiLevel": percentile_ranks(signals, lambda item: item["row"].get("rsiStrategy")),
+        "rsiBalance": percentile_ranks(signals, lambda item: rsi_balance_value(item["row"])),
+        "maAlignment": percentile_ranks(signals, lambda item: ma_alignment_value(item["row"])),
+        "turnoverRateF": percentile_ranks(signals, lambda item: item["row"].get("turnoverRateF")),
+        "volumeRatioBasic": percentile_ranks(signals, lambda item: item["row"].get("volumeRatioBasic")),
+        "lowVolumeRatioBasic": percentile_ranks(signals, lambda item: low_volume_ratio_basic_value(item["row"])),
+        "smallCircMv": percentile_ranks(signals, lambda item: small_circ_mv_value(item["row"])),
+        "priorGapStability": percentile_ranks(signals, prior_gap_stability_value),
+        "amountRatio": percentile_ranks(signals, lambda item: item["row"].get("amountRatio")),
+        "amountEfficiency20": percentile_ranks(signals, lambda item: item["row"].get("amountEfficiency20")),
+        "amountEfficiencyRsi": percentile_ranks(signals, amount_efficiency_rsi_value),
+        "moneyflowMainNetRank1": percentile_ranks(signals, lambda item: item["row"].get("moneyflowMainNetRank1")),
+        "moneyflowMainNetRank3": percentile_ranks(signals, lambda item: item["row"].get("moneyflowMainNetRank3")),
+        "moneyflowMainNetRank5": percentile_ranks(signals, lambda item: item["row"].get("moneyflowMainNetRank5")),
+        "moneyflowIndustryConfirm": percentile_ranks(signals, lambda item: moneyflow_industry_confirm_value(item, industry_states)),
+        "moneyflowRsiConfirm": percentile_ranks(signals, moneyflow_rsi_confirm_value),
+        "moneyflowMarketStrong": percentile_ranks_from_values(moneyflow_market_strong_values),
+        "industryMoneyflowSumNetRank1": percentile_ranks(signals, lambda item: item["row"].get("industryMoneyflowSumNetRank1")),
+        "kplConceptCountRank1": percentile_ranks(signals, lambda item: item["row"].get("kplConceptCountRank1")),
     }
+    ranks["moneyflowMarketQuality"] = percentile_ranks_from_values(
+        [
+            ranks["moneyflowMarketStrong"][index]
+            * ranks["rsiBalance"][index]
+            * ranks["industryReturn20"][index]
+            for index in range(len(signals))
+        ]
+    )
+    ranks["stockSpecificBreakoutQuality"] = percentile_ranks_from_values(
+        [
+            ranks["industryRelativeReturn20"][index]
+            * ranks["amountEfficiency20"][index]
+            * (1.0 - ranks["industryReturn20"][index])
+            for index in range(len(signals))
+        ]
+    )
+    market_up_pct = float(entry_market_state.get("upPct") or 0.0) if entry_market_state else 0.0
+    market_above_ma20_pct = float(entry_market_state.get("aboveMa20Pct") or 0.0) if entry_market_state else 0.0
+    market_above_ma60_pct = float(entry_market_state.get("aboveMa60Pct") or 0.0) if entry_market_state else 0.0
+    mature_non_euphoric_breadth = (
+        bool(entry_market_state and entry_market_state.get("riskOn"))
+        and market_above_ma60_pct >= 0.70
+        and market_above_ma20_pct <= 0.90
+    )
+    ranks["stockSpecificMatureBreadthQuality"] = percentile_ranks_from_values(
+        [
+            (
+                ranks["industryRelativeReturn20"][index]
+                * ranks["amountEfficiency20"][index]
+                * (1.0 - ranks["industryReturn20"][index])
+                if mature_non_euphoric_breadth
+                else float("-inf")
+            )
+            for index in range(len(signals))
+        ]
+    )
+    ranks["moneyflowMarketSurgeQuality"] = percentile_ranks_from_values(
+        [
+            (
+                ranks["moneyflowMarketQuality"][index]
+                if entry_market_state and entry_market_state.get("riskOn") and market_up_pct >= 0.70
+                else float("-inf")
+            )
+            for index in range(len(signals))
+        ]
+    )
+    moneyflow_market_strict_quality_values = [
+        (
+            float(moneyflow_market_strong_values[index])
+            * ranks["rsiBalance"][index]
+            * ranks["industryReturn20"][index]
+            if finite(moneyflow_market_strong_values[index]) and float(moneyflow_market_strong_values[index]) > 0.0
+            else float("-inf")
+        )
+        for index in range(len(signals))
+    ]
+    ranks["moneyflowMarketSurgeStrictQuality"] = percentile_ranks_from_values(
+        [
+            (
+                moneyflow_market_strict_quality_values[index]
+                if entry_market_state
+                and entry_market_state.get("riskOn")
+                and market_up_pct >= 0.70
+                and finite(moneyflow_market_strict_quality_values[index])
+                and float(moneyflow_market_strict_quality_values[index]) > 0.0
+                else float("-inf")
+            )
+            for index in range(len(signals))
+        ]
+    )
+    ranks["moneyflowMarketSurgeRelativeQuality"] = percentile_ranks_from_values(
+        [
+            (
+                ranks["moneyflowMarketStrong"][index]
+                * ranks["rsiBalance"][index]
+                * ranks["industryRelativeReturn20"][index]
+                if entry_market_state and entry_market_state.get("riskOn") and market_up_pct >= 0.70
+                else float("-inf")
+            )
+            for index in range(len(signals))
+        ]
+    )
+    ranks["moneyflowMarketSurgeConfirmedQuality"] = percentile_ranks_from_values(
+        [
+            (
+                ranks["moneyflowMarketStrong"][index]
+                * ranks["rsiBalance"][index]
+                * ranks["industryRelativeReturn20"][index]
+                if (
+                    entry_market_state
+                    and entry_market_state.get("riskOn")
+                    and market_up_pct >= 0.70
+                    and ranks["moneyflowMarketStrong"][index] > 0.0
+                    and ranks["rsiBalance"][index] >= 0.50
+                    and ranks["industryRelativeReturn20"][index] >= 0.85
+                )
+                else float("-inf")
+            )
+            for index in range(len(signals))
+        ]
+    )
+    ranks["indicatorSetup"] = percentile_ranks_from_values(
+        [
+            ranks["macdHist"][index]
+            * ranks["bollSqueeze"][index]
+            * ranks["rsiBalance"][index]
+            * indicator_overheat_guard(signal["row"])
+            for index, signal in enumerate(signals)
+        ]
+    )
+    ranks["indicatorPulseQuality"] = percentile_ranks_from_values(
+        [
+            ranks["indicatorSetup"][index]
+            * ranks["high60"][index]
+            * ranks["priorGapStability"][index]
+            for index in range(len(signals))
+        ]
+    )
+    ranks["indicatorConfluenceQuality"] = percentile_ranks_from_values(
+        [
+            ranks["macdHistDelta"][index]
+            * ranks["bollSqueeze"][index]
+            * ranks["rsiBalance"][index]
+            * ranks["maAlignment"][index]
+            * ranks["amountEfficiency20"][index]
+            * ranks["priorGapStability"][index]
+            * indicator_overheat_guard(signal["row"])
+            for index, signal in enumerate(signals)
+        ]
+    )
+    ranks["indicatorTurnQuality"] = percentile_ranks_from_values(
+        [
+            ranks["macdHistDelta"][index]
+            * ranks["bollPositionBalance"][index]
+            * ranks["rsiBalance"][index]
+            * ranks["priorGapStability"][index]
+            * indicator_overheat_guard(signal["row"])
+            for index, signal in enumerate(signals)
+        ]
+    )
+    ranks["rsiMomentumQuality"] = percentile_ranks_from_values(
+        [
+            ranks["moneyflowMarketSurgeQuality"][index]
+            * ranks["rsiLevel"][index]
+            * ranks["macdHistDelta"][index]
+            for index in range(len(signals))
+        ]
+    )
+    ranks["rsiMomentumConfirmedQuality"] = percentile_ranks_from_values(
+        [
+            (
+                ranks["moneyflowMarketSurgeConfirmedQuality"][index]
+                * ranks["rsiLevel"][index]
+                * ranks["macdHistDelta"][index]
+                if ranks["moneyflowMarketSurgeConfirmedQuality"][index] > 0.0
+                else float("-inf")
+            )
+            for index in range(len(signals))
+        ]
+    )
     weights = portfolio_rules.get("crossSectionScoreWeights") or {}
     for index, signal in enumerate(signals):
         base = float(signal["score"])
@@ -1454,10 +2761,55 @@ def apply_cross_section_strength_scores(signals: list[dict[str, Any]], symbol_fa
             + ranks["recovery20"][index] * float(weights.get("recovery20", 1.0))
             + ranks["volume"][index] * float(weights.get("volume", 0.5))
             + base * float(weights.get("base", 0.25))
+            + ranks["industryReturn20"][index] * float(weights.get("industryReturn20", 0.0))
+            + ranks["industryRelativeReturn20"][index] * float(weights.get("industryRelativeReturn20", 0.0))
+            + ranks["stockSpecificBreakoutQuality"][index] * float(weights.get("stockSpecificBreakoutQuality", 0.0))
+            + ranks["stockSpecificMatureBreadthQuality"][index] * float(weights.get("stockSpecificMatureBreadthQuality", 0.0))
+            + ranks["macdHist"][index] * float(weights.get("macdHist", 0.0))
+            + ranks["macdHistDelta"][index] * float(weights.get("macdHistDelta", 0.0))
+            + ranks["bollSqueeze"][index] * float(weights.get("bollSqueeze", 0.0))
+            + ranks["bollPosition"][index] * float(weights.get("bollPosition", 0.0))
+            + ranks["bollPositionBalance"][index] * float(weights.get("bollPositionBalance", 0.0))
+            + ranks["rsiBalance"][index] * float(weights.get("rsiBalance", 0.0))
+            + ranks["maAlignment"][index] * float(weights.get("maAlignment", 0.0))
+            + ranks["indicatorSetup"][index] * float(weights.get("indicatorSetup", 0.0))
+            + ranks["indicatorPulseQuality"][index] * float(weights.get("indicatorPulseQuality", 0.0))
+            + ranks["indicatorConfluenceQuality"][index] * float(weights.get("indicatorConfluenceQuality", 0.0))
+            + ranks["indicatorTurnQuality"][index] * float(weights.get("indicatorTurnQuality", 0.0))
+            + ranks["rsiMomentumQuality"][index] * float(weights.get("rsiMomentumQuality", 0.0))
+            + ranks["rsiMomentumConfirmedQuality"][index] * float(weights.get("rsiMomentumConfirmedQuality", 0.0))
+            + ranks["turnoverRateF"][index] * float(weights.get("turnoverRateF", 0.0))
+            + ranks["volumeRatioBasic"][index] * float(weights.get("volumeRatioBasic", 0.0))
+            + ranks["lowVolumeRatioBasic"][index] * float(weights.get("lowVolumeRatioBasic", 0.0))
+            + ranks["smallCircMv"][index] * float(weights.get("smallCircMv", 0.0))
+            + ranks["priorGapStability"][index] * float(weights.get("priorGapStability", 0.0))
+            + ranks["amountRatio"][index] * float(weights.get("amountRatio", 0.0))
+            + ranks["amountEfficiency20"][index] * float(weights.get("amountEfficiency20", 0.0))
+            + ranks["amountEfficiencyRsi"][index] * float(weights.get("amountEfficiencyRsi", 0.0))
+            + ranks["moneyflowMainNetRank1"][index] * float(weights.get("moneyflowMainNetRank1", 0.0))
+            + ranks["moneyflowMainNetRank3"][index] * float(weights.get("moneyflowMainNetRank3", 0.0))
+            + ranks["moneyflowMainNetRank5"][index] * float(weights.get("moneyflowMainNetRank5", 0.0))
+            + ranks["moneyflowIndustryConfirm"][index] * float(weights.get("moneyflowIndustryConfirm", 0.0))
+            + ranks["moneyflowRsiConfirm"][index] * float(weights.get("moneyflowRsiConfirm", 0.0))
+            + ranks["moneyflowMarketStrong"][index] * float(weights.get("moneyflowMarketStrong", 0.0))
+            + ranks["moneyflowMarketQuality"][index] * float(weights.get("moneyflowMarketQuality", 0.0))
+            + ranks["moneyflowMarketSurgeQuality"][index] * float(weights.get("moneyflowMarketSurgeQuality", 0.0))
+            + ranks["moneyflowMarketSurgeStrictQuality"][index] * float(weights.get("moneyflowMarketSurgeStrictQuality", 0.0))
+            + ranks["moneyflowMarketSurgeRelativeQuality"][index] * float(weights.get("moneyflowMarketSurgeRelativeQuality", 0.0))
+            + ranks["moneyflowMarketSurgeConfirmedQuality"][index] * float(weights.get("moneyflowMarketSurgeConfirmedQuality", 0.0))
+            + ranks["industryMoneyflowSumNetRank1"][index] * float(weights.get("industryMoneyflowSumNetRank1", 0.0))
+            + ranks["kplConceptCountRank1"][index] * float(weights.get("kplConceptCountRank1", 0.0))
             - penalty
         )
         entry_risk_penalty, entry_risk_penalty_parts = calc_entry_score_penalty(signal.get("riskMetrics") or {}, portfolio_rules)
+        entry_rank_penalty, entry_rank_penalty_parts = calc_rank_entry_score_penalty(
+            index,
+            ranks,
+            signal.get("riskMetrics") or {},
+            portfolio_rules,
+        )
         score -= entry_risk_penalty
+        score -= entry_rank_penalty
         signal["score"] = score
         signal["scoreParts"] = {
             "return20Rank": ranks["return20"][index],
@@ -1466,11 +2818,162 @@ def apply_cross_section_strength_scores(signals: list[dict[str, Any]], symbol_fa
             "recovery20Rank": ranks["recovery20"][index],
             "volumeRank": ranks["volume"][index],
             "baseScore": base,
+            "industryReturn20Rank": ranks["industryReturn20"][index],
+            "industryRelativeReturn20Rank": ranks["industryRelativeReturn20"][index],
+            "stockSpecificBreakoutQualityRank": ranks["stockSpecificBreakoutQuality"][index],
+            "stockSpecificMatureBreadthQualityRank": ranks["stockSpecificMatureBreadthQuality"][index],
+            "macdHistRank": ranks["macdHist"][index],
+            "macdHistDeltaRank": ranks["macdHistDelta"][index],
+            "bollSqueezeRank": ranks["bollSqueeze"][index],
+            "bollPositionRank": ranks["bollPosition"][index],
+            "bollPositionBalanceRank": ranks["bollPositionBalance"][index],
+            "rsiLevelRank": ranks["rsiLevel"][index],
+            "rsiBalanceRank": ranks["rsiBalance"][index],
+            "maAlignmentRank": ranks["maAlignment"][index],
+            "indicatorSetupRank": ranks["indicatorSetup"][index],
+            "indicatorPulseQualityRank": ranks["indicatorPulseQuality"][index],
+            "indicatorConfluenceQualityRank": ranks["indicatorConfluenceQuality"][index],
+            "indicatorTurnQualityRank": ranks["indicatorTurnQuality"][index],
+            "rsiMomentumQualityRank": ranks["rsiMomentumQuality"][index],
+            "rsiMomentumConfirmedQualityRank": ranks["rsiMomentumConfirmedQuality"][index],
+            "turnoverRateFRank": ranks["turnoverRateF"][index],
+            "volumeRatioBasicRank": ranks["volumeRatioBasic"][index],
+            "lowVolumeRatioBasicRank": ranks["lowVolumeRatioBasic"][index],
+            "smallCircMvRank": ranks["smallCircMv"][index],
+            "priorGapStabilityRank": ranks["priorGapStability"][index],
+            "amountRatioRank": ranks["amountRatio"][index],
+            "amountEfficiency20Rank": ranks["amountEfficiency20"][index],
+            "amountEfficiencyRsiRank": ranks["amountEfficiencyRsi"][index],
+            "moneyflowMainNetRank1Rank": ranks["moneyflowMainNetRank1"][index],
+            "moneyflowMainNetRank3Rank": ranks["moneyflowMainNetRank3"][index],
+            "moneyflowMainNetRank5Rank": ranks["moneyflowMainNetRank5"][index],
+            "moneyflowIndustryConfirmRank": ranks["moneyflowIndustryConfirm"][index],
+            "moneyflowRsiConfirmRank": ranks["moneyflowRsiConfirm"][index],
+            "moneyflowMarketStrongRank": ranks["moneyflowMarketStrong"][index],
+            "moneyflowMarketQualityRank": ranks["moneyflowMarketQuality"][index],
+            "moneyflowMarketSurgeQualityRank": ranks["moneyflowMarketSurgeQuality"][index],
+            "moneyflowMarketSurgeStrictQualityRank": ranks["moneyflowMarketSurgeStrictQuality"][index],
+            "moneyflowMarketSurgeRelativeQualityRank": ranks["moneyflowMarketSurgeRelativeQuality"][index],
+            "moneyflowMarketSurgeConfirmedQualityRank": ranks["moneyflowMarketSurgeConfirmedQuality"][index],
+            "industryMoneyflowSumNetRank1Rank": ranks["industryMoneyflowSumNetRank1"][index],
+            "kplConceptCountRank1Rank": ranks["kplConceptCountRank1"][index],
             "failurePenalty": penalty,
             "entryRiskPenalty": entry_risk_penalty,
+            "entryRankPenalty": entry_rank_penalty,
             **entry_risk_penalty_parts,
+            **entry_rank_penalty_parts,
             "knownSymbolBonus": float(portfolio_rules["knownSymbolScoreBonus"]) if signal.get("knownSymbol") else 0.0,
         }
+
+
+def calc_rank_entry_score_penalty(
+    index: int,
+    ranks: dict[str, list[float]],
+    risk_metrics: dict[str, float],
+    portfolio_rules: dict[str, Any],
+) -> tuple[float, dict[str, float]]:
+    rules = portfolio_rules.get("entryScorePenalty") or {}
+    penalty = 0.0
+    parts = {
+        "entryMoneyflowSurgeRsiCrowdingScorePenalty": 0.0,
+        "entryIndicatorConfluenceMoneyflowCrowdingScorePenalty": 0.0,
+        "entryUnconfirmedGapRangeScorePenalty": 0.0,
+        "entryVolumeInefficiencyCrowdingScorePenalty": 0.0,
+        "entryIndustryReturnOverheatScorePenalty": 0.0,
+        "entryUnsupportedBollSqueezeScorePenalty": 0.0,
+    }
+    volume_ratio_threshold = rules.get("volumeInefficiencyCrowdingPriorVolumeRatioBasicThreshold")
+    amount_efficiency_rsi_rank_max = rules.get("volumeInefficiencyCrowdingAmountEfficiencyRsiRankMax")
+    if (
+        volume_ratio_threshold is not None
+        and amount_efficiency_rsi_rank_max is not None
+        and finite(risk_metrics.get("priorVolumeRatioBasic"))
+        and float(risk_metrics["priorVolumeRatioBasic"]) >= float(volume_ratio_threshold)
+        and ranks["amountEfficiencyRsi"][index] <= float(amount_efficiency_rsi_rank_max)
+    ):
+        parts["entryVolumeInefficiencyCrowdingScorePenalty"] = float(rules.get("volumeInefficiencyCrowdingPenalty") or 0)
+        penalty += parts["entryVolumeInefficiencyCrowdingScorePenalty"]
+    industry_return_overheat_threshold = rules.get("industryReturnOverheatRankThreshold")
+    if (
+        industry_return_overheat_threshold is not None
+        and ranks["industryReturn20"][index] >= float(industry_return_overheat_threshold)
+    ):
+        parts["entryIndustryReturnOverheatScorePenalty"] = float(rules.get("industryReturnOverheatPenalty") or 0)
+        penalty += parts["entryIndustryReturnOverheatScorePenalty"]
+    unsupported_boll_squeeze_threshold = rules.get("unsupportedBollSqueezeBollRankThreshold")
+    unsupported_boll_squeeze_moneyflow_max = rules.get("unsupportedBollSqueezeIndustryMoneyflowRankMax")
+    if (
+        unsupported_boll_squeeze_threshold is not None
+        and unsupported_boll_squeeze_moneyflow_max is not None
+        and ranks["bollSqueeze"][index] >= float(unsupported_boll_squeeze_threshold)
+        and ranks["industryMoneyflowSumNetRank1"][index] <= float(unsupported_boll_squeeze_moneyflow_max)
+    ):
+        parts["entryUnsupportedBollSqueezeScorePenalty"] = float(rules.get("unsupportedBollSqueezePenalty") or 0)
+        penalty += parts["entryUnsupportedBollSqueezeScorePenalty"]
+    surge_rank_threshold = rules.get("moneyflowSurgeRsiCrowdingSurgeRankThreshold")
+    rsi_rank_threshold = rules.get("moneyflowSurgeRsiCrowdingRsiRankThreshold")
+    gap_threshold = rules.get("moneyflowSurgeRsiCrowdingGapThresholdPct")
+    range_threshold = rules.get("moneyflowSurgeRsiCrowdingRangeThresholdPct")
+    risk_condition_met = True
+    if gap_threshold is not None or range_threshold is not None:
+        risk_condition_met = (
+            (
+                gap_threshold is not None
+                and finite(risk_metrics.get("gapPct"))
+                and float(risk_metrics["gapPct"]) >= float(gap_threshold)
+            )
+            or (
+                range_threshold is not None
+                and finite(risk_metrics.get("entryRangePct"))
+                and float(risk_metrics["entryRangePct"]) >= float(range_threshold)
+            )
+        )
+    if (
+        surge_rank_threshold is not None
+        and rsi_rank_threshold is not None
+        and risk_condition_met
+        and ranks["moneyflowMarketSurgeQuality"][index] >= float(surge_rank_threshold)
+        and ranks["rsiBalance"][index] > float(rsi_rank_threshold)
+    ):
+        parts["entryMoneyflowSurgeRsiCrowdingScorePenalty"] = float(rules.get("moneyflowSurgeRsiCrowdingPenalty") or 0)
+        penalty += parts["entryMoneyflowSurgeRsiCrowdingScorePenalty"]
+    confluence_rank_threshold = rules.get("indicatorConfluenceMoneyflowCrowdingConfluenceRankThreshold")
+    moneyflow5_rank_threshold = rules.get("indicatorConfluenceMoneyflowCrowdingMoneyflow5RankThreshold")
+    min_gap_pct = rules.get("indicatorConfluenceMoneyflowCrowdingMinGapPct")
+    confluence_gap_condition_met = (
+        min_gap_pct is None
+        or (
+            finite(risk_metrics.get("gapPct"))
+            and float(risk_metrics["gapPct"]) >= float(min_gap_pct)
+        )
+    )
+    if (
+        confluence_rank_threshold is not None
+        and moneyflow5_rank_threshold is not None
+        and confluence_gap_condition_met
+        and ranks["indicatorConfluenceQuality"][index] >= float(confluence_rank_threshold)
+        and ranks["moneyflowMainNetRank5"][index] >= float(moneyflow5_rank_threshold)
+    ):
+        parts["entryIndicatorConfluenceMoneyflowCrowdingScorePenalty"] = float(
+            rules.get("indicatorConfluenceMoneyflowCrowdingPenalty") or 0
+        )
+        penalty += parts["entryIndicatorConfluenceMoneyflowCrowdingScorePenalty"]
+    min_gap_pct = rules.get("unconfirmedGapRangeMinGapPct")
+    min_range_pct = rules.get("unconfirmedGapRangeMinRangePct")
+    max_surge_rank = rules.get("unconfirmedGapRangeMaxSurgeRank")
+    if (
+        min_gap_pct is not None
+        and min_range_pct is not None
+        and max_surge_rank is not None
+        and finite(risk_metrics.get("gapPct"))
+        and finite(risk_metrics.get("entryRangePct"))
+        and float(risk_metrics["gapPct"]) >= float(min_gap_pct)
+        and float(risk_metrics["entryRangePct"]) >= float(min_range_pct)
+        and ranks["moneyflowMarketSurgeQuality"][index] <= float(max_surge_rank)
+    ):
+        parts["entryUnconfirmedGapRangeScorePenalty"] = float(rules.get("unconfirmedGapRangePenalty") or 0)
+        penalty += parts["entryUnconfirmedGapRangeScorePenalty"]
+    return penalty, parts
 
 
 def calc_entry_score_penalty(risk_metrics: dict[str, float], portfolio_rules: dict[str, Any]) -> tuple[float, dict[str, float]]:
@@ -1479,6 +2982,8 @@ def calc_entry_score_penalty(risk_metrics: dict[str, float], portfolio_rules: di
     parts = {
         "entryGapScorePenalty": 0.0,
         "entryRangeScorePenalty": 0.0,
+        "entryPriorVolumeRatioBasicScorePenalty": 0.0,
+        "entryIndustryMoneyflowCrowdingScorePenalty": 0.0,
     }
     gap_threshold = rules.get("gapThresholdPct")
     if gap_threshold is not None and float(risk_metrics.get("gapPct") or 0) > float(gap_threshold):
@@ -1488,11 +2993,35 @@ def calc_entry_score_penalty(risk_metrics: dict[str, float], portfolio_rules: di
     if range_threshold is not None and float(risk_metrics.get("entryRangePct") or 0) > float(range_threshold):
         parts["entryRangeScorePenalty"] = float(rules.get("rangePenalty") or 0)
         penalty += parts["entryRangeScorePenalty"]
+    prior_volume_ratio_threshold = rules.get("priorVolumeRatioBasicThreshold")
+    if (
+        prior_volume_ratio_threshold is not None
+        and finite(risk_metrics.get("priorVolumeRatioBasic"))
+        and float(risk_metrics["priorVolumeRatioBasic"]) > float(prior_volume_ratio_threshold)
+    ):
+        parts["entryPriorVolumeRatioBasicScorePenalty"] = float(rules.get("priorVolumeRatioBasicPenalty") or 0)
+        penalty += parts["entryPriorVolumeRatioBasicScorePenalty"]
+    industry_sum_threshold = rules.get("industryMoneyflowCrowdingSumRankThreshold")
+    industry_persistent_max = rules.get("industryMoneyflowCrowdingPersistentScoreMax")
+    if (
+        industry_sum_threshold is not None
+        and industry_persistent_max is not None
+        and finite(risk_metrics.get("industryMoneyflowSumNetRank1"))
+        and finite(risk_metrics.get("industryMoneyflowPersistentScore1"))
+        and float(risk_metrics["industryMoneyflowSumNetRank1"]) >= float(industry_sum_threshold)
+        and float(risk_metrics["industryMoneyflowPersistentScore1"]) <= float(industry_persistent_max)
+    ):
+        parts["entryIndustryMoneyflowCrowdingScorePenalty"] = float(rules.get("industryMoneyflowCrowdingPenalty") or 0)
+        penalty += parts["entryIndustryMoneyflowCrowdingScorePenalty"]
     return penalty, parts
 
 
 def percentile_ranks(items: list[dict[str, Any]], value_fn: Any) -> list[float]:
     values = [float(value_fn(item)) if finite(value_fn(item)) else float("-inf") for item in items]
+    return percentile_ranks_from_values(values)
+
+
+def percentile_ranks_from_values(values: list[float]) -> list[float]:
     order = sorted(range(len(values)), key=lambda index: values[index])
     ranks = [0.0] * len(values)
     if len(values) == 1:
@@ -1505,6 +3034,155 @@ def percentile_ranks(items: list[dict[str, Any]], value_fn: Any) -> list[float]:
 
 def volume_ratio(row: dict[str, Any]) -> float:
     return row["volume"] / row["volMa"] if row.get("volume") and finite(row.get("volMa")) and row["volMa"] else 0.0
+
+
+def industry_return20_value(signal: dict[str, Any], industry_states: dict[str, dict[str, float]] | None) -> float:
+    if not industry_states:
+        return float("nan")
+    industry = str(signal["stock"].get("industry") or "未知")
+    state = industry_states.get(industry)
+    if not state or not finite(state.get("avgReturn20Pct")):
+        return float("nan")
+    return float(state["avgReturn20Pct"])
+
+
+def industry_relative_return20_value(signal: dict[str, Any], industry_states: dict[str, dict[str, float]] | None) -> float:
+    industry_return20 = industry_return20_value(signal, industry_states)
+    stock_return20 = signal["row"].get("return20")
+    if not finite(stock_return20) or not finite(industry_return20):
+        return float("nan")
+    return float(stock_return20) - float(industry_return20)
+
+
+def moneyflow_industry_confirm_value(signal: dict[str, Any], industry_states: dict[str, dict[str, float]] | None) -> float:
+    moneyflow_rank = signal["row"].get("moneyflowMainNetRank1")
+    if not finite(moneyflow_rank) or not industry_states:
+        return float("nan")
+    industry = str(signal["stock"].get("industry") or "未知")
+    state = industry_states.get(industry)
+    if not state:
+        return float("nan")
+    if float(state.get("samples") or 0) < 5:
+        return float("nan")
+    above_ma20 = float(state.get("aboveMa20Pct") or 0.0)
+    avg_return20 = float(state.get("avgReturn20Pct") or 0.0)
+    if above_ma20 < 0.5 or avg_return20 < 0:
+        return float("nan")
+    up_pct = float(state.get("upPct") or 0.0)
+    return20_score = min(max(avg_return20 / 0.10, 0.0), 1.0)
+    state_score = above_ma20 * 0.45 + up_pct * 0.25 + return20_score * 0.30
+    return float(moneyflow_rank) * state_score
+
+
+def macd_hist_delta_value(signal: dict[str, Any]) -> float:
+    prev = signal.get("prev")
+    row_value = signal["row"].get("macdHist")
+    prev_value = prev.get("macdHist") if prev else None
+    if not finite(row_value) or not finite(prev_value):
+        return float("nan")
+    return float(row_value) - float(prev_value)
+
+
+def small_circ_mv_value(row: dict[str, Any]) -> float:
+    circ_mv = row.get("circMv")
+    if not finite(circ_mv) or float(circ_mv) <= 0:
+        return float("nan")
+    return -float(circ_mv)
+
+
+def low_volume_ratio_basic_value(row: dict[str, Any]) -> float:
+    volume_ratio_basic = row.get("volumeRatioBasic")
+    if not finite(volume_ratio_basic):
+        return float("nan")
+    return -float(volume_ratio_basic)
+
+
+def prior_gap_stability_value(signal: dict[str, Any]) -> float:
+    metrics = signal.get("riskMetrics") or {}
+    gap_down_3 = metrics.get("priorGapDown3Count60")
+    gap_down_5 = metrics.get("priorGapDown5Count60")
+    worst_gap = metrics.get("priorGapDown60Pct")
+    if not finite(gap_down_3) or not finite(gap_down_5) or not finite(worst_gap):
+        return float("nan")
+    return -(float(gap_down_3) + float(gap_down_5) * 2.0 + float(worst_gap) * 10.0)
+
+
+def boll_squeeze_value(row: dict[str, Any]) -> float:
+    bandwidth = row.get("bollBandwidthPct")
+    return -float(bandwidth) if finite(bandwidth) else float("nan")
+
+
+def boll_position_value(row: dict[str, Any]) -> float:
+    mid = row.get("bollMid")
+    upper = row.get("bollUpper")
+    close = row.get("close")
+    if not finite(mid) or not finite(upper) or not close:
+        return float("nan")
+    width = float(upper) - float(mid)
+    return (float(close) - float(mid)) / width if width else float("nan")
+
+
+def boll_position_balance_value(row: dict[str, Any]) -> float:
+    position = boll_position_value(row)
+    if not finite(position):
+        return float("nan")
+    return max(0.0, 1.0 - abs(float(position) - 0.55) / 0.65)
+
+
+def rsi_balance_value(row: dict[str, Any]) -> float:
+    rsi_value = row.get("rsiStrategy")
+    if not finite(rsi_value):
+        return float("nan")
+    return max(0.0, 1.0 - abs(float(rsi_value) - 62.0) / 50.0)
+
+
+def amount_efficiency_rsi_value(item: dict[str, Any]) -> float:
+    row = item["row"]
+    amount_efficiency = row.get("amountEfficiency20")
+    rsi_balance = rsi_balance_value(row)
+    if not finite(amount_efficiency) or not finite(rsi_balance):
+        return float("nan")
+    return float(amount_efficiency) * float(rsi_balance)
+
+
+def moneyflow_rsi_confirm_value(item: dict[str, Any]) -> float:
+    row = item["row"]
+    moneyflow_rank = row.get("moneyflowMainNetRank1")
+    rsi_balance = rsi_balance_value(row)
+    if not finite(moneyflow_rank) or not finite(rsi_balance):
+        return float("nan")
+    return float(moneyflow_rank) * float(rsi_balance) * indicator_overheat_guard(row)
+
+
+def moneyflow_market_strong_value(item: dict[str, Any], entry_market_state: dict[str, Any] | None) -> float:
+    moneyflow_rank = item["row"].get("moneyflowMainNetRank1")
+    if not finite(moneyflow_rank) or not entry_market_state or not entry_market_state.get("riskOn"):
+        return float("nan")
+    above_ma20 = float(entry_market_state.get("aboveMa20Pct") or 0.0)
+    up_pct = float(entry_market_state.get("upPct") or 0.0)
+    if above_ma20 < 0.50 or up_pct < 0.50:
+        return float("nan")
+    market_score = min(max((above_ma20 - 0.45) / 0.20, 0.0), 1.0) * 0.6 + min(max((up_pct - 0.45) / 0.20, 0.0), 1.0) * 0.4
+    return float(moneyflow_rank) * market_score
+
+
+def indicator_overheat_guard(row: dict[str, Any]) -> float:
+    guard = 1.0
+    rsi_value = row.get("rsiStrategy")
+    if finite(rsi_value):
+        guard *= max(0.0, 1.0 - max(0.0, float(rsi_value) - 76.0) / 24.0)
+    boll_position = boll_position_value(row)
+    if finite(boll_position):
+        guard *= max(0.0, 1.0 - max(0.0, float(boll_position) - 1.0) / 0.75)
+    return guard
+
+
+def ma_alignment_value(row: dict[str, Any]) -> float:
+    values = [row.get(key) for key in ["close", "ma5", "ma10", "ma20", "ma60"]]
+    if any(not finite(value) or float(value) <= 0 for value in values):
+        return float("nan")
+    close, ma5, ma10, ma20, ma60 = [float(value) for value in values]
+    return (close / ma20 - 1) + (ma5 / ma10 - 1) * 2 + (ma20 / ma60 - 1)
 
 
 def prepare_pending_entries(signals: list[dict[str, Any]], cfg: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1817,6 +3495,8 @@ def build_summary(
     average_loss = mean(losses) if losses else 0
     risk_stats = calc_equity_performance_stats(equity_curve, initial_cash)
     risk_on_days = sum(1 for state in market_states.values() if state["riskOn"])
+    base_risk_on_days = sum(1 for state in market_states.values() if state.get("baseRiskOn", state["riskOn"]))
+    soft_risk_on_days = sum(1 for state in market_states.values() if state.get("softRiskOn", False))
     risk_off_days = len(market_states) - risk_on_days
     return {
         "initialCash": initial_cash,
@@ -1842,6 +3522,8 @@ def build_summary(
         "maxIndustryPositionPct": max_industry_position_pct,
         "maxOvernightExposurePct": portfolio_rules.get("maxOvernightExposurePct"),
         "marketRiskOnDays": risk_on_days,
+        "marketBaseRiskOnDays": base_risk_on_days,
+        "marketSoftRiskOnDays": soft_risk_on_days,
         "marketRiskOffDays": risk_off_days,
         "blockedMarketDays": int(market_stats["blockedMarketDays"]),
         "blockedMarketSignals": int(market_stats["blockedMarketSignals"]),
@@ -1862,6 +3544,7 @@ def build_summary(
         "industryOvernightRiskActiveDays": int(market_stats["industryOvernightRiskActiveDays"]),
         "industryOvernightRiskActiveIndustryDays": int(market_stats["industryOvernightRiskActiveIndustryDays"]),
         "blockedIndustryOvernightRiskSignals": int(market_stats["blockedIndustryOvernightRiskSignals"]),
+        "blockedIndustryStateSignals": int(market_stats["blockedIndustryStateSignals"]),
         "blockedOvernightBudgetSignals": int(market_stats["blockedOvernightBudgetSignals"]),
         "overnightBudgetReducedEntries": int(market_stats["overnightBudgetReducedEntries"]),
         "overnightBudgetReductionShares": int(market_stats["overnightBudgetReductionShares"]),
@@ -1927,6 +3610,8 @@ def summarize_portfolio(result: dict[str, Any], context: dict[str, Any], source_
         "maxIndustryPositionPct": summary["maxIndustryPositionPct"],
         "maxOvernightExposurePct": summary["maxOvernightExposurePct"],
         "marketRiskOnDays": summary["marketRiskOnDays"],
+        "marketBaseRiskOnDays": summary.get("marketBaseRiskOnDays"),
+        "marketSoftRiskOnDays": summary.get("marketSoftRiskOnDays"),
         "marketRiskOffDays": summary["marketRiskOffDays"],
         "blockedMarketDays": summary["blockedMarketDays"],
         "blockedMarketSignals": summary["blockedMarketSignals"],
@@ -1947,6 +3632,7 @@ def summarize_portfolio(result: dict[str, Any], context: dict[str, Any], source_
         "industryOvernightRiskActiveDays": summary["industryOvernightRiskActiveDays"],
         "industryOvernightRiskActiveIndustryDays": summary["industryOvernightRiskActiveIndustryDays"],
         "blockedIndustryOvernightRiskSignals": summary["blockedIndustryOvernightRiskSignals"],
+        "blockedIndustryStateSignals": summary["blockedIndustryStateSignals"],
         "blockedOvernightBudgetSignals": summary["blockedOvernightBudgetSignals"],
         "overnightBudgetReducedEntries": summary["overnightBudgetReducedEntries"],
         "overnightBudgetReductionShares": summary["overnightBudgetReductionShares"],
@@ -2240,6 +3926,7 @@ def render_review(run_id: str, started_at: str, strategy: dict[str, Any], analys
 - 最大行业集中度：{format_optional_percent(summary.get("maxIndustryPositionPct"))}
 - 隔夜持仓预算：{format_optional_percent(summary.get("maxOvernightExposurePct"))}
 - 市场 Risk-On 天数：{summary.get("marketRiskOnDays")}
+- 市场基础/软 Risk-On 天数：{summary.get("marketBaseRiskOnDays")} / {summary.get("marketSoftRiskOnDays")}
 - 市场 Risk-Off 天数：{summary.get("marketRiskOffDays")}
 - 市场过滤拦截天数：{summary.get("blockedMarketDays")}
 - 市场过滤拦截信号数：{summary.get("blockedMarketSignals")}

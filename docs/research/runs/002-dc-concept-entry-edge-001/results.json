@@ -1,0 +1,7189 @@
+{
+  "runId": "002-dc-concept-entry-edge-001",
+  "startedAt": "2026-05-31 12:51 +0800",
+  "finishedAt": "2026-05-31 12:52 +0800",
+  "sourceRun": "002-repair-indicator-ablate-ma-001",
+  "sourceCompletedTrades": 125,
+  "uniquePriorDates": 80,
+  "uniqueDateSymbolPairs": 125,
+  "fetchErrors": [],
+  "perDate": [
+    {
+      "tradeDate": "2023-09-04",
+      "status": "fetched",
+      "rows": 931,
+      "conceptBoards": 390
+    },
+    {
+      "tradeDate": "2023-10-12",
+      "status": "fetched",
+      "rows": 934,
+      "conceptBoards": 393
+    },
+    {
+      "tradeDate": "2023-10-30",
+      "status": "fetched",
+      "rows": 935,
+      "conceptBoards": 394
+    },
+    {
+      "tradeDate": "2023-11-07",
+      "status": "fetched",
+      "rows": 935,
+      "conceptBoards": 394
+    },
+    {
+      "tradeDate": "2023-11-13",
+      "status": "fetched",
+      "rows": 936,
+      "conceptBoards": 395
+    },
+    {
+      "tradeDate": "2023-11-20",
+      "status": "fetched",
+      "rows": 936,
+      "conceptBoards": 395
+    },
+    {
+      "tradeDate": "2023-11-23",
+      "status": "fetched",
+      "rows": 937,
+      "conceptBoards": 396
+    },
+    {
+      "tradeDate": "2023-11-28",
+      "status": "fetched",
+      "rows": 937,
+      "conceptBoards": 396
+    },
+    {
+      "tradeDate": "2023-12-29",
+      "status": "fetched",
+      "rows": 940,
+      "conceptBoards": 399
+    },
+    {
+      "tradeDate": "2024-03-11",
+      "status": "fetched",
+      "rows": 950,
+      "conceptBoards": 409
+    },
+    {
+      "tradeDate": "2024-03-15",
+      "status": "fetched",
+      "rows": 950,
+      "conceptBoards": 409
+    },
+    {
+      "tradeDate": "2024-04-01",
+      "status": "fetched",
+      "rows": 956,
+      "conceptBoards": 415
+    },
+    {
+      "tradeDate": "2024-04-26",
+      "status": "fetched",
+      "rows": 957,
+      "conceptBoards": 416
+    },
+    {
+      "tradeDate": "2024-05-06",
+      "status": "fetched",
+      "rows": 957,
+      "conceptBoards": 416
+    },
+    {
+      "tradeDate": "2024-05-14",
+      "status": "fetched",
+      "rows": 958,
+      "conceptBoards": 417
+    },
+    {
+      "tradeDate": "2024-05-16",
+      "status": "fetched",
+      "rows": 958,
+      "conceptBoards": 417
+    },
+    {
+      "tradeDate": "2024-05-17",
+      "status": "fetched",
+      "rows": 958,
+      "conceptBoards": 417
+    },
+    {
+      "tradeDate": "2024-05-22",
+      "status": "fetched",
+      "rows": 959,
+      "conceptBoards": 418
+    },
+    {
+      "tradeDate": "2024-09-24",
+      "status": "fetched",
+      "rows": 963,
+      "conceptBoards": 422
+    },
+    {
+      "tradeDate": "2024-09-27",
+      "status": "fetched",
+      "rows": 963,
+      "conceptBoards": 422
+    },
+    {
+      "tradeDate": "2024-09-30",
+      "status": "fetched",
+      "rows": 963,
+      "conceptBoards": 423
+    },
+    {
+      "tradeDate": "2024-10-08",
+      "status": "fetched",
+      "rows": 963,
+      "conceptBoards": 423
+    },
+    {
+      "tradeDate": "2024-10-14",
+      "status": "fetched",
+      "rows": 963,
+      "conceptBoards": 423
+    },
+    {
+      "tradeDate": "2024-10-18",
+      "status": "fetched",
+      "rows": 963,
+      "conceptBoards": 423
+    },
+    {
+      "tradeDate": "2024-10-25",
+      "status": "fetched",
+      "rows": 964,
+      "conceptBoards": 423
+    },
+    {
+      "tradeDate": "2024-11-04",
+      "status": "fetched",
+      "rows": 966,
+      "conceptBoards": 425
+    },
+    {
+      "tradeDate": "2024-11-11",
+      "status": "fetched",
+      "rows": 966,
+      "conceptBoards": 425
+    },
+    {
+      "tradeDate": "2024-11-20",
+      "status": "fetched",
+      "rows": 967,
+      "conceptBoards": 426
+    },
+    {
+      "tradeDate": "2024-12-02",
+      "status": "fetched",
+      "rows": 969,
+      "conceptBoards": 428
+    },
+    {
+      "tradeDate": "2024-12-06",
+      "status": "fetched",
+      "rows": 969,
+      "conceptBoards": 428
+    },
+    {
+      "tradeDate": "2025-02-07",
+      "status": "fetched",
+      "rows": 974,
+      "conceptBoards": 433
+    },
+    {
+      "tradeDate": "2025-02-17",
+      "status": "fetched",
+      "rows": 974,
+      "conceptBoards": 433
+    },
+    {
+      "tradeDate": "2025-02-21",
+      "status": "fetched",
+      "rows": 975,
+      "conceptBoards": 434
+    },
+    {
+      "tradeDate": "2025-03-04",
+      "status": "fetched",
+      "rows": 974,
+      "conceptBoards": 434
+    },
+    {
+      "tradeDate": "2025-03-10",
+      "status": "fetched",
+      "rows": 974,
+      "conceptBoards": 434
+    },
+    {
+      "tradeDate": "2025-03-14",
+      "status": "fetched",
+      "rows": 975,
+      "conceptBoards": 434
+    },
+    {
+      "tradeDate": "2025-03-18",
+      "status": "fetched",
+      "rows": 975,
+      "conceptBoards": 434
+    },
+    {
+      "tradeDate": "2025-05-06",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-05-12",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-05-16",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-05-29",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-06-04",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-06-05",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-06-09",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-06-24",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-06-30",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-07-07",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-07-11",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-07-14",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-07-18",
+      "status": "fetched",
+      "rows": 976,
+      "conceptBoards": 435
+    },
+    {
+      "tradeDate": "2025-07-21",
+      "status": "fetched",
+      "rows": 977,
+      "conceptBoards": 436
+    },
+    {
+      "tradeDate": "2025-07-28",
+      "status": "fetched",
+      "rows": 978,
+      "conceptBoards": 437
+    },
+    {
+      "tradeDate": "2025-08-01",
+      "status": "fetched",
+      "rows": 978,
+      "conceptBoards": 437
+    },
+    {
+      "tradeDate": "2025-08-05",
+      "status": "fetched",
+      "rows": 981,
+      "conceptBoards": 440
+    },
+    {
+      "tradeDate": "2025-08-11",
+      "status": "fetched",
+      "rows": 979,
+      "conceptBoards": 438
+    },
+    {
+      "tradeDate": "2025-08-15",
+      "status": "fetched",
+      "rows": 979,
+      "conceptBoards": 438
+    },
+    {
+      "tradeDate": "2025-08-22",
+      "status": "fetched",
+      "rows": 979,
+      "conceptBoards": 438
+    },
+    {
+      "tradeDate": "2025-09-01",
+      "status": "fetched",
+      "rows": 979,
+      "conceptBoards": 438
+    },
+    {
+      "tradeDate": "2025-09-08",
+      "status": "fetched",
+      "rows": 979,
+      "conceptBoards": 438
+    },
+    {
+      "tradeDate": "2025-09-16",
+      "status": "fetched",
+      "rows": 979,
+      "conceptBoards": 438
+    },
+    {
+      "tradeDate": "2025-10-09",
+      "status": "fetched",
+      "rows": 980,
+      "conceptBoards": 439
+    },
+    {
+      "tradeDate": "2025-10-15",
+      "status": "fetched",
+      "rows": 980,
+      "conceptBoards": 439
+    },
+    {
+      "tradeDate": "2025-10-24",
+      "status": "fetched",
+      "rows": 983,
+      "conceptBoards": 442
+    },
+    {
+      "tradeDate": "2025-10-31",
+      "status": "fetched",
+      "rows": 983,
+      "conceptBoards": 442
+    },
+    {
+      "tradeDate": "2025-11-03",
+      "status": "fetched",
+      "rows": 983,
+      "conceptBoards": 442
+    },
+    {
+      "tradeDate": "2025-11-17",
+      "status": "fetched",
+      "rows": 982,
+      "conceptBoards": 441
+    },
+    {
+      "tradeDate": "2025-12-22",
+      "status": "fetched",
+      "rows": 982,
+      "conceptBoards": 441
+    },
+    {
+      "tradeDate": "2026-01-05",
+      "status": "fetched",
+      "rows": 982,
+      "conceptBoards": 441
+    },
+    {
+      "tradeDate": "2026-01-09",
+      "status": "fetched",
+      "rows": 982,
+      "conceptBoards": 441
+    },
+    {
+      "tradeDate": "2026-01-19",
+      "status": "fetched",
+      "rows": 983,
+      "conceptBoards": 442
+    },
+    {
+      "tradeDate": "2026-01-23",
+      "status": "fetched",
+      "rows": 983,
+      "conceptBoards": 442
+    },
+    {
+      "tradeDate": "2026-02-24",
+      "status": "fetched",
+      "rows": 995,
+      "conceptBoards": 466
+    },
+    {
+      "tradeDate": "2026-02-27",
+      "status": "fetched",
+      "rows": 994,
+      "conceptBoards": 466
+    },
+    {
+      "tradeDate": "2026-04-20",
+      "status": "fetched",
+      "rows": 1018,
+      "conceptBoards": 491
+    },
+    {
+      "tradeDate": "2026-04-27",
+      "status": "fetched",
+      "rows": 1013,
+      "conceptBoards": 486
+    },
+    {
+      "tradeDate": "2026-04-30",
+      "status": "fetched",
+      "rows": 1013,
+      "conceptBoards": 486
+    },
+    {
+      "tradeDate": "2026-05-06",
+      "status": "fetched",
+      "rows": 1013,
+      "conceptBoards": 486
+    },
+    {
+      "tradeDate": "2026-05-08",
+      "status": "fetched",
+      "rows": 1013,
+      "conceptBoards": 486
+    },
+    {
+      "tradeDate": "2026-05-11",
+      "status": "fetched",
+      "rows": 1013,
+      "conceptBoards": 486
+    },
+    {
+      "tradeDate": "2026-05-19",
+      "status": "fetched",
+      "rows": 1013,
+      "conceptBoards": 486
+    }
+  ],
+  "perPair": [
+    {
+      "tradeDate": "2023-09-04",
+      "ts_code": "601666.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2023-09-04",
+      "ts_code": "601699.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2023-10-12",
+      "ts_code": "603178.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2023-10-30",
+      "ts_code": "002436.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2023-11-07",
+      "ts_code": "603686.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2023-11-13",
+      "ts_code": "000503.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2023-11-20",
+      "ts_code": "600172.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2023-11-23",
+      "ts_code": "600566.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2023-11-28",
+      "ts_code": "688025.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2023-12-29",
+      "ts_code": "002498.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2023-12-29",
+      "ts_code": "601225.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-03-11",
+      "ts_code": "002085.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-03-11",
+      "ts_code": "605117.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-03-15",
+      "ts_code": "002739.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-03-15",
+      "ts_code": "600418.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-04-01",
+      "ts_code": "001696.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-04-01",
+      "ts_code": "002167.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-04-26",
+      "ts_code": "002409.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-04-26",
+      "ts_code": "688578.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-05-06",
+      "ts_code": "002125.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-05-06",
+      "ts_code": "002773.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-05-14",
+      "ts_code": "002851.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-05-16",
+      "ts_code": "000006.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-05-17",
+      "ts_code": "002706.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-05-22",
+      "ts_code": "000564.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-09-24",
+      "ts_code": "000617.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-09-24",
+      "ts_code": "600061.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-09-27",
+      "ts_code": "601012.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-09-30",
+      "ts_code": "600711.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-10-08",
+      "ts_code": "600206.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-10-14",
+      "ts_code": "002583.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-10-14",
+      "ts_code": "600641.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-10-18",
+      "ts_code": "000503.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-10-18",
+      "ts_code": "603893.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-10-25",
+      "ts_code": "000021.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-10-25",
+      "ts_code": "600438.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-11-04",
+      "ts_code": "002031.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-11-04",
+      "ts_code": "603366.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-11-11",
+      "ts_code": "300450.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-11-11",
+      "ts_code": "600292.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-11-20",
+      "ts_code": "002245.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-11-20",
+      "ts_code": "002354.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-12-02",
+      "ts_code": "603002.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-12-02",
+      "ts_code": "603667.SH",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-12-06",
+      "ts_code": "300007.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2024-12-06",
+      "ts_code": "301018.SZ",
+      "status": "fetched",
+      "concepts": 0
+    },
+    {
+      "tradeDate": "2025-02-07",
+      "ts_code": "300676.SZ",
+      "status": "fetched",
+      "concepts": 23
+    },
+    {
+      "tradeDate": "2025-02-07",
+      "ts_code": "600588.SH",
+      "status": "fetched",
+      "concepts": 32
+    },
+    {
+      "tradeDate": "2025-02-17",
+      "ts_code": "000967.SZ",
+      "status": "fetched",
+      "concepts": 16
+    },
+    {
+      "tradeDate": "2025-02-17",
+      "ts_code": "603583.SH",
+      "status": "fetched",
+      "concepts": 12
+    },
+    {
+      "tradeDate": "2025-02-21",
+      "ts_code": "000581.SZ",
+      "status": "fetched",
+      "concepts": 23
+    },
+    {
+      "tradeDate": "2025-02-21",
+      "ts_code": "002051.SZ",
+      "status": "fetched",
+      "concepts": 12
+    },
+    {
+      "tradeDate": "2025-03-04",
+      "ts_code": "600301.SH",
+      "status": "fetched",
+      "concepts": 6
+    },
+    {
+      "tradeDate": "2025-03-04",
+      "ts_code": "601177.SH",
+      "status": "fetched",
+      "concepts": 10
+    },
+    {
+      "tradeDate": "2025-03-10",
+      "ts_code": "000733.SZ",
+      "status": "fetched",
+      "concepts": 23
+    },
+    {
+      "tradeDate": "2025-03-10",
+      "ts_code": "002773.SZ",
+      "status": "fetched",
+      "concepts": 11
+    },
+    {
+      "tradeDate": "2025-03-14",
+      "ts_code": "603960.SH",
+      "status": "fetched",
+      "concepts": 11
+    },
+    {
+      "tradeDate": "2025-03-18",
+      "ts_code": "002342.SZ",
+      "status": "fetched",
+      "concepts": 13
+    },
+    {
+      "tradeDate": "2025-05-06",
+      "ts_code": "002246.SZ",
+      "status": "fetched",
+      "concepts": 13
+    },
+    {
+      "tradeDate": "2025-05-06",
+      "ts_code": "600592.SH",
+      "status": "fetched",
+      "concepts": 13
+    },
+    {
+      "tradeDate": "2025-05-12",
+      "ts_code": "300607.SZ",
+      "status": "fetched",
+      "concepts": 13
+    },
+    {
+      "tradeDate": "2025-05-12",
+      "ts_code": "600562.SH",
+      "status": "fetched",
+      "concepts": 13
+    },
+    {
+      "tradeDate": "2025-05-16",
+      "ts_code": "002080.SZ",
+      "status": "fetched",
+      "concepts": 21
+    },
+    {
+      "tradeDate": "2025-05-16",
+      "ts_code": "600468.SH",
+      "status": "fetched",
+      "concepts": 6
+    },
+    {
+      "tradeDate": "2025-05-29",
+      "ts_code": "300255.SZ",
+      "status": "fetched",
+      "concepts": 10
+    },
+    {
+      "tradeDate": "2025-05-29",
+      "ts_code": "688578.SH",
+      "status": "fetched",
+      "concepts": 6
+    },
+    {
+      "tradeDate": "2025-06-04",
+      "ts_code": "600259.SH",
+      "status": "fetched",
+      "concepts": 12
+    },
+    {
+      "tradeDate": "2025-06-05",
+      "ts_code": "003040.SZ",
+      "status": "fetched",
+      "concepts": 9
+    },
+    {
+      "tradeDate": "2025-06-09",
+      "ts_code": "002181.SZ",
+      "status": "fetched",
+      "concepts": 13
+    },
+    {
+      "tradeDate": "2025-06-09",
+      "ts_code": "002605.SZ",
+      "status": "fetched",
+      "concepts": 16
+    },
+    {
+      "tradeDate": "2025-06-24",
+      "ts_code": "002074.SZ",
+      "status": "fetched",
+      "concepts": 23
+    },
+    {
+      "tradeDate": "2025-06-24",
+      "ts_code": "002670.SZ",
+      "status": "fetched",
+      "concepts": 14
+    },
+    {
+      "tradeDate": "2025-06-30",
+      "ts_code": "003031.SZ",
+      "status": "fetched",
+      "concepts": 15
+    },
+    {
+      "tradeDate": "2025-06-30",
+      "ts_code": "603936.SH",
+      "status": "fetched",
+      "concepts": 18
+    },
+    {
+      "tradeDate": "2025-07-07",
+      "ts_code": "300393.SZ",
+      "status": "fetched",
+      "concepts": 12
+    },
+    {
+      "tradeDate": "2025-07-07",
+      "ts_code": "601138.SH",
+      "status": "fetched",
+      "concepts": 25
+    },
+    {
+      "tradeDate": "2025-07-11",
+      "ts_code": "002716.SZ",
+      "status": "fetched",
+      "concepts": 10
+    },
+    {
+      "tradeDate": "2025-07-14",
+      "ts_code": "300304.SZ",
+      "status": "fetched",
+      "concepts": 13
+    },
+    {
+      "tradeDate": "2025-07-18",
+      "ts_code": "002645.SZ",
+      "status": "fetched",
+      "concepts": 11
+    },
+    {
+      "tradeDate": "2025-07-21",
+      "ts_code": "601399.SH",
+      "status": "fetched",
+      "concepts": 18
+    },
+    {
+      "tradeDate": "2025-07-28",
+      "ts_code": "688261.SH",
+      "status": "fetched",
+      "concepts": 11
+    },
+    {
+      "tradeDate": "2025-08-01",
+      "ts_code": "002097.SZ",
+      "status": "fetched",
+      "concepts": 18
+    },
+    {
+      "tradeDate": "2025-08-05",
+      "ts_code": "000901.SZ",
+      "status": "fetched",
+      "concepts": 23
+    },
+    {
+      "tradeDate": "2025-08-11",
+      "ts_code": "002176.SZ",
+      "status": "fetched",
+      "concepts": 15
+    },
+    {
+      "tradeDate": "2025-08-11",
+      "ts_code": "601929.SH",
+      "status": "fetched",
+      "concepts": 19
+    },
+    {
+      "tradeDate": "2025-08-15",
+      "ts_code": "600330.SH",
+      "status": "fetched",
+      "concepts": 28
+    },
+    {
+      "tradeDate": "2025-08-15",
+      "ts_code": "600737.SH",
+      "status": "fetched",
+      "concepts": 18
+    },
+    {
+      "tradeDate": "2025-08-22",
+      "ts_code": "002190.SZ",
+      "status": "fetched",
+      "concepts": 17
+    },
+    {
+      "tradeDate": "2025-08-22",
+      "ts_code": "002202.SZ",
+      "status": "fetched",
+      "concepts": 21
+    },
+    {
+      "tradeDate": "2025-09-01",
+      "ts_code": "000981.SZ",
+      "status": "fetched",
+      "concepts": 12
+    },
+    {
+      "tradeDate": "2025-09-01",
+      "ts_code": "601069.SH",
+      "status": "fetched",
+      "concepts": 12
+    },
+    {
+      "tradeDate": "2025-09-08",
+      "ts_code": "600699.SH",
+      "status": "fetched",
+      "concepts": 24
+    },
+    {
+      "tradeDate": "2025-09-08",
+      "ts_code": "600977.SH",
+      "status": "fetched",
+      "concepts": 14
+    },
+    {
+      "tradeDate": "2025-09-16",
+      "ts_code": "002050.SZ",
+      "status": "fetched",
+      "concepts": 24
+    },
+    {
+      "tradeDate": "2025-09-16",
+      "ts_code": "300857.SZ",
+      "status": "fetched",
+      "concepts": 21
+    },
+    {
+      "tradeDate": "2025-10-09",
+      "ts_code": "002941.SZ",
+      "status": "fetched",
+      "concepts": 13
+    },
+    {
+      "tradeDate": "2025-10-09",
+      "ts_code": "600362.SH",
+      "status": "fetched",
+      "concepts": 23
+    },
+    {
+      "tradeDate": "2025-10-15",
+      "ts_code": "601699.SH",
+      "status": "fetched",
+      "concepts": 13
+    },
+    {
+      "tradeDate": "2025-10-15",
+      "ts_code": "601898.SH",
+      "status": "fetched",
+      "concepts": 16
+    },
+    {
+      "tradeDate": "2025-10-24",
+      "ts_code": "000543.SZ",
+      "status": "fetched",
+      "concepts": 23
+    },
+    {
+      "tradeDate": "2025-10-24",
+      "ts_code": "600549.SH",
+      "status": "fetched",
+      "concepts": 21
+    },
+    {
+      "tradeDate": "2025-10-31",
+      "ts_code": "603185.SH",
+      "status": "fetched",
+      "concepts": 10
+    },
+    {
+      "tradeDate": "2025-11-03",
+      "ts_code": "300058.SZ",
+      "status": "fetched",
+      "concepts": 31
+    },
+    {
+      "tradeDate": "2025-11-17",
+      "ts_code": "603619.SH",
+      "status": "fetched",
+      "concepts": 11
+    },
+    {
+      "tradeDate": "2025-12-22",
+      "ts_code": "002284.SZ",
+      "status": "fetched",
+      "concepts": 14
+    },
+    {
+      "tradeDate": "2025-12-22",
+      "ts_code": "002414.SZ",
+      "status": "fetched",
+      "concepts": 27
+    },
+    {
+      "tradeDate": "2026-01-05",
+      "ts_code": "002131.SZ",
+      "status": "fetched",
+      "concepts": 34
+    },
+    {
+      "tradeDate": "2026-01-09",
+      "ts_code": "603882.SH",
+      "status": "fetched",
+      "concepts": 11
+    },
+    {
+      "tradeDate": "2026-01-19",
+      "ts_code": "600312.SH",
+      "status": "fetched",
+      "concepts": 15
+    },
+    {
+      "tradeDate": "2026-01-19",
+      "ts_code": "601179.SH",
+      "status": "fetched",
+      "concepts": 20
+    },
+    {
+      "tradeDate": "2026-01-23",
+      "ts_code": "601212.SH",
+      "status": "fetched",
+      "concepts": 16
+    },
+    {
+      "tradeDate": "2026-02-24",
+      "ts_code": "301217.SZ",
+      "status": "fetched",
+      "concepts": 12
+    },
+    {
+      "tradeDate": "2026-02-24",
+      "ts_code": "601872.SH",
+      "status": "fetched",
+      "concepts": 18
+    },
+    {
+      "tradeDate": "2026-02-27",
+      "ts_code": "000960.SZ",
+      "status": "fetched",
+      "concepts": 16
+    },
+    {
+      "tradeDate": "2026-02-27",
+      "ts_code": "600452.SH",
+      "status": "fetched",
+      "concepts": 13
+    },
+    {
+      "tradeDate": "2026-04-20",
+      "ts_code": "002149.SZ",
+      "status": "fetched",
+      "concepts": 28
+    },
+    {
+      "tradeDate": "2026-04-20",
+      "ts_code": "300806.SZ",
+      "status": "fetched",
+      "concepts": 34
+    },
+    {
+      "tradeDate": "2026-04-27",
+      "ts_code": "300679.SZ",
+      "status": "fetched",
+      "concepts": 28
+    },
+    {
+      "tradeDate": "2026-04-27",
+      "ts_code": "600338.SH",
+      "status": "fetched",
+      "concepts": 25
+    },
+    {
+      "tradeDate": "2026-04-30",
+      "ts_code": "000783.SZ",
+      "status": "fetched",
+      "concepts": 20
+    },
+    {
+      "tradeDate": "2026-05-06",
+      "ts_code": "000060.SZ",
+      "status": "fetched",
+      "concepts": 18
+    },
+    {
+      "tradeDate": "2026-05-08",
+      "ts_code": "002929.SZ",
+      "status": "fetched",
+      "concepts": 45
+    },
+    {
+      "tradeDate": "2026-05-11",
+      "ts_code": "600198.SH",
+      "status": "fetched",
+      "concepts": 24
+    },
+    {
+      "tradeDate": "2026-05-19",
+      "ts_code": "603078.SH",
+      "status": "fetched",
+      "concepts": 20
+    },
+    {
+      "tradeDate": "2026-05-19",
+      "ts_code": "688126.SH",
+      "status": "fetched",
+      "concepts": 14
+    }
+  ],
+  "coverage": {
+    "samples": 125,
+    "dcMatched": 79,
+    "dcMatchedRate": 0.632,
+    "avgConceptCount": 11.088,
+    "avgMatchedConceptCount": 9.88
+  },
+  "overall": {
+    "all": {
+      "count": 125,
+      "avgReturnPct": 0.03614558980439426,
+      "winRate": 0.472,
+      "dcMatchedRate": 0.632,
+      "dcConceptCount": {
+        "avg": 11.088,
+        "min": 0.0,
+        "max": 45.0
+      },
+      "dcConceptMatched": {
+        "avg": 9.88,
+        "min": 0.0,
+        "max": 41.0
+      },
+      "dcConceptPositiveRatio": {
+        "avg": 0.9643186309405206,
+        "min": 0.5555555555555556,
+        "max": 1.0
+      },
+      "dcConceptPctMaxRank": {
+        "avg": 0.8984353244226039,
+        "min": 0.4376417233560091,
+        "max": 1.0
+      },
+      "dcConceptPctMeanRank": {
+        "avg": 0.5700934301577772,
+        "min": 0.2671232876712329,
+        "max": 0.8024425287356322
+      },
+      "dcConceptTurnoverMaxRank": {
+        "avg": 0.8774181683060194,
+        "min": 0.5127020785219399,
+        "max": 1.0
+      },
+      "dcConceptTurnoverMeanRank": {
+        "avg": 0.4377941331945947,
+        "min": 0.12573385518591,
+        "max": 0.7719072164948454
+      },
+      "dcConceptAmountMaxRank": {
+        "avg": 0.9992855649879337,
+        "min": 0.976905311778291,
+        "max": 1.0
+      },
+      "dcConceptAmountMeanRank": {
+        "avg": 0.8461774194358078,
+        "min": 0.7010869565217391,
+        "max": 0.9558762886597938
+      },
+      "dcConceptSwingMaxRank": {
+        "avg": 0.8589842992381702,
+        "min": 0.3401826484018265,
+        "max": 1.0
+      }
+    },
+    "winners": {
+      "count": 59,
+      "avgReturnPct": 0.13671182484962127,
+      "winRate": 1.0,
+      "dcMatchedRate": 0.6101694915254238,
+      "dcConceptCount": {
+        "avg": 11.542372881355933,
+        "min": 0.0,
+        "max": 45.0
+      },
+      "dcConceptMatched": {
+        "avg": 10.491525423728813,
+        "min": 0.0,
+        "max": 41.0
+      },
+      "dcConceptPositiveRatio": {
+        "avg": 0.9675371729719556,
+        "min": 0.75,
+        "max": 1.0
+      },
+      "dcConceptPctMaxRank": {
+        "avg": 0.9192976743874459,
+        "min": 0.4817351598173516,
+        "max": 1.0
+      },
+      "dcConceptPctMeanRank": {
+        "avg": 0.5660770749838747,
+        "min": 0.2671232876712329,
+        "max": 0.7382133995037221
+      },
+      "dcConceptTurnoverMaxRank": {
+        "avg": 0.9043265036086257,
+        "min": 0.5288683602771362,
+        "max": 1.0
+      },
+      "dcConceptTurnoverMeanRank": {
+        "avg": 0.46747718658833737,
+        "min": 0.12573385518591,
+        "max": 0.7379779498006099
+      },
+      "dcConceptAmountMaxRank": {
+        "avg": 0.9987253112275728,
+        "min": 0.976905311778291,
+        "max": 1.0
+      },
+      "dcConceptAmountMeanRank": {
+        "avg": 0.8432170908150248,
+        "min": 0.7066974595842956,
+        "max": 0.9422043010752688
+      },
+      "dcConceptSwingMaxRank": {
+        "avg": 0.8560532318590851,
+        "min": 0.3584474885844749,
+        "max": 1.0
+      }
+    },
+    "losers": {
+      "count": 66,
+      "avgReturnPct": -0.05375452940270264,
+      "winRate": 0.0,
+      "dcMatchedRate": 0.6515151515151515,
+      "dcConceptCount": {
+        "avg": 10.681818181818182,
+        "min": 0.0,
+        "max": 28.0
+      },
+      "dcConceptMatched": {
+        "avg": 9.333333333333334,
+        "min": 0.0,
+        "max": 26.0
+      },
+      "dcConceptPositiveRatio": {
+        "avg": 0.9616240376118775,
+        "min": 0.5555555555555556,
+        "max": 1.0
+      },
+      "dcConceptPctMaxRank": {
+        "avg": 0.8809691709636666,
+        "min": 0.4376417233560091,
+        "max": 1.0
+      },
+      "dcConceptPctMeanRank": {
+        "avg": 0.573455960070812,
+        "min": 0.27106683271066834,
+        "max": 0.8024425287356322
+      },
+      "dcConceptTurnoverMaxRank": {
+        "avg": 0.8548902596805814,
+        "min": 0.5127020785219399,
+        "max": 1.0
+      },
+      "dcConceptTurnoverMeanRank": {
+        "avg": 0.41294320477192636,
+        "min": 0.15753424657534246,
+        "max": 0.7719072164948454
+      },
+      "dcConceptAmountMaxRank": {
+        "avg": 0.9997546146477709,
+        "min": 0.9917525773195877,
+        "max": 1.0
+      },
+      "dcConceptAmountMeanRank": {
+        "avg": 0.8486558340950681,
+        "min": 0.7010869565217391,
+        "max": 0.9558762886597938
+      },
+      "dcConceptSwingMaxRank": {
+        "avg": 0.8614382161136834,
+        "min": 0.3401826484018265,
+        "max": 1.0
+      }
+    },
+    "winnerMinusLoser": {
+      "dcConceptCount": 0.8605546995377509,
+      "dcConceptMatched": 1.1581920903954792,
+      "dcConceptPositiveRatio": 0.005913135360078092,
+      "dcConceptPctMaxRank": 0.03832850342377936,
+      "dcConceptPctMeanRank": -0.007378885086937292,
+      "dcConceptTurnoverMaxRank": 0.04943624392804424,
+      "dcConceptTurnoverMeanRank": 0.054533981816411004,
+      "dcConceptAmountMaxRank": -0.0010293034201981355,
+      "dcConceptAmountMeanRank": -0.0054387432800432345,
+      "dcConceptSwingMaxRank": -0.005384984254598324
+    }
+  },
+  "weakWindows": {
+    "Y1": {
+      "all": {
+        "count": 25,
+        "avgReturnPct": 0.018186411066905776,
+        "winRate": 0.4,
+        "dcMatchedRate": 0.0,
+        "dcConceptCount": {
+          "avg": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "dcConceptMatched": {
+          "avg": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "winners": {
+        "count": 10,
+        "avgReturnPct": 0.12473497791222057,
+        "winRate": 1.0,
+        "dcMatchedRate": 0.0,
+        "dcConceptCount": {
+          "avg": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "dcConceptMatched": {
+          "avg": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "losers": {
+        "count": 15,
+        "avgReturnPct": -0.052845966829970746,
+        "winRate": 0.0,
+        "dcMatchedRate": 0.0,
+        "dcConceptCount": {
+          "avg": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "dcConceptMatched": {
+          "avg": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "winnerMinusLoser": {
+        "dcConceptCount": 0.0,
+        "dcConceptMatched": 0.0,
+        "dcConceptPositiveRatio": null,
+        "dcConceptPctMaxRank": null,
+        "dcConceptPctMeanRank": null,
+        "dcConceptTurnoverMaxRank": null,
+        "dcConceptTurnoverMeanRank": null,
+        "dcConceptAmountMaxRank": null,
+        "dcConceptAmountMeanRank": null,
+        "dcConceptSwingMaxRank": null
+      }
+    },
+    "R18-1": {
+      "all": {
+        "count": 42,
+        "avgReturnPct": 0.023377193648174595,
+        "winRate": 0.4523809523809524,
+        "dcMatchedRate": 0.0,
+        "dcConceptCount": {
+          "avg": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "dcConceptMatched": {
+          "avg": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "winners": {
+        "count": 19,
+        "avgReturnPct": 0.1169412994707504,
+        "winRate": 1.0,
+        "dcMatchedRate": 0.0,
+        "dcConceptCount": {
+          "avg": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "dcConceptMatched": {
+          "avg": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "losers": {
+        "count": 23,
+        "avgReturnPct": -0.05391489377047498,
+        "winRate": 0.0,
+        "dcMatchedRate": 0.0,
+        "dcConceptCount": {
+          "avg": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "dcConceptMatched": {
+          "avg": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "winnerMinusLoser": {
+        "dcConceptCount": 0.0,
+        "dcConceptMatched": 0.0,
+        "dcConceptPositiveRatio": null,
+        "dcConceptPctMaxRank": null,
+        "dcConceptPctMeanRank": null,
+        "dcConceptTurnoverMaxRank": null,
+        "dcConceptTurnoverMeanRank": null,
+        "dcConceptAmountMaxRank": null,
+        "dcConceptAmountMeanRank": null,
+        "dcConceptSwingMaxRank": null
+      }
+    },
+    "Y3": {
+      "all": {
+        "count": 61,
+        "avgReturnPct": 0.027852319308600743,
+        "winRate": 0.4098360655737705,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 18.278688524590162,
+          "min": 6.0,
+          "max": 45.0
+        },
+        "dcConceptMatched": {
+          "avg": 15.885245901639344,
+          "min": 6.0,
+          "max": 41.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9619069711742368,
+          "min": 0.5555555555555556,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.9008604736616731,
+          "min": 0.4376417233560091,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.5762040026955373,
+          "min": 0.2671232876712329,
+          "max": 0.8024425287356322
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.8924935684055214,
+          "min": 0.5570776255707762,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.44891278355739017,
+          "min": 0.12573385518591,
+          "max": 0.7719072164948454
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9997180216163402,
+          "min": 0.9917525773195877,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8494153480463912,
+          "min": 0.7034233048057933,
+          "max": 0.9558762886597938
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.8680164402812302,
+          "min": 0.3401826484018265,
+          "max": 1.0
+        }
+      },
+      "winners": {
+        "count": 25,
+        "avgReturnPct": 0.14547304375489198,
+        "winRate": 1.0,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 20.84,
+          "min": 9.0,
+          "max": 45.0
+        },
+        "dcConceptMatched": {
+          "avg": 18.44,
+          "min": 7.0,
+          "max": 41.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9676841709015622,
+          "min": 0.75,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.9181312073479104,
+          "min": 0.4817351598173516,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.5623929587571042,
+          "min": 0.2671232876712329,
+          "max": 0.6963797013058097
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.926358633390672,
+          "min": 0.5570776255707762,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.4892848979883948,
+          "min": 0.12573385518591,
+          "max": 0.7379779498006099
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9997340355497037,
+          "min": 0.9953917050691244,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8418369647235948,
+          "min": 0.7120743034055728,
+          "max": 0.9422043010752688
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.8619560290000158,
+          "min": 0.3584474885844749,
+          "max": 1.0
+        }
+      },
+      "losers": {
+        "count": 36,
+        "avgReturnPct": -0.05382873933465705,
+        "winRate": 0.0,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 16.5,
+          "min": 6.0,
+          "max": 28.0
+        },
+        "dcConceptMatched": {
+          "avg": 14.11111111111111,
+          "min": 6.0,
+          "max": 26.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9578950269191497,
+          "min": 0.5555555555555556,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.8888669086017861,
+          "min": 0.4376417233560091,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.5857950054305603,
+          "min": 0.27106683271066834,
+          "max": 0.8024425287356322
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.8689761621658335,
+          "min": 0.5570776255707762,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.42087659298030367,
+          "min": 0.15753424657534246,
+          "max": 0.7719072164948454
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9997069008292819,
+          "min": 0.9917525773195877,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8546781142427774,
+          "min": 0.7034233048057933,
+          "max": 0.9558762886597938
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.8722250592265178,
+          "min": 0.3401826484018265,
+          "max": 1.0
+        }
+      },
+      "winnerMinusLoser": {
+        "dcConceptCount": 4.34,
+        "dcConceptMatched": 4.328888888888891,
+        "dcConceptPositiveRatio": 0.009789143982412485,
+        "dcConceptPctMaxRank": 0.02926429874612435,
+        "dcConceptPctMeanRank": -0.023402046673456134,
+        "dcConceptTurnoverMaxRank": 0.05738247122483853,
+        "dcConceptTurnoverMeanRank": 0.06840830500809114,
+        "dcConceptAmountMaxRank": 2.7134720421817526e-05,
+        "dcConceptAmountMeanRank": -0.012841149519182582,
+        "dcConceptSwingMaxRank": -0.010269030226502052
+      }
+    }
+  },
+  "thresholds": {
+    "dcConceptPctMaxRank>=0.5": {
+      "kept": {
+        "count": 76,
+        "avgReturnPct": 0.039957252252424046,
+        "winRate": 0.4605263157894737,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 17.723684210526315,
+          "min": 6.0,
+          "max": 45.0
+        },
+        "dcConceptMatched": {
+          "avg": 15.81578947368421,
+          "min": 5.0,
+          "max": 41.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9645548926881728,
+          "min": 0.5555555555555556,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.9154641919262501,
+          "min": 0.5173210161662818,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.581536226583673,
+          "min": 0.296969696969697,
+          "max": 0.8024425287356322
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.8851303586305043,
+          "min": 0.5127020785219399,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.44681312129996936,
+          "min": 0.19812116102613514,
+          "max": 0.7719072164948454
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9992573636058785,
+          "min": 0.976905311778291,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8430626651476605,
+          "min": 0.7010869565217391,
+          "max": 0.9558762886597938
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.8762663107886232,
+          "min": 0.3401826484018265,
+          "max": 1.0
+        }
+      },
+      "filtered": {
+        "count": 3,
+        "avgReturnPct": -0.018746429951480886,
+        "winRate": 0.3333333333333333,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 13.0,
+          "min": 10.0,
+          "max": 16.0
+        },
+        "dcConceptMatched": {
+          "avg": 11.0,
+          "min": 8.0,
+          "max": 14.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9583333333333334,
+          "min": 0.875,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.46703734766357075,
+          "min": 0.4376417233560091,
+          "max": 0.4817351598173516
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.28020925403508573,
+          "min": 0.2671232876712329,
+          "max": 0.302437641723356
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.682042680085733,
+          "min": 0.5570776255707762,
+          "max": 0.9319727891156463
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.20931310119177046,
+          "min": 0.12573385518591,
+          "max": 0.34467120181405897
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 1.0,
+          "min": 1.0,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.9250845280688725,
+          "min": 0.9070450097847358,
+          "max": 0.9410543794105438
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.42117333996003276,
+          "min": 0.3584474885844749,
+          "max": 0.5260770975056689
+        }
+      }
+    },
+    "dcConceptPctMaxRank>=0.7": {
+      "kept": {
+        "count": 72,
+        "avgReturnPct": 0.04222859797470158,
+        "winRate": 0.4722222222222222,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 17.98611111111111,
+          "min": 6.0,
+          "max": 45.0
+        },
+        "dcConceptMatched": {
+          "avg": 16.055555555555557,
+          "min": 6.0,
+          "max": 41.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9759735667809181,
+          "min": 0.6875,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.9342557806677131,
+          "min": 0.7603686635944701,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.5944529425168947,
+          "min": 0.3271215596330275,
+          "max": 0.8024425287356322
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.8985617233474998,
+          "min": 0.5254629629629629,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.45710179545331164,
+          "min": 0.19812116102613514,
+          "max": 0.7719072164948454
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9993123338960177,
+          "min": 0.976905311778291,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8442364862246511,
+          "min": 0.7010869565217391,
+          "max": 0.9558762886597938
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.8947965154892726,
+          "min": 0.3401826484018265,
+          "max": 1.0
+        }
+      },
+      "filtered": {
+        "count": 7,
+        "avgReturnPct": -0.008563881835532675,
+        "winRate": 0.2857142857142857,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 13.0,
+          "min": 6.0,
+          "max": 23.0
+        },
+        "dcConceptMatched": {
+          "avg": 11.285714285714286,
+          "min": 5.0,
+          "max": 21.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.8444392908678623,
+          "min": 0.5555555555555556,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.5299963459014808,
+          "min": 0.4376417233560091,
+          "max": 0.6825396825396826
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.319538445892569,
+          "min": 0.2671232876712329,
+          "max": 0.4092378752886836
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.6599416021650777,
+          "min": 0.5127020785219399,
+          "max": 0.9319727891156463
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.23920103567636325,
+          "min": 0.12573385518591,
+          "max": 0.34467120181405897
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9990102276476411,
+          "min": 0.9930715935334873,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8661413038934198,
+          "min": 0.7752525252525252,
+          "max": 0.9410543794105438
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.4906300749411178,
+          "min": 0.3584474885844749,
+          "max": 0.7573696145124716
+        }
+      }
+    },
+    "dcConceptPctMeanRank>=0.5": {
+      "kept": {
+        "count": 60,
+        "avgReturnPct": 0.043645739797126985,
+        "winRate": 0.4666666666666667,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 17.983333333333334,
+          "min": 6.0,
+          "max": 45.0
+        },
+        "dcConceptMatched": {
+          "avg": 16.0,
+          "min": 6.0,
+          "max": 41.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9898013891778193,
+          "min": 0.8,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.9508973030046527,
+          "min": 0.7625570776255708,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.6255209545751347,
+          "min": 0.5023148148148148,
+          "max": 0.8024425287356322
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.9069506316420362,
+          "min": 0.5254629629629629,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.4777859404195302,
+          "min": 0.24055299539170508,
+          "max": 0.7719072164948454
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9991748006752215,
+          "min": 0.976905311778291,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8417933687366881,
+          "min": 0.7010869565217391,
+          "max": 0.9558762886597938
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.9022815648113062,
+          "min": 0.3401826484018265,
+          "max": 1.0
+        }
+      },
+      "filtered": {
+        "count": 19,
+        "avgReturnPct": 0.019040394394850817,
+        "winRate": 0.42105263157894735,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 16.157894736842106,
+          "min": 6.0,
+          "max": 25.0
+        },
+        "dcConceptMatched": {
+          "avg": 14.473684210526315,
+          "min": 5.0,
+          "max": 23.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.8838467628227354,
+          "min": 0.5555555555555556,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.7327659183740289,
+          "min": 0.4376417233560091,
+          "max": 0.9908466819221968
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.39505914252401725,
+          "min": 0.2671232876712329,
+          "max": 0.49412591625665225
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.7841577577712296,
+          "min": 0.5127020785219399,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.31150421564216696,
+          "min": 0.12573385518591,
+          "max": 0.5883161512027492
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9996353470280782,
+          "min": 0.9930715935334873,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8600217900646069,
+          "min": 0.7378250828396425,
+          "max": 0.9422043010752688
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.7222560921651096,
+          "min": 0.3584474885844749,
+          "max": 0.9815668202764977
+        }
+      }
+    },
+    "dcConceptPctMeanRank>=0.7": {
+      "kept": {
+        "count": 8,
+        "avgReturnPct": -0.04289930136498821,
+        "winRate": 0.125,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 18.5,
+          "min": 11.0,
+          "max": 28.0
+        },
+        "dcConceptMatched": {
+          "avg": 16.5,
+          "min": 9.0,
+          "max": 26.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 1.0,
+          "min": 1.0,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.9825981662385003,
+          "min": 0.9290617848970252,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.7347196447605339,
+          "min": 0.7050691244239631,
+          "max": 0.8024425287356322
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.9443322077141866,
+          "min": 0.7517241379310344,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.4610062855392277,
+          "min": 0.2806034482758621,
+          "max": 0.6281460475008862
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 1.0,
+          "min": 1.0,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8415082694816526,
+          "min": 0.7714285714285715,
+          "max": 0.9145299145299145
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.9581663402212381,
+          "min": 0.8850574712643678,
+          "max": 1.0
+        }
+      },
+      "filtered": {
+        "count": 71,
+        "avgReturnPct": 0.046812764679573106,
+        "winRate": 0.49295774647887325,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 17.43661971830986,
+          "min": 6.0,
+          "max": 45.0
+        },
+        "dcConceptMatched": {
+          "avg": 15.535211267605634,
+          "min": 5.0,
+          "max": 41.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9602981949901568,
+          "min": 0.5555555555555556,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.8889521873165874,
+          "min": 0.4376417233560091,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.5515439975264808,
+          "min": 0.2671232876712329,
+          "max": 0.6963797013058097
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.8698785582318597,
+          "min": 0.5127020785219399,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.43517867940928395,
+          "min": 0.12573385518591,
+          "max": 0.7719072164948454
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9992050652682642,
+          "min": 0.976905311778291,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.846703520839093,
+          "min": 0.7010869565217391,
+          "max": 0.9558762886597938
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.8478088580006415,
+          "min": 0.3401826484018265,
+          "max": 1.0
+        }
+      }
+    },
+    "dcConceptTurnoverMaxRank>=0.5": {
+      "kept": {
+        "count": 79,
+        "avgReturnPct": 0.03772799849784538,
+        "winRate": 0.45569620253164556,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 17.544303797468356,
+          "min": 6.0,
+          "max": 45.0
+        },
+        "dcConceptMatched": {
+          "avg": 15.632911392405063,
+          "min": 5.0,
+          "max": 41.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9643186309405206,
+          "min": 0.5555555555555556,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.8984353244226039,
+          "min": 0.4376417233560091,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.5700934301577772,
+          "min": 0.2671232876712329,
+          "max": 0.8024425287356322
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.8774181683060194,
+          "min": 0.5127020785219399,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.4377941331945947,
+          "min": 0.12573385518591,
+          "max": 0.7719072164948454
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9992855649879337,
+          "min": 0.976905311778291,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8461774194358078,
+          "min": 0.7010869565217391,
+          "max": 0.9558762886597938
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.8589842992381702,
+          "min": 0.3401826484018265,
+          "max": 1.0
+        }
+      },
+      "filtered": {
+        "count": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "dcMatchedRate": null,
+        "dcConceptCount": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptMatched": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPositiveRatio": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        }
+      }
+    },
+    "dcConceptTurnoverMaxRank>=0.7": {
+      "kept": {
+        "count": 66,
+        "avgReturnPct": 0.03944293027759235,
+        "winRate": 0.45454545454545453,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 18.651515151515152,
+          "min": 6.0,
+          "max": 45.0
+        },
+        "dcConceptMatched": {
+          "avg": 16.636363636363637,
+          "min": 6.0,
+          "max": 41.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9654018996917374,
+          "min": 0.5714285714285714,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.9242499795779349,
+          "min": 0.4376417233560091,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.5919882922851881,
+          "min": 0.302437641723356,
+          "max": 0.8024425287356322
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.9301475048872985,
+          "min": 0.7517241379310344,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.4720414444658487,
+          "min": 0.19812116102613514,
+          "max": 0.7719072164948454
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9992498187956558,
+          "min": 0.976905311778291,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8417750998224388,
+          "min": 0.7010869565217391,
+          "max": 0.9558762886597938
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.8981521630678908,
+          "min": 0.5260770975056689,
+          "max": 1.0
+        }
+      },
+      "filtered": {
+        "count": 13,
+        "avgReturnPct": 0.02902142176989921,
+        "winRate": 0.46153846153846156,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 11.923076923076923,
+          "min": 6.0,
+          "max": 16.0
+        },
+        "dcConceptMatched": {
+          "avg": 10.538461538461538,
+          "min": 5.0,
+          "max": 16.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9588189588189588,
+          "min": 0.5555555555555556,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.7673763059416926,
+          "min": 0.4817351598173516,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.4589348993570763,
+          "min": 0.2671232876712329,
+          "max": 0.6659668276296452
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.609715382585679,
+          "min": 0.5127020785219399,
+          "max": 0.6889400921658986
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.2639231682789976,
+          "min": 0.12573385518591,
+          "max": 0.3294270833333333
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9994670456564221,
+          "min": 0.9930715935334873,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8685276574729122,
+          "min": 0.7066974595842956,
+          "max": 0.9422043010752688
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.6601320674872813,
+          "min": 0.3401826484018265,
+          "max": 0.9954233409610984
+        }
+      }
+    },
+    "dcConceptAmountMaxRank>=0.5": {
+      "kept": {
+        "count": 79,
+        "avgReturnPct": 0.03772799849784538,
+        "winRate": 0.45569620253164556,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 17.544303797468356,
+          "min": 6.0,
+          "max": 45.0
+        },
+        "dcConceptMatched": {
+          "avg": 15.632911392405063,
+          "min": 5.0,
+          "max": 41.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9643186309405206,
+          "min": 0.5555555555555556,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.8984353244226039,
+          "min": 0.4376417233560091,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.5700934301577772,
+          "min": 0.2671232876712329,
+          "max": 0.8024425287356322
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.8774181683060194,
+          "min": 0.5127020785219399,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.4377941331945947,
+          "min": 0.12573385518591,
+          "max": 0.7719072164948454
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9992855649879337,
+          "min": 0.976905311778291,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8461774194358078,
+          "min": 0.7010869565217391,
+          "max": 0.9558762886597938
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.8589842992381702,
+          "min": 0.3401826484018265,
+          "max": 1.0
+        }
+      },
+      "filtered": {
+        "count": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "dcMatchedRate": null,
+        "dcConceptCount": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptMatched": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPositiveRatio": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        }
+      }
+    },
+    "dcConceptAmountMaxRank>=0.7": {
+      "kept": {
+        "count": 79,
+        "avgReturnPct": 0.03772799849784538,
+        "winRate": 0.45569620253164556,
+        "dcMatchedRate": 1.0,
+        "dcConceptCount": {
+          "avg": 17.544303797468356,
+          "min": 6.0,
+          "max": 45.0
+        },
+        "dcConceptMatched": {
+          "avg": 15.632911392405063,
+          "min": 5.0,
+          "max": 41.0
+        },
+        "dcConceptPositiveRatio": {
+          "avg": 0.9643186309405206,
+          "min": 0.5555555555555556,
+          "max": 1.0
+        },
+        "dcConceptPctMaxRank": {
+          "avg": 0.8984353244226039,
+          "min": 0.4376417233560091,
+          "max": 1.0
+        },
+        "dcConceptPctMeanRank": {
+          "avg": 0.5700934301577772,
+          "min": 0.2671232876712329,
+          "max": 0.8024425287356322
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": 0.8774181683060194,
+          "min": 0.5127020785219399,
+          "max": 1.0
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": 0.4377941331945947,
+          "min": 0.12573385518591,
+          "max": 0.7719072164948454
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": 0.9992855649879337,
+          "min": 0.976905311778291,
+          "max": 1.0
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": 0.8461774194358078,
+          "min": 0.7010869565217391,
+          "max": 0.9558762886597938
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": 0.8589842992381702,
+          "min": 0.3401826484018265,
+          "max": 1.0
+        }
+      },
+      "filtered": {
+        "count": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "dcMatchedRate": null,
+        "dcConceptCount": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptMatched": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPositiveRatio": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptPctMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptTurnoverMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptAmountMeanRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        },
+        "dcConceptSwingMaxRank": {
+          "avg": null,
+          "min": null,
+          "max": null
+        }
+      }
+    }
+  },
+  "samples": [
+    {
+      "ts_code": "603178.SH",
+      "name": "圣龙股份",
+      "industry": "汽车配件",
+      "entryDate": "2023-10-13",
+      "priorDate": "2023-10-12",
+      "returnPct": 0.1976014996250936,
+      "netPnl": 2692.3230806471984,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "601666.SH",
+      "name": "平煤股份",
+      "industry": "煤炭开采",
+      "entryDate": "2023-09-05",
+      "priorDate": "2023-09-04",
+      "returnPct": 0.04406284582700501,
+      "netPnl": 558.6212980348027,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "603686.SH",
+      "name": "福龙马",
+      "industry": "环境保护",
+      "entryDate": "2023-11-08",
+      "priorDate": "2023-11-07",
+      "returnPct": -0.052845966829970864,
+      "netPnl": -726.3764508000004,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002436.SZ",
+      "name": "兴森科技",
+      "industry": "元器件",
+      "entryDate": "2023-10-31",
+      "priorDate": "2023-10-30",
+      "returnPct": 0.15324588852786808,
+      "netPnl": 2036.8826027550003,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "600172.SH",
+      "name": "黄河旋风",
+      "industry": "矿物制品",
+      "entryDate": "2023-11-21",
+      "priorDate": "2023-11-20",
+      "returnPct": -0.052845966829970684,
+      "netPnl": -761.9333399999978,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "601699.SH",
+      "name": "潞安环能",
+      "industry": "煤炭开采",
+      "entryDate": "2023-09-05",
+      "priorDate": "2023-09-04",
+      "returnPct": 0.15483001749562603,
+      "netPnl": 1939.1901339060241,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "688025.SH",
+      "name": "杰普特",
+      "industry": "专用机械",
+      "entryDate": "2023-11-29",
+      "priorDate": "2023-11-28",
+      "returnPct": -0.05284596682997056,
+      "netPnl": -464.0385688749975,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "000503.SZ",
+      "name": "国新健康",
+      "industry": "软件服务",
+      "entryDate": "2023-11-14",
+      "priorDate": "2023-11-13",
+      "returnPct": 0.04790131217195716,
+      "netPnl": 647.4762106312519,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002498.SZ",
+      "name": "汉缆股份",
+      "industry": "电气设备",
+      "entryDate": "2024-01-02",
+      "priorDate": "2023-12-29",
+      "returnPct": -0.05284596682997095,
+      "netPnl": -751.8800528750016,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "600566.SH",
+      "name": "济川药业",
+      "industry": "中成药",
+      "entryDate": "2023-11-24",
+      "priorDate": "2023-11-23",
+      "returnPct": -0.05284596682997062,
+      "netPnl": -672.8294688499973,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "601225.SH",
+      "name": "陕西煤业",
+      "industry": "煤炭开采",
+      "entryDate": "2024-01-02",
+      "priorDate": "2023-12-29",
+      "returnPct": 0.14770143714071488,
+      "netPnl": 1894.4209520486256,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "605117.SH",
+      "name": "德业股份",
+      "industry": "电气设备",
+      "entryDate": "2024-03-12",
+      "priorDate": "2024-03-11",
+      "returnPct": -0.05284596682997064,
+      "netPnl": -567.6403382999979,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002085.SZ",
+      "name": "万丰奥威",
+      "industry": "汽车配件",
+      "entryDate": "2024-03-12",
+      "priorDate": "2024-03-11",
+      "returnPct": 0.15153990348566707,
+      "netPnl": 2096.74811220875,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "600418.SH",
+      "name": "江淮汽车",
+      "industry": "汽车整车",
+      "entryDate": "2024-03-18",
+      "priorDate": "2024-03-15",
+      "returnPct": -0.052845966829970836,
+      "netPnl": -698.1743348125001,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "001696.SZ",
+      "name": "宗申动力",
+      "industry": "摩托车",
+      "entryDate": "2024-04-02",
+      "priorDate": "2024-04-01",
+      "returnPct": -0.052845966829970885,
+      "netPnl": -751.7742288000009,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002167.SZ",
+      "name": "东方锆业",
+      "industry": "小金属",
+      "entryDate": "2024-04-02",
+      "priorDate": "2024-04-01",
+      "returnPct": 0.1503277562188401,
+      "netPnl": 2162.0075650173003,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002739.SZ",
+      "name": "儒意电影",
+      "industry": "影视音像",
+      "entryDate": "2024-03-18",
+      "priorDate": "2024-03-15",
+      "returnPct": -0.05284596682997086,
+      "netPnl": -721.9318396500003,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002409.SZ",
+      "name": "雅克科技",
+      "industry": "半导体",
+      "entryDate": "2024-04-29",
+      "priorDate": "2024-04-26",
+      "returnPct": -0.05284596682997061,
+      "netPnl": -679.919681874997,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002125.SZ",
+      "name": "湘潭电化",
+      "industry": "化工原料",
+      "entryDate": "2024-05-07",
+      "priorDate": "2024-05-06",
+      "returnPct": 0.15223780645747642,
+      "netPnl": 2134.4512692753233,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002773.SZ",
+      "name": "康弘药业",
+      "industry": "化学制药",
+      "entryDate": "2024-05-07",
+      "priorDate": "2024-05-06",
+      "returnPct": -0.052845966829970746,
+      "netPnl": -758.1236732999987,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002851.SZ",
+      "name": "麦格米特",
+      "industry": "电气设备",
+      "entryDate": "2024-05-15",
+      "priorDate": "2024-05-14",
+      "returnPct": -0.05284596682997069,
+      "netPnl": -716.958108124998,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "688578.SH",
+      "name": "艾力斯",
+      "industry": "化学制药",
+      "entryDate": "2024-04-29",
+      "priorDate": "2024-04-26",
+      "returnPct": 0.04790131217195724,
+      "netPnl": 555.1988603161026,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "000006.SZ",
+      "name": "深振业Ａ",
+      "industry": "区域地产",
+      "entryDate": "2024-05-17",
+      "priorDate": "2024-05-16",
+      "returnPct": -0.05284596682997068,
+      "netPnl": -777.1720067999977,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002706.SZ",
+      "name": "良信股份",
+      "industry": "电气设备",
+      "entryDate": "2024-05-20",
+      "priorDate": "2024-05-17",
+      "returnPct": -0.05284596682997062,
+      "netPnl": -738.2287471999971,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "000564.SZ",
+      "name": "供销大集",
+      "industry": "百货",
+      "entryDate": "2024-05-23",
+      "priorDate": "2024-05-22",
+      "returnPct": -0.05284596682997095,
+      "netPnl": -755.5838955000017,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "000617.SZ",
+      "name": "中油资本",
+      "industry": "多元金融",
+      "entryDate": "2024-09-25",
+      "priorDate": "2024-09-24",
+      "returnPct": 0.14987100507481824,
+      "netPnl": 2122.5758034731243,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "600061.SH",
+      "name": "国投资本",
+      "industry": "证券",
+      "entryDate": "2024-09-25",
+      "priorDate": "2024-09-24",
+      "returnPct": 0.14770143714071476,
+      "netPnl": 2017.166415764499,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "601012.SH",
+      "name": "隆基绿能",
+      "industry": "电气设备",
+      "entryDate": "2024-09-30",
+      "priorDate": "2024-09-27",
+      "returnPct": -0.05284596682997071,
+      "netPnl": -743.3083027999983,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "600711.SH",
+      "name": "盛屯矿业",
+      "industry": "小金属",
+      "entryDate": "2024-10-08",
+      "priorDate": "2024-09-30",
+      "returnPct": -0.07051297208216203,
+      "netPnl": -1032.1179329999977,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "600206.SH",
+      "name": "有研新材",
+      "industry": "半导体",
+      "entryDate": "2024-10-09",
+      "priorDate": "2024-10-08",
+      "returnPct": -0.05284596682997064,
+      "netPnl": -744.1548953999973,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002583.SZ",
+      "name": "海能达",
+      "industry": "通信设备",
+      "entryDate": "2024-10-15",
+      "priorDate": "2024-10-14",
+      "returnPct": 0.19760149962509396,
+      "netPnl": 2860.890046014003,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "600641.SH",
+      "name": "先导基电",
+      "industry": "半导体",
+      "entryDate": "2024-10-15",
+      "priorDate": "2024-10-14",
+      "returnPct": -0.056627707071302914,
+      "netPnl": -822.1283349999976,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "603893.SH",
+      "name": "瑞芯微",
+      "industry": "半导体",
+      "entryDate": "2024-10-21",
+      "priorDate": "2024-10-18",
+      "returnPct": -0.052845966829970774,
+      "netPnl": -510.28368964999936,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "000503.SZ",
+      "name": "国新健康",
+      "industry": "软件服务",
+      "entryDate": "2024-10-21",
+      "priorDate": "2024-10-18",
+      "returnPct": 0.1477014371407147,
+      "netPnl": 2133.9964354458734,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "000021.SZ",
+      "name": "深科技",
+      "industry": "元器件",
+      "entryDate": "2024-10-28",
+      "priorDate": "2024-10-25",
+      "returnPct": 0.0039309602209211016,
+      "netPnl": 57.554298720275256,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "600438.SH",
+      "name": "通威股份",
+      "industry": "电气设备",
+      "entryDate": "2024-10-28",
+      "priorDate": "2024-10-25",
+      "returnPct": 0.03792129967508116,
+      "netPnl": 546.7494352319991,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "603366.SH",
+      "name": "日出东方",
+      "industry": "家用电器",
+      "entryDate": "2024-11-05",
+      "priorDate": "2024-11-04",
+      "returnPct": 0.19400464760079364,
+      "netPnl": 2931.5787712477013,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "300450.SZ",
+      "name": "先导智能",
+      "industry": "专用机械",
+      "entryDate": "2024-11-12",
+      "priorDate": "2024-11-11",
+      "returnPct": -0.052845966829970836,
+      "netPnl": -824.4753683250001,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002031.SZ",
+      "name": "巨轮智能",
+      "industry": "汽车配件",
+      "entryDate": "2024-11-05",
+      "priorDate": "2024-11-04",
+      "returnPct": 0.0479013121719571,
+      "netPnl": 709.6339268518514,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "600292.SH",
+      "name": "XD电投水",
+      "industry": "水力发电",
+      "entryDate": "2024-11-12",
+      "priorDate": "2024-11-11",
+      "returnPct": -0.05598254096804458,
+      "netPnl": -825.8219707499975,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002354.SZ",
+      "name": "天娱数科",
+      "industry": "互联网",
+      "entryDate": "2024-11-21",
+      "priorDate": "2024-11-20",
+      "returnPct": 0.047901312171957186,
+      "netPnl": 719.8017014188026,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "002245.SZ",
+      "name": "蔚蓝锂芯",
+      "industry": "电气设备",
+      "entryDate": "2024-11-21",
+      "priorDate": "2024-11-20",
+      "returnPct": -0.05284596682997088,
+      "netPnl": -754.9489510500007,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "603667.SH",
+      "name": "五洲新春",
+      "industry": "机械基件",
+      "entryDate": "2024-12-03",
+      "priorDate": "2024-12-02",
+      "returnPct": 0.19760149962509363,
+      "netPnl": 2627.0330588501984,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "603002.SH",
+      "name": "宏昌电子",
+      "industry": "化工原料",
+      "entryDate": "2024-12-03",
+      "priorDate": "2024-12-02",
+      "returnPct": 0.04573174423785359,
+      "netPnl": 684.54435924875,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "300007.SZ",
+      "name": "汉威科技",
+      "industry": "电器仪表",
+      "entryDate": "2024-12-09",
+      "priorDate": "2024-12-06",
+      "returnPct": 0.15483001749562608,
+      "netPnl": 2270.1655065089,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "301018.SZ",
+      "name": "申菱环境",
+      "industry": "专用机械",
+      "entryDate": "2024-12-09",
+      "priorDate": "2024-12-06",
+      "returnPct": 0.15768144963759037,
+      "netPnl": 2297.1334971584965,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [],
+      "dcConceptCount": 0,
+      "dcConceptMatched": 0,
+      "dcConceptPositiveRatio": null,
+      "dcConceptPctMaxRank": null,
+      "dcConceptPctMeanRank": null,
+      "dcConceptTurnoverMaxRank": null,
+      "dcConceptTurnoverMeanRank": null,
+      "dcConceptAmountMaxRank": null,
+      "dcConceptAmountMeanRank": null,
+      "dcConceptSwingMaxRank": null
+    },
+    {
+      "ts_code": "300676.SZ",
+      "name": "华大基因",
+      "industry": "医疗保健",
+      "entryDate": "2025-02-10",
+      "priorDate": "2025-02-07",
+      "returnPct": -0.0528459668299709,
+      "netPnl": -860.0322575250011,
+      "isWinner": false,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0506.DC",
+        "BK0549.DC",
+        "BK0568.DC",
+        "BK0570.DC",
+        "BK0596.DC",
+        "BK0638.DC",
+        "BK0664.DC",
+        "BK0668.DC",
+        "BK0675.DC",
+        "BK0693.DC",
+        "BK0701.DC",
+        "BK0712.DC",
+        "BK0742.DC",
+        "BK0804.DC",
+        "BK0806.DC",
+        "BK0817.DC",
+        "BK0830.DC",
+        "BK0841.DC",
+        "BK0867.DC",
+        "BK0939.DC"
+      ],
+      "dcConceptCount": 23,
+      "dcConceptMatched": 23,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9212962962962963,
+      "dcConceptPctMeanRank": 0.6411030595813204,
+      "dcConceptTurnoverMaxRank": 0.9629629629629629,
+      "dcConceptTurnoverMeanRank": 0.4630636070853462,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7010869565217391,
+      "dcConceptSwingMaxRank": 0.8773148148148148
+    },
+    {
+      "ts_code": "600588.SH",
+      "name": "用友网络",
+      "industry": "软件服务",
+      "entryDate": "2025-02-10",
+      "priorDate": "2025-02-07",
+      "returnPct": 0.15223780645747664,
+      "netPnl": 2451.3493760255515,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0500.DC",
+        "BK0525.DC",
+        "BK0552.DC",
+        "BK0556.DC",
+        "BK0567.DC",
+        "BK0570.DC",
+        "BK0579.DC",
+        "BK0596.DC",
+        "BK0604.DC",
+        "BK0612.DC",
+        "BK0634.DC",
+        "BK0637.DC",
+        "BK0689.DC",
+        "BK0696.DC",
+        "BK0707.DC",
+        "BK0718.DC",
+        "BK0821.DC",
+        "BK0830.DC",
+        "BK0832.DC",
+        "BK0837.DC"
+      ],
+      "dcConceptCount": 32,
+      "dcConceptMatched": 32,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9907407407407407,
+      "dcConceptPctMeanRank": 0.677662037037037,
+      "dcConceptTurnoverMaxRank": 0.9583333333333334,
+      "dcConceptTurnoverMeanRank": 0.5022424768518519,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8480902777777778,
+      "dcConceptSwingMaxRank": 0.9930555555555556
+    },
+    {
+      "ts_code": "000967.SZ",
+      "name": "盈峰环境",
+      "industry": "环境保护",
+      "entryDate": "2025-02-18",
+      "priorDate": "2025-02-17",
+      "returnPct": -0.05284596682997069,
+      "netPnl": -863.7361001499976,
+      "isWinner": false,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0493.DC",
+        "BK0494.DC",
+        "BK0528.DC",
+        "BK0568.DC",
+        "BK0577.DC",
+        "BK0594.DC",
+        "BK0596.DC",
+        "BK0700.DC",
+        "BK0701.DC",
+        "BK0721.DC",
+        "BK0802.DC",
+        "BK0804.DC",
+        "BK0867.DC",
+        "BK0873.DC",
+        "BK1090.DC",
+        "BK1112.DC"
+      ],
+      "dcConceptCount": 16,
+      "dcConceptMatched": 16,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9328703703703703,
+      "dcConceptPctMeanRank": 0.5517939814814815,
+      "dcConceptTurnoverMaxRank": 0.5254629629629629,
+      "dcConceptTurnoverMeanRank": 0.3294270833333333,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8326099537037037,
+      "dcConceptSwingMaxRank": 0.7638888888888888
+    },
+    {
+      "ts_code": "603583.SH",
+      "name": "捷昌驱动",
+      "industry": "电气设备",
+      "entryDate": "2025-02-18",
+      "priorDate": "2025-02-17",
+      "returnPct": 0.19760149962509374,
+      "netPnl": 2909.9564866372,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0571.DC",
+        "BK0596.DC",
+        "BK0653.DC",
+        "BK0668.DC",
+        "BK0705.DC",
+        "BK0707.DC",
+        "BK0712.DC",
+        "BK0823.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK1090.DC",
+        "BK1184.DC"
+      ],
+      "dcConceptCount": 12,
+      "dcConceptMatched": 12,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9861111111111112,
+      "dcConceptPctMeanRank": 0.5023148148148148,
+      "dcConceptTurnoverMaxRank": 0.6666666666666666,
+      "dcConceptTurnoverMeanRank": 0.30864197530864196,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8902391975308642,
+      "dcConceptSwingMaxRank": 0.9837962962962963
+    },
+    {
+      "ts_code": "002051.SZ",
+      "name": "中工国际",
+      "industry": "建筑工程",
+      "entryDate": "2025-02-24",
+      "priorDate": "2025-02-21",
+      "returnPct": -0.05284596682997075,
+      "netPnl": -849.1323777999987,
+      "isWinner": false,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0505.DC",
+        "BK0596.DC",
+        "BK0597.DC",
+        "BK0683.DC",
+        "BK0712.DC",
+        "BK0804.DC",
+        "BK0812.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK1112.DC",
+        "BK1140.DC",
+        "BK1185.DC"
+      ],
+      "dcConceptCount": 12,
+      "dcConceptMatched": 11,
+      "dcConceptPositiveRatio": 0.9090909090909091,
+      "dcConceptPctMaxRank": 0.5658198614318707,
+      "dcConceptPctMeanRank": 0.34537056477010286,
+      "dcConceptTurnoverMaxRank": 0.5127020785219399,
+      "dcConceptTurnoverMeanRank": 0.23472601301700607,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8005458744488767,
+      "dcConceptSwingMaxRank": 0.38799076212471134
+    },
+    {
+      "ts_code": "000581.SZ",
+      "name": "威孚高科",
+      "industry": "汽车配件",
+      "entryDate": "2025-02-24",
+      "priorDate": "2025-02-21",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -790.7704004375009,
+      "isWinner": false,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0494.DC",
+        "BK0498.DC",
+        "BK0514.DC",
+        "BK0568.DC",
+        "BK0594.DC",
+        "BK0596.DC",
+        "BK0604.DC",
+        "BK0682.DC",
+        "BK0683.DC",
+        "BK0804.DC",
+        "BK0823.DC",
+        "BK0864.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0891.DC",
+        "BK0900.DC",
+        "BK0932.DC",
+        "BK0969.DC",
+        "BK1048.DC",
+        "BK1099.DC"
+      ],
+      "dcConceptCount": 23,
+      "dcConceptMatched": 23,
+      "dcConceptPositiveRatio": 0.9565217391304348,
+      "dcConceptPctMaxRank": 0.9191685912240185,
+      "dcConceptPctMeanRank": 0.49412591625665225,
+      "dcConceptTurnoverMaxRank": 0.7621247113163973,
+      "dcConceptTurnoverMeanRank": 0.3662014258459685,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7378250828396425,
+      "dcConceptSwingMaxRank": 0.9284064665127021
+    },
+    {
+      "ts_code": "601177.SH",
+      "name": "杭齿前进",
+      "industry": "机械基件",
+      "entryDate": "2025-03-05",
+      "priorDate": "2025-03-04",
+      "returnPct": 0.19760149962509369,
+      "netPnl": 3296.948252197599,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0490.DC",
+        "BK0525.DC",
+        "BK0577.DC",
+        "BK0595.DC",
+        "BK0683.DC",
+        "BK0712.DC",
+        "BK0808.DC",
+        "BK0900.DC",
+        "BK0980.DC",
+        "BK1184.DC"
+      ],
+      "dcConceptCount": 10,
+      "dcConceptMatched": 10,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9722863741339491,
+      "dcConceptPctMeanRank": 0.5861431870669745,
+      "dcConceptTurnoverMaxRank": 0.9260969976905312,
+      "dcConceptTurnoverMeanRank": 0.3842956120092379,
+      "dcConceptAmountMaxRank": 0.976905311778291,
+      "dcConceptAmountMeanRank": 0.8316397228637413,
+      "dcConceptSwingMaxRank": 0.9792147806004619
+    },
+    {
+      "ts_code": "600301.SH",
+      "name": "华锡有色",
+      "industry": "小金属",
+      "entryDate": "2025-03-05",
+      "priorDate": "2025-03-04",
+      "returnPct": 0.15483001749562614,
+      "netPnl": 2336.3605810294757,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0571.DC",
+        "BK0590.DC",
+        "BK0683.DC",
+        "BK0695.DC",
+        "BK0707.DC",
+        "BK1154.DC"
+      ],
+      "dcConceptCount": 6,
+      "dcConceptMatched": 5,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.5173210161662818,
+      "dcConceptPctMeanRank": 0.4092378752886836,
+      "dcConceptTurnoverMaxRank": 0.6443418013856813,
+      "dcConceptTurnoverMeanRank": 0.2983833718244804,
+      "dcConceptAmountMaxRank": 0.9930715935334873,
+      "dcConceptAmountMeanRank": 0.9288683602771363,
+      "dcConceptSwingMaxRank": 0.4618937644341801
+    },
+    {
+      "ts_code": "603960.SH",
+      "name": "克来机电",
+      "industry": "汽车配件",
+      "entryDate": "2025-03-17",
+      "priorDate": "2025-03-14",
+      "returnPct": -0.05284596682997109,
+      "netPnl": -918.9233552625046,
+      "isWinner": false,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0596.DC",
+        "BK0640.DC",
+        "BK0707.DC",
+        "BK0802.DC",
+        "BK0810.DC",
+        "BK0864.DC",
+        "BK0867.DC",
+        "BK0900.DC",
+        "BK0984.DC",
+        "BK1005.DC",
+        "BK1090.DC"
+      ],
+      "dcConceptCount": 11,
+      "dcConceptMatched": 9,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.7967667436489607,
+      "dcConceptPctMeanRank": 0.5032075955863484,
+      "dcConceptTurnoverMaxRank": 0.8267898383371824,
+      "dcConceptTurnoverMeanRank": 0.41647421093148573,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9237875288683602,
+      "dcConceptSwingMaxRank": 0.9168591224018475
+    },
+    {
+      "ts_code": "002342.SZ",
+      "name": "巨力索具",
+      "industry": "机械基件",
+      "entryDate": "2025-03-19",
+      "priorDate": "2025-03-18",
+      "returnPct": 0.19128392970144495,
+      "netPnl": 3315.6476031070015,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0490.DC",
+        "BK0493.DC",
+        "BK0570.DC",
+        "BK0588.DC",
+        "BK0595.DC",
+        "BK0596.DC",
+        "BK0684.DC",
+        "BK0808.DC",
+        "BK0813.DC",
+        "BK0896.DC",
+        "BK1050.DC",
+        "BK1051.DC",
+        "BK1105.DC"
+      ],
+      "dcConceptCount": 13,
+      "dcConceptMatched": 12,
+      "dcConceptPositiveRatio": 0.9166666666666666,
+      "dcConceptPctMaxRank": 0.9976905311778291,
+      "dcConceptPctMeanRank": 0.5637028483448807,
+      "dcConceptTurnoverMaxRank": 0.9976905311778291,
+      "dcConceptTurnoverMeanRank": 0.4857582755966128,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7553887605850654,
+      "dcConceptSwingMaxRank": 0.9653579676674365
+    },
+    {
+      "ts_code": "002773.SZ",
+      "name": "康弘药业",
+      "industry": "化学制药",
+      "entryDate": "2025-03-11",
+      "priorDate": "2025-03-10",
+      "returnPct": 0.1548300174956261,
+      "netPnl": 2463.32490429025,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0568.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0615.DC",
+        "BK0804.DC",
+        "BK0867.DC",
+        "BK0870.DC",
+        "BK0879.DC",
+        "BK0894.DC",
+        "BK1106.DC",
+        "BK1174.DC"
+      ],
+      "dcConceptCount": 11,
+      "dcConceptMatched": 11,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9792147806004619,
+      "dcConceptPctMeanRank": 0.6659668276296452,
+      "dcConceptTurnoverMaxRank": 0.5288683602771362,
+      "dcConceptTurnoverMeanRank": 0.3038001259710267,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7066974595842956,
+      "dcConceptSwingMaxRank": 0.6651270207852193
+    },
+    {
+      "ts_code": "000733.SZ",
+      "name": "振华科技",
+      "industry": "元器件",
+      "entryDate": "2025-03-11",
+      "priorDate": "2025-03-10",
+      "returnPct": 0.16433479130217446,
+      "netPnl": 2533.2617024715,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0490.DC",
+        "BK0514.DC",
+        "BK0554.DC",
+        "BK0568.DC",
+        "BK0570.DC",
+        "BK0574.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0701.DC",
+        "BK0703.DC",
+        "BK0804.DC",
+        "BK0808.DC",
+        "BK0814.DC",
+        "BK0821.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0891.DC",
+        "BK0900.DC",
+        "BK0917.DC"
+      ],
+      "dcConceptCount": 23,
+      "dcConceptMatched": 23,
+      "dcConceptPositiveRatio": 0.9130434782608695,
+      "dcConceptPctMaxRank": 0.9630484988452656,
+      "dcConceptPctMeanRank": 0.5268601265187268,
+      "dcConceptTurnoverMaxRank": 0.859122401847575,
+      "dcConceptTurnoverMeanRank": 0.4658098202630786,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8554071693945176,
+      "dcConceptSwingMaxRank": 0.7274826789838337
+    },
+    {
+      "ts_code": "002246.SZ",
+      "name": "北化股份",
+      "industry": "化工原料",
+      "entryDate": "2025-05-07",
+      "priorDate": "2025-05-06",
+      "returnPct": -0.05284596682997076,
+      "netPnl": -926.2252164374986,
+      "isWinner": false,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0490.DC",
+        "BK0494.DC",
+        "BK0552.DC",
+        "BK0570.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0718.DC",
+        "BK0804.DC",
+        "BK0808.DC",
+        "BK0963.DC",
+        "BK0983.DC",
+        "BK0994.DC"
+      ],
+      "dcConceptCount": 13,
+      "dcConceptMatched": 13,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.7603686635944701,
+      "dcConceptPctMeanRank": 0.42059553349875933,
+      "dcConceptTurnoverMaxRank": 0.8986175115207373,
+      "dcConceptTurnoverMeanRank": 0.35430698333924143,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8006026231832684,
+      "dcConceptSwingMaxRank": 0.7695852534562212
+    },
+    {
+      "ts_code": "600562.SH",
+      "name": "国睿科技",
+      "industry": "通信设备",
+      "entryDate": "2025-05-13",
+      "priorDate": "2025-05-12",
+      "returnPct": -0.05284596682997072,
+      "netPnl": -939.664873962498,
+      "isWinner": false,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0490.DC",
+        "BK0594.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0705.DC",
+        "BK0707.DC",
+        "BK0714.DC",
+        "BK0721.DC",
+        "BK0802.DC",
+        "BK0808.DC",
+        "BK0854.DC",
+        "BK0867.DC",
+        "BK1166.DC"
+      ],
+      "dcConceptCount": 13,
+      "dcConceptMatched": 13,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9861751152073732,
+      "dcConceptPctMeanRank": 0.6137894363700815,
+      "dcConceptTurnoverMaxRank": 0.988479262672811,
+      "dcConceptTurnoverMeanRank": 0.44080113434952145,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9273307337823467,
+      "dcConceptSwingMaxRank": 0.9976958525345622
+    },
+    {
+      "ts_code": "600592.SH",
+      "name": "龙溪股份",
+      "industry": "机械基件",
+      "entryDate": "2025-05-07",
+      "priorDate": "2025-05-06",
+      "returnPct": 0.047901312171957,
+      "netPnl": 781.2879608283747,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0490.DC",
+        "BK0535.DC",
+        "BK0552.DC",
+        "BK0592.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0808.DC",
+        "BK0814.DC",
+        "BK0815.DC",
+        "BK0900.DC",
+        "BK0963.DC",
+        "BK1050.DC",
+        "BK1184.DC"
+      ],
+      "dcConceptCount": 13,
+      "dcConceptMatched": 13,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9631336405529954,
+      "dcConceptPctMeanRank": 0.5900389932647997,
+      "dcConceptTurnoverMaxRank": 0.9746543778801844,
+      "dcConceptTurnoverMeanRank": 0.4491315136476427,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8445586671393123,
+      "dcConceptSwingMaxRank": 0.7811059907834101
+    },
+    {
+      "ts_code": "300607.SZ",
+      "name": "拓斯达",
+      "industry": "专用机械",
+      "entryDate": "2025-05-13",
+      "priorDate": "2025-05-12",
+      "returnPct": 0.04714057852755199,
+      "netPnl": 717.810239873299,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0554.DC",
+        "BK0570.DC",
+        "BK0596.DC",
+        "BK0742.DC",
+        "BK0804.DC",
+        "BK0832.DC",
+        "BK0854.DC",
+        "BK0867.DC",
+        "BK0998.DC",
+        "BK1004.DC",
+        "BK1090.DC",
+        "BK1157.DC",
+        "BK1166.DC"
+      ],
+      "dcConceptCount": 13,
+      "dcConceptMatched": 13,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.967741935483871,
+      "dcConceptPctMeanRank": 0.7382133995037221,
+      "dcConceptTurnoverMaxRank": 0.9285714285714286,
+      "dcConceptTurnoverMeanRank": 0.6281460475008862,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8940092165898618,
+      "dcConceptSwingMaxRank": 0.9608294930875576
+    },
+    {
+      "ts_code": "600468.SH",
+      "name": "百利电气",
+      "industry": "电气设备",
+      "entryDate": "2025-05-19",
+      "priorDate": "2025-05-16",
+      "returnPct": 0.19144291245541434,
+      "netPnl": 3504.335149656603,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0490.DC",
+        "BK0570.DC",
+        "BK0581.DC",
+        "BK0679.DC",
+        "BK0683.DC",
+        "BK0707.DC"
+      ],
+      "dcConceptCount": 6,
+      "dcConceptMatched": 6,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9861751152073732,
+      "dcConceptPctMeanRank": 0.5913978494623656,
+      "dcConceptTurnoverMaxRank": 0.956221198156682,
+      "dcConceptTurnoverMeanRank": 0.44431643625192013,
+      "dcConceptAmountMaxRank": 0.9907834101382489,
+      "dcConceptAmountMeanRank": 0.8310291858678955,
+      "dcConceptSwingMaxRank": 0.9861751152073732
+    },
+    {
+      "ts_code": "300255.SZ",
+      "name": "常山药业",
+      "industry": "生物制药",
+      "entryDate": "2025-05-30",
+      "priorDate": "2025-05-29",
+      "returnPct": -0.05284596682997067,
+      "netPnl": -989.1905410624968,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0552.DC",
+        "BK0571.DC",
+        "BK0596.DC",
+        "BK0742.DC",
+        "BK0804.DC",
+        "BK0813.DC",
+        "BK0889.DC",
+        "BK0944.DC",
+        "BK0974.DC",
+        "BK1106.DC"
+      ],
+      "dcConceptCount": 10,
+      "dcConceptMatched": 10,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.967741935483871,
+      "dcConceptPctMeanRank": 0.5064516129032258,
+      "dcConceptTurnoverMaxRank": 0.9055299539170507,
+      "dcConceptTurnoverMeanRank": 0.4912442396313364,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7723502304147465,
+      "dcConceptSwingMaxRank": 0.9815668202764977
+    },
+    {
+      "ts_code": "688578.SH",
+      "name": "艾力斯",
+      "industry": "化学制药",
+      "entryDate": "2025-05-30",
+      "priorDate": "2025-05-29",
+      "returnPct": -0.05284596682997087,
+      "netPnl": -518.5379675000004,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0571.DC",
+        "BK0596.DC",
+        "BK0701.DC",
+        "BK0705.DC",
+        "BK0707.DC",
+        "BK1106.DC"
+      ],
+      "dcConceptCount": 6,
+      "dcConceptMatched": 6,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.967741935483871,
+      "dcConceptPctMeanRank": 0.4589093701996928,
+      "dcConceptTurnoverMaxRank": 0.6497695852534562,
+      "dcConceptTurnoverMeanRank": 0.2423195084485407,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9266513056835637,
+      "dcConceptSwingMaxRank": 0.9815668202764977
+    },
+    {
+      "ts_code": "600259.SH",
+      "name": "中稀有色",
+      "industry": "小金属",
+      "entryDate": "2025-06-05",
+      "priorDate": "2025-06-04",
+      "returnPct": -0.052845966829970774,
+      "netPnl": -869.715160387499,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0176.DC",
+        "BK0519.DC",
+        "BK0523.DC",
+        "BK0570.DC",
+        "BK0578.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0695.DC",
+        "BK0707.DC",
+        "BK0815.DC",
+        "BK1027.DC",
+        "BK1050.DC"
+      ],
+      "dcConceptCount": 12,
+      "dcConceptMatched": 10,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9815668202764977,
+      "dcConceptPctMeanRank": 0.728110599078341,
+      "dcConceptTurnoverMaxRank": 0.9953917050691244,
+      "dcConceptTurnoverMeanRank": 0.4423963133640553,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8599078341013825,
+      "dcConceptSwingMaxRank": 0.9792626728110599
+    },
+    {
+      "ts_code": "003040.SZ",
+      "name": "楚天龙",
+      "industry": "通信设备",
+      "entryDate": "2025-06-06",
+      "priorDate": "2025-06-05",
+      "returnPct": 0.19760149962509385,
+      "netPnl": 3698.976507626401,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0153.DC",
+        "BK0448.DC",
+        "BK0570.DC",
+        "BK0596.DC",
+        "BK0710.DC",
+        "BK0804.DC",
+        "BK0875.DC",
+        "BK0883.DC",
+        "BK0886.DC"
+      ],
+      "dcConceptCount": 9,
+      "dcConceptMatched": 7,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9631336405529954,
+      "dcConceptPctMeanRank": 0.6714944042132982,
+      "dcConceptTurnoverMaxRank": 0.956221198156682,
+      "dcConceptTurnoverMeanRank": 0.5793285055957866,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7946017116524029,
+      "dcConceptSwingMaxRank": 0.967741935483871
+    },
+    {
+      "ts_code": "002181.SZ",
+      "name": "粤传媒",
+      "industry": "出版业",
+      "entryDate": "2025-06-10",
+      "priorDate": "2025-06-09",
+      "returnPct": 0.19369995515574653,
+      "netPnl": 3701.191580764993,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0153.DC",
+        "BK0486.DC",
+        "BK0506.DC",
+        "BK0596.DC",
+        "BK0665.DC",
+        "BK0671.DC",
+        "BK0677.DC",
+        "BK0683.DC",
+        "BK0708.DC",
+        "BK0804.DC",
+        "BK0835.DC",
+        "BK0940.DC",
+        "BK1111.DC"
+      ],
+      "dcConceptCount": 13,
+      "dcConceptMatched": 11,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9539170506912442,
+      "dcConceptPctMeanRank": 0.6770004189359028,
+      "dcConceptTurnoverMaxRank": 0.923963133640553,
+      "dcConceptTurnoverMeanRank": 0.5703812316715543,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7674905739421869,
+      "dcConceptSwingMaxRank": 0.9539170506912442
+    },
+    {
+      "ts_code": "002605.SZ",
+      "name": "姚记科技",
+      "industry": "互联网",
+      "entryDate": "2025-06-10",
+      "priorDate": "2025-06-09",
+      "returnPct": -0.0528459668299707,
+      "netPnl": -1009.5616754999974,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0145.DC",
+        "BK0506.DC",
+        "BK0509.DC",
+        "BK0528.DC",
+        "BK0567.DC",
+        "BK0698.DC",
+        "BK0804.DC",
+        "BK0807.DC",
+        "BK0823.DC",
+        "BK0845.DC",
+        "BK0867.DC",
+        "BK0923.DC",
+        "BK0986.DC",
+        "BK1046.DC",
+        "BK1183.DC",
+        "BK1187.DC"
+      ],
+      "dcConceptCount": 16,
+      "dcConceptMatched": 14,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9516129032258065,
+      "dcConceptPctMeanRank": 0.684331797235023,
+      "dcConceptTurnoverMaxRank": 0.9447004608294931,
+      "dcConceptTurnoverMeanRank": 0.6260697827518104,
+      "dcConceptAmountMaxRank": 0.9976958525345622,
+      "dcConceptAmountMeanRank": 0.7034233048057933,
+      "dcConceptSwingMaxRank": 0.9746543778801844
+    },
+    {
+      "ts_code": "002080.SZ",
+      "name": "中材科技",
+      "industry": "玻璃",
+      "entryDate": "2025-05-19",
+      "priorDate": "2025-05-16",
+      "returnPct": 0.1522378064574765,
+      "netPnl": 2743.096839382899,
+      "isWinner": true,
+      "windowLabels": [],
+      "dcConceptCodes": [
+        "BK0490.DC",
+        "BK0493.DC",
+        "BK0494.DC",
+        "BK0505.DC",
+        "BK0523.DC",
+        "BK0568.DC",
+        "BK0570.DC",
+        "BK0574.DC",
+        "BK0594.DC",
+        "BK0595.DC",
+        "BK0596.DC",
+        "BK0682.DC",
+        "BK0683.DC",
+        "BK0701.DC",
+        "BK0712.DC",
+        "BK0714.DC",
+        "BK0804.DC",
+        "BK0821.DC",
+        "BK0864.DC",
+        "BK0867.DC"
+      ],
+      "dcConceptCount": 21,
+      "dcConceptMatched": 21,
+      "dcConceptPositiveRatio": 0.8095238095238095,
+      "dcConceptPctMaxRank": 0.8179723502304147,
+      "dcConceptPctMeanRank": 0.467412771560237,
+      "dcConceptTurnoverMaxRank": 0.956221198156682,
+      "dcConceptTurnoverMeanRank": 0.32653061224489793,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.923963133640553,
+      "dcConceptSwingMaxRank": 0.7649769585253456
+    },
+    {
+      "ts_code": "002074.SZ",
+      "name": "国轩高科",
+      "industry": "电气设备",
+      "entryDate": "2025-06-25",
+      "priorDate": "2025-06-24",
+      "returnPct": -0.0528459668299708,
+      "netPnl": -873.5777391249994,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0149.DC",
+        "BK0493.DC",
+        "BK0500.DC",
+        "BK0568.DC",
+        "BK0574.DC",
+        "BK0581.DC",
+        "BK0594.DC",
+        "BK0595.DC",
+        "BK0596.DC",
+        "BK0700.DC",
+        "BK0804.DC",
+        "BK0821.DC",
+        "BK0854.DC",
+        "BK0867.DC",
+        "BK0868.DC",
+        "BK0879.DC",
+        "BK0900.DC",
+        "BK0968.DC",
+        "BK0989.DC",
+        "BK1033.DC"
+      ],
+      "dcConceptCount": 23,
+      "dcConceptMatched": 21,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9861751152073732,
+      "dcConceptPctMeanRank": 0.6070879964889182,
+      "dcConceptTurnoverMaxRank": 0.8341013824884793,
+      "dcConceptTurnoverMeanRank": 0.42879087118718456,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8729427254772877,
+      "dcConceptSwingMaxRank": 0.988479262672811
+    },
+    {
+      "ts_code": "002670.SZ",
+      "name": "国盛证券",
+      "industry": "证券",
+      "entryDate": "2025-06-25",
+      "priorDate": "2025-06-24",
+      "returnPct": 0.044062845827004864,
+      "netPnl": 830.4760159696016,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0160.DC",
+        "BK0473.DC",
+        "BK0514.DC",
+        "BK0568.DC",
+        "BK0571.DC",
+        "BK0596.DC",
+        "BK0637.DC",
+        "BK0683.DC",
+        "BK0701.DC",
+        "BK0711.DC",
+        "BK0804.DC",
+        "BK0830.DC",
+        "BK0867.DC",
+        "BK0879.DC"
+      ],
+      "dcConceptCount": 14,
+      "dcConceptMatched": 12,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9124423963133641,
+      "dcConceptPctMeanRank": 0.45065284178187404,
+      "dcConceptTurnoverMaxRank": 0.6889400921658986,
+      "dcConceptTurnoverMeanRank": 0.26056067588325654,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9422043010752688,
+      "dcConceptSwingMaxRank": 0.9631336405529954
+    },
+    {
+      "ts_code": "003031.SZ",
+      "name": "中瓷电子",
+      "industry": "元器件",
+      "entryDate": "2025-07-01",
+      "priorDate": "2025-06-30",
+      "returnPct": -0.0528459668299707,
+      "netPnl": -883.0489938374976,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0155.DC",
+        "BK0448.DC",
+        "BK0490.DC",
+        "BK0568.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0701.DC",
+        "BK0714.DC",
+        "BK0804.DC",
+        "BK0854.DC",
+        "BK0917.DC",
+        "BK0952.DC",
+        "BK1005.DC",
+        "BK1048.DC",
+        "BK1136.DC"
+      ],
+      "dcConceptCount": 15,
+      "dcConceptMatched": 13,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9608294930875576,
+      "dcConceptPctMeanRank": 0.640730237504431,
+      "dcConceptTurnoverMaxRank": 0.9470046082949308,
+      "dcConceptTurnoverMeanRank": 0.5301311591634172,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.902871322226161,
+      "dcConceptSwingMaxRank": 0.956221198156682
+    },
+    {
+      "ts_code": "603936.SH",
+      "name": "博敏电子",
+      "industry": "元器件",
+      "entryDate": "2025-07-01",
+      "priorDate": "2025-06-30",
+      "returnPct": -0.05284596682997075,
+      "netPnl": -1042.5258748624983,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0153.DC",
+        "BK0459.DC",
+        "BK0490.DC",
+        "BK0552.DC",
+        "BK0571.DC",
+        "BK0596.DC",
+        "BK0641.DC",
+        "BK0707.DC",
+        "BK0714.DC",
+        "BK0802.DC",
+        "BK0854.DC",
+        "BK0877.DC",
+        "BK0900.DC",
+        "BK0902.DC",
+        "BK0922.DC",
+        "BK0952.DC",
+        "BK1002.DC",
+        "BK1048.DC"
+      ],
+      "dcConceptCount": 18,
+      "dcConceptMatched": 16,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9608294930875576,
+      "dcConceptPctMeanRank": 0.6736751152073732,
+      "dcConceptTurnoverMaxRank": 0.9470046082949308,
+      "dcConceptTurnoverMeanRank": 0.5381624423963134,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8402937788018433,
+      "dcConceptSwingMaxRank": 0.956221198156682
+    },
+    {
+      "ts_code": "002716.SZ",
+      "name": "湖南白银",
+      "industry": "小金属",
+      "entryDate": "2025-07-14",
+      "priorDate": "2025-07-11",
+      "returnPct": -0.05284596682997079,
+      "netPnl": -1026.493527499999,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0158.DC",
+        "BK0547.DC",
+        "BK0552.DC",
+        "BK0571.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0695.DC",
+        "BK0732.DC",
+        "BK0804.DC",
+        "BK0879.DC"
+      ],
+      "dcConceptCount": 10,
+      "dcConceptMatched": 8,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.967741935483871,
+      "dcConceptPctMeanRank": 0.6244239631336406,
+      "dcConceptTurnoverMaxRank": 0.7695852534562212,
+      "dcConceptTurnoverMeanRank": 0.41129032258064513,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9326036866359447,
+      "dcConceptSwingMaxRank": 0.9285714285714286
+    },
+    {
+      "ts_code": "300393.SZ",
+      "name": "中来股份",
+      "industry": "塑料",
+      "entryDate": "2025-07-08",
+      "priorDate": "2025-07-07",
+      "returnPct": 0.04629163273697716,
+      "netPnl": 882.216551466252,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0159.DC",
+        "BK0570.DC",
+        "BK0588.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0742.DC",
+        "BK0803.DC",
+        "BK0804.DC",
+        "BK0854.DC",
+        "BK1031.DC",
+        "BK1094.DC",
+        "BK1097.DC"
+      ],
+      "dcConceptCount": 12,
+      "dcConceptMatched": 10,
+      "dcConceptPositiveRatio": 0.8,
+      "dcConceptPctMaxRank": 0.8110599078341014,
+      "dcConceptPctMeanRank": 0.5253456221198156,
+      "dcConceptTurnoverMaxRank": 0.9285714285714286,
+      "dcConceptTurnoverMeanRank": 0.517741935483871,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7788018433179723,
+      "dcConceptSwingMaxRank": 0.7741935483870968
+    },
+    {
+      "ts_code": "002645.SZ",
+      "name": "华宏科技",
+      "industry": "专用机械",
+      "entryDate": "2025-07-21",
+      "priorDate": "2025-07-18",
+      "returnPct": -0.05284596682997069,
+      "netPnl": -1000.6724531999971,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0159.DC",
+        "BK0494.DC",
+        "BK0528.DC",
+        "BK0571.DC",
+        "BK0578.DC",
+        "BK0596.DC",
+        "BK0712.DC",
+        "BK0728.DC",
+        "BK0800.DC",
+        "BK0873.DC",
+        "BK0943.DC"
+      ],
+      "dcConceptCount": 11,
+      "dcConceptMatched": 9,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 1.0,
+      "dcConceptPctMeanRank": 0.7050691244239631,
+      "dcConceptTurnoverMaxRank": 0.9769585253456221,
+      "dcConceptTurnoverMeanRank": 0.4511008704557092,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7726574500768049,
+      "dcConceptSwingMaxRank": 1.0
+    },
+    {
+      "ts_code": "601399.SH",
+      "name": "国机重装",
+      "industry": "工程机械",
+      "entryDate": "2025-07-22",
+      "priorDate": "2025-07-21",
+      "returnPct": -0.04424896992448345,
+      "netPnl": -857.0222283000003,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0169.DC",
+        "BK0552.DC",
+        "BK0577.DC",
+        "BK0590.DC",
+        "BK0595.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0701.DC",
+        "BK0707.DC",
+        "BK0712.DC",
+        "BK0814.DC",
+        "BK0864.DC",
+        "BK0910.DC",
+        "BK0989.DC",
+        "BK1003.DC",
+        "BK1004.DC",
+        "BK1087.DC",
+        "BK1163.DC"
+      ],
+      "dcConceptCount": 18,
+      "dcConceptMatched": 16,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.993103448275862,
+      "dcConceptPctMeanRank": 0.8024425287356322,
+      "dcConceptTurnoverMaxRank": 0.7517241379310344,
+      "dcConceptTurnoverMeanRank": 0.2806034482758621,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8229885057471265,
+      "dcConceptSwingMaxRank": 0.8850574712643678
+    },
+    {
+      "ts_code": "601138.SH",
+      "name": "工业富联",
+      "industry": "通信设备",
+      "entryDate": "2025-07-08",
+      "priorDate": "2025-07-07",
+      "returnPct": 0.15483001749562622,
+      "netPnl": 2862.6656817258518,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0153.DC",
+        "BK0500.DC",
+        "BK0549.DC",
+        "BK0554.DC",
+        "BK0579.DC",
+        "BK0596.DC",
+        "BK0612.DC",
+        "BK0634.DC",
+        "BK0666.DC",
+        "BK0707.DC",
+        "BK0714.DC",
+        "BK0800.DC",
+        "BK0821.DC",
+        "BK0830.DC",
+        "BK0832.DC",
+        "BK0835.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0920.DC",
+        "BK1037.DC"
+      ],
+      "dcConceptCount": 25,
+      "dcConceptMatched": 23,
+      "dcConceptPositiveRatio": 0.8260869565217391,
+      "dcConceptPctMaxRank": 0.8064516129032258,
+      "dcConceptPctMeanRank": 0.4028250851532759,
+      "dcConceptTurnoverMaxRank": 0.9585253456221198,
+      "dcConceptTurnoverMeanRank": 0.37998397114806653,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8982167902224003,
+      "dcConceptSwingMaxRank": 0.8018433179723502
+    },
+    {
+      "ts_code": "002097.SZ",
+      "name": "山河智能",
+      "industry": "工程机械",
+      "entryDate": "2025-08-04",
+      "priorDate": "2025-08-01",
+      "returnPct": 0.19760149962509352,
+      "netPnl": 3706.099055458795,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0158.DC",
+        "BK0490.DC",
+        "BK0574.DC",
+        "BK0596.DC",
+        "BK0625.DC",
+        "BK0683.DC",
+        "BK0704.DC",
+        "BK0712.DC",
+        "BK0739.DC",
+        "BK0804.DC",
+        "BK0808.DC",
+        "BK0832.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0991.DC",
+        "BK1157.DC",
+        "BK1166.DC",
+        "BK1192.DC"
+      ],
+      "dcConceptCount": 18,
+      "dcConceptMatched": 16,
+      "dcConceptPositiveRatio": 0.75,
+      "dcConceptPctMaxRank": 0.8188073394495413,
+      "dcConceptPctMeanRank": 0.3271215596330275,
+      "dcConceptTurnoverMaxRank": 0.9174311926605505,
+      "dcConceptTurnoverMeanRank": 0.44753440366972475,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8334288990825688,
+      "dcConceptSwingMaxRank": 0.7454128440366973
+    },
+    {
+      "ts_code": "300304.SZ",
+      "name": "云意电气",
+      "industry": "汽车配件",
+      "entryDate": "2025-07-15",
+      "priorDate": "2025-07-14",
+      "returnPct": 0.1477014371407149,
+      "netPnl": 2784.991051442601,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0159.DC",
+        "BK0481.DC",
+        "BK0506.DC",
+        "BK0588.DC",
+        "BK0742.DC",
+        "BK0802.DC",
+        "BK0804.DC",
+        "BK0891.DC",
+        "BK0898.DC",
+        "BK0900.DC",
+        "BK0917.DC",
+        "BK0969.DC",
+        "BK1005.DC"
+      ],
+      "dcConceptCount": 13,
+      "dcConceptMatched": 11,
+      "dcConceptPositiveRatio": 0.9090909090909091,
+      "dcConceptPctMaxRank": 0.8986175115207373,
+      "dcConceptPctMeanRank": 0.604943443653121,
+      "dcConceptTurnoverMaxRank": 0.9216589861751152,
+      "dcConceptTurnoverMeanRank": 0.519689987431923,
+      "dcConceptAmountMaxRank": 0.9953917050691244,
+      "dcConceptAmountMeanRank": 0.8255131964809385,
+      "dcConceptSwingMaxRank": 0.7465437788018433
+    },
+    {
+      "ts_code": "000901.SZ",
+      "name": "航天科技",
+      "industry": "汽车配件",
+      "entryDate": "2025-08-06",
+      "priorDate": "2025-08-05",
+      "returnPct": 0.14770143714071468,
+      "netPnl": 2855.3848354531474,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0146.DC",
+        "BK0481.DC",
+        "BK0490.DC",
+        "BK0554.DC",
+        "BK0570.DC",
+        "BK0581.DC",
+        "BK0596.DC",
+        "BK0629.DC",
+        "BK0683.DC",
+        "BK0712.DC",
+        "BK0802.DC",
+        "BK0804.DC",
+        "BK0808.DC",
+        "BK0832.DC",
+        "BK0838.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0905.DC",
+        "BK0920.DC",
+        "BK0963.DC"
+      ],
+      "dcConceptCount": 23,
+      "dcConceptMatched": 21,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9817767653758542,
+      "dcConceptPctMeanRank": 0.6557110315652457,
+      "dcConceptTurnoverMaxRank": 1.0,
+      "dcConceptTurnoverMeanRank": 0.508840438225404,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8367501898253606,
+      "dcConceptSwingMaxRank": 0.9863325740318907
+    },
+    {
+      "ts_code": "601929.SH",
+      "name": "吉视传媒",
+      "industry": "影视音像",
+      "entryDate": "2025-08-12",
+      "priorDate": "2025-08-11",
+      "returnPct": 0.19135261544729634,
+      "netPnl": 4009.6343216580026,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0148.DC",
+        "BK0486.DC",
+        "BK0525.DC",
+        "BK0596.DC",
+        "BK0634.DC",
+        "BK0662.DC",
+        "BK0683.DC",
+        "BK0707.DC",
+        "BK0722.DC",
+        "BK0815.DC",
+        "BK0816.DC",
+        "BK0847.DC",
+        "BK0859.DC",
+        "BK0891.DC",
+        "BK0904.DC",
+        "BK1050.DC",
+        "BK1051.DC",
+        "BK1053.DC",
+        "BK1181.DC"
+      ],
+      "dcConceptCount": 19,
+      "dcConceptMatched": 17,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.988558352402746,
+      "dcConceptPctMeanRank": 0.5470453627675327,
+      "dcConceptTurnoverMaxRank": 1.0,
+      "dcConceptTurnoverMeanRank": 0.5940234217256697,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7120743034055728,
+      "dcConceptSwingMaxRank": 0.9908466819221968
+    },
+    {
+      "ts_code": "002176.SZ",
+      "name": "江特电机",
+      "industry": "小金属",
+      "entryDate": "2025-08-12",
+      "priorDate": "2025-08-11",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -1111.6819078750013,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0160.DC",
+        "BK0490.DC",
+        "BK0519.DC",
+        "BK0568.DC",
+        "BK0574.DC",
+        "BK0595.DC",
+        "BK0596.DC",
+        "BK0804.DC",
+        "BK0814.DC",
+        "BK0879.DC",
+        "BK0900.DC",
+        "BK0968.DC",
+        "BK1030.DC",
+        "BK1090.DC",
+        "BK1173.DC"
+      ],
+      "dcConceptCount": 15,
+      "dcConceptMatched": 13,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9954233409610984,
+      "dcConceptPctMeanRank": 0.5351170568561873,
+      "dcConceptTurnoverMaxRank": 0.965675057208238,
+      "dcConceptTurnoverMeanRank": 0.4446400281640556,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8994895264918148,
+      "dcConceptSwingMaxRank": 0.7803203661327232
+    },
+    {
+      "ts_code": "688261.SH",
+      "name": "东微半导",
+      "industry": "半导体",
+      "entryDate": "2025-07-29",
+      "priorDate": "2025-07-28",
+      "returnPct": 0.16433479130217435,
+      "netPnl": 2670.488271701248,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0159.DC",
+        "BK0552.DC",
+        "BK0570.DC",
+        "BK0596.DC",
+        "BK0700.DC",
+        "BK0707.DC",
+        "BK0917.DC",
+        "BK0989.DC",
+        "BK1005.DC",
+        "BK1036.DC",
+        "BK1048.DC"
+      ],
+      "dcConceptCount": 11,
+      "dcConceptMatched": 9,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.8256880733944955,
+      "dcConceptPctMeanRank": 0.5744138634046891,
+      "dcConceptTurnoverMaxRank": 0.8830275229357798,
+      "dcConceptTurnoverMeanRank": 0.3483690112130479,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8937308868501529,
+      "dcConceptSwingMaxRank": 0.75
+    },
+    {
+      "ts_code": "600330.SH",
+      "name": "天通股份",
+      "industry": "专用机械",
+      "entryDate": "2025-08-18",
+      "priorDate": "2025-08-15",
+      "returnPct": -0.052845966829970635,
+      "netPnl": -1098.8771947999958,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0172.DC",
+        "BK0490.DC",
+        "BK0506.DC",
+        "BK0523.DC",
+        "BK0574.DC",
+        "BK0580.DC",
+        "BK0588.DC",
+        "BK0594.DC",
+        "BK0596.DC",
+        "BK0644.DC",
+        "BK0674.DC",
+        "BK0695.DC",
+        "BK0700.DC",
+        "BK0707.DC",
+        "BK0714.DC",
+        "BK0840.DC",
+        "BK0859.DC",
+        "BK0891.DC",
+        "BK0900.DC",
+        "BK0917.DC"
+      ],
+      "dcConceptCount": 28,
+      "dcConceptMatched": 26,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9290617848970252,
+      "dcConceptPctMeanRank": 0.7195036085196268,
+      "dcConceptTurnoverMaxRank": 0.9519450800915332,
+      "dcConceptTurnoverMeanRank": 0.5405738426333392,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7935222672064778,
+      "dcConceptSwingMaxRank": 0.9244851258581236
+    },
+    {
+      "ts_code": "002190.SZ",
+      "name": "成飞集成",
+      "industry": "汽车配件",
+      "entryDate": "2025-08-25",
+      "priorDate": "2025-08-22",
+      "returnPct": -0.05284596682997085,
+      "netPnl": -1135.9156210500005,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0169.DC",
+        "BK0481.DC",
+        "BK0490.DC",
+        "BK0574.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0704.DC",
+        "BK0804.DC",
+        "BK0814.DC",
+        "BK0815.DC",
+        "BK0816.DC",
+        "BK0900.DC",
+        "BK0984.DC",
+        "BK1005.DC",
+        "BK1050.DC",
+        "BK1051.DC"
+      ],
+      "dcConceptCount": 17,
+      "dcConceptMatched": 15,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 1.0,
+      "dcConceptPctMeanRank": 0.6122044241037377,
+      "dcConceptTurnoverMaxRank": 0.9610983981693364,
+      "dcConceptTurnoverMeanRank": 0.556979405034325,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7659801678108314,
+      "dcConceptSwingMaxRank": 0.9954233409610984
+    },
+    {
+      "ts_code": "600737.SH",
+      "name": "中粮糖业",
+      "industry": "食品",
+      "entryDate": "2025-08-18",
+      "priorDate": "2025-08-15",
+      "returnPct": 0.1477014371407147,
+      "netPnl": 3161.509064238522,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0147.DC",
+        "BK0438.DC",
+        "BK0505.DC",
+        "BK0552.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0701.DC",
+        "BK0705.DC",
+        "BK0707.DC",
+        "BK0815.DC",
+        "BK0821.DC",
+        "BK0834.DC",
+        "BK0867.DC",
+        "BK0888.DC",
+        "BK1026.DC",
+        "BK1050.DC",
+        "BK1195.DC"
+      ],
+      "dcConceptCount": 18,
+      "dcConceptMatched": 16,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9908466819221968,
+      "dcConceptPctMeanRank": 0.44107551487414187,
+      "dcConceptTurnoverMaxRank": 0.9725400457665904,
+      "dcConceptTurnoverMeanRank": 0.29347826086956524,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7980549199084668,
+      "dcConceptSwingMaxRank": 0.9679633867276888
+    },
+    {
+      "ts_code": "002202.SZ",
+      "name": "金风科技",
+      "industry": "电气设备",
+      "entryDate": "2025-08-25",
+      "priorDate": "2025-08-22",
+      "returnPct": -0.05284596682997096,
+      "netPnl": -1106.7081763500028,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0147.DC",
+        "BK0493.DC",
+        "BK0499.DC",
+        "BK0552.DC",
+        "BK0568.DC",
+        "BK0578.DC",
+        "BK0590.DC",
+        "BK0595.DC",
+        "BK0596.DC",
+        "BK0701.DC",
+        "BK0712.DC",
+        "BK0718.DC",
+        "BK0804.DC",
+        "BK0821.DC",
+        "BK0864.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0989.DC",
+        "BK1003.DC",
+        "BK1024.DC"
+      ],
+      "dcConceptCount": 21,
+      "dcConceptMatched": 19,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.7734553775743707,
+      "dcConceptPctMeanRank": 0.4595929182223293,
+      "dcConceptTurnoverMaxRank": 0.8649885583524027,
+      "dcConceptTurnoverMeanRank": 0.19812116102613514,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8602914609177406,
+      "dcConceptSwingMaxRank": 0.931350114416476
+    },
+    {
+      "ts_code": "000981.SZ",
+      "name": "山子高科",
+      "industry": "汽车配件",
+      "entryDate": "2025-09-02",
+      "priorDate": "2025-09-01",
+      "returnPct": -0.05284596682997093,
+      "netPnl": -1135.756884937502,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0152.DC",
+        "BK0481.DC",
+        "BK0552.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0689.DC",
+        "BK0804.DC",
+        "BK0900.DC",
+        "BK0984.DC",
+        "BK1053.DC",
+        "BK1100.DC",
+        "BK1196.DC"
+      ],
+      "dcConceptCount": 12,
+      "dcConceptMatched": 10,
+      "dcConceptPositiveRatio": 0.9,
+      "dcConceptPctMaxRank": 0.8329519450800915,
+      "dcConceptPctMeanRank": 0.43318077803203664,
+      "dcConceptTurnoverMaxRank": 0.8535469107551488,
+      "dcConceptTurnoverMeanRank": 0.5064073226544622,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8260869565217391,
+      "dcConceptSwingMaxRank": 0.9290617848970252
+    },
+    {
+      "ts_code": "601069.SH",
+      "name": "西部黄金",
+      "industry": "黄金",
+      "entryDate": "2025-09-02",
+      "priorDate": "2025-09-01",
+      "returnPct": 0.14770143714071476,
+      "netPnl": 2851.244024628999,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0147.DC",
+        "BK0547.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0695.DC",
+        "BK0707.DC",
+        "BK0732.DC",
+        "BK0812.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK1194.DC"
+      ],
+      "dcConceptCount": 12,
+      "dcConceptMatched": 10,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 1.0,
+      "dcConceptPctMeanRank": 0.5350114416475973,
+      "dcConceptTurnoverMaxRank": 0.6704805491990846,
+      "dcConceptTurnoverMeanRank": 0.311441647597254,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9157894736842105,
+      "dcConceptSwingMaxRank": 0.9954233409610984
+    },
+    {
+      "ts_code": "600977.SH",
+      "name": "中国电影",
+      "industry": "影视音像",
+      "entryDate": "2025-09-09",
+      "priorDate": "2025-09-08",
+      "returnPct": 0.1976014996250939,
+      "netPnl": 4176.1872123972025,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0150.DC",
+        "BK0486.DC",
+        "BK0505.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0701.DC",
+        "BK0707.DC",
+        "BK0800.DC",
+        "BK0815.DC",
+        "BK0847.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK1050.DC",
+        "BK1183.DC"
+      ],
+      "dcConceptCount": 14,
+      "dcConceptMatched": 12,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9519450800915332,
+      "dcConceptPctMeanRank": 0.6165141113653699,
+      "dcConceptTurnoverMaxRank": 0.9977116704805492,
+      "dcConceptTurnoverMeanRank": 0.41723874904652936,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8670861937452327,
+      "dcConceptSwingMaxRank": 0.6361556064073226
+    },
+    {
+      "ts_code": "600699.SH",
+      "name": "均胜电子",
+      "industry": "汽车配件",
+      "entryDate": "2025-09-09",
+      "priorDate": "2025-09-08",
+      "returnPct": 0.14770143714071488,
+      "netPnl": 3194.339778630001,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0172.DC",
+        "BK0481.DC",
+        "BK0596.DC",
+        "BK0644.DC",
+        "BK0700.DC",
+        "BK0701.DC",
+        "BK0705.DC",
+        "BK0707.DC",
+        "BK0802.DC",
+        "BK0815.DC",
+        "BK0821.DC",
+        "BK0854.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0900.DC",
+        "BK0920.DC",
+        "BK0960.DC",
+        "BK0984.DC",
+        "BK1002.DC",
+        "BK1050.DC"
+      ],
+      "dcConceptCount": 24,
+      "dcConceptMatched": 22,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9794050343249427,
+      "dcConceptPctMeanRank": 0.6428125650093613,
+      "dcConceptTurnoverMaxRank": 0.9977116704805492,
+      "dcConceptTurnoverMeanRank": 0.5413979613064281,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8677969627626378,
+      "dcConceptSwingMaxRank": 0.9610983981693364
+    },
+    {
+      "ts_code": "300857.SZ",
+      "name": "协创数据",
+      "industry": "IT设备",
+      "entryDate": "2025-09-17",
+      "priorDate": "2025-09-16",
+      "returnPct": -0.05284596682997067,
+      "netPnl": -886.8057484999972,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0153.DC",
+        "BK0509.DC",
+        "BK0536.DC",
+        "BK0549.DC",
+        "BK0554.DC",
+        "BK0568.DC",
+        "BK0596.DC",
+        "BK0638.DC",
+        "BK0701.DC",
+        "BK0742.DC",
+        "BK0800.DC",
+        "BK0804.DC",
+        "BK0833.DC",
+        "BK0891.DC",
+        "BK0920.DC",
+        "BK1037.DC",
+        "BK1049.DC",
+        "BK1059.DC",
+        "BK1134.DC",
+        "BK1137.DC"
+      ],
+      "dcConceptCount": 21,
+      "dcConceptMatched": 19,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9382151029748284,
+      "dcConceptPctMeanRank": 0.6356738528242803,
+      "dcConceptTurnoverMaxRank": 0.9954233409610984,
+      "dcConceptTurnoverMeanRank": 0.5632903769721788,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8825725641334458,
+      "dcConceptSwingMaxRank": 0.9610983981693364
+    },
+    {
+      "ts_code": "002050.SZ",
+      "name": "三花智控",
+      "industry": "家用电器",
+      "entryDate": "2025-09-17",
+      "priorDate": "2025-09-16",
+      "returnPct": 0.15768144963759076,
+      "netPnl": 3307.556478726503,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0172.DC",
+        "BK0456.DC",
+        "BK0499.DC",
+        "BK0500.DC",
+        "BK0536.DC",
+        "BK0567.DC",
+        "BK0568.DC",
+        "BK0594.DC",
+        "BK0596.DC",
+        "BK0644.DC",
+        "BK0680.DC",
+        "BK0682.DC",
+        "BK0743.DC",
+        "BK0804.DC",
+        "BK0821.DC",
+        "BK0852.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0900.DC",
+        "BK0984.DC"
+      ],
+      "dcConceptCount": 24,
+      "dcConceptMatched": 22,
+      "dcConceptPositiveRatio": 0.9545454545454546,
+      "dcConceptPctMaxRank": 0.9977116704805492,
+      "dcConceptPctMeanRank": 0.5722904098190139,
+      "dcConceptTurnoverMaxRank": 0.9954233409610984,
+      "dcConceptTurnoverMeanRank": 0.4743083003952569,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.874869981277304,
+      "dcConceptSwingMaxRank": 1.0
+    },
+    {
+      "ts_code": "600362.SH",
+      "name": "江西铜业",
+      "industry": "铜",
+      "entryDate": "2025-10-10",
+      "priorDate": "2025-10-09",
+      "returnPct": -0.08185618537312066,
+      "netPnl": -1725.2269737499955,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0160.DC",
+        "BK0478.DC",
+        "BK0499.DC",
+        "BK0500.DC",
+        "BK0514.DC",
+        "BK0519.DC",
+        "BK0523.DC",
+        "BK0525.DC",
+        "BK0547.DC",
+        "BK0552.DC",
+        "BK0574.DC",
+        "BK0596.DC",
+        "BK0612.DC",
+        "BK0683.DC",
+        "BK0695.DC",
+        "BK0707.DC",
+        "BK0712.DC",
+        "BK0718.DC",
+        "BK0815.DC",
+        "BK0821.DC"
+      ],
+      "dcConceptCount": 23,
+      "dcConceptMatched": 21,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9954337899543378,
+      "dcConceptPctMeanRank": 0.7195042400521853,
+      "dcConceptTurnoverMaxRank": 0.9931506849315068,
+      "dcConceptTurnoverMeanRank": 0.3339856490541422,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9030223961730811,
+      "dcConceptSwingMaxRank": 0.9406392694063926
+    },
+    {
+      "ts_code": "002941.SZ",
+      "name": "新疆交建",
+      "industry": "建筑工程",
+      "entryDate": "2025-10-10",
+      "priorDate": "2025-10-09",
+      "returnPct": -0.05412417740105025,
+      "netPnl": -1162.4150999999947,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0147.DC",
+        "BK0425.DC",
+        "BK0590.DC",
+        "BK0592.DC",
+        "BK0596.DC",
+        "BK0597.DC",
+        "BK0683.DC",
+        "BK0712.DC",
+        "BK0721.DC",
+        "BK0804.DC",
+        "BK0867.DC",
+        "BK0875.DC",
+        "BK1194.DC"
+      ],
+      "dcConceptCount": 13,
+      "dcConceptMatched": 11,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.7625570776255708,
+      "dcConceptPctMeanRank": 0.6222498962224989,
+      "dcConceptTurnoverMaxRank": 0.6689497716894978,
+      "dcConceptTurnoverMeanRank": 0.3094645080946451,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8080116230801162,
+      "dcConceptSwingMaxRank": 0.3401826484018265
+    },
+    {
+      "ts_code": "601699.SH",
+      "name": "潞安环能",
+      "industry": "煤炭开采",
+      "entryDate": "2025-10-16",
+      "priorDate": "2025-10-15",
+      "returnPct": -0.052845966829970725,
+      "netPnl": -1180.0442603249976,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0167.DC",
+        "BK0437.DC",
+        "BK0500.DC",
+        "BK0519.DC",
+        "BK0596.DC",
+        "BK0612.DC",
+        "BK0683.DC",
+        "BK0707.DC",
+        "BK0821.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK1112.DC",
+        "BK1197.DC"
+      ],
+      "dcConceptCount": 13,
+      "dcConceptMatched": 11,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.4817351598173516,
+      "dcConceptPctMeanRank": 0.27106683271066834,
+      "dcConceptTurnoverMaxRank": 0.5570776255707762,
+      "dcConceptTurnoverMeanRank": 0.15753424657534246,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9410543794105438,
+      "dcConceptSwingMaxRank": 0.3789954337899543
+    },
+    {
+      "ts_code": "000543.SZ",
+      "name": "皖能电力",
+      "industry": "火力发电",
+      "entryDate": "2025-10-27",
+      "priorDate": "2025-10-24",
+      "returnPct": -0.05284596682997077,
+      "netPnl": -1189.9917233749984,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0149.DC",
+        "BK0428.DC",
+        "BK0492.DC",
+        "BK0493.DC",
+        "BK0514.DC",
+        "BK0525.DC",
+        "BK0568.DC",
+        "BK0577.DC",
+        "BK0595.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0697.DC",
+        "BK0700.DC",
+        "BK0701.DC",
+        "BK0804.DC",
+        "BK0823.DC",
+        "BK0843.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0966.DC"
+      ],
+      "dcConceptCount": 23,
+      "dcConceptMatched": 21,
+      "dcConceptPositiveRatio": 0.5714285714285714,
+      "dcConceptPctMaxRank": 0.6825396825396826,
+      "dcConceptPctMeanRank": 0.3445632221142425,
+      "dcConceptTurnoverMaxRank": 0.7755102040816326,
+      "dcConceptTurnoverMeanRank": 0.24921714717633084,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.783068783068783,
+      "dcConceptSwingMaxRank": 0.7573696145124716
+    },
+    {
+      "ts_code": "603185.SH",
+      "name": "弘元绿能",
+      "industry": "电气设备",
+      "entryDate": "2025-11-03",
+      "priorDate": "2025-10-31",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -1188.9334826250015,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0159.DC",
+        "BK0588.DC",
+        "BK0596.DC",
+        "BK0707.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0952.DC",
+        "BK1005.DC",
+        "BK1031.DC",
+        "BK1197.DC"
+      ],
+      "dcConceptCount": 10,
+      "dcConceptMatched": 8,
+      "dcConceptPositiveRatio": 0.875,
+      "dcConceptPctMaxRank": 0.4376417233560091,
+      "dcConceptPctMeanRank": 0.302437641723356,
+      "dcConceptTurnoverMaxRank": 0.9319727891156463,
+      "dcConceptTurnoverMeanRank": 0.34467120181405897,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9271541950113379,
+      "dcConceptSwingMaxRank": 0.5260770975056689
+    },
+    {
+      "ts_code": "300058.SZ",
+      "name": "蓝色光标",
+      "industry": "广告包装",
+      "entryDate": "2025-11-04",
+      "priorDate": "2025-11-03",
+      "returnPct": 0.1477014371407149,
+      "netPnl": 3254.6773077819016,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0150.DC",
+        "BK0486.DC",
+        "BK0568.DC",
+        "BK0596.DC",
+        "BK0634.DC",
+        "BK0638.DC",
+        "BK0662.DC",
+        "BK0701.DC",
+        "BK0742.DC",
+        "BK0800.DC",
+        "BK0804.DC",
+        "BK0809.DC",
+        "BK0830.DC",
+        "BK0845.DC",
+        "BK0867.DC",
+        "BK0923.DC",
+        "BK0940.DC",
+        "BK0972.DC",
+        "BK0997.DC",
+        "BK1009.DC"
+      ],
+      "dcConceptCount": 31,
+      "dcConceptMatched": 29,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9886621315192744,
+      "dcConceptPctMeanRank": 0.6963797013058097,
+      "dcConceptTurnoverMaxRank": 1.0,
+      "dcConceptTurnoverMeanRank": 0.7379779498006099,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7615919931190867,
+      "dcConceptSwingMaxRank": 0.9297052154195011
+    },
+    {
+      "ts_code": "600549.SH",
+      "name": "厦门钨业",
+      "industry": "小金属",
+      "entryDate": "2025-10-27",
+      "priorDate": "2025-10-24",
+      "returnPct": -0.052845966829970656,
+      "netPnl": -1096.2315929249962,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0151.DC",
+        "BK0519.DC",
+        "BK0523.DC",
+        "BK0552.DC",
+        "BK0574.DC",
+        "BK0578.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0695.DC",
+        "BK0701.DC",
+        "BK0705.DC",
+        "BK0707.DC",
+        "BK0821.DC",
+        "BK0835.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0968.DC",
+        "BK1027.DC",
+        "BK1052.DC",
+        "BK1090.DC"
+      ],
+      "dcConceptCount": 21,
+      "dcConceptMatched": 19,
+      "dcConceptPositiveRatio": 0.8947368421052632,
+      "dcConceptPctMaxRank": 0.8367346938775511,
+      "dcConceptPctMeanRank": 0.545530492898914,
+      "dcConceptTurnoverMaxRank": 0.873015873015873,
+      "dcConceptTurnoverMeanRank": 0.3745076978159685,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8862632772407208,
+      "dcConceptSwingMaxRank": 0.7959183673469388
+    },
+    {
+      "ts_code": "603619.SH",
+      "name": "中曼石油",
+      "industry": "石油开采",
+      "entryDate": "2025-11-18",
+      "priorDate": "2025-11-17",
+      "returnPct": -0.05284596682997069,
+      "netPnl": -1187.1873853874968,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0145.DC",
+        "BK0520.DC",
+        "BK0596.DC",
+        "BK0606.DC",
+        "BK0705.DC",
+        "BK0707.DC",
+        "BK0712.DC",
+        "BK0843.DC",
+        "BK0879.DC",
+        "BK1017.DC",
+        "BK1090.DC"
+      ],
+      "dcConceptCount": 11,
+      "dcConceptMatched": 9,
+      "dcConceptPositiveRatio": 0.5555555555555556,
+      "dcConceptPctMaxRank": 0.5431818181818182,
+      "dcConceptPctMeanRank": 0.296969696969697,
+      "dcConceptTurnoverMaxRank": 0.6409090909090909,
+      "dcConceptTurnoverMeanRank": 0.2641414141414141,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7752525252525252,
+      "dcConceptSwingMaxRank": 0.5636363636363636
+    },
+    {
+      "ts_code": "601898.SH",
+      "name": "中煤能源",
+      "industry": "煤炭开采",
+      "entryDate": "2025-10-16",
+      "priorDate": "2025-10-15",
+      "returnPct": 0.049452643805498964,
+      "netPnl": 1118.6804652954052,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0150.DC",
+        "BK0437.DC",
+        "BK0492.DC",
+        "BK0499.DC",
+        "BK0500.DC",
+        "BK0505.DC",
+        "BK0552.DC",
+        "BK0596.DC",
+        "BK0612.DC",
+        "BK0683.DC",
+        "BK0707.DC",
+        "BK0718.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK1139.DC",
+        "BK1197.DC"
+      ],
+      "dcConceptCount": 16,
+      "dcConceptMatched": 14,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.4817351598173516,
+      "dcConceptPctMeanRank": 0.2671232876712329,
+      "dcConceptTurnoverMaxRank": 0.5570776255707762,
+      "dcConceptTurnoverMeanRank": 0.12573385518591,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9070450097847358,
+      "dcConceptSwingMaxRank": 0.3584474885844749
+    },
+    {
+      "ts_code": "002131.SZ",
+      "name": "利欧股份",
+      "industry": "互联网",
+      "entryDate": "2026-01-06",
+      "priorDate": "2026-01-05",
+      "returnPct": 0.14770143714071488,
+      "netPnl": 3333.648485642476,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0172.DC",
+        "BK0447.DC",
+        "BK0506.DC",
+        "BK0568.DC",
+        "BK0594.DC",
+        "BK0596.DC",
+        "BK0597.DC",
+        "BK0600.DC",
+        "BK0604.DC",
+        "BK0693.DC",
+        "BK0701.DC",
+        "BK0724.DC",
+        "BK0804.DC",
+        "BK0809.DC",
+        "BK0815.DC",
+        "BK0830.DC",
+        "BK0833.DC",
+        "BK0845.DC",
+        "BK0854.DC",
+        "BK0867.DC"
+      ],
+      "dcConceptCount": 34,
+      "dcConceptMatched": 32,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9886363636363636,
+      "dcConceptPctMeanRank": 0.6048295454545455,
+      "dcConceptTurnoverMaxRank": 1.0,
+      "dcConceptTurnoverMeanRank": 0.6948863636363636,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.78828125,
+      "dcConceptSwingMaxRank": 0.9931818181818182
+    },
+    {
+      "ts_code": "002414.SZ",
+      "name": "高德红外",
+      "industry": "电器仪表",
+      "entryDate": "2025-12-23",
+      "priorDate": "2025-12-22",
+      "returnPct": 0.147701437140715,
+      "netPnl": 3144.945820941928,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0157.DC",
+        "BK0459.DC",
+        "BK0490.DC",
+        "BK0568.DC",
+        "BK0596.DC",
+        "BK0667.DC",
+        "BK0668.DC",
+        "BK0680.DC",
+        "BK0699.DC",
+        "BK0701.DC",
+        "BK0704.DC",
+        "BK0800.DC",
+        "BK0802.DC",
+        "BK0804.DC",
+        "BK0808.DC",
+        "BK0821.DC",
+        "BK0854.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0891.DC"
+      ],
+      "dcConceptCount": 27,
+      "dcConceptMatched": 25,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9613636363636363,
+      "dcConceptPctMeanRank": 0.6291818181818182,
+      "dcConceptTurnoverMaxRank": 0.9818181818181818,
+      "dcConceptTurnoverMeanRank": 0.5673636363636364,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8383636363636363,
+      "dcConceptSwingMaxRank": 0.9568181818181818
+    },
+    {
+      "ts_code": "603882.SH",
+      "name": "金域医学",
+      "industry": "医疗保健",
+      "entryDate": "2026-01-12",
+      "priorDate": "2026-01-09",
+      "returnPct": -0.05284596682997072,
+      "netPnl": -1175.5996491749975,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0153.DC",
+        "BK0596.DC",
+        "BK0668.DC",
+        "BK0693.DC",
+        "BK0707.DC",
+        "BK0727.DC",
+        "BK0841.DC",
+        "BK0852.DC",
+        "BK0854.DC",
+        "BK0867.DC",
+        "BK0879.DC"
+      ],
+      "dcConceptCount": 11,
+      "dcConceptMatched": 9,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.7977272727272727,
+      "dcConceptPctMeanRank": 0.5656565656565656,
+      "dcConceptTurnoverMaxRank": 0.884090909090909,
+      "dcConceptTurnoverMeanRank": 0.379040404040404,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7858585858585858,
+      "dcConceptSwingMaxRank": 0.7522727272727273
+    },
+    {
+      "ts_code": "600312.SH",
+      "name": "平高电气",
+      "industry": "电气设备",
+      "entryDate": "2026-01-20",
+      "priorDate": "2026-01-19",
+      "returnPct": -0.05284596682997057,
+      "netPnl": -1243.9620016249937,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0156.DC",
+        "BK0457.DC",
+        "BK0577.DC",
+        "BK0581.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0700.DC",
+        "BK0701.DC",
+        "BK0707.DC",
+        "BK0712.DC",
+        "BK0817.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0918.DC",
+        "BK1090.DC"
+      ],
+      "dcConceptCount": 15,
+      "dcConceptMatched": 13,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 1.0,
+      "dcConceptPctMeanRank": 0.7326007326007326,
+      "dcConceptTurnoverMaxRank": 0.9569160997732427,
+      "dcConceptTurnoverMeanRank": 0.4259549973835688,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9145299145299145,
+      "dcConceptSwingMaxRank": 0.9954648526077098
+    },
+    {
+      "ts_code": "601212.SH",
+      "name": "白银有色",
+      "industry": "铜",
+      "entryDate": "2026-01-26",
+      "priorDate": "2026-01-23",
+      "returnPct": -0.05284596682997077,
+      "netPnl": -1207.4526957499984,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0152.DC",
+        "BK0478.DC",
+        "BK0547.DC",
+        "BK0552.DC",
+        "BK0574.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0695.DC",
+        "BK0701.DC",
+        "BK0707.DC",
+        "BK0815.DC",
+        "BK0816.DC",
+        "BK0877.DC",
+        "BK1050.DC",
+        "BK1051.DC",
+        "BK1163.DC"
+      ],
+      "dcConceptCount": 16,
+      "dcConceptMatched": 14,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9614512471655329,
+      "dcConceptPctMeanRank": 0.6852931648850016,
+      "dcConceptTurnoverMaxRank": 1.0,
+      "dcConceptTurnoverMeanRank": 0.5840621963070942,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8072562358276644,
+      "dcConceptSwingMaxRank": 0.9342403628117913
+    },
+    {
+      "ts_code": "002284.SZ",
+      "name": "亚太股份",
+      "industry": "汽车配件",
+      "entryDate": "2025-12-23",
+      "priorDate": "2025-12-22",
+      "returnPct": 0.14770143714071482,
+      "netPnl": 3138.7346047057,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0172.DC",
+        "BK0481.DC",
+        "BK0594.DC",
+        "BK0596.DC",
+        "BK0802.DC",
+        "BK0804.DC",
+        "BK0898.DC",
+        "BK0900.DC",
+        "BK0920.DC",
+        "BK0963.DC",
+        "BK0984.DC",
+        "BK1099.DC",
+        "BK1194.DC",
+        "BK1198.DC"
+      ],
+      "dcConceptCount": 14,
+      "dcConceptMatched": 12,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9295454545454546,
+      "dcConceptPctMeanRank": 0.6835227272727272,
+      "dcConceptTurnoverMaxRank": 0.95,
+      "dcConceptTurnoverMeanRank": 0.6143939393939394,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7793560606060607,
+      "dcConceptSwingMaxRank": 0.9522727272727273
+    },
+    {
+      "ts_code": "601179.SH",
+      "name": "中国西电",
+      "industry": "电气设备",
+      "entryDate": "2026-01-20",
+      "priorDate": "2026-01-19",
+      "returnPct": -0.052845966829970906,
+      "netPnl": -1240.522719187502,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0165.DC",
+        "BK0457.DC",
+        "BK0505.DC",
+        "BK0535.DC",
+        "BK0552.DC",
+        "BK0581.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0597.DC",
+        "BK0683.DC",
+        "BK0701.DC",
+        "BK0705.DC",
+        "BK0707.DC",
+        "BK0712.DC",
+        "BK0821.DC",
+        "BK0918.DC",
+        "BK0922.DC",
+        "BK1121.DC",
+        "BK1139.DC",
+        "BK1163.DC"
+      ],
+      "dcConceptCount": 20,
+      "dcConceptMatched": 18,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 1.0,
+      "dcConceptPctMeanRank": 0.6686822877299068,
+      "dcConceptTurnoverMaxRank": 0.9569160997732427,
+      "dcConceptTurnoverMeanRank": 0.3256487780297304,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.845930964978584,
+      "dcConceptSwingMaxRank": 0.9954648526077098
+    },
+    {
+      "ts_code": "301217.SZ",
+      "name": "铜冠铜箔",
+      "industry": "元器件",
+      "entryDate": "2026-02-25",
+      "priorDate": "2026-02-24",
+      "returnPct": -0.05284596682997074,
+      "netPnl": -1033.266268299998,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0149.DC",
+        "BK0574.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0742.DC",
+        "BK0804.DC",
+        "BK0877.DC",
+        "BK0989.DC",
+        "BK1033.DC",
+        "BK1200.DC",
+        "BK1303.DC",
+        "BK1633.DC"
+      ],
+      "dcConceptCount": 12,
+      "dcConceptMatched": 8,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9311827956989247,
+      "dcConceptPctMeanRank": 0.6529569892473118,
+      "dcConceptTurnoverMaxRank": 0.8709677419354839,
+      "dcConceptTurnoverMeanRank": 0.5456989247311828,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9489247311827957,
+      "dcConceptSwingMaxRank": 0.7720430107526882
+    },
+    {
+      "ts_code": "601872.SH",
+      "name": "招商轮船",
+      "industry": "水运",
+      "entryDate": "2026-02-25",
+      "priorDate": "2026-02-24",
+      "returnPct": 0.15102810797300678,
+      "netPnl": 3345.6745953881255,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0145.DC",
+        "BK0450.DC",
+        "BK0500.DC",
+        "BK0596.DC",
+        "BK0612.DC",
+        "BK0623.DC",
+        "BK0683.DC",
+        "BK0707.DC",
+        "BK0712.DC",
+        "BK0821.DC",
+        "BK0843.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK1210.DC",
+        "BK1482.DC",
+        "BK1633.DC",
+        "BK1638.DC",
+        "BK1639.DC"
+      ],
+      "dcConceptCount": 18,
+      "dcConceptMatched": 14,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9806451612903225,
+      "dcConceptPctMeanRank": 0.6394777265745007,
+      "dcConceptTurnoverMaxRank": 0.9526881720430107,
+      "dcConceptTurnoverMeanRank": 0.24055299539170508,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9270353302611367,
+      "dcConceptSwingMaxRank": 0.9032258064516129
+    },
+    {
+      "ts_code": "000960.SZ",
+      "name": "锡业股份",
+      "industry": "小金属",
+      "entryDate": "2026-03-02",
+      "priorDate": "2026-02-27",
+      "returnPct": -0.0665343447899346,
+      "netPnl": -1300.3741730000002,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0171.DC",
+        "BK0478.DC",
+        "BK0519.DC",
+        "BK0568.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0695.DC",
+        "BK0701.DC",
+        "BK0804.DC",
+        "BK0821.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK0980.DC",
+        "BK1027.DC",
+        "BK1624.DC"
+      ],
+      "dcConceptCount": 16,
+      "dcConceptMatched": 12,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9956989247311828,
+      "dcConceptPctMeanRank": 0.6326164874551972,
+      "dcConceptTurnoverMaxRank": 0.8709677419354839,
+      "dcConceptTurnoverMeanRank": 0.36989247311827955,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.918100358422939,
+      "dcConceptSwingMaxRank": 0.9978494623655914
+    },
+    {
+      "ts_code": "600452.SH",
+      "name": "涪陵电力",
+      "industry": "水力发电",
+      "entryDate": "2026-03-02",
+      "priorDate": "2026-02-27",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -1236.8717886000013,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0170.DC",
+        "BK0427.DC",
+        "BK0428.DC",
+        "BK0494.DC",
+        "BK0534.DC",
+        "BK0552.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0705.DC",
+        "BK0707.DC",
+        "BK0879.DC",
+        "BK1373.DC"
+      ],
+      "dcConceptCount": 13,
+      "dcConceptMatched": 9,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.8451612903225807,
+      "dcConceptPctMeanRank": 0.5894862604540024,
+      "dcConceptTurnoverMaxRank": 0.6150537634408603,
+      "dcConceptTurnoverMeanRank": 0.2848267622461171,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9158900836320191,
+      "dcConceptSwingMaxRank": 0.7376344086021506
+    },
+    {
+      "ts_code": "002149.SZ",
+      "name": "西部材料",
+      "industry": "小金属",
+      "entryDate": "2026-04-21",
+      "priorDate": "2026-04-20",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -973.528577962501,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0165.DC",
+        "BK0478.DC",
+        "BK0490.DC",
+        "BK0494.DC",
+        "BK0577.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0597.DC",
+        "BK0600.DC",
+        "BK0625.DC",
+        "BK0679.DC",
+        "BK0682.DC",
+        "BK0683.DC",
+        "BK0695.DC",
+        "BK0714.DC",
+        "BK0715.DC",
+        "BK0804.DC",
+        "BK0855.DC",
+        "BK0932.DC",
+        "BK0963.DC"
+      ],
+      "dcConceptCount": 28,
+      "dcConceptMatched": 24,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9938775510204082,
+      "dcConceptPctMeanRank": 0.7323129251700681,
+      "dcConceptTurnoverMaxRank": 1.0,
+      "dcConceptTurnoverMeanRank": 0.5852891156462585,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.7714285714285715,
+      "dcConceptSwingMaxRank": 0.9795918367346939
+    },
+    {
+      "ts_code": "300806.SZ",
+      "name": "斯迪克",
+      "industry": "塑料",
+      "entryDate": "2026-04-21",
+      "priorDate": "2026-04-20",
+      "returnPct": 0.1976014996250935,
+      "netPnl": 4118.613284085295,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0159.DC",
+        "BK0454.DC",
+        "BK0523.DC",
+        "BK0535.DC",
+        "BK0552.DC",
+        "BK0567.DC",
+        "BK0588.DC",
+        "BK0617.DC",
+        "BK0644.DC",
+        "BK0682.DC",
+        "BK0742.DC",
+        "BK0804.DC",
+        "BK0815.DC",
+        "BK0854.DC",
+        "BK0864.DC",
+        "BK0877.DC",
+        "BK0893.DC",
+        "BK0900.DC",
+        "BK1005.DC",
+        "BK1050.DC"
+      ],
+      "dcConceptCount": 34,
+      "dcConceptMatched": 30,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9938775510204082,
+      "dcConceptPctMeanRank": 0.6152380952380953,
+      "dcConceptTurnoverMaxRank": 0.9979591836734694,
+      "dcConceptTurnoverMeanRank": 0.7198639455782313,
+      "dcConceptAmountMaxRank": 0.9979591836734694,
+      "dcConceptAmountMeanRank": 0.8678231292517007,
+      "dcConceptSwingMaxRank": 0.7795918367346939
+    },
+    {
+      "ts_code": "600338.SH",
+      "name": "西藏珠峰",
+      "industry": "铅锌",
+      "entryDate": "2026-04-28",
+      "priorDate": "2026-04-27",
+      "returnPct": 0.04235686078480374,
+      "netPnl": 958.0377761954987,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0174.DC",
+        "BK0478.DC",
+        "BK0514.DC",
+        "BK0574.DC",
+        "BK0590.DC",
+        "BK0596.DC",
+        "BK0695.DC",
+        "BK0707.DC",
+        "BK0712.DC",
+        "BK0815.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK1050.DC",
+        "BK1173.DC",
+        "BK1287.DC",
+        "BK1614.DC",
+        "BK1630.DC",
+        "BK1632.DC",
+        "BK1633.DC",
+        "BK1637.DC"
+      ],
+      "dcConceptCount": 25,
+      "dcConceptMatched": 21,
+      "dcConceptPositiveRatio": 0.9523809523809523,
+      "dcConceptPctMaxRank": 0.7835051546391752,
+      "dcConceptPctMeanRank": 0.46244477172312226,
+      "dcConceptTurnoverMaxRank": 1.0,
+      "dcConceptTurnoverMeanRank": 0.5883161512027492,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8748159057437408,
+      "dcConceptSwingMaxRank": 0.5938144329896907
+    },
+    {
+      "ts_code": "000783.SZ",
+      "name": "长江证券",
+      "industry": "证券",
+      "entryDate": "2026-05-06",
+      "priorDate": "2026-04-30",
+      "returnPct": -0.05284596682997091,
+      "netPnl": -1255.7613859875019,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0157.DC",
+        "BK0473.DC",
+        "BK0524.DC",
+        "BK0568.DC",
+        "BK0596.DC",
+        "BK0600.DC",
+        "BK0637.DC",
+        "BK0701.DC",
+        "BK0711.DC",
+        "BK0721.DC",
+        "BK0804.DC",
+        "BK0821.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK1203.DC",
+        "BK1366.DC",
+        "BK1664.DC",
+        "BK1669.DC",
+        "BK1673.DC",
+        "BK1677.DC"
+      ],
+      "dcConceptCount": 20,
+      "dcConceptMatched": 16,
+      "dcConceptPositiveRatio": 0.6875,
+      "dcConceptPctMaxRank": 0.8288659793814434,
+      "dcConceptPctMeanRank": 0.4514175257731959,
+      "dcConceptTurnoverMaxRank": 0.756701030927835,
+      "dcConceptTurnoverMeanRank": 0.2804123711340206,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8552835051546391,
+      "dcConceptSwingMaxRank": 0.911340206185567
+    },
+    {
+      "ts_code": "000060.SZ",
+      "name": "中金岭南",
+      "industry": "铅锌",
+      "entryDate": "2026-05-07",
+      "priorDate": "2026-05-06",
+      "returnPct": -0.052845966829970885,
+      "netPnl": -1239.8348627000014,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0153.DC",
+        "BK0478.DC",
+        "BK0519.DC",
+        "BK0523.DC",
+        "BK0524.DC",
+        "BK0547.DC",
+        "BK0549.DC",
+        "BK0568.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0695.DC",
+        "BK0701.DC",
+        "BK0804.DC",
+        "BK0867.DC",
+        "BK0879.DC",
+        "BK1287.DC",
+        "BK1614.DC",
+        "BK1643.DC"
+      ],
+      "dcConceptCount": 18,
+      "dcConceptMatched": 14,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9402061855670103,
+      "dcConceptPctMeanRank": 0.5771723122238586,
+      "dcConceptTurnoverMaxRank": 0.756701030927835,
+      "dcConceptTurnoverMeanRank": 0.3621502209131075,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8840942562592047,
+      "dcConceptSwingMaxRank": 0.9072164948453608
+    },
+    {
+      "ts_code": "300679.SZ",
+      "name": "电连技术",
+      "industry": "元器件",
+      "entryDate": "2026-04-28",
+      "priorDate": "2026-04-27",
+      "returnPct": 0.15768144963759065,
+      "netPnl": 3624.892446375201,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0153.DC",
+        "BK0549.DC",
+        "BK0568.DC",
+        "BK0596.DC",
+        "BK0638.DC",
+        "BK0701.DC",
+        "BK0704.DC",
+        "BK0714.DC",
+        "BK0742.DC",
+        "BK0802.DC",
+        "BK0804.DC",
+        "BK0823.DC",
+        "BK0833.DC",
+        "BK0854.DC",
+        "BK0865.DC",
+        "BK0867.DC",
+        "BK0877.DC",
+        "BK0900.DC",
+        "BK1037.DC",
+        "BK1090.DC"
+      ],
+      "dcConceptCount": 28,
+      "dcConceptMatched": 24,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.977319587628866,
+      "dcConceptPctMeanRank": 0.6399484536082474,
+      "dcConceptTurnoverMaxRank": 0.911340206185567,
+      "dcConceptTurnoverMeanRank": 0.5417525773195876,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.875085910652921,
+      "dcConceptSwingMaxRank": 0.9443298969072165
+    },
+    {
+      "ts_code": "002929.SZ",
+      "name": "润建股份",
+      "industry": "通信设备",
+      "entryDate": "2026-05-11",
+      "priorDate": "2026-05-08",
+      "returnPct": 0.16433479130217452,
+      "netPnl": 3832.965144133126,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0154.DC",
+        "BK0493.DC",
+        "BK0579.DC",
+        "BK0581.DC",
+        "BK0588.DC",
+        "BK0590.DC",
+        "BK0595.DC",
+        "BK0596.DC",
+        "BK0634.DC",
+        "BK0689.DC",
+        "BK0700.DC",
+        "BK0704.DC",
+        "BK0714.DC",
+        "BK0722.DC",
+        "BK0736.DC",
+        "BK0800.DC",
+        "BK0804.DC",
+        "BK0813.DC",
+        "BK0815.DC",
+        "BK0830.DC"
+      ],
+      "dcConceptCount": 45,
+      "dcConceptMatched": 41,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9876288659793815,
+      "dcConceptPctMeanRank": 0.5774201659542368,
+      "dcConceptTurnoverMaxRank": 0.9958762886597938,
+      "dcConceptTurnoverMeanRank": 0.6369625345737994,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8201156650741765,
+      "dcConceptSwingMaxRank": 0.8969072164948454
+    },
+    {
+      "ts_code": "600198.SH",
+      "name": "大唐电信",
+      "industry": "通信设备",
+      "entryDate": "2026-05-12",
+      "priorDate": "2026-05-11",
+      "returnPct": -0.05284596682997085,
+      "netPnl": -1229.1466311250006,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0150.DC",
+        "BK0448.DC",
+        "BK0509.DC",
+        "BK0554.DC",
+        "BK0556.DC",
+        "BK0641.DC",
+        "BK0683.DC",
+        "BK0707.DC",
+        "BK0712.DC",
+        "BK0714.DC",
+        "BK0833.DC",
+        "BK0891.DC",
+        "BK0897.DC",
+        "BK0917.DC",
+        "BK0920.DC",
+        "BK0935.DC",
+        "BK0963.DC",
+        "BK1047.DC",
+        "BK1181.DC",
+        "BK1215.DC"
+      ],
+      "dcConceptCount": 24,
+      "dcConceptMatched": 20,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9896907216494846,
+      "dcConceptPctMeanRank": 0.6430927835051546,
+      "dcConceptTurnoverMaxRank": 0.8886597938144329,
+      "dcConceptTurnoverMeanRank": 0.5365979381443299,
+      "dcConceptAmountMaxRank": 0.9917525773195877,
+      "dcConceptAmountMeanRank": 0.8120618556701031,
+      "dcConceptSwingMaxRank": 0.9814432989690721
+    },
+    {
+      "ts_code": "688126.SH",
+      "name": "沪硅产业",
+      "industry": "半导体",
+      "entryDate": "2026-05-20",
+      "priorDate": "2026-05-19",
+      "returnPct": -0.0528459668299707,
+      "netPnl": -1240.6814552999967,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0145.DC",
+        "BK0500.DC",
+        "BK0596.DC",
+        "BK0612.DC",
+        "BK0707.DC",
+        "BK0821.DC",
+        "BK0891.DC",
+        "BK0917.DC",
+        "BK0935.DC",
+        "BK1036.DC",
+        "BK1137.DC",
+        "BK1201.DC",
+        "BK1325.DC",
+        "BK1663.DC"
+      ],
+      "dcConceptCount": 14,
+      "dcConceptMatched": 10,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.8536082474226804,
+      "dcConceptPctMeanRank": 0.5725773195876288,
+      "dcConceptTurnoverMaxRank": 0.9711340206185567,
+      "dcConceptTurnoverMeanRank": 0.4144329896907217,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.9558762886597938,
+      "dcConceptSwingMaxRank": 0.9896907216494846
+    },
+    {
+      "ts_code": "603078.SH",
+      "name": "江化微",
+      "industry": "半导体",
+      "entryDate": "2026-05-20",
+      "priorDate": "2026-05-19",
+      "returnPct": -0.05284596682997072,
+      "netPnl": -1118.7721208999974,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "dcConceptCodes": [
+        "BK0159.DC",
+        "BK0596.DC",
+        "BK0683.DC",
+        "BK0707.DC",
+        "BK0840.DC",
+        "BK0884.DC",
+        "BK0891.DC",
+        "BK0917.DC",
+        "BK0935.DC",
+        "BK1005.DC",
+        "BK1039.DC",
+        "BK1201.DC",
+        "BK1332.DC",
+        "BK1632.DC",
+        "BK1633.DC",
+        "BK1637.DC",
+        "BK1638.DC",
+        "BK1674.DC",
+        "BK1675.DC",
+        "BK1676.DC"
+      ],
+      "dcConceptCount": 20,
+      "dcConceptMatched": 16,
+      "dcConceptPositiveRatio": 1.0,
+      "dcConceptPctMaxRank": 0.9154639175257732,
+      "dcConceptPctMeanRank": 0.6559278350515464,
+      "dcConceptTurnoverMaxRank": 1.0,
+      "dcConceptTurnoverMeanRank": 0.7719072164948454,
+      "dcConceptAmountMaxRank": 1.0,
+      "dcConceptAmountMeanRank": 0.8947164948453609,
+      "dcConceptSwingMaxRank": 0.9896907216494846
+    }
+  ]
+}

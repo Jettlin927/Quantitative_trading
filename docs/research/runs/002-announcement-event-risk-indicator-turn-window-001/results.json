@@ -1,0 +1,1219 @@
+{
+  "runId": "002-announcement-event-risk-indicator-turn-window-001",
+  "startedAt": "2026-05-31 22:13 +0800",
+  "finishedAt": "2026-05-31 22:13 +0800",
+  "baselineRun": "002-repair-indicator-pulse-moneyflow-surge-002-window-validation",
+  "candidateRun": "002-repair-indicator-turn-quality-001-window-validation",
+  "mode": "window_validation",
+  "lookbackDays": 30,
+  "windows": [
+    {
+      "label": "Y1",
+      "window": {
+        "label": "Y1",
+        "kind": "annual",
+        "startDate": "2023-05-30",
+        "endDate": "2024-05-30",
+        "years": 1.002053388090349,
+        "warmupStartDate": "2023-02-28",
+        "warmupDays": 91,
+        "warmupMonths": 3
+      },
+      "comparison": {
+        "label": "Y1",
+        "replacementNetPnlDelta": -191.96487205000085,
+        "baselineOnly": {
+          "count": 3,
+          "netPnl": -1787.1569785999945,
+          "avgReturnPct": -0.052845966829970725,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 3,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnly": {
+          "count": 3,
+          "netPnl": -1979.1218506499954,
+          "avgReturnPct": -0.05284596682997071,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 1.6666666666666667,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyLosses": {
+          "count": 3,
+          "netPnl": -1979.1218506499954,
+          "avgReturnPct": -0.05284596682997071,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 1.6666666666666667,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyWins": {
+          "count": 0,
+          "netPnl": 0.0,
+          "avgReturnPct": null,
+          "riskTradeRatio": null,
+          "avgAnnouncementCount": null,
+          "avgRiskAnnouncementCount": null,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "baselineOnlyLosses": {
+          "count": 3,
+          "netPnl": -1787.1569785999945,
+          "avgReturnPct": -0.052845966829970725,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 3,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyRiskSamples": [
+          {
+            "ts_code": "300832.SZ",
+            "name": "新产业",
+            "entryDate": "2023-11-08",
+            "returnPct": -0.05284596682997074,
+            "netPnl": -747.5412657999987,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "603650.SH",
+            "name": "彤程新材",
+            "entryDate": "2024-04-29",
+            "returnPct": -0.0528459668299707,
+            "netPnl": -653.7811353499983,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "600085.SH",
+            "name": "同仁堂",
+            "entryDate": "2024-01-02",
+            "returnPct": -0.0528459668299707,
+            "netPnl": -577.7994494999984,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ],
+        "baselineOnlyRiskSamples": [
+          {
+            "ts_code": "688123.SH",
+            "name": "聚辰股份",
+            "entryDate": "2023-11-08",
+            "returnPct": -0.052845966829970975,
+            "netPnl": -377.686123675001,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "002409.SZ",
+            "name": "雅克科技",
+            "entryDate": "2024-04-29",
+            "returnPct": -0.05284596682997061,
+            "netPnl": -679.919681874997,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "600123.SH",
+            "name": "兰花科创",
+            "entryDate": "2024-01-02",
+            "returnPct": -0.052845966829970586,
+            "netPnl": -729.5511730499966,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ]
+      }
+    },
+    {
+      "label": "Y2",
+      "window": {
+        "label": "Y2",
+        "kind": "annual",
+        "startDate": "2024-05-30",
+        "endDate": "2025-05-30",
+        "years": 0.999315537303217,
+        "warmupStartDate": "2024-02-29",
+        "warmupDays": 91,
+        "warmupMonths": 3
+      },
+      "comparison": {
+        "label": "Y2",
+        "replacementNetPnlDelta": -1048.8396730874992,
+        "baselineOnly": {
+          "count": 1,
+          "netPnl": -1110.447665249998,
+          "avgReturnPct": -0.08050675534681044,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 1,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnly": {
+          "count": 3,
+          "netPnl": -2159.287338337497,
+          "avgReturnPct": -0.05284596682997077,
+          "riskTradeRatio": 0.6666666666666666,
+          "avgAnnouncementCount": 1.6666666666666667,
+          "avgRiskAnnouncementCount": 0.6666666666666666,
+          "riskCategoryCounts": {
+            "减持解禁": 1,
+            "监管问询": 1
+          },
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyLosses": {
+          "count": 3,
+          "netPnl": -2159.287338337497,
+          "avgReturnPct": -0.05284596682997077,
+          "riskTradeRatio": 0.6666666666666666,
+          "avgAnnouncementCount": 1.6666666666666667,
+          "avgRiskAnnouncementCount": 0.6666666666666666,
+          "riskCategoryCounts": {
+            "减持解禁": 1,
+            "监管问询": 1
+          },
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyWins": {
+          "count": 0,
+          "netPnl": 0.0,
+          "avgReturnPct": null,
+          "riskTradeRatio": null,
+          "avgAnnouncementCount": null,
+          "avgRiskAnnouncementCount": null,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "baselineOnlyLosses": {
+          "count": 1,
+          "netPnl": -1110.447665249998,
+          "avgReturnPct": -0.08050675534681044,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 1,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyRiskSamples": [
+          {
+            "ts_code": "600435.SH",
+            "name": "北方导航",
+            "entryDate": "2025-03-11",
+            "returnPct": -0.052845966829970725,
+            "netPnl": -756.8537843999984,
+            "riskAnnouncementCount": 1,
+            "riskCategories": [
+              "减持解禁"
+            ],
+            "riskAnnouncements": [
+              {
+                "title": "北方导航股东及董监高集中竞价减持股份计划公告",
+                "type": "",
+                "date": "2025-02-21",
+                "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1222594285",
+                "riskCategories": [
+                  "减持解禁"
+                ]
+              }
+            ],
+            "fetchError": null
+          },
+          {
+            "ts_code": "600835.SH",
+            "name": "上海机电",
+            "entryDate": "2025-03-05",
+            "returnPct": -0.05284596682997072,
+            "netPnl": -675.6867188749984,
+            "riskAnnouncementCount": 1,
+            "riskCategories": [
+              "监管问询"
+            ],
+            "riskAnnouncements": [
+              {
+                "title": "关于《上海机电股份有限公司股票交易异常波动问询函》的回函",
+                "type": "",
+                "date": "2025-02-22",
+                "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1222604574",
+                "riskCategories": [
+                  "监管问询"
+                ]
+              }
+            ],
+            "fetchError": null
+          },
+          {
+            "ts_code": "600547.SH",
+            "name": "山东黄金",
+            "entryDate": "2025-03-19",
+            "returnPct": -0.052845966829970864,
+            "netPnl": -726.7468350625004,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ],
+        "baselineOnlyRiskSamples": [
+          {
+            "ts_code": "600031.SH",
+            "name": "三一重工",
+            "entryDate": "2025-03-05",
+            "returnPct": -0.08050675534681044,
+            "netPnl": -1110.447665249998,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ]
+      }
+    },
+    {
+      "label": "Y3",
+      "window": {
+        "label": "Y3",
+        "kind": "annual",
+        "startDate": "2025-05-30",
+        "endDate": "2026-05-30",
+        "years": 0.999315537303217,
+        "warmupStartDate": "2025-02-28",
+        "warmupDays": 91,
+        "warmupMonths": 3
+      },
+      "comparison": {
+        "label": "Y3",
+        "replacementNetPnlDelta": -3520.1151591464222,
+        "baselineOnly": {
+          "count": 4,
+          "netPnl": 3971.467328285973,
+          "avgReturnPct": 0.08176289969465672,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 6.75,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnly": {
+          "count": 8,
+          "netPnl": 451.3521691395508,
+          "avgReturnPct": 0.013409363827800771,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 2.25,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyLosses": {
+          "count": 5,
+          "netPnl": -3705.346904437497,
+          "avgReturnPct": -0.057185867663071856,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 3.4,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyWins": {
+          "count": 3,
+          "netPnl": 4156.699073577048,
+          "avgReturnPct": 0.13106808297925515,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0.3333333333333333,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "baselineOnlyLosses": {
+          "count": 1,
+          "netPnl": -737.8054509000012,
+          "avgReturnPct": -0.052845966829970926,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyRiskSamples": [
+          {
+            "ts_code": "603778.SH",
+            "name": "国晟科技",
+            "entryDate": "2025-11-14",
+            "returnPct": -0.07454547099547609,
+            "netPnl": -1078.5288027499992,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "603067.SH",
+            "name": "振华股份",
+            "entryDate": "2025-11-06",
+            "returnPct": -0.052845966829970864,
+            "netPnl": -700.5553765000004,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "000830.SZ",
+            "name": "鲁西化工",
+            "entryDate": "2025-11-11",
+            "returnPct": -0.05284596682997083,
+            "netPnl": -771.9337150874999,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "300724.SZ",
+            "name": "捷佳伟创",
+            "entryDate": "2025-08-04",
+            "returnPct": -0.052845966829970795,
+            "netPnl": -365.0930587499997,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "002170.SZ",
+            "name": "芭田股份",
+            "entryDate": "2025-11-07",
+            "returnPct": -0.052845966829970684,
+            "netPnl": -789.2359513499978,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "600345.SH",
+            "name": "长江通信",
+            "entryDate": "2025-08-25",
+            "returnPct": 0.047901312171956985,
+            "netPnl": 569.0116861428996,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "002478.SZ",
+            "name": "常宝股份",
+            "entryDate": "2025-10-27",
+            "returnPct": 0.14770143714071476,
+            "netPnl": 2192.8551035891487,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "300624.SZ",
+            "name": "万兴科技",
+            "entryDate": "2025-07-15",
+            "returnPct": 0.19760149962509369,
+            "netPnl": 1394.8322838449994,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ],
+        "baselineOnlyRiskSamples": [
+          {
+            "ts_code": "002202.SZ",
+            "name": "金风科技",
+            "entryDate": "2025-08-25",
+            "returnPct": -0.052845966829970926,
+            "netPnl": -737.8054509000012,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "603699.SH",
+            "name": "纽威股份",
+            "entryDate": "2025-10-27",
+            "returnPct": 0.03126795801049745,
+            "netPnl": 459.74404063087604,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "300304.SZ",
+            "name": "云意电气",
+            "entryDate": "2025-07-15",
+            "returnPct": 0.15102810797300673,
+            "netPnl": 1941.6253923065997,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "002046.SZ",
+            "name": "国机精工",
+            "entryDate": "2025-08-05",
+            "returnPct": 0.19760149962509366,
+            "netPnl": 2307.9033462484986,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ]
+      }
+    },
+    {
+      "label": "R18-1",
+      "window": {
+        "label": "R18-1",
+        "kind": "rolling18m",
+        "startDate": "2023-05-30",
+        "endDate": "2024-11-30",
+        "years": 1.5058179329226558,
+        "warmupStartDate": "2023-02-28",
+        "warmupDays": 91,
+        "warmupMonths": 3
+      },
+      "comparison": {
+        "label": "R18-1",
+        "replacementNetPnlDelta": 806.3794515000027,
+        "baselineOnly": {
+          "count": 2,
+          "netPnl": -1514.3425132500015,
+          "avgReturnPct": -0.05284596682997088,
+          "riskTradeRatio": 0.5,
+          "avgAnnouncementCount": 20.5,
+          "avgRiskAnnouncementCount": 2,
+          "riskCategoryCounts": {
+            "业绩减值": 1,
+            "诉讼债务担保": 1
+          },
+          "fetchErrorCount": 0
+        },
+        "candidateOnly": {
+          "count": 1,
+          "netPnl": -707.9630617499988,
+          "avgReturnPct": -0.05284596682997074,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyLosses": {
+          "count": 1,
+          "netPnl": -707.9630617499988,
+          "avgReturnPct": -0.05284596682997074,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyWins": {
+          "count": 0,
+          "netPnl": 0.0,
+          "avgReturnPct": null,
+          "riskTradeRatio": null,
+          "avgAnnouncementCount": null,
+          "avgRiskAnnouncementCount": null,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "baselineOnlyLosses": {
+          "count": 2,
+          "netPnl": -1514.3425132500015,
+          "avgReturnPct": -0.05284596682997088,
+          "riskTradeRatio": 0.5,
+          "avgAnnouncementCount": 20.5,
+          "avgRiskAnnouncementCount": 2,
+          "riskCategoryCounts": {
+            "业绩减值": 1,
+            "诉讼债务担保": 1
+          },
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyRiskSamples": [
+          {
+            "ts_code": "002508.SZ",
+            "name": "老板电器",
+            "entryDate": "2024-05-17",
+            "returnPct": -0.05284596682997074,
+            "netPnl": -707.9630617499988,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ],
+        "baselineOnlyRiskSamples": [
+          {
+            "ts_code": "000006.SZ",
+            "name": "深振业Ａ",
+            "entryDate": "2024-05-17",
+            "returnPct": -0.05284596682997092,
+            "netPnl": -754.3140066000014,
+            "riskAnnouncementCount": 4,
+            "riskCategories": [
+              "业绩减值",
+              "诉讼债务担保"
+            ],
+            "riskAnnouncements": [
+              {
+                "title": "深圳市深担增信融资担保有限公司2023年度审计报告",
+                "type": "",
+                "date": "2024-04-29",
+                "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1219910007",
+                "riskCategories": [
+                  "诉讼债务担保"
+                ]
+              },
+              {
+                "title": "深圳市高新投融资担保有限公司2023年度审计报告",
+                "type": "",
+                "date": "2024-04-29",
+                "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1219909985",
+                "riskCategories": [
+                  "诉讼债务担保"
+                ]
+              },
+              {
+                "title": "关于2024年度对子公司担保额度的公告",
+                "type": "",
+                "date": "2024-04-27",
+                "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1219865445",
+                "riskCategories": [
+                  "诉讼债务担保"
+                ]
+              }
+            ],
+            "fetchError": null
+          },
+          {
+            "ts_code": "600383.SH",
+            "name": "金地集团",
+            "entryDate": "2024-05-23",
+            "returnPct": -0.052845966829970836,
+            "netPnl": -760.02850665,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ]
+      }
+    },
+    {
+      "label": "R18-2",
+      "window": {
+        "label": "R18-2",
+        "kind": "rolling18m",
+        "startDate": "2023-11-30",
+        "endDate": "2025-05-30",
+        "years": 1.4976043805612593,
+        "warmupStartDate": "2023-08-30",
+        "warmupDays": 92,
+        "warmupMonths": 3
+      },
+      "comparison": {
+        "label": "R18-2",
+        "replacementNetPnlDelta": -2177.297933912504,
+        "baselineOnly": {
+          "count": 3,
+          "netPnl": -1957.4279152749932,
+          "avgReturnPct": -0.052845966829970656,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 10,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnly": {
+          "count": 2,
+          "netPnl": -4134.725849187497,
+          "avgReturnPct": -0.18747991087853114,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyLosses": {
+          "count": 2,
+          "netPnl": -4134.725849187497,
+          "avgReturnPct": -0.18747991087853114,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyWins": {
+          "count": 0,
+          "netPnl": 0.0,
+          "avgReturnPct": null,
+          "riskTradeRatio": null,
+          "avgAnnouncementCount": null,
+          "avgRiskAnnouncementCount": null,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "baselineOnlyLosses": {
+          "count": 3,
+          "netPnl": -1957.4279152749932,
+          "avgReturnPct": -0.052845966829970656,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 10,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyRiskSamples": [
+          {
+            "ts_code": "688018.SH",
+            "name": "乐鑫科技",
+            "entryDate": "2024-04-29",
+            "returnPct": -0.32211385492709155,
+            "netPnl": -3519.6234132499985,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "603979.SH",
+            "name": "金诚信",
+            "entryDate": "2024-01-02",
+            "returnPct": -0.05284596682997073,
+            "netPnl": -615.1024359374987,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ],
+        "baselineOnlyRiskSamples": [
+          {
+            "ts_code": "600085.SH",
+            "name": "同仁堂",
+            "entryDate": "2024-01-02",
+            "returnPct": -0.0528459668299707,
+            "netPnl": -577.7994494999984,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "600216.SH",
+            "name": "浙江医药",
+            "entryDate": "2024-05-07",
+            "returnPct": -0.05284596682997067,
+            "netPnl": -699.7087838999978,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "002409.SZ",
+            "name": "雅克科技",
+            "entryDate": "2024-04-29",
+            "returnPct": -0.05284596682997061,
+            "netPnl": -679.919681874997,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ]
+      }
+    },
+    {
+      "label": "R18-3",
+      "window": {
+        "label": "R18-3",
+        "kind": "rolling18m",
+        "startDate": "2024-05-30",
+        "endDate": "2025-11-30",
+        "years": 1.5030800821355237,
+        "warmupStartDate": "2024-02-29",
+        "warmupDays": 91,
+        "warmupMonths": 3
+      },
+      "comparison": {
+        "label": "R18-3",
+        "replacementNetPnlDelta": -3506.246086449919,
+        "baselineOnly": {
+          "count": 8,
+          "netPnl": 329.48038868481854,
+          "avgReturnPct": 0.0014653546227381652,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0.375,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnly": {
+          "count": 9,
+          "netPnl": -3176.7656977651004,
+          "avgReturnPct": -0.025880797054828573,
+          "riskTradeRatio": 0.1111111111111111,
+          "avgAnnouncementCount": 1.5555555555555556,
+          "avgRiskAnnouncementCount": 0.2222222222222222,
+          "riskCategoryCounts": {
+            "业绩减值": 1,
+            "诉讼债务担保": 1
+          },
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyLosses": {
+          "count": 8,
+          "netPnl": -6344.518846225001,
+          "avgReturnPct": -0.053816084139818865,
+          "riskTradeRatio": 0.125,
+          "avgAnnouncementCount": 1.75,
+          "avgRiskAnnouncementCount": 0.25,
+          "riskCategoryCounts": {
+            "业绩减值": 1,
+            "诉讼债务担保": 1
+          },
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyWins": {
+          "count": 1,
+          "netPnl": 3167.7531484599003,
+          "avgReturnPct": 0.1976014996250938,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "baselineOnlyLosses": {
+          "count": 5,
+          "netPnl": -3906.5655587000056,
+          "avgReturnPct": -0.05285743983624756,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0.4,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyRiskSamples": [
+          {
+            "ts_code": "000988.SZ",
+            "name": "华工科技",
+            "entryDate": "2025-07-29",
+            "returnPct": -0.05284596682997082,
+            "netPnl": -816.6972988124999,
+            "riskAnnouncementCount": 2,
+            "riskCategories": [
+              "业绩减值",
+              "诉讼债务担保"
+            ],
+            "riskAnnouncements": [
+              {
+                "title": "关于为部分全资子公司新增担保额度的公告",
+                "type": "",
+                "date": "2025-07-26",
+                "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1224299185",
+                "riskCategories": [
+                  "诉讼债务担保"
+                ]
+              },
+              {
+                "title": "2025年半年度业绩预告",
+                "type": "",
+                "date": "2025-07-09",
+                "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1224104380",
+                "riskCategories": [
+                  "业绩减值"
+                ]
+              }
+            ],
+            "fetchError": null
+          },
+          {
+            "ts_code": "301308.SZ",
+            "name": "江波龙",
+            "entryDate": "2025-02-24",
+            "returnPct": -0.059466321717064764,
+            "netPnl": -616.007766499999,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "600820.SH",
+            "name": "隧道股份",
+            "entryDate": "2025-07-22",
+            "returnPct": -0.053986550421661034,
+            "netPnl": -883.567454,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "002947.SZ",
+            "name": "恒铭达",
+            "entryDate": "2025-03-17",
+            "returnPct": -0.05284596682997096,
+            "netPnl": -639.7065333750015,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "002468.SZ",
+            "name": "申通快递",
+            "entryDate": "2025-07-25",
+            "returnPct": -0.052845966829970906,
+            "netPnl": -881.1970725250012,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "002649.SZ",
+            "name": "博彦科技",
+            "entryDate": "2025-07-08",
+            "returnPct": -0.05284596682997088,
+            "netPnl": -798.9717662500007,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "300747.SZ",
+            "name": "锐科激光",
+            "entryDate": "2025-05-13",
+            "returnPct": -0.0528459668299708,
+            "netPnl": -805.9561551999996,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "002119.SZ",
+            "name": "康强电子",
+            "entryDate": "2025-10-27",
+            "returnPct": -0.05284596682997078,
+            "netPnl": -902.414799562499,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ],
+        "baselineOnlyRiskSamples": [
+          {
+            "ts_code": "002335.SZ",
+            "name": "科华数据",
+            "entryDate": "2025-02-24",
+            "returnPct": -0.052903331861354146,
+            "netPnl": -552.3656775,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "301200.SZ",
+            "name": "大族数控",
+            "entryDate": "2025-07-08",
+            "returnPct": -0.05284596682997108,
+            "netPnl": -745.7422565250035,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "000543.SZ",
+            "name": "皖能电力",
+            "entryDate": "2025-10-27",
+            "returnPct": -0.052845966829970954,
+            "netPnl": -961.1471611875022,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "002716.SZ",
+            "name": "湖南白银",
+            "entryDate": "2025-07-14",
+            "returnPct": -0.0528459668299709,
+            "netPnl": -846.857160187501,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "603659.SH",
+            "name": "璞泰来",
+            "entryDate": "2025-03-17",
+            "returnPct": -0.05284596682997075,
+            "netPnl": -800.4533032999989,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "600316.SH",
+            "name": "洪都航空",
+            "entryDate": "2025-07-21",
+            "returnPct": 0.03126795801049745,
+            "netPnl": 393.81139169872586,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "300607.SZ",
+            "name": "拓斯达",
+            "entryDate": "2025-05-13",
+            "returnPct": 0.04714057852755199,
+            "netPnl": 717.810239873299,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "600268.SH",
+            "name": "国电南自",
+            "entryDate": "2025-07-21",
+            "returnPct": 0.1976014996250937,
+            "netPnl": 3124.4243158127993,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ]
+      }
+    },
+    {
+      "label": "R18-4",
+      "window": {
+        "label": "R18-4",
+        "kind": "rolling18m",
+        "startDate": "2024-11-30",
+        "endDate": "2026-05-30",
+        "years": 1.4948665297741273,
+        "warmupStartDate": "2024-08-30",
+        "warmupDays": 92,
+        "warmupMonths": 3
+      },
+      "comparison": {
+        "label": "R18-4",
+        "replacementNetPnlDelta": -710.9064158752535,
+        "baselineOnly": {
+          "count": 5,
+          "netPnl": 2577.798785118899,
+          "avgReturnPct": 0.037940066813818944,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 5.4,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnly": {
+          "count": 5,
+          "netPnl": 1866.8923692436456,
+          "avgReturnPct": 0.023570420566187064,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0.2,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyLosses": {
+          "count": 2,
+          "netPnl": -1369.892650875001,
+          "avgReturnPct": -0.05284596682997088,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyWins": {
+          "count": 3,
+          "netPnl": 3236.7850201186466,
+          "avgReturnPct": 0.07451467883029236,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0.3333333333333333,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "baselineOnlyLosses": {
+          "count": 3,
+          "netPnl": -2386.4916273624985,
+          "avgReturnPct": -0.05284596682997081,
+          "riskTradeRatio": 0.0,
+          "avgAnnouncementCount": 0,
+          "avgRiskAnnouncementCount": 0,
+          "riskCategoryCounts": {},
+          "fetchErrorCount": 0
+        },
+        "candidateOnlyRiskSamples": [
+          {
+            "ts_code": "002947.SZ",
+            "name": "恒铭达",
+            "entryDate": "2025-03-17",
+            "returnPct": -0.05284596682997096,
+            "netPnl": -639.7065333750015,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "300724.SZ",
+            "name": "捷佳伟创",
+            "entryDate": "2025-08-04",
+            "returnPct": -0.052845966829970795,
+            "netPnl": -730.1861174999995,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "603683.SH",
+            "name": "晶华新材",
+            "entryDate": "2025-09-17",
+            "returnPct": 0.037921299675081094,
+            "netPnl": 588.5150170899979,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "600345.SH",
+            "name": "长江通信",
+            "entryDate": "2025-08-25",
+            "returnPct": 0.037921299675081184,
+            "netPnl": 563.0759808673993,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "300624.SZ",
+            "name": "万兴科技",
+            "entryDate": "2025-07-15",
+            "returnPct": 0.1477014371407148,
+            "netPnl": 2085.1940221612494,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ],
+        "baselineOnlyRiskSamples": [
+          {
+            "ts_code": "002202.SZ",
+            "name": "金风科技",
+            "entryDate": "2025-08-25",
+            "returnPct": -0.05284596682997091,
+            "netPnl": -799.2892384750012,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "603659.SH",
+            "name": "璞泰来",
+            "entryDate": "2025-03-17",
+            "returnPct": -0.05284596682997084,
+            "netPnl": -700.3966403875002,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "300857.SZ",
+            "name": "协创数据",
+            "entryDate": "2025-09-17",
+            "returnPct": -0.05284596682997067,
+            "netPnl": -886.8057484999972,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "300304.SZ",
+            "name": "云意电气",
+            "entryDate": "2025-07-15",
+            "returnPct": 0.15063673493391372,
+            "netPnl": 2194.806396983202,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          },
+          {
+            "ts_code": "002046.SZ",
+            "name": "国机精工",
+            "entryDate": "2025-08-05",
+            "returnPct": 0.19760149962509344,
+            "netPnl": 2769.4840154981957,
+            "riskAnnouncementCount": 0,
+            "riskCategories": [],
+            "riskAnnouncements": [],
+            "fetchError": null
+          }
+        ]
+      }
+    }
+  ]
+}

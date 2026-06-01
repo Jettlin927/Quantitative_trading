@@ -1,0 +1,8 @@
+{
+  "runId": "002-market-soft-gate-entry-quality-001",
+  "baselineRun": "002-repair-indicator-pulse-moneyflow-surge-002",
+  "candidateRun": "002-repair-market-breadth-soft-gate-001",
+  "objective": "Explain why market-breadth soft-gate forward samples did not convert into better completed trades.",
+  "readOnly": true,
+  "tradeKey": "ts_code + entryDate, matching analyze_trade_delta.py"
+}

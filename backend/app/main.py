@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
+import sys
 from statistics import mean, median
 from threading import Lock
 from time import monotonic, sleep
@@ -28,6 +30,7 @@ from .schemas import (
     DailyBarOut,
     MarketBacktestRequest,
     NewsTrendOut,
+    ResearchJobRequest,
     StockPoolCreate,
     StockPoolDetailOut,
     StockPoolMembersRequest,
@@ -145,6 +148,11 @@ MARKET_BACKTEST_JOB_TTL_SECONDS = 3600
 MARKET_BACKTEST_EXECUTOR = ThreadPoolExecutor(max_workers=1)
 MARKET_BACKTEST_JOBS: dict[str, dict[str, Any]] = {}
 MARKET_BACKTEST_LOCK = Lock()
+RESEARCH_JOB_TTL_SECONDS = int(os.getenv("RESEARCH_JOB_TTL_SECONDS", "7200"))
+RESEARCH_JOB_WORKERS = int(os.getenv("RESEARCH_JOB_WORKERS", "1"))
+RESEARCH_JOB_EXECUTOR = ThreadPoolExecutor(max_workers=max(RESEARCH_JOB_WORKERS, 1))
+RESEARCH_JOBS: dict[str, dict[str, Any]] = {}
+RESEARCH_JOB_LOCK = Lock()
 TRADE_CALENDAR_CACHE_TTL_SECONDS = 3600
 TRADE_CALENDAR_CACHE: dict[tuple[date, date], tuple[float, list[date]]] = {}
 RESEARCH_RUN_SUMMARY_READ_CHARS = int(os.getenv("RESEARCH_RUN_SUMMARY_READ_CHARS", "300000"))
@@ -157,6 +165,147 @@ RESEARCH_RUNS_DIR = REPO_ROOT / "docs" / "research" / "runs"
 RESEARCH_RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+$")
 EXECUTABLE_STRATEGY_ID = "cross-section-strength-risk8"
 EXECUTABLE_STRATEGY_SPEC_PATH = REPO_ROOT / "docs" / "research" / "executable-strategy-cross-section-risk8.json"
+RESEARCH_JOB_SCRIPTS = {
+    "portfolio_backtest": "scripts/research/run_portfolio_backtest.py",
+    "window_validation": "scripts/research/run_window_validation.py",
+    "trade_delta": "scripts/research/analyze_trade_delta.py",
+}
+RESEARCH_WEIGHT_FLAGS = {
+    "return20": "cross-section-return20-weight",
+    "return60": "cross-section-return60-weight",
+    "high60": "cross-section-high60-weight",
+    "recovery20": "cross-section-recovery20-weight",
+    "volume": "cross-section-volume-weight",
+    "base": "cross-section-base-weight",
+    "industryReturn20": "cross-section-industry-return20-weight",
+    "industryRelativeReturn20": "cross-section-industry-relative-return20-weight",
+    "stockSpecificBreakoutQuality": "cross-section-stock-specific-breakout-quality-weight",
+    "stockSpecificMatureBreadthQuality": "cross-section-stock-specific-mature-breadth-quality-weight",
+    "macdHist": "cross-section-macd-hist-weight",
+    "macdHistDelta": "cross-section-macd-hist-delta-weight",
+    "bollSqueeze": "cross-section-boll-squeeze-weight",
+    "bollPosition": "cross-section-boll-position-weight",
+    "bollPositionBalance": "cross-section-boll-position-balance-weight",
+    "rsiBalance": "cross-section-rsi-balance-weight",
+    "maAlignment": "cross-section-ma-alignment-weight",
+    "indicatorSetup": "cross-section-indicator-setup-weight",
+    "indicatorConfluenceQuality": "cross-section-indicator-confluence-quality-weight",
+    "indicatorTurnQuality": "cross-section-indicator-turn-quality-weight",
+    "rsiMomentumQuality": "cross-section-rsi-momentum-quality-weight",
+    "rsiMomentumConfirmedQuality": "cross-section-rsi-momentum-confirmed-quality-weight",
+    "turnoverRateF": "cross-section-turnover-rate-f-weight",
+    "volumeRatioBasic": "cross-section-volume-ratio-basic-weight",
+    "lowVolumeRatioBasic": "cross-section-low-volume-ratio-basic-weight",
+    "smallCircMv": "cross-section-small-circ-mv-weight",
+    "priorGapStability": "cross-section-prior-gap-stability-weight",
+    "amountRatio": "cross-section-amount-ratio-weight",
+    "amountEfficiency20": "cross-section-amount-efficiency20-weight",
+    "amountEfficiencyRsi": "cross-section-amount-efficiency-rsi-weight",
+    "moneyflowMainNetRank1": "cross-section-moneyflow-main-rank1-weight",
+    "moneyflowMainNetRank3": "cross-section-moneyflow-main-rank3-weight",
+    "moneyflowMainNetRank5": "cross-section-moneyflow-main-rank5-weight",
+    "moneyflowIndustryConfirm": "cross-section-moneyflow-industry-confirm-weight",
+    "moneyflowRsiConfirm": "cross-section-moneyflow-rsi-confirm-weight",
+    "moneyflowMarketStrong": "cross-section-moneyflow-market-strong-weight",
+    "moneyflowMarketQuality": "cross-section-moneyflow-market-quality-weight",
+    "moneyflowMarketSurgeQuality": "cross-section-moneyflow-market-surge-quality-weight",
+    "moneyflowMarketSurgeStrictQuality": "cross-section-moneyflow-market-surge-strict-quality-weight",
+    "moneyflowMarketSurgeRelativeQuality": "cross-section-moneyflow-market-surge-relative-quality-weight",
+    "industryMoneyflowSumNetRank1": "cross-section-industry-moneyflow-sum-net-rank1-weight",
+    "kplConceptCountRank1": "cross-section-kpl-concept-count-rank1-weight",
+}
+RESEARCH_COMMON_PARAM_FLAGS = {
+    "costMultiplier": "cost-multiplier",
+    "maxSinglePositionPct": "max-single-position-pct",
+    "marketMinSamples": "market-min-samples",
+    "marketMinAboveMa20Pct": "market-min-above-ma20-pct",
+    "marketMinAboveMa60Pct": "market-min-above-ma60-pct",
+    "marketMinUpPct": "market-min-up-pct",
+    "marketSoftMinSamples": "market-soft-min-samples",
+    "marketSoftMinAboveMa20Pct": "market-soft-min-above-ma20-pct",
+    "marketSoftMinAboveMa60Pct": "market-soft-min-above-ma60-pct",
+    "marketSoftMinUpPct": "market-soft-min-up-pct",
+    "marketSoftMaxBaseFailedChecks": "market-soft-max-base-failed-checks",
+    "maxEntryGapPct": "max-entry-gap-pct",
+    "minEntryGapPct": "min-entry-gap-pct",
+    "maxEntryRangePct": "max-entry-range-pct",
+    "maxIntradayReturnPct": "max-intraday-return-pct",
+    "failureSymbolCooldownDays": "failure-symbol-cooldown-days",
+    "failureIndustryWeeklyLossLimit": "failure-industry-weekly-loss-limit",
+    "failureIndustryCooldownDays": "failure-industry-cooldown-days",
+    "industryStateMinSamples": "industry-state-min-samples",
+    "industryStateMinUpPct": "industry-state-min-up-pct",
+    "industryStateMinAboveMa20Pct": "industry-state-min-above-ma20-pct",
+    "industryStateMinAboveMa60Pct": "industry-state-min-above-ma60-pct",
+    "industryStateMinReturn20Pct": "industry-state-min-return20-pct",
+    "entryGapSizeHaircutThresholdPct": "entry-gap-size-haircut-threshold-pct",
+    "entryGapSizeHaircutPct": "entry-gap-size-haircut-pct",
+    "entryRangeSizeHaircutThresholdPct": "entry-range-size-haircut-threshold-pct",
+    "entryRangeSizeHaircutPct": "entry-range-size-haircut-pct",
+    "entryIntradaySizeHaircutThresholdPct": "entry-intraday-size-haircut-threshold-pct",
+    "entryIntradaySizeHaircutPct": "entry-intraday-size-haircut-pct",
+    "slippagePct": "slippage-pct",
+    "buySlippagePct": "buy-slippage-pct",
+    "sellSlippagePct": "sell-slippage-pct",
+    "limitBandTolerancePct": "limit-band-tolerance-pct",
+}
+RESEARCH_PORTFOLIO_ONLY_PARAM_FLAGS = {
+    "maxOvernightExposurePct": "max-overnight-exposure-pct",
+    "entryGapScorePenaltyThresholdPct": "entry-gap-score-penalty-threshold-pct",
+    "entryGapScorePenalty": "entry-gap-score-penalty",
+    "entryRangeScorePenaltyThresholdPct": "entry-range-score-penalty-threshold-pct",
+    "entryRangeScorePenalty": "entry-range-score-penalty",
+    "entryPriorVolumeRatioBasicScorePenaltyThreshold": "entry-prior-volume-ratio-basic-score-penalty-threshold",
+    "entryPriorVolumeRatioBasicScorePenalty": "entry-prior-volume-ratio-basic-score-penalty",
+    "entryVolumeInefficiencyCrowdingPriorVolumeRatioBasicThreshold": "entry-volume-inefficiency-crowding-prior-volume-ratio-basic-threshold",
+    "entryVolumeInefficiencyCrowdingAmountEfficiencyRsiRankMax": "entry-volume-inefficiency-crowding-amount-efficiency-rsi-rank-max",
+    "entryVolumeInefficiencyCrowdingScorePenalty": "entry-volume-inefficiency-crowding-score-penalty",
+    "entryIndustryReturnOverheatRankThreshold": "entry-industry-return-overheat-rank-threshold",
+    "entryIndustryReturnOverheatScorePenalty": "entry-industry-return-overheat-score-penalty",
+    "entryUnsupportedBollSqueezeBollRankThreshold": "entry-unsupported-boll-squeeze-boll-rank-threshold",
+    "entryUnsupportedBollSqueezeIndustryMoneyflowRankMax": "entry-unsupported-boll-squeeze-industry-moneyflow-rank-max",
+    "entryUnsupportedBollSqueezeScorePenalty": "entry-unsupported-boll-squeeze-score-penalty",
+    "entryIndustryMoneyflowCrowdingSumRankThreshold": "entry-industry-moneyflow-crowding-sum-rank-threshold",
+    "entryIndustryMoneyflowCrowdingPersistentScoreMax": "entry-industry-moneyflow-crowding-persistent-score-max",
+    "entryIndustryMoneyflowCrowdingScorePenalty": "entry-industry-moneyflow-crowding-score-penalty",
+    "entryMoneyflowSurgeRsiCrowdingSurgeRankThreshold": "entry-moneyflow-surge-rsi-crowding-surge-rank-threshold",
+    "entryMoneyflowSurgeRsiCrowdingRsiRankThreshold": "entry-moneyflow-surge-rsi-crowding-rsi-rank-threshold",
+    "entryMoneyflowSurgeRsiCrowdingGapThresholdPct": "entry-moneyflow-surge-rsi-crowding-gap-threshold-pct",
+    "entryMoneyflowSurgeRsiCrowdingRangeThresholdPct": "entry-moneyflow-surge-rsi-crowding-range-threshold-pct",
+    "entryMoneyflowSurgeRsiCrowdingScorePenalty": "entry-moneyflow-surge-rsi-crowding-score-penalty",
+    "entryIndicatorConfluenceMoneyflowCrowdingConfluenceRankThreshold": "entry-indicator-confluence-moneyflow-crowding-confluence-rank-threshold",
+    "entryIndicatorConfluenceMoneyflowCrowdingMoneyflow5RankThreshold": "entry-indicator-confluence-moneyflow-crowding-moneyflow5-rank-threshold",
+    "entryIndicatorConfluenceMoneyflowCrowdingMinGapPct": "entry-indicator-confluence-moneyflow-crowding-min-gap-pct",
+    "entryIndicatorConfluenceMoneyflowCrowdingScorePenalty": "entry-indicator-confluence-moneyflow-crowding-score-penalty",
+    "entryUnconfirmedGapRangeMinGapPct": "entry-unconfirmed-gap-range-min-gap-pct",
+    "entryUnconfirmedGapRangeMinRangePct": "entry-unconfirmed-gap-range-min-range-pct",
+    "entryUnconfirmedGapRangeMaxSurgeRank": "entry-unconfirmed-gap-range-max-surge-rank",
+    "entryUnconfirmedGapRangeScorePenalty": "entry-unconfirmed-gap-range-score-penalty",
+    "maxPriorGapDown60Pct": "max-prior-gap-down-60-pct",
+    "maxPriorGapDown3Count60": "max-prior-gap-down-3-count-60",
+    "limitUpEntryBlockPct": "limit-up-entry-block-pct",
+    "nextOpenCancelGapDownPct": "next-open-cancel-gap-down-pct",
+    "earlyExitDays": "early-exit-days",
+    "earlyExitLossPct": "early-exit-loss-pct",
+    "gapStopMarketCooldownDays": "gap-stop-market-cooldown-days",
+    "gapStopIndustryCooldownDays": "gap-stop-industry-cooldown-days",
+    "gapStopSymbolCooldownDays": "gap-stop-symbol-cooldown-days",
+    "industryOvernightRiskWindowDays": "industry-overnight-risk-window-days",
+    "industryOvernightRiskGapDownPct": "industry-overnight-risk-gap-down-pct",
+    "industryOvernightRiskMinCount": "industry-overnight-risk-min-count",
+    "industryOvernightRiskMinRatio": "industry-overnight-risk-min-ratio",
+}
+RESEARCH_COMMON_BOOL_FLAGS = {
+    "disableMarketBreadthFilter": "disable-market-breadth-filter",
+    "marketSoftGate": "market-soft-gate",
+    "industryStateFilter": "industry-state-filter",
+    "stopGapFillAtOpen": "stop-gap-fill-at-open",
+    "limitDownStopDelay": "limit-down-stop-delay",
+}
+RESEARCH_PORTFOLIO_ONLY_BOOL_FLAGS = {
+    "nextOpenEntry": "next-open-entry",
+    "earlyExitEntryLowBreak": "early-exit-entry-low-break",
+}
 
 
 @app.get("/api/health")
@@ -284,6 +433,84 @@ def get_research_session(session_id: str) -> dict[str, Any]:
 
 @app.get("/api/research/runs/{run_id}")
 def get_research_run(run_id: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+    return json_safe(build_research_run_response(run_id, db))
+
+
+@app.post("/api/research/jobs", status_code=202)
+def create_research_job(payload: ResearchJobRequest) -> dict[str, Any]:
+    cleanup_research_jobs()
+    command, run_id = build_research_job_command(payload)
+    job_id = uuid4().hex
+    now = datetime.now().isoformat(timespec="seconds")
+    job = {
+        "jobId": job_id,
+        "jobType": payload.job_type,
+        "runId": run_id,
+        "status": "queued",
+        "message": "等待研究任务启动",
+        "createdAt": now,
+        "updatedAt": now,
+        "progressPct": 0,
+        "command": command,
+        "request": research_payload_dict(payload),
+        "_updatedMono": monotonic(),
+    }
+    with RESEARCH_JOB_LOCK:
+        RESEARCH_JOBS[job_id] = job
+    RESEARCH_JOB_EXECUTOR.submit(run_research_job, job_id, command, run_id)
+    return public_research_job(job)
+
+
+@app.get("/api/research/jobs")
+def list_research_jobs() -> dict[str, Any]:
+    cleanup_research_jobs()
+    with RESEARCH_JOB_LOCK:
+        jobs = [public_research_job(job) for job in sorted(RESEARCH_JOBS.values(), key=lambda item: str(item.get("createdAt") or ""), reverse=True)]
+    return {"count": len(jobs), "jobs": jobs}
+
+
+@app.get("/api/research/jobs/{job_id}")
+def get_research_job(job_id: str) -> dict[str, Any]:
+    with RESEARCH_JOB_LOCK:
+        job = RESEARCH_JOBS.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="未找到这个研究任务，可能已经过期。")
+        return public_research_job(job)
+
+
+@app.post("/api/research/jobs/{job_id}/cancel")
+def cancel_research_job(job_id: str) -> dict[str, Any]:
+    with RESEARCH_JOB_LOCK:
+        job = RESEARCH_JOBS.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="未找到这个研究任务，可能已经过期。")
+        process = job.get("_process")
+        if job.get("status") not in {"queued", "running", "canceling"}:
+            return public_research_job(job)
+        job["_cancelRequested"] = True
+        if process and process.poll() is None:
+            process.terminate()
+            job["status"] = "canceling"
+            job["message"] = "正在取消研究任务"
+        else:
+            job["status"] = "canceled"
+            job["message"] = "研究任务已取消"
+            job["finishedAt"] = datetime.now().isoformat(timespec="seconds")
+        job["updatedAt"] = datetime.now().isoformat(timespec="seconds")
+        job["_updatedMono"] = monotonic()
+        return public_research_job(job)
+
+
+@app.get("/api/research/jobs/{job_id}/result")
+def get_research_job_result(job_id: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+    with RESEARCH_JOB_LOCK:
+        job = RESEARCH_JOBS.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="未找到这个研究任务，可能已经过期。")
+        run_id = str(job.get("runId") or "")
+        status = str(job.get("status") or "")
+    if status != "ok":
+        raise HTTPException(status_code=409, detail="研究任务尚未完成。")
     return json_safe(build_research_run_response(run_id, db))
 
 
@@ -1100,6 +1327,291 @@ def cleanup_market_backtest_jobs() -> None:
         ]
         for job_id in expired:
             del MARKET_BACKTEST_JOBS[job_id]
+
+
+def build_research_job_command(payload: ResearchJobRequest) -> tuple[list[str], str]:
+    job_type = str(payload.job_type or "").strip()
+    script = RESEARCH_JOB_SCRIPTS.get(job_type)
+    if not script:
+        raise HTTPException(status_code=400, detail=f"不支持的研究任务类型：{job_type}")
+
+    run_id = validate_research_run_id(payload.run_id, "runId")
+    run_dir = RESEARCH_RUNS_DIR / run_id
+    if run_dir.exists():
+        raise HTTPException(status_code=409, detail=f"runId 已存在，不能覆盖既有研究输出：{run_id}")
+
+    command = [sys.executable, script, "--run-id", run_id]
+    if job_type == "trade_delta":
+        baseline_run = validate_existing_research_run_id(payload.baseline_run, "baselineRun")
+        candidate_run = validate_existing_research_run_id(payload.candidate_run, "candidateRun")
+        command.extend(["--baseline-run", baseline_run, "--candidate-run", candidate_run])
+        reject_research_params(payload.params, {"note"})
+        return command, run_id
+
+    if payload.strategy:
+        command.extend(["--strategy", str(payload.strategy)])
+    if payload.source_run:
+        if job_type != "portfolio_backtest":
+            raise HTTPException(status_code=400, detail="sourceRun 只支持 portfolio_backtest。")
+        command.extend(["--source-run", validate_existing_research_run_id(payload.source_run, "sourceRun")])
+
+    context_path = resolve_research_context_path(payload)
+    if context_path:
+        command.extend(["--context", context_path])
+    moneyflow_cache_path = resolve_research_cache_path(payload.moneyflow_cache, payload.moneyflow_cache_run_id, "moneyflow-cache.jsonl", "moneyflowCache")
+    if moneyflow_cache_path:
+        command.extend(["--moneyflow-cache", moneyflow_cache_path])
+    concept_cache_path = resolve_research_cache_path(payload.concept_cache, payload.concept_cache_run_id, "concept-cache.jsonl", "conceptCache")
+    if concept_cache_path:
+        command.extend(["--concept-cache", concept_cache_path])
+
+    append_research_params(command, job_type, payload.params)
+    return command, run_id
+
+
+def run_research_job(job_id: str, command: list[str], run_id: str) -> None:
+    process: subprocess.Popen[str] | None = None
+    update_research_job(job_id, status="running", message="研究任务执行中", progressPct=0.01, startedAt=datetime.now().isoformat(timespec="seconds"))
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        update_research_job(job_id, pid=process.pid, _process=process)
+        stdout, stderr = process.communicate()
+        stdout_tail = tail_text(stdout)
+        stderr_tail = tail_text(stderr)
+        with RESEARCH_JOB_LOCK:
+            cancel_requested = bool(RESEARCH_JOBS.get(job_id, {}).get("_cancelRequested"))
+        if process.returncode == 0:
+            update_research_job(
+                job_id,
+                status="ok",
+                message="研究任务完成",
+                progressPct=1,
+                stdoutTail=stdout_tail,
+                stderrTail=stderr_tail,
+                resultFiles=build_known_research_run_files(run_id),
+                summary=read_finished_research_job_summary(run_id),
+                finishedAt=datetime.now().isoformat(timespec="seconds"),
+                _process=None,
+            )
+        elif cancel_requested:
+            update_research_job(
+                job_id,
+                status="canceled",
+                message="研究任务已取消",
+                stdoutTail=stdout_tail,
+                stderrTail=stderr_tail,
+                finishedAt=datetime.now().isoformat(timespec="seconds"),
+                _process=None,
+            )
+        else:
+            update_research_job(
+                job_id,
+                status="failed",
+                message="研究任务失败",
+                error=f"exit code {process.returncode}",
+                stdoutTail=stdout_tail,
+                stderrTail=stderr_tail,
+                finishedAt=datetime.now().isoformat(timespec="seconds"),
+                _process=None,
+            )
+    except Exception as error:
+        if process and process.poll() is None:
+            process.terminate()
+        update_research_job(
+            job_id,
+            status="failed",
+            message="研究任务失败",
+            error=compact_error(error),
+            finishedAt=datetime.now().isoformat(timespec="seconds"),
+            _process=None,
+        )
+
+
+def append_research_params(command: list[str], job_type: str, params: dict[str, Any]) -> None:
+    if not params:
+        return
+    remaining = dict(params)
+    append_nested_research_flags(command, remaining.pop("crossSectionScoreWeights", {}), RESEARCH_WEIGHT_FLAGS, "crossSectionScoreWeights")
+    append_nested_research_flags(command, remaining.pop("marketBreadthFilter", {}), {
+        "minSamples": "market-min-samples",
+        "minAboveMa20Pct": "market-min-above-ma20-pct",
+        "minAboveMa60Pct": "market-min-above-ma60-pct",
+        "minUpPct": "market-min-up-pct",
+        "disabled": "disable-market-breadth-filter",
+    }, "marketBreadthFilter")
+    append_nested_research_flags(command, remaining.pop("marketBreadthSoftGate", {}), {
+        "enabled": "market-soft-gate",
+        "minSamples": "market-soft-min-samples",
+        "minAboveMa20Pct": "market-soft-min-above-ma20-pct",
+        "minAboveMa60Pct": "market-soft-min-above-ma60-pct",
+        "minUpPct": "market-soft-min-up-pct",
+        "maxBaseFailedChecks": "market-soft-max-base-failed-checks",
+    }, "marketBreadthSoftGate")
+    append_nested_research_flags(command, remaining.pop("entryRiskFilter", {}), {
+        "maxGapPct": "max-entry-gap-pct",
+        "minGapPct": "min-entry-gap-pct",
+        "maxEntryRangePct": "max-entry-range-pct",
+        "maxIntradayReturnPct": "max-intraday-return-pct",
+    }, "entryRiskFilter")
+    append_nested_research_flags(command, remaining.pop("industryStateFilter", {}), {
+        "enabled": "industry-state-filter",
+        "minSamples": "industry-state-min-samples",
+        "minUpPct": "industry-state-min-up-pct",
+        "minAboveMa20Pct": "industry-state-min-above-ma20-pct",
+        "minAboveMa60Pct": "industry-state-min-above-ma60-pct",
+        "minReturn20Pct": "industry-state-min-return20-pct",
+    }, "industryStateFilter")
+
+    value_flags = dict(RESEARCH_COMMON_PARAM_FLAGS)
+    bool_flags = dict(RESEARCH_COMMON_BOOL_FLAGS)
+    if job_type == "portfolio_backtest":
+        value_flags.update(RESEARCH_PORTFOLIO_ONLY_PARAM_FLAGS)
+        bool_flags.update(RESEARCH_PORTFOLIO_ONLY_BOOL_FLAGS)
+
+    for key, flag in value_flags.items():
+        append_research_value_flag(command, flag, remaining.pop(key, None))
+    for key, flag in bool_flags.items():
+        append_research_bool_flag(command, flag, remaining.pop(key, None))
+    reject_research_params(remaining, {"note"})
+
+
+def append_nested_research_flags(command: list[str], value: Any, flag_map: dict[str, str], label: str) -> None:
+    if value in (None, ""):
+        return
+    if not isinstance(value, dict):
+        raise HTTPException(status_code=400, detail=f"{label} 必须是对象。")
+    remaining = dict(value)
+    for key, flag in flag_map.items():
+        raw = remaining.pop(key, None)
+        if isinstance(raw, bool):
+            append_research_bool_flag(command, flag, raw)
+        else:
+            append_research_value_flag(command, flag, raw)
+    reject_research_params(remaining, set())
+
+
+def append_research_value_flag(command: list[str], flag: str, value: Any) -> None:
+    if value is None or value == "":
+        return
+    if isinstance(value, bool):
+        raise HTTPException(status_code=400, detail=f"--{flag} 需要数值，不能传布尔值。")
+    command.extend([f"--{flag}", str(value)])
+
+
+def append_research_bool_flag(command: list[str], flag: str, value: Any) -> None:
+    if value is None or value is False:
+        return
+    if value is not True:
+        raise HTTPException(status_code=400, detail=f"--{flag} 是布尔开关，只接受 true。")
+    command.append(f"--{flag}")
+
+
+def reject_research_params(params: dict[str, Any], allowed_ignored: set[str]) -> None:
+    unknown = [key for key in params if key not in allowed_ignored]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"不支持的研究参数：{', '.join(sorted(unknown))}")
+
+
+def resolve_research_context_path(payload: ResearchJobRequest) -> str | None:
+    if payload.context and payload.base_context_run_id:
+        raise HTTPException(status_code=400, detail="context 和 baseContextRunId 只能二选一。")
+    if payload.base_context_run_id:
+        run_id = validate_existing_research_run_id(payload.base_context_run_id, "baseContextRunId")
+        return repo_relative_existing_path(RESEARCH_RUNS_DIR / run_id / "context.json", "baseContextRunId")
+    if payload.context:
+        return repo_relative_existing_path(payload.context, "context")
+    return None
+
+
+def resolve_research_cache_path(path_value: str | None, run_id_value: str | None, file_name: str, label: str) -> str | None:
+    if path_value and run_id_value:
+        raise HTTPException(status_code=400, detail=f"{label} 和 {label}RunId 只能二选一。")
+    if run_id_value:
+        run_id = validate_existing_research_run_id(run_id_value, f"{label}RunId")
+        return repo_relative_existing_path(RESEARCH_RUNS_DIR / run_id / file_name, f"{label}RunId")
+    if path_value:
+        return repo_relative_existing_path(path_value, label)
+    return None
+
+
+def validate_research_run_id(run_id: str | None, label: str) -> str:
+    value = str(run_id or "").strip()
+    if not value or not RESEARCH_RUN_ID_PATTERN.fullmatch(value) or "/" in value or "\\" in value:
+        raise HTTPException(status_code=400, detail=f"{label} 不是合法 run id。")
+    return value
+
+
+def validate_existing_research_run_id(run_id: str | None, label: str) -> str:
+    value = validate_research_run_id(run_id, label)
+    if not (RESEARCH_RUNS_DIR / value).is_dir():
+        raise HTTPException(status_code=404, detail=f"{label} 对应的研究 run 不存在：{value}")
+    return value
+
+
+def repo_relative_existing_path(path_value: str | Path, label: str) -> str:
+    path = Path(path_value)
+    resolved = (REPO_ROOT / path).resolve() if not path.is_absolute() else path.resolve()
+    repo_root = REPO_ROOT.resolve()
+    if resolved != repo_root and repo_root not in resolved.parents:
+        raise HTTPException(status_code=400, detail=f"{label} 必须位于项目目录内。")
+    if not resolved.exists():
+        raise HTTPException(status_code=404, detail=f"{label} 文件不存在：{path_value}")
+    return resolved.relative_to(repo_root).as_posix()
+
+
+def read_finished_research_job_summary(run_id: str) -> dict[str, Any] | None:
+    run_dir = RESEARCH_RUNS_DIR / run_id
+    if not (run_dir / "results.json").exists():
+        return None
+    try:
+        return read_research_run_summary_cached(run_dir)
+    except Exception:
+        return None
+
+
+def update_research_job(job_id: str, **updates: Any) -> None:
+    with RESEARCH_JOB_LOCK:
+        job = RESEARCH_JOBS.get(job_id)
+        if not job:
+            return
+        job.update(updates)
+        job["updatedAt"] = datetime.now().isoformat(timespec="seconds")
+        job["_updatedMono"] = monotonic()
+
+
+def public_research_job(job: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in job.items() if not key.startswith("_")}
+
+
+def cleanup_research_jobs() -> None:
+    now = monotonic()
+    with RESEARCH_JOB_LOCK:
+        expired = [
+            job_id
+            for job_id, job in RESEARCH_JOBS.items()
+            if job.get("status") in {"ok", "failed", "canceled"} and now - float(job.get("_updatedMono", now)) > RESEARCH_JOB_TTL_SECONDS
+        ]
+        for job_id in expired:
+            del RESEARCH_JOBS[job_id]
+
+
+def research_payload_dict(payload: ResearchJobRequest) -> dict[str, Any]:
+    if hasattr(payload, "model_dump"):
+        return payload.model_dump(by_alias=True)
+    return payload.dict(by_alias=True)
+
+
+def tail_text(text: str | None, limit: int = 4000) -> str:
+    value = text or ""
+    return value[-limit:] if len(value) > limit else value
 
 
 def query_market_trade_dates(pro: Any, start_date: date, end_date: date) -> list[date]:

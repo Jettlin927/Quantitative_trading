@@ -22,6 +22,8 @@ yarn-error.log*
 *.tmp
 artifacts/
 .agent/
+tmp/
+docs/research/runs/002-moneyflow-cache-mainline-001/moneyflow-cache.jsonl
 
 # OS/editor files
 .DS_Store

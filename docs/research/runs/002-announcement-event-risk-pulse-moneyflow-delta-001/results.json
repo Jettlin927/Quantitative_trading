@@ -1,0 +1,1964 @@
+{
+  "runId": "002-announcement-event-risk-pulse-moneyflow-delta-001",
+  "startedAt": "2026-05-31 22:12 +0800",
+  "finishedAt": "2026-05-31 22:13 +0800",
+  "baselineRun": "002-repair-indicator-ablate-ma-001",
+  "candidateRun": "002-repair-indicator-pulse-moneyflow-surge-002",
+  "mode": "full",
+  "lookbackDays": 30,
+  "baselineOnlyTradeCount": 14,
+  "candidateOnlyTradeCount": 12,
+  "comparisons": [
+    {
+      "label": "ALL",
+      "replacementNetPnlDelta": 5939.977671429382,
+      "baselineOnly": {
+        "count": 14,
+        "netPnl": 1965.19700255323,
+        "avgReturnPct": -0.00020657326546366997,
+        "riskTradeRatio": 0.21428571428571427,
+        "avgAnnouncementCount": 7.571428571428571,
+        "avgRiskAnnouncementCount": 0.21428571428571427,
+        "riskCategoryCounts": {
+          "业绩减值": 1,
+          "诉讼债务担保": 2
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnly": {
+        "count": 12,
+        "netPnl": 7905.174673982612,
+        "avgReturnPct": 0.033478948717889034,
+        "riskTradeRatio": 0.25,
+        "avgAnnouncementCount": 9.083333333333334,
+        "avgRiskAnnouncementCount": 0.4166666666666667,
+        "riskCategoryCounts": {
+          "业绩减值": 1,
+          "监管问询": 1,
+          "诉讼债务担保": 3
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyLosses": {
+        "count": 6,
+        "netPnl": -5566.258646549984,
+        "avgReturnPct": -0.0543441972534493,
+        "riskTradeRatio": 0.16666666666666666,
+        "avgAnnouncementCount": 5.333333333333333,
+        "avgRiskAnnouncementCount": 0.16666666666666666,
+        "riskCategoryCounts": {
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyWins": {
+        "count": 6,
+        "netPnl": 13471.433320532597,
+        "avgReturnPct": 0.12130209468922737,
+        "riskTradeRatio": 0.3333333333333333,
+        "avgAnnouncementCount": 12.833333333333334,
+        "avgRiskAnnouncementCount": 0.6666666666666666,
+        "riskCategoryCounts": {
+          "业绩减值": 1,
+          "监管问询": 1,
+          "诉讼债务担保": 2
+        },
+        "fetchErrorCount": 0
+      },
+      "baselineOnlyLosses": {
+        "count": 9,
+        "netPnl": -7117.88602061249,
+        "avgReturnPct": -0.05284596682997076,
+        "riskTradeRatio": 0.1111111111111111,
+        "avgAnnouncementCount": 7.222222222222222,
+        "avgRiskAnnouncementCount": 0.1111111111111111,
+        "riskCategoryCounts": {
+          "业绩减值": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyRiskSamples": [
+        {
+          "ts_code": "002015.SZ",
+          "name": "协鑫能科",
+          "entryDate": "2025-06-05",
+          "returnPct": 0.14770143714071468,
+          "netPnl": 2798.0050283184974,
+          "riskAnnouncementCount": 2,
+          "riskCategories": [
+            "监管问询",
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于对控股子公司及参股公司提供担保的进展公告",
+              "type": "",
+              "date": "2025-05-24",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1223644643",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            },
+            {
+              "title": "关于增设子公司募集资金专户并签订募集资金专户监管协议的公告",
+              "type": "",
+              "date": "2025-05-14",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1223534563",
+              "riskCategories": [
+                "监管问询"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "000066.SZ",
+          "name": "中国长城",
+          "entryDate": "2026-04-30",
+          "returnPct": 0.19760149962509357,
+          "netPnl": 4705.629934605597,
+          "riskAnnouncementCount": 2,
+          "riskCategories": [
+            "业绩减值",
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于2025年度计提资产减值准备及核销的公告",
+              "type": "",
+              "date": "2026-04-29",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1225241003",
+              "riskCategories": [
+                "业绩减值"
+              ]
+            },
+            {
+              "title": "关于为下属公司提供担保及下属公司之间担保的公告",
+              "type": "",
+              "date": "2026-04-29",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1225240998",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600732.SH",
+          "name": "爱旭股份",
+          "entryDate": "2024-10-28",
+          "returnPct": -0.061835349370842424,
+          "netPnl": -906.4013279999981,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于为子公司提供担保的进展公告",
+              "type": "",
+              "date": "2024-10-22",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1221451639",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "300953.SZ",
+          "name": "震裕科技",
+          "entryDate": "2026-04-21",
+          "returnPct": -0.05284596682997085,
+          "netPnl": -1152.2654406375004,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600184.SH",
+          "name": "光电股份",
+          "entryDate": "2025-05-13",
+          "returnPct": -0.05284596682997074,
+          "netPnl": -966.3854528999982,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "301219.SZ",
+          "name": "腾远钴业",
+          "entryDate": "2024-04-02",
+          "returnPct": -0.052845966829970635,
+          "netPnl": -684.1526448749973,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002895.SZ",
+          "name": "川恒股份",
+          "entryDate": "2024-05-07",
+          "returnPct": -0.05284596682997059,
+          "netPnl": -693.6768116249968,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002334.SZ",
+          "name": "英威腾",
+          "entryDate": "2025-08-18",
+          "returnPct": -0.052845966829970545,
+          "netPnl": -1163.3769685124935,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ],
+      "baselineOnlyRiskSamples": [
+        {
+          "ts_code": "001696.SZ",
+          "name": "宗申动力",
+          "entryDate": "2024-04-02",
+          "returnPct": -0.052845966829970885,
+          "netPnl": -751.7742288000009,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "业绩减值"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "重庆宗申动力机械股份有限公司拟进行商誉减值测试涉及的含并购东莞市锂智慧能源有限公司形成的商誉资产组可收回金额评估项目资产评估报告",
+              "type": "",
+              "date": "2024-03-30",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1219467523",
+              "riskCategories": [
+                "业绩减值"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600438.SH",
+          "name": "通威股份",
+          "entryDate": "2024-10-28",
+          "returnPct": 0.03792129967508116,
+          "netPnl": 546.7494352319991,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "通威股份有限公司关于对外提供担保及公司新增借款的进展公告",
+              "type": "",
+              "date": "2024-10-10",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1221355358",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600338.SH",
+          "name": "西藏珠峰",
+          "entryDate": "2026-04-28",
+          "returnPct": 0.04235686078480374,
+          "netPnl": 958.0377761954987,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于公司2026年度预计为控股子公司提供担保额度的公告",
+              "type": "",
+              "date": "2026-04-23",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1225153642",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002149.SZ",
+          "name": "西部材料",
+          "entryDate": "2026-04-21",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -973.528577962501,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "688578.SH",
+          "name": "艾力斯",
+          "entryDate": "2025-05-30",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -518.5379675000004,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002246.SZ",
+          "name": "北化股份",
+          "entryDate": "2025-05-07",
+          "returnPct": -0.05284596682997076,
+          "netPnl": -926.2252164374986,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002773.SZ",
+          "name": "康弘药业",
+          "entryDate": "2024-05-07",
+          "returnPct": -0.052845966829970746,
+          "netPnl": -758.1236732999987,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600562.SH",
+          "name": "国睿科技",
+          "entryDate": "2025-05-13",
+          "returnPct": -0.05284596682997072,
+          "netPnl": -939.664873962498,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ]
+    },
+    {
+      "label": "Y1",
+      "replacementNetPnlDelta": 3950.5122182919768,
+      "baselineOnly": {
+        "count": 4,
+        "netPnl": -2750.3677092499947,
+        "avgReturnPct": -0.052845966829970725,
+        "riskTradeRatio": 0.25,
+        "avgAnnouncementCount": 8.75,
+        "avgRiskAnnouncementCount": 0.25,
+        "riskCategoryCounts": {
+          "业绩减值": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnly": {
+        "count": 4,
+        "netPnl": 1200.144509041982,
+        "avgReturnPct": 0.023611796242373112,
+        "riskTradeRatio": 0.0,
+        "avgAnnouncementCount": 0.5,
+        "avgRiskAnnouncementCount": 0,
+        "riskCategoryCounts": {},
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyLosses": {
+        "count": 2,
+        "netPnl": -1377.8294564999942,
+        "avgReturnPct": -0.052845966829970614,
+        "riskTradeRatio": 0.0,
+        "avgAnnouncementCount": 0,
+        "avgRiskAnnouncementCount": 0,
+        "riskCategoryCounts": {},
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyWins": {
+        "count": 2,
+        "netPnl": 2577.973965541976,
+        "avgReturnPct": 0.10006955931471684,
+        "riskTradeRatio": 0.0,
+        "avgAnnouncementCount": 1,
+        "avgRiskAnnouncementCount": 0,
+        "riskCategoryCounts": {},
+        "fetchErrorCount": 0
+      },
+      "baselineOnlyLosses": {
+        "count": 4,
+        "netPnl": -2750.3677092499947,
+        "avgReturnPct": -0.052845966829970725,
+        "riskTradeRatio": 0.25,
+        "avgAnnouncementCount": 8.75,
+        "avgRiskAnnouncementCount": 0.25,
+        "riskCategoryCounts": {
+          "业绩减值": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyRiskSamples": [
+        {
+          "ts_code": "301219.SZ",
+          "name": "腾远钴业",
+          "entryDate": "2024-04-02",
+          "returnPct": -0.052845966829970635,
+          "netPnl": -684.1526448749973,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002895.SZ",
+          "name": "川恒股份",
+          "entryDate": "2024-05-07",
+          "returnPct": -0.05284596682997059,
+          "netPnl": -693.6768116249968,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "603087.SH",
+          "name": "XD甘李药",
+          "entryDate": "2023-11-24",
+          "returnPct": 0.04790131217195706,
+          "netPnl": 507.2376595286005,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600580.SH",
+          "name": "卧龙电驱",
+          "entryDate": "2024-03-12",
+          "returnPct": 0.15223780645747662,
+          "netPnl": 2070.7363060133757,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ],
+      "baselineOnlyRiskSamples": [
+        {
+          "ts_code": "001696.SZ",
+          "name": "宗申动力",
+          "entryDate": "2024-04-02",
+          "returnPct": -0.052845966829970885,
+          "netPnl": -751.7742288000009,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "业绩减值"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "重庆宗申动力机械股份有限公司拟进行商誉减值测试涉及的含并购东莞市锂智慧能源有限公司形成的商誉资产组可收回金额评估项目资产评估报告",
+              "type": "",
+              "date": "2024-03-30",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1219467523",
+              "riskCategories": [
+                "业绩减值"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002773.SZ",
+          "name": "康弘药业",
+          "entryDate": "2024-05-07",
+          "returnPct": -0.052845966829970746,
+          "netPnl": -758.1236732999987,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "605117.SH",
+          "name": "德业股份",
+          "entryDate": "2024-03-12",
+          "returnPct": -0.05284596682997064,
+          "netPnl": -567.6403382999979,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600566.SH",
+          "name": "济川药业",
+          "entryDate": "2023-11-24",
+          "returnPct": -0.05284596682997062,
+          "netPnl": -672.8294688499973,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ]
+    },
+    {
+      "label": "Y2",
+      "replacementNetPnlDelta": 1976.4674794130024,
+      "baselineOnly": {
+        "count": 5,
+        "netPnl": -1119.8683827946988,
+        "avgReturnPct": -0.014695204457455839,
+        "riskTradeRatio": 0.2,
+        "avgAnnouncementCount": 7.8,
+        "avgRiskAnnouncementCount": 0.2,
+        "riskCategoryCounts": {
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnly": {
+        "count": 3,
+        "netPnl": 856.5990966183035,
+        "avgReturnPct": 0.011006706979967218,
+        "riskTradeRatio": 0.3333333333333333,
+        "avgAnnouncementCount": 20.666666666666668,
+        "avgRiskAnnouncementCount": 0.3333333333333333,
+        "riskCategoryCounts": {
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyLosses": {
+        "count": 2,
+        "netPnl": -1872.7867808999963,
+        "avgReturnPct": -0.05734065810040658,
+        "riskTradeRatio": 0.5,
+        "avgAnnouncementCount": 16,
+        "avgRiskAnnouncementCount": 0.5,
+        "riskCategoryCounts": {
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyWins": {
+        "count": 1,
+        "netPnl": 2729.3858775183,
+        "avgReturnPct": 0.14770143714071482,
+        "riskTradeRatio": 0.0,
+        "avgAnnouncementCount": 30,
+        "avgRiskAnnouncementCount": 0,
+        "riskCategoryCounts": {},
+        "fetchErrorCount": 0
+      },
+      "baselineOnlyLosses": {
+        "count": 3,
+        "netPnl": -2384.428057899997,
+        "avgReturnPct": -0.05284596682997078,
+        "riskTradeRatio": 0.0,
+        "avgAnnouncementCount": 10,
+        "avgRiskAnnouncementCount": 0,
+        "riskCategoryCounts": {},
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyRiskSamples": [
+        {
+          "ts_code": "600732.SH",
+          "name": "爱旭股份",
+          "entryDate": "2024-10-28",
+          "returnPct": -0.061835349370842424,
+          "netPnl": -906.4013279999981,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于为子公司提供担保的进展公告",
+              "type": "",
+              "date": "2024-10-22",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1221451639",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600184.SH",
+          "name": "光电股份",
+          "entryDate": "2025-05-13",
+          "returnPct": -0.05284596682997074,
+          "netPnl": -966.3854528999982,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600562.SH",
+          "name": "国睿科技",
+          "entryDate": "2025-05-07",
+          "returnPct": 0.14770143714071482,
+          "netPnl": 2729.3858775183,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ],
+      "baselineOnlyRiskSamples": [
+        {
+          "ts_code": "600438.SH",
+          "name": "通威股份",
+          "entryDate": "2024-10-28",
+          "returnPct": 0.03792129967508116,
+          "netPnl": 546.7494352319991,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "通威股份有限公司关于对外提供担保及公司新增借款的进展公告",
+              "type": "",
+              "date": "2024-10-10",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1221355358",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "688578.SH",
+          "name": "艾力斯",
+          "entryDate": "2025-05-30",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -518.5379675000004,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002246.SZ",
+          "name": "北化股份",
+          "entryDate": "2025-05-07",
+          "returnPct": -0.05284596682997076,
+          "netPnl": -926.2252164374986,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600562.SH",
+          "name": "国睿科技",
+          "entryDate": "2025-05-13",
+          "returnPct": -0.05284596682997072,
+          "netPnl": -939.664873962498,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "300607.SZ",
+          "name": "拓斯达",
+          "entryDate": "2025-05-13",
+          "returnPct": 0.04714057852755199,
+          "netPnl": 717.810239873299,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ]
+    },
+    {
+      "label": "Y3",
+      "replacementNetPnlDelta": 531.5359412244034,
+      "baselineOnly": {
+        "count": 6,
+        "netPnl": 5316.895127097923,
+        "avgReturnPct": 0.03818698284344997,
+        "riskTradeRatio": 0.16666666666666666,
+        "avgAnnouncementCount": 5.333333333333333,
+        "avgRiskAnnouncementCount": 0.16666666666666666,
+        "riskCategoryCounts": {
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnly": {
+        "count": 5,
+        "netPnl": 5848.431068322327,
+        "avgReturnPct": 0.05485601574105486,
+        "riskTradeRatio": 0.4,
+        "avgAnnouncementCount": 9,
+        "avgRiskAnnouncementCount": 0.8,
+        "riskCategoryCounts": {
+          "业绩减值": 1,
+          "监管问询": 1,
+          "诉讼债务担保": 2
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyLosses": {
+        "count": 2,
+        "netPnl": -2315.642409149994,
+        "avgReturnPct": -0.0528459668299707,
+        "riskTradeRatio": 0.0,
+        "avgAnnouncementCount": 0,
+        "avgRiskAnnouncementCount": 0,
+        "riskCategoryCounts": {},
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyWins": {
+        "count": 3,
+        "netPnl": 8164.0734774723205,
+        "avgReturnPct": 0.1266573374550719,
+        "riskTradeRatio": 0.6666666666666666,
+        "avgAnnouncementCount": 15,
+        "avgRiskAnnouncementCount": 1.3333333333333333,
+        "riskCategoryCounts": {
+          "业绩减值": 1,
+          "监管问询": 1,
+          "诉讼债务担保": 2
+        },
+        "fetchErrorCount": 0
+      },
+      "baselineOnlyLosses": {
+        "count": 3,
+        "netPnl": -2501.6282209624987,
+        "avgReturnPct": -0.05284596682997082,
+        "riskTradeRatio": 0.0,
+        "avgAnnouncementCount": 0,
+        "avgRiskAnnouncementCount": 0,
+        "riskCategoryCounts": {},
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyRiskSamples": [
+        {
+          "ts_code": "002015.SZ",
+          "name": "协鑫能科",
+          "entryDate": "2025-06-05",
+          "returnPct": 0.14770143714071468,
+          "netPnl": 2798.0050283184974,
+          "riskAnnouncementCount": 2,
+          "riskCategories": [
+            "监管问询",
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于对控股子公司及参股公司提供担保的进展公告",
+              "type": "",
+              "date": "2025-05-24",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1223644643",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            },
+            {
+              "title": "关于增设子公司募集资金专户并签订募集资金专户监管协议的公告",
+              "type": "",
+              "date": "2025-05-14",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1223534563",
+              "riskCategories": [
+                "监管问询"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "000066.SZ",
+          "name": "中国长城",
+          "entryDate": "2026-04-30",
+          "returnPct": 0.19760149962509357,
+          "netPnl": 4705.629934605597,
+          "riskAnnouncementCount": 2,
+          "riskCategories": [
+            "业绩减值",
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于2025年度计提资产减值准备及核销的公告",
+              "type": "",
+              "date": "2026-04-29",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1225241003",
+              "riskCategories": [
+                "业绩减值"
+              ]
+            },
+            {
+              "title": "关于为下属公司提供担保及下属公司之间担保的公告",
+              "type": "",
+              "date": "2026-04-29",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1225240998",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "300953.SZ",
+          "name": "震裕科技",
+          "entryDate": "2026-04-21",
+          "returnPct": -0.05284596682997085,
+          "netPnl": -1152.2654406375004,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002334.SZ",
+          "name": "英威腾",
+          "entryDate": "2025-08-18",
+          "returnPct": -0.052845966829970545,
+          "netPnl": -1163.3769685124935,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600366.SH",
+          "name": "宁波韵升",
+          "entryDate": "2025-06-12",
+          "returnPct": 0.03466907559940742,
+          "netPnl": 660.4385145482265,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ],
+      "baselineOnlyRiskSamples": [
+        {
+          "ts_code": "600338.SH",
+          "name": "西藏珠峰",
+          "entryDate": "2026-04-28",
+          "returnPct": 0.04235686078480374,
+          "netPnl": 958.0377761954987,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于公司2026年度预计为控股子公司提供担保额度的公告",
+              "type": "",
+              "date": "2026-04-23",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1225153642",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002149.SZ",
+          "name": "西部材料",
+          "entryDate": "2026-04-21",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -973.528577962501,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "688578.SH",
+          "name": "艾力斯",
+          "entryDate": "2025-05-30",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -518.5379675000004,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002605.SZ",
+          "name": "姚记科技",
+          "entryDate": "2025-06-10",
+          "returnPct": -0.0528459668299707,
+          "netPnl": -1009.5616754999974,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600737.SH",
+          "name": "中粮糖业",
+          "entryDate": "2025-08-18",
+          "returnPct": 0.1477014371407147,
+          "netPnl": 3161.509064238522,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "003040.SZ",
+          "name": "楚天龙",
+          "entryDate": "2025-06-06",
+          "returnPct": 0.19760149962509385,
+          "netPnl": 3698.976507626401,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ]
+    },
+    {
+      "label": "R18-1",
+      "replacementNetPnlDelta": 2497.3614550599796,
+      "baselineOnly": {
+        "count": 5,
+        "netPnl": -2203.6182740179956,
+        "avgReturnPct": -0.03469251352896035,
+        "riskTradeRatio": 0.4,
+        "avgAnnouncementCount": 8.8,
+        "avgRiskAnnouncementCount": 0.4,
+        "riskCategoryCounts": {
+          "业绩减值": 1,
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnly": {
+        "count": 5,
+        "netPnl": 293.7431810419839,
+        "avgReturnPct": 0.006522367119730005,
+        "riskTradeRatio": 0.2,
+        "avgAnnouncementCount": 0.8,
+        "avgRiskAnnouncementCount": 0.2,
+        "riskCategoryCounts": {
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyLosses": {
+        "count": 3,
+        "netPnl": -2284.2307844999923,
+        "avgReturnPct": -0.05584242767692788,
+        "riskTradeRatio": 0.3333333333333333,
+        "avgAnnouncementCount": 0.6666666666666666,
+        "avgRiskAnnouncementCount": 0.3333333333333333,
+        "riskCategoryCounts": {
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyWins": {
+        "count": 2,
+        "netPnl": 2577.973965541976,
+        "avgReturnPct": 0.10006955931471684,
+        "riskTradeRatio": 0.0,
+        "avgAnnouncementCount": 1,
+        "avgRiskAnnouncementCount": 0,
+        "riskCategoryCounts": {},
+        "fetchErrorCount": 0
+      },
+      "baselineOnlyLosses": {
+        "count": 4,
+        "netPnl": -2750.3677092499947,
+        "avgReturnPct": -0.052845966829970725,
+        "riskTradeRatio": 0.25,
+        "avgAnnouncementCount": 8.75,
+        "avgRiskAnnouncementCount": 0.25,
+        "riskCategoryCounts": {
+          "业绩减值": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyRiskSamples": [
+        {
+          "ts_code": "600732.SH",
+          "name": "爱旭股份",
+          "entryDate": "2024-10-28",
+          "returnPct": -0.061835349370842424,
+          "netPnl": -906.4013279999981,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于为子公司提供担保的进展公告",
+              "type": "",
+              "date": "2024-10-22",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1221451639",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "301219.SZ",
+          "name": "腾远钴业",
+          "entryDate": "2024-04-02",
+          "returnPct": -0.052845966829970635,
+          "netPnl": -684.1526448749973,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002895.SZ",
+          "name": "川恒股份",
+          "entryDate": "2024-05-07",
+          "returnPct": -0.05284596682997059,
+          "netPnl": -693.6768116249968,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "603087.SH",
+          "name": "XD甘李药",
+          "entryDate": "2023-11-24",
+          "returnPct": 0.04790131217195706,
+          "netPnl": 507.2376595286005,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600580.SH",
+          "name": "卧龙电驱",
+          "entryDate": "2024-03-12",
+          "returnPct": 0.15223780645747662,
+          "netPnl": 2070.7363060133757,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ],
+      "baselineOnlyRiskSamples": [
+        {
+          "ts_code": "001696.SZ",
+          "name": "宗申动力",
+          "entryDate": "2024-04-02",
+          "returnPct": -0.052845966829970885,
+          "netPnl": -751.7742288000009,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "业绩减值"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "重庆宗申动力机械股份有限公司拟进行商誉减值测试涉及的含并购东莞市锂智慧能源有限公司形成的商誉资产组可收回金额评估项目资产评估报告",
+              "type": "",
+              "date": "2024-03-30",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1219467523",
+              "riskCategories": [
+                "业绩减值"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600438.SH",
+          "name": "通威股份",
+          "entryDate": "2024-10-28",
+          "returnPct": 0.03792129967508116,
+          "netPnl": 546.7494352319991,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "通威股份有限公司关于对外提供担保及公司新增借款的进展公告",
+              "type": "",
+              "date": "2024-10-10",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1221355358",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002773.SZ",
+          "name": "康弘药业",
+          "entryDate": "2024-05-07",
+          "returnPct": -0.052845966829970746,
+          "netPnl": -758.1236732999987,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "605117.SH",
+          "name": "德业股份",
+          "entryDate": "2024-03-12",
+          "returnPct": -0.05284596682997064,
+          "netPnl": -567.6403382999979,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600566.SH",
+          "name": "济川药业",
+          "entryDate": "2023-11-24",
+          "returnPct": -0.05284596682997062,
+          "netPnl": -672.8294688499973,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ]
+    },
+    {
+      "label": "R18-2",
+      "replacementNetPnlDelta": 4746.912569326381,
+      "baselineOnly": {
+        "count": 8,
+        "netPnl": -3197.4066231946963,
+        "avgReturnPct": -0.029001740347148933,
+        "riskTradeRatio": 0.25,
+        "avgAnnouncementCount": 8.625,
+        "avgRiskAnnouncementCount": 0.25,
+        "riskCategoryCounts": {
+          "业绩减值": 1,
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnly": {
+        "count": 6,
+        "netPnl": 1549.505946131685,
+        "avgReturnPct": 0.013260998956239507,
+        "riskTradeRatio": 0.16666666666666666,
+        "avgAnnouncementCount": 10.666666666666666,
+        "avgRiskAnnouncementCount": 0.16666666666666666,
+        "riskCategoryCounts": {
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyLosses": {
+        "count": 4,
+        "netPnl": -3250.6162373999905,
+        "avgReturnPct": -0.0550933124651886,
+        "riskTradeRatio": 0.25,
+        "avgAnnouncementCount": 8,
+        "avgRiskAnnouncementCount": 0.25,
+        "riskCategoryCounts": {
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyWins": {
+        "count": 2,
+        "netPnl": 4800.122183531676,
+        "avgReturnPct": 0.14996962179909573,
+        "riskTradeRatio": 0.0,
+        "avgAnnouncementCount": 16,
+        "avgRiskAnnouncementCount": 0,
+        "riskCategoryCounts": {},
+        "fetchErrorCount": 0
+      },
+      "baselineOnlyLosses": {
+        "count": 6,
+        "netPnl": -4461.966298299994,
+        "avgReturnPct": -0.05284596682997077,
+        "riskTradeRatio": 0.16666666666666666,
+        "avgAnnouncementCount": 10,
+        "avgRiskAnnouncementCount": 0.16666666666666666,
+        "riskCategoryCounts": {
+          "业绩减值": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyRiskSamples": [
+        {
+          "ts_code": "600732.SH",
+          "name": "爱旭股份",
+          "entryDate": "2024-10-28",
+          "returnPct": -0.061835349370842424,
+          "netPnl": -906.4013279999981,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于为子公司提供担保的进展公告",
+              "type": "",
+              "date": "2024-10-22",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1221451639",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600184.SH",
+          "name": "光电股份",
+          "entryDate": "2025-05-13",
+          "returnPct": -0.05284596682997074,
+          "netPnl": -966.3854528999982,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "301219.SZ",
+          "name": "腾远钴业",
+          "entryDate": "2024-04-02",
+          "returnPct": -0.052845966829970635,
+          "netPnl": -684.1526448749973,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002895.SZ",
+          "name": "川恒股份",
+          "entryDate": "2024-05-07",
+          "returnPct": -0.05284596682997059,
+          "netPnl": -693.6768116249968,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600562.SH",
+          "name": "国睿科技",
+          "entryDate": "2025-05-07",
+          "returnPct": 0.14770143714071482,
+          "netPnl": 2729.3858775183,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600580.SH",
+          "name": "卧龙电驱",
+          "entryDate": "2024-03-12",
+          "returnPct": 0.15223780645747662,
+          "netPnl": 2070.7363060133757,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ],
+      "baselineOnlyRiskSamples": [
+        {
+          "ts_code": "001696.SZ",
+          "name": "宗申动力",
+          "entryDate": "2024-04-02",
+          "returnPct": -0.052845966829970885,
+          "netPnl": -751.7742288000009,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "业绩减值"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "重庆宗申动力机械股份有限公司拟进行商誉减值测试涉及的含并购东莞市锂智慧能源有限公司形成的商誉资产组可收回金额评估项目资产评估报告",
+              "type": "",
+              "date": "2024-03-30",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1219467523",
+              "riskCategories": [
+                "业绩减值"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600438.SH",
+          "name": "通威股份",
+          "entryDate": "2024-10-28",
+          "returnPct": 0.03792129967508116,
+          "netPnl": 546.7494352319991,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "通威股份有限公司关于对外提供担保及公司新增借款的进展公告",
+              "type": "",
+              "date": "2024-10-10",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1221355358",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "688578.SH",
+          "name": "艾力斯",
+          "entryDate": "2025-05-30",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -518.5379675000004,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002246.SZ",
+          "name": "北化股份",
+          "entryDate": "2025-05-07",
+          "returnPct": -0.05284596682997076,
+          "netPnl": -926.2252164374986,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002773.SZ",
+          "name": "康弘药业",
+          "entryDate": "2024-05-07",
+          "returnPct": -0.052845966829970746,
+          "netPnl": -758.1236732999987,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600562.SH",
+          "name": "国睿科技",
+          "entryDate": "2025-05-13",
+          "returnPct": -0.05284596682997072,
+          "netPnl": -939.664873962498,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "605117.SH",
+          "name": "德业股份",
+          "entryDate": "2024-03-12",
+          "returnPct": -0.05284596682997064,
+          "netPnl": -567.6403382999979,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "300607.SZ",
+          "name": "拓斯达",
+          "entryDate": "2025-05-13",
+          "returnPct": 0.04714057852755199,
+          "netPnl": 717.810239873299,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ]
+    },
+    {
+      "label": "R18-3",
+      "replacementNetPnlDelta": -1579.3898425976931,
+      "baselineOnly": {
+        "count": 8,
+        "netPnl": 4731.055513570227,
+        "avgReturnPct": 0.027372618456069833,
+        "riskTradeRatio": 0.125,
+        "avgAnnouncementCount": 5.25,
+        "avgRiskAnnouncementCount": 0.125,
+        "riskCategoryCounts": {
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnly": {
+        "count": 6,
+        "netPnl": 3151.665670972534,
+        "avgReturnPct": 0.027090777808342202,
+        "riskTradeRatio": 0.3333333333333333,
+        "avgAnnouncementCount": 12.833333333333334,
+        "avgRiskAnnouncementCount": 0.5,
+        "riskCategoryCounts": {
+          "监管问询": 1,
+          "诉讼债务担保": 2
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyLosses": {
+        "count": 3,
+        "netPnl": -3036.16374941249,
+        "avgReturnPct": -0.0558424276769279,
+        "riskTradeRatio": 0.3333333333333333,
+        "avgAnnouncementCount": 10.666666666666666,
+        "avgRiskAnnouncementCount": 0.3333333333333333,
+        "riskCategoryCounts": {
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyWins": {
+        "count": 3,
+        "netPnl": 6187.829420385024,
+        "avgReturnPct": 0.1100239832936123,
+        "riskTradeRatio": 0.3333333333333333,
+        "avgAnnouncementCount": 15,
+        "avgRiskAnnouncementCount": 0.6666666666666666,
+        "riskCategoryCounts": {
+          "监管问询": 1,
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "baselineOnlyLosses": {
+        "count": 4,
+        "netPnl": -3393.9897333999943,
+        "avgReturnPct": -0.05284596682997076,
+        "riskTradeRatio": 0.0,
+        "avgAnnouncementCount": 7.5,
+        "avgRiskAnnouncementCount": 0,
+        "riskCategoryCounts": {},
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyRiskSamples": [
+        {
+          "ts_code": "002015.SZ",
+          "name": "协鑫能科",
+          "entryDate": "2025-06-05",
+          "returnPct": 0.14770143714071468,
+          "netPnl": 2798.0050283184974,
+          "riskAnnouncementCount": 2,
+          "riskCategories": [
+            "监管问询",
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于对控股子公司及参股公司提供担保的进展公告",
+              "type": "",
+              "date": "2025-05-24",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1223644643",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            },
+            {
+              "title": "关于增设子公司募集资金专户并签订募集资金专户监管协议的公告",
+              "type": "",
+              "date": "2025-05-14",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1223534563",
+              "riskCategories": [
+                "监管问询"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600732.SH",
+          "name": "爱旭股份",
+          "entryDate": "2024-10-28",
+          "returnPct": -0.061835349370842424,
+          "netPnl": -906.4013279999981,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于为子公司提供担保的进展公告",
+              "type": "",
+              "date": "2024-10-22",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1221451639",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600184.SH",
+          "name": "光电股份",
+          "entryDate": "2025-05-13",
+          "returnPct": -0.05284596682997074,
+          "netPnl": -966.3854528999982,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002334.SZ",
+          "name": "英威腾",
+          "entryDate": "2025-08-18",
+          "returnPct": -0.052845966829970545,
+          "netPnl": -1163.3769685124935,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600366.SH",
+          "name": "宁波韵升",
+          "entryDate": "2025-06-12",
+          "returnPct": 0.03466907559940742,
+          "netPnl": 660.4385145482265,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600562.SH",
+          "name": "国睿科技",
+          "entryDate": "2025-05-07",
+          "returnPct": 0.14770143714071482,
+          "netPnl": 2729.3858775183,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ],
+      "baselineOnlyRiskSamples": [
+        {
+          "ts_code": "600438.SH",
+          "name": "通威股份",
+          "entryDate": "2024-10-28",
+          "returnPct": 0.03792129967508116,
+          "netPnl": 546.7494352319991,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "通威股份有限公司关于对外提供担保及公司新增借款的进展公告",
+              "type": "",
+              "date": "2024-10-10",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1221355358",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "688578.SH",
+          "name": "艾力斯",
+          "entryDate": "2025-05-30",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -518.5379675000004,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002246.SZ",
+          "name": "北化股份",
+          "entryDate": "2025-05-07",
+          "returnPct": -0.05284596682997076,
+          "netPnl": -926.2252164374986,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600562.SH",
+          "name": "国睿科技",
+          "entryDate": "2025-05-13",
+          "returnPct": -0.05284596682997072,
+          "netPnl": -939.664873962498,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002605.SZ",
+          "name": "姚记科技",
+          "entryDate": "2025-06-10",
+          "returnPct": -0.0528459668299707,
+          "netPnl": -1009.5616754999974,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "300607.SZ",
+          "name": "拓斯达",
+          "entryDate": "2025-05-13",
+          "returnPct": 0.04714057852755199,
+          "netPnl": 717.810239873299,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600737.SH",
+          "name": "中粮糖业",
+          "entryDate": "2025-08-18",
+          "returnPct": 0.1477014371407147,
+          "netPnl": 3161.509064238522,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "003040.SZ",
+          "name": "楚天龙",
+          "entryDate": "2025-06-06",
+          "returnPct": 0.19760149962509385,
+          "netPnl": 3698.976507626401,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ]
+    },
+    {
+      "label": "R18-4",
+      "replacementNetPnlDelta": 3442.6162163694025,
+      "baselineOnly": {
+        "count": 9,
+        "netPnl": 4168.815276571226,
+        "avgReturnPct": 0.018952282436478927,
+        "riskTradeRatio": 0.1111111111111111,
+        "avgAnnouncementCount": 6.888888888888889,
+        "avgRiskAnnouncementCount": 0.1111111111111111,
+        "riskCategoryCounts": {
+          "诉讼债务担保": 1
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnly": {
+        "count": 7,
+        "netPnl": 7611.431492940628,
+        "avgReturnPct": 0.05273364985943119,
+        "riskTradeRatio": 0.2857142857142857,
+        "avgAnnouncementCount": 15,
+        "avgRiskAnnouncementCount": 0.5714285714285714,
+        "riskCategoryCounts": {
+          "业绩减值": 1,
+          "监管问询": 1,
+          "诉讼债务担保": 2
+        },
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyLosses": {
+        "count": 3,
+        "netPnl": -3282.027862049992,
+        "avgReturnPct": -0.05284596682997071,
+        "riskTradeRatio": 0.0,
+        "avgAnnouncementCount": 10,
+        "avgRiskAnnouncementCount": 0,
+        "riskCategoryCounts": {},
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyWins": {
+        "count": 4,
+        "netPnl": 10893.45935499062,
+        "avgReturnPct": 0.13191836237648263,
+        "riskTradeRatio": 0.5,
+        "avgAnnouncementCount": 18.75,
+        "avgRiskAnnouncementCount": 1,
+        "riskCategoryCounts": {
+          "业绩减值": 1,
+          "监管问询": 1,
+          "诉讼债务担保": 2
+        },
+        "fetchErrorCount": 0
+      },
+      "baselineOnlyLosses": {
+        "count": 5,
+        "netPnl": -4367.518311362495,
+        "avgReturnPct": -0.05284596682997079,
+        "riskTradeRatio": 0.0,
+        "avgAnnouncementCount": 6,
+        "avgRiskAnnouncementCount": 0,
+        "riskCategoryCounts": {},
+        "fetchErrorCount": 0
+      },
+      "candidateOnlyRiskSamples": [
+        {
+          "ts_code": "002015.SZ",
+          "name": "协鑫能科",
+          "entryDate": "2025-06-05",
+          "returnPct": 0.14770143714071468,
+          "netPnl": 2798.0050283184974,
+          "riskAnnouncementCount": 2,
+          "riskCategories": [
+            "监管问询",
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于对控股子公司及参股公司提供担保的进展公告",
+              "type": "",
+              "date": "2025-05-24",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1223644643",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            },
+            {
+              "title": "关于增设子公司募集资金专户并签订募集资金专户监管协议的公告",
+              "type": "",
+              "date": "2025-05-14",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1223534563",
+              "riskCategories": [
+                "监管问询"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "000066.SZ",
+          "name": "中国长城",
+          "entryDate": "2026-04-30",
+          "returnPct": 0.19760149962509357,
+          "netPnl": 4705.629934605597,
+          "riskAnnouncementCount": 2,
+          "riskCategories": [
+            "业绩减值",
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于2025年度计提资产减值准备及核销的公告",
+              "type": "",
+              "date": "2026-04-29",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1225241003",
+              "riskCategories": [
+                "业绩减值"
+              ]
+            },
+            {
+              "title": "关于为下属公司提供担保及下属公司之间担保的公告",
+              "type": "",
+              "date": "2026-04-29",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1225240998",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "300953.SZ",
+          "name": "震裕科技",
+          "entryDate": "2026-04-21",
+          "returnPct": -0.05284596682997085,
+          "netPnl": -1152.2654406375004,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600184.SH",
+          "name": "光电股份",
+          "entryDate": "2025-05-13",
+          "returnPct": -0.05284596682997074,
+          "netPnl": -966.3854528999982,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002334.SZ",
+          "name": "英威腾",
+          "entryDate": "2025-08-18",
+          "returnPct": -0.052845966829970545,
+          "netPnl": -1163.3769685124935,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600366.SH",
+          "name": "宁波韵升",
+          "entryDate": "2025-06-12",
+          "returnPct": 0.03466907559940742,
+          "netPnl": 660.4385145482265,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600562.SH",
+          "name": "国睿科技",
+          "entryDate": "2025-05-07",
+          "returnPct": 0.14770143714071482,
+          "netPnl": 2729.3858775183,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ],
+      "baselineOnlyRiskSamples": [
+        {
+          "ts_code": "600338.SH",
+          "name": "西藏珠峰",
+          "entryDate": "2026-04-28",
+          "returnPct": 0.04235686078480374,
+          "netPnl": 958.0377761954987,
+          "riskAnnouncementCount": 1,
+          "riskCategories": [
+            "诉讼债务担保"
+          ],
+          "riskAnnouncements": [
+            {
+              "title": "关于公司2026年度预计为控股子公司提供担保额度的公告",
+              "type": "",
+              "date": "2026-04-23",
+              "url": "https://www.cninfo.com.cn/new/disclosure/detail?annoId=1225153642",
+              "riskCategories": [
+                "诉讼债务担保"
+              ]
+            }
+          ],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002149.SZ",
+          "name": "西部材料",
+          "entryDate": "2026-04-21",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -973.528577962501,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "688578.SH",
+          "name": "艾力斯",
+          "entryDate": "2025-05-30",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -518.5379675000004,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002246.SZ",
+          "name": "北化股份",
+          "entryDate": "2025-05-07",
+          "returnPct": -0.05284596682997076,
+          "netPnl": -926.2252164374986,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600562.SH",
+          "name": "国睿科技",
+          "entryDate": "2025-05-13",
+          "returnPct": -0.05284596682997072,
+          "netPnl": -939.664873962498,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "002605.SZ",
+          "name": "姚记科技",
+          "entryDate": "2025-06-10",
+          "returnPct": -0.0528459668299707,
+          "netPnl": -1009.5616754999974,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "300607.SZ",
+          "name": "拓斯达",
+          "entryDate": "2025-05-13",
+          "returnPct": 0.04714057852755199,
+          "netPnl": 717.810239873299,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        },
+        {
+          "ts_code": "600737.SH",
+          "name": "中粮糖业",
+          "entryDate": "2025-08-18",
+          "returnPct": 0.1477014371407147,
+          "netPnl": 3161.509064238522,
+          "riskAnnouncementCount": 0,
+          "riskCategories": [],
+          "riskAnnouncements": [],
+          "fetchError": null
+        }
+      ]
+    }
+  ]
+}

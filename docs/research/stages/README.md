@@ -9,12 +9,12 @@
 | 阶段 | 状态 | 目录 | 说明 |
 | --- | --- | --- | --- |
 | `000-goal-system-design` | `completed` | `000-goal-system-design/` | 本次完成长期目标和阶段推进制度设计。 |
-| `001-observation-diagnosis` | `active` | `001-observation-diagnosis/` | 当前活跃阶段：解释 `105/106/110` 为什么滚动窗口失败。 |
-| `002-candidate-repair-30` | `planned` | 通过上一阶段后创建 | 修复观察级候选，阶段目标为年化 `>= 30%`、最大回撤 `< 10%`、盈亏比 `>= 2:1`、滚动窗口至少 `5/7` 通过。 |
+| `001-observation-diagnosis` | `completed` | `001-observation-diagnosis/` | 已完成：解释 `105/106/110` 为什么滚动窗口失败，并提出结构性修复假设。 |
+| `002-candidate-repair-30` | `active` | `002-candidate-repair-30/` | 当前活跃阶段：修复观察级候选，阶段目标为年化 `>= 30%`、最大回撤 `< 10%`、盈亏比 `>= 2:1`、滚动窗口至少 `5/7` 通过。 |
 | `003-research-qualified-50` | `planned` | 通过上一阶段后创建 | 推进到合格研究级，阶段目标为年化 `>= 50%`、最大回撤 `< 10%`、盈亏比 `>= 2.5:1`、滚动窗口 `7/7` 通过。 |
 | `004-high-return-frontier-75` | `planned` | 通过上一阶段后创建 | 接近高收益边界，阶段目标为年化 `>= 75%`、最大回撤 `< 10%`、盈亏比 `>= 3:1`，并通过尾部后 10 审计。 |
 | `005-ultimate-research-target-100` | `planned` | 通过上一阶段后创建 | 达成终极研究目标：年化 `>= 100%`、最大回撤 `< 10%`、盈亏比 `>= 3:1`。 |
 | `006-paper-trading-readiness` | `planned` | 通过上一阶段后创建 | 不新增收益门槛；把研究结果落地成每日纸面作业、账本、数据质量报告、运行时风控和对账流程。 |
 | `007-pre-live-validation` | `planned` | 用户确认后创建 | 实盘前验证准备；只有用户明确确认真实资金边界后才能进入。 |
 
-当前只存在 `000-goal-system-design/` 和 `001-observation-diagnosis/` 两个阶段目录。未来阶段目标已经预设，但目录必须等上一阶段验收通过并写完 `next-stage.md` 后再创建。
+当前已存在 `000-goal-system-design/`、`001-observation-diagnosis/` 和 `002-candidate-repair-30/`。未来阶段目标已经预设，但目录必须等上一阶段验收通过并写完 `next-stage.md` 后再创建。

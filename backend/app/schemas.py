@@ -115,6 +115,14 @@ class SyncMarketDataRequest(BaseModel):
     min_existing_rows: int = Field(default=5000, ge=1)
 
 
+class SyncMarketFundamentalsRequest(BaseModel):
+    start_date: date
+    end_date: date
+    token: str | None = Field(default=None, repr=False)
+    max_stocks: int = Field(default=0, ge=0)
+    skip_existing: bool = True
+
+
 class SyncStockBasicRequest(BaseModel):
     token: str | None = Field(default=None, repr=False)
 
@@ -142,6 +150,24 @@ class MarketBacktestRequest(BaseModel):
     min_avg_amount: float | None = Field(default=None, ge=0)
     min_avg_circ_mv: float | None = Field(default=None, ge=0)
     min_avg_turnover_rate_f: float | None = Field(default=None, ge=0)
+
+
+class ResearchJobRequest(BaseModel):
+    model_config = {"populate_by_name": True, "validate_by_name": True}
+
+    job_type: str = Field(..., alias="jobType")
+    run_id: str = Field(..., alias="runId")
+    strategy: str | None = None
+    context: str | None = None
+    base_context_run_id: str | None = Field(default=None, alias="baseContextRunId")
+    source_run: str | None = Field(default=None, alias="sourceRun")
+    baseline_run: str | None = Field(default=None, alias="baselineRun")
+    candidate_run: str | None = Field(default=None, alias="candidateRun")
+    moneyflow_cache: str | None = Field(default=None, alias="moneyflowCache")
+    moneyflow_cache_run_id: str | None = Field(default=None, alias="moneyflowCacheRunId")
+    concept_cache: str | None = Field(default=None, alias="conceptCache")
+    concept_cache_run_id: str | None = Field(default=None, alias="conceptCacheRunId")
+    params: dict[str, Any] = Field(default_factory=dict)
 
 
 class StockFundamentalsOut(BaseModel):

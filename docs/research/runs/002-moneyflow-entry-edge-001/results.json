@@ -1,0 +1,3135 @@
+{
+  "runId": "002-moneyflow-entry-edge-001",
+  "startedAt": "2026-05-31 09:52 +0800",
+  "finishedAt": "2026-05-31 09:53 +0800",
+  "sourceRun": "002-repair-indicator-ablate-ma-001",
+  "sourceCompletedTrades": 125,
+  "uniquePriorDates": 80,
+  "fetchErrors": [
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2023-09-04",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/小时)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2023-10-12",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2023-10-30",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2023-11-07",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2023-11-13",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2023-11-20",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2023-11-23",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2023-11-28",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2023-12-29",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-03-11",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-03-15",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-04-01",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-04-26",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-05-06",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-05-14",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-05-16",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-05-17",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-05-22",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-09-24",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-09-27",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-09-30",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-10-08",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-10-14",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-10-18",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-10-25",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-11-04",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-11-11",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-11-20",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-12-02",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2024-12-06",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-02-07",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-02-17",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-02-21",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-03-04",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-03-10",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-03-14",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-03-18",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-05-06",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-05-12",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-05-16",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-05-29",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-06-04",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-06-05",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-06-09",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-06-24",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-06-30",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-07-07",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-07-11",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-07-14",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-07-18",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-07-21",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-07-28",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-08-01",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-08-05",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-08-11",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-08-15",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-08-22",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-09-01",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-09-08",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-09-16",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-10-09",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-10-15",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-10-24",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-10-31",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-11-03",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-11-17",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2025-12-22",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-01-05",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-01-09",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-01-19",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-01-23",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-02-24",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-02-27",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-04-20",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-04-27",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-04-30",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-05-06",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-05-08",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-05-11",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    },
+    {
+      "endpoint": "ths_hot",
+      "tradeDate": "2026-05-19",
+      "error": "Exception",
+      "message": "抱歉，您访问接口(ths_hot)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
+    }
+  ],
+  "coverage": {
+    "samples": 125,
+    "moneyflowMatched": 125,
+    "thsHotMatched": 0
+  },
+  "overall": {
+    "all": {
+      "count": 125,
+      "avgReturnPct": 0.03614558980439425,
+      "winRate": 0.472,
+      "moneyflowNetMfRank": {
+        "count": 125,
+        "mean": 0.5123789899945546,
+        "median": 0.6577924601632336
+      },
+      "moneyflowMainNetRank": {
+        "count": 125,
+        "mean": 0.6931199548778255,
+        "median": 0.9414039837555599
+      },
+      "moneyflowRetailNetRank": {
+        "count": 125,
+        "mean": 0.3068800451221745,
+        "median": 0.05859601624444015
+      },
+      "thsHotPresentRate": 0.0
+    },
+    "winners": {
+      "count": 59,
+      "avgReturnPct": 0.13671182484962127,
+      "winRate": 1.0,
+      "moneyflowNetMfRank": {
+        "count": 59,
+        "mean": 0.4109918176148572,
+        "median": 0.1503037428963355
+      },
+      "moneyflowMainNetRank": {
+        "count": 59,
+        "mean": 0.7253138196600394,
+        "median": 0.9636860601327606
+      },
+      "moneyflowRetailNetRank": {
+        "count": 59,
+        "mean": 0.2746861803399606,
+        "median": 0.03631393986723936
+      },
+      "thsHotPresentRate": 0.0
+    },
+    "losers": {
+      "count": 66,
+      "avgReturnPct": -0.05375452940270264,
+      "winRate": 0.0,
+      "moneyflowNetMfRank": {
+        "count": 66,
+        "mean": 0.60301297742489,
+        "median": 0.844091115943534
+      },
+      "moneyflowMainNetRank": {
+        "count": 66,
+        "mean": 0.6643405909058464,
+        "median": 0.919872993127588
+      },
+      "moneyflowRetailNetRank": {
+        "count": 66,
+        "mean": 0.33565940909415354,
+        "median": 0.08012700687241198
+      },
+      "thsHotPresentRate": 0.0
+    },
+    "winnerMinusLoser": {
+      "moneyflowNetMfRank": -0.19202115981003282,
+      "moneyflowMainNetRank": 0.060973228754192976,
+      "moneyflowRetailNetRank": -0.06097322875419292
+    }
+  },
+  "weakWindows": {
+    "Y1": {
+      "all": {
+        "count": 25,
+        "avgReturnPct": 0.018186411066905776,
+        "winRate": 0.4,
+        "moneyflowNetMfRank": {
+          "count": 25,
+          "mean": 0.6621381300197184,
+          "median": 0.8596112311015118
+        },
+        "moneyflowMainNetRank": {
+          "count": 25,
+          "mean": 0.459378447413272,
+          "median": 0.26456167876054126
+        },
+        "moneyflowRetailNetRank": {
+          "count": 25,
+          "mean": 0.5406215525867281,
+          "median": 0.7354383212394587
+        },
+        "thsHotPresentRate": 0.0
+      },
+      "winners": {
+        "count": 10,
+        "avgReturnPct": 0.12473497791222056,
+        "winRate": 1.0,
+        "moneyflowNetMfRank": {
+          "count": 10,
+          "mean": 0.49532269751457675,
+          "median": 0.49686363970354724
+        },
+        "moneyflowMainNetRank": {
+          "count": 10,
+          "mean": 0.4903536508929604,
+          "median": 0.45391541688125536
+        },
+        "moneyflowRetailNetRank": {
+          "count": 10,
+          "mean": 0.5096463491070397,
+          "median": 0.5460845831187446
+        },
+        "thsHotPresentRate": 0.0
+      },
+      "losers": {
+        "count": 15,
+        "avgReturnPct": -0.052845966829970746,
+        "winRate": 0.0,
+        "moneyflowNetMfRank": {
+          "count": 15,
+          "mean": 0.7733484183564795,
+          "median": 0.8596112311015118
+        },
+        "moneyflowMainNetRank": {
+          "count": 15,
+          "mean": 0.4387283117601464,
+          "median": 0.26456167876054126
+        },
+        "moneyflowRetailNetRank": {
+          "count": 15,
+          "mean": 0.5612716882398536,
+          "median": 0.7354383212394587
+        },
+        "thsHotPresentRate": 0.0
+      },
+      "winnerMinusLoser": {
+        "moneyflowNetMfRank": -0.27802572084190275,
+        "moneyflowMainNetRank": 0.051625339132813974,
+        "moneyflowRetailNetRank": -0.051625339132813974
+      }
+    },
+    "R18-1": {
+      "all": {
+        "count": 42,
+        "avgReturnPct": 0.02337719364817459,
+        "winRate": 0.4523809523809524,
+        "moneyflowNetMfRank": {
+          "count": 42,
+          "mean": 0.5652300591362283,
+          "median": 0.8398252279963172
+        },
+        "moneyflowMainNetRank": {
+          "count": 42,
+          "mean": 0.5928421941896675,
+          "median": 0.876544083943842
+        },
+        "moneyflowRetailNetRank": {
+          "count": 42,
+          "mean": 0.4071578058103324,
+          "median": 0.12345591605615805
+        },
+        "thsHotPresentRate": 0.0
+      },
+      "winners": {
+        "count": 19,
+        "avgReturnPct": 0.1169412994707504,
+        "winRate": 1.0,
+        "moneyflowNetMfRank": {
+          "count": 19,
+          "mean": 0.43283274749243567,
+          "median": 0.0600942655145326
+        },
+        "moneyflowMainNetRank": {
+          "count": 19,
+          "mean": 0.6662424005901845,
+          "median": 0.9620277940888627
+        },
+        "moneyflowRetailNetRank": {
+          "count": 19,
+          "mean": 0.33375759940981553,
+          "median": 0.03797220591113721
+        },
+        "thsHotPresentRate": 0.0
+      },
+      "losers": {
+        "count": 23,
+        "avgReturnPct": -0.05391489377047498,
+        "winRate": 0.0,
+        "moneyflowNetMfRank": {
+          "count": 23,
+          "mean": 0.674601751363709,
+          "median": 0.8596112311015118
+        },
+        "moneyflowMainNetRank": {
+          "count": 23,
+          "mean": 0.5322072410761971,
+          "median": 0.42411152562340465
+        },
+        "moneyflowRetailNetRank": {
+          "count": 23,
+          "mean": 0.46779275892380284,
+          "median": 0.5758884743765953
+        },
+        "thsHotPresentRate": 0.0
+      },
+      "winnerMinusLoser": {
+        "moneyflowNetMfRank": -0.24176900387127337,
+        "moneyflowMainNetRank": 0.13403515951398737,
+        "moneyflowRetailNetRank": -0.1340351595139873
+      }
+    },
+    "Y3": {
+      "all": {
+        "count": 61,
+        "avgReturnPct": 0.027852319308600743,
+        "winRate": 0.4098360655737705,
+        "moneyflowNetMfRank": {
+          "count": 61,
+          "mean": 0.5531972392044578,
+          "median": 0.7993821201004054
+        },
+        "moneyflowMainNetRank": {
+          "count": 61,
+          "mean": 0.7203261073921918,
+          "median": 0.9551107656432181
+        },
+        "moneyflowRetailNetRank": {
+          "count": 61,
+          "mean": 0.2796738926078081,
+          "median": 0.044889234356781965
+        },
+        "thsHotPresentRate": 0.0
+      },
+      "winners": {
+        "count": 25,
+        "avgReturnPct": 0.14547304375489198,
+        "winRate": 1.0,
+        "moneyflowNetMfRank": {
+          "count": 25,
+          "mean": 0.5087097765963476,
+          "median": 0.490272373540856
+        },
+        "moneyflowMainNetRank": {
+          "count": 25,
+          "mean": 0.7148401864295059,
+          "median": 0.9551107656432181
+        },
+        "moneyflowRetailNetRank": {
+          "count": 25,
+          "mean": 0.2851598135704942,
+          "median": 0.044889234356781965
+        },
+        "thsHotPresentRate": 0.0
+      },
+      "losers": {
+        "count": 36,
+        "avgReturnPct": -0.05382873933465705,
+        "winRate": 0.0,
+        "moneyflowNetMfRank": {
+          "count": 36,
+          "mean": 0.58409131046009,
+          "median": 0.837759330839206
+        },
+        "moneyflowMainNetRank": {
+          "count": 36,
+          "mean": 0.7241357747273905,
+          "median": 0.9513289389182784
+        },
+        "moneyflowRetailNetRank": {
+          "count": 36,
+          "mean": 0.27586422527260945,
+          "median": 0.04867106108172163
+        },
+        "thsHotPresentRate": 0.0
+      },
+      "winnerMinusLoser": {
+        "moneyflowNetMfRank": -0.07538153386374236,
+        "moneyflowMainNetRank": -0.009295588297884683,
+        "moneyflowRetailNetRank": 0.009295588297884738
+      }
+    }
+  },
+  "samples": [
+    {
+      "ts_code": "603178.SH",
+      "name": "圣龙股份",
+      "industry": "汽车配件",
+      "entryDate": "2023-10-13",
+      "priorDate": "2023-10-12",
+      "returnPct": 0.1976014996250936,
+      "netPnl": 2692.3230806471984,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 8919.09,
+      "moneyflowMainNet": 181.60000000000036,
+      "moneyflowRetailNet": -181.6099999999933,
+      "moneyflowNetMfRank": 0.9806324110671937,
+      "moneyflowMainNetRank": 0.758498023715415,
+      "moneyflowRetailNetRank": 0.24150197628458497
+    },
+    {
+      "ts_code": "601666.SH",
+      "name": "平煤股份",
+      "industry": "煤炭开采",
+      "entryDate": "2023-09-05",
+      "priorDate": "2023-09-04",
+      "returnPct": 0.04406284582700501,
+      "netPnl": 558.6212980348027,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 8714.42,
+      "moneyflowMainNet": -5504.48,
+      "moneyflowRetailNet": 5504.480000000003,
+      "moneyflowNetMfRank": 0.9704599524187153,
+      "moneyflowMainNetRank": 0.008326724821570182,
+      "moneyflowRetailNetRank": 0.9916732751784298
+    },
+    {
+      "ts_code": "603686.SH",
+      "name": "福龙马",
+      "industry": "环境保护",
+      "entryDate": "2023-11-08",
+      "priorDate": "2023-11-07",
+      "returnPct": -0.052845966829970864,
+      "netPnl": -726.3764508000004,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": -3313.04,
+      "moneyflowMainNet": -5271.4400000000005,
+      "moneyflowRetailNet": 5271.450000000008,
+      "moneyflowNetMfRank": 0.08011049723756906,
+      "moneyflowMainNetRank": 0.025256511444356748,
+      "moneyflowRetailNetRank": 0.9747434885556433
+    },
+    {
+      "ts_code": "002436.SZ",
+      "name": "兴森科技",
+      "industry": "元器件",
+      "entryDate": "2023-10-31",
+      "priorDate": "2023-10-30",
+      "returnPct": 0.15324588852786808,
+      "netPnl": 2036.8826027550003,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": -7294.1,
+      "moneyflowMainNet": 28249.2,
+      "moneyflowRetailNet": -28249.200000000004,
+      "moneyflowNetMfRank": 0.030793525463876825,
+      "moneyflowMainNetRank": 0.9980260560600079,
+      "moneyflowRetailNetRank": 0.0019739439399921043
+    },
+    {
+      "ts_code": "600172.SH",
+      "name": "黄河旋风",
+      "industry": "矿物制品",
+      "entryDate": "2023-11-21",
+      "priorDate": "2023-11-20",
+      "returnPct": -0.052845966829970684,
+      "netPnl": -761.9333399999978,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 2671.59,
+      "moneyflowMainNet": 9920.369999999999,
+      "moneyflowRetailNet": -9920.380000000001,
+      "moneyflowNetMfRank": 0.9191799724029174,
+      "moneyflowMainNetRank": 0.9944805834811749,
+      "moneyflowRetailNetRank": 0.005519416518825153
+    },
+    {
+      "ts_code": "601699.SH",
+      "name": "潞安环能",
+      "industry": "煤炭开采",
+      "entryDate": "2023-09-05",
+      "priorDate": "2023-09-04",
+      "returnPct": 0.15483001749562603,
+      "netPnl": 1939.1901339060241,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 18144.17,
+      "moneyflowMainNet": -9749.060000000003,
+      "moneyflowRetailNet": 9749.060000000012,
+      "moneyflowNetMfRank": 0.9888977002379065,
+      "moneyflowMainNetRank": 0.002973830293417922,
+      "moneyflowRetailNetRank": 0.9970261697065821
+    },
+    {
+      "ts_code": "688025.SH",
+      "name": "杰普特",
+      "industry": "专用机械",
+      "entryDate": "2023-11-29",
+      "priorDate": "2023-11-28",
+      "returnPct": -0.05284596682997056,
+      "netPnl": -464.0385688749975,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 2813.76,
+      "moneyflowMainNet": -687.8899999999999,
+      "moneyflowRetailNet": 687.8900000000012,
+      "moneyflowNetMfRank": 0.9507583218436084,
+      "moneyflowMainNetRank": 0.196178845775064,
+      "moneyflowRetailNetRank": 0.8038211542249359
+    },
+    {
+      "ts_code": "000503.SZ",
+      "name": "国新健康",
+      "industry": "软件服务",
+      "entryDate": "2023-11-14",
+      "priorDate": "2023-11-13",
+      "returnPct": 0.04790131217195716,
+      "netPnl": 647.4762106312519,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 5040.83,
+      "moneyflowMainNet": 10840.880000000003,
+      "moneyflowRetailNet": -10840.89,
+      "moneyflowNetMfRank": 0.9629337539432177,
+      "moneyflowMainNetRank": 0.9952681388012619,
+      "moneyflowRetailNetRank": 0.00473186119873817
+    },
+    {
+      "ts_code": "002498.SZ",
+      "name": "汉缆股份",
+      "industry": "电气设备",
+      "entryDate": "2024-01-02",
+      "priorDate": "2023-12-29",
+      "returnPct": -0.05284596682997095,
+      "netPnl": -751.8800528750016,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 1476.87,
+      "moneyflowMainNet": -513.5000000000001,
+      "moneyflowRetailNet": 513.5000000000005,
+      "moneyflowNetMfRank": 0.821898958128563,
+      "moneyflowMainNetRank": 0.2103400825633969,
+      "moneyflowRetailNetRank": 0.7896599174366031
+    },
+    {
+      "ts_code": "600566.SH",
+      "name": "济川药业",
+      "industry": "中成药",
+      "entryDate": "2023-11-24",
+      "priorDate": "2023-11-23",
+      "returnPct": -0.05284596682997062,
+      "netPnl": -672.8294688499973,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 5765.11,
+      "moneyflowMainNet": -233.97000000000116,
+      "moneyflowRetailNet": 233.98000000000138,
+      "moneyflowNetMfRank": 0.9718226600985221,
+      "moneyflowMainNetRank": 0.3720197044334975,
+      "moneyflowRetailNetRank": 0.6279802955665025
+    },
+    {
+      "ts_code": "601225.SH",
+      "name": "陕西煤业",
+      "industry": "煤炭开采",
+      "entryDate": "2024-01-02",
+      "priorDate": "2023-12-29",
+      "returnPct": 0.14770143714071488,
+      "netPnl": 1894.4209520486256,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 6537.3,
+      "moneyflowMainNet": -3949.05,
+      "moneyflowRetailNet": 3949.0499999999956,
+      "moneyflowNetMfRank": 0.9681541183408688,
+      "moneyflowMainNetRank": 0.02594849616669943,
+      "moneyflowRetailNetRank": 0.9740515038333005
+    },
+    {
+      "ts_code": "605117.SH",
+      "name": "德业股份",
+      "industry": "电气设备",
+      "entryDate": "2024-03-12",
+      "priorDate": "2024-03-11",
+      "returnPct": -0.05284596682997064,
+      "netPnl": -567.6403382999979,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 1414.44,
+      "moneyflowMainNet": -303.2100000000064,
+      "moneyflowRetailNet": 303.2099999999991,
+      "moneyflowNetMfRank": 0.8017258285938419,
+      "moneyflowMainNetRank": 0.26456167876054126,
+      "moneyflowRetailNetRank": 0.7354383212394587
+    },
+    {
+      "ts_code": "002085.SZ",
+      "name": "万丰奥威",
+      "industry": "汽车配件",
+      "entryDate": "2024-03-12",
+      "priorDate": "2024-03-11",
+      "returnPct": 0.15153990348566707,
+      "netPnl": 2096.74811220875,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": -18599.1,
+      "moneyflowMainNet": -13656.909999999989,
+      "moneyflowRetailNet": 13656.900000000001,
+      "moneyflowNetMfRank": 0.004902922141596391,
+      "moneyflowMainNetRank": 0.005491272798587958,
+      "moneyflowRetailNetRank": 0.994508727201412
+    },
+    {
+      "ts_code": "600418.SH",
+      "name": "江淮汽车",
+      "industry": "汽车整车",
+      "entryDate": "2024-03-18",
+      "priorDate": "2024-03-15",
+      "returnPct": -0.052845966829970836,
+      "netPnl": -698.1743348125001,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 8857.14,
+      "moneyflowMainNet": 3933.0,
+      "moneyflowRetailNet": -3933.0,
+      "moneyflowNetMfRank": 0.9805958447667581,
+      "moneyflowMainNetRank": 0.9766758134065072,
+      "moneyflowRetailNetRank": 0.023324186593492748
+    },
+    {
+      "ts_code": "001696.SZ",
+      "name": "宗申动力",
+      "industry": "摩托车",
+      "entryDate": "2024-04-02",
+      "priorDate": "2024-04-01",
+      "returnPct": -0.052845966829970885,
+      "netPnl": -751.7742288000009,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 3340.3,
+      "moneyflowMainNet": -5097.819999999994,
+      "moneyflowRetailNet": 5097.820000000007,
+      "moneyflowNetMfRank": 0.9156390683108241,
+      "moneyflowMainNetRank": 0.015658641612840085,
+      "moneyflowRetailNetRank": 0.9843413583871599
+    },
+    {
+      "ts_code": "002167.SZ",
+      "name": "东方锆业",
+      "industry": "小金属",
+      "entryDate": "2024-04-02",
+      "priorDate": "2024-04-01",
+      "returnPct": 0.1503277562188401,
+      "netPnl": 2162.0075650173003,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": -6756.09,
+      "moneyflowMainNet": 3430.4300000000057,
+      "moneyflowRetailNet": -3430.4299999999967,
+      "moneyflowNetMfRank": 0.024858093560383637,
+      "moneyflowMainNetRank": 0.9620277940888627,
+      "moneyflowRetailNetRank": 0.03797220591113721
+    },
+    {
+      "ts_code": "002739.SZ",
+      "name": "儒意电影",
+      "industry": "影视音像",
+      "entryDate": "2024-03-18",
+      "priorDate": "2024-03-15",
+      "returnPct": -0.05284596682997086,
+      "netPnl": -721.9318396500003,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 12437.15,
+      "moneyflowMainNet": 1126.140000000003,
+      "moneyflowRetailNet": -1126.1299999999974,
+      "moneyflowNetMfRank": 0.9890239121912975,
+      "moneyflowMainNetRank": 0.9100352802822422,
+      "moneyflowRetailNetRank": 0.08996471971775774
+    },
+    {
+      "ts_code": "002409.SZ",
+      "name": "雅克科技",
+      "industry": "半导体",
+      "entryDate": "2024-04-29",
+      "priorDate": "2024-04-26",
+      "returnPct": -0.05284596682997061,
+      "netPnl": -679.919681874997,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 2614.28,
+      "moneyflowMainNet": -5832.360000000002,
+      "moneyflowRetailNet": 5832.360000000004,
+      "moneyflowNetMfRank": 0.8467425431711146,
+      "moneyflowMainNetRank": 0.013736263736263736,
+      "moneyflowRetailNetRank": 0.9862637362637363
+    },
+    {
+      "ts_code": "002125.SZ",
+      "name": "湘潭电化",
+      "industry": "化工原料",
+      "entryDate": "2024-05-07",
+      "priorDate": "2024-05-06",
+      "returnPct": 0.15223780645747642,
+      "netPnl": 2134.4512692753233,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": -14255.7,
+      "moneyflowMainNet": 18807.16,
+      "moneyflowRetailNet": -18807.170000000002,
+      "moneyflowNetMfRank": 0.011390416339355853,
+      "moneyflowMainNetRank": 0.997643362136685,
+      "moneyflowRetailNetRank": 0.002356637863315004
+    },
+    {
+      "ts_code": "002773.SZ",
+      "name": "康弘药业",
+      "industry": "化学制药",
+      "entryDate": "2024-05-07",
+      "priorDate": "2024-05-06",
+      "returnPct": -0.052845966829970746,
+      "netPnl": -758.1236732999987,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 668.16,
+      "moneyflowMainNet": 1107.7900000000009,
+      "moneyflowRetailNet": -1107.7799999999988,
+      "moneyflowNetMfRank": 0.657109190887667,
+      "moneyflowMainNetRank": 0.8906127258444619,
+      "moneyflowRetailNetRank": 0.1093872741555381
+    },
+    {
+      "ts_code": "002851.SZ",
+      "name": "麦格米特",
+      "industry": "电气设备",
+      "entryDate": "2024-05-15",
+      "priorDate": "2024-05-14",
+      "returnPct": -0.05284596682997069,
+      "netPnl": -716.958108124998,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": -7027.87,
+      "moneyflowMainNet": -904.5300000000007,
+      "moneyflowRetailNet": 904.5299999999988,
+      "moneyflowNetMfRank": 0.03279010406440212,
+      "moneyflowMainNetRank": 0.1413705085411349,
+      "moneyflowRetailNetRank": 0.8586294914588651
+    },
+    {
+      "ts_code": "688578.SH",
+      "name": "艾力斯",
+      "industry": "化学制药",
+      "entryDate": "2024-04-29",
+      "priorDate": "2024-04-26",
+      "returnPct": 0.04790131217195724,
+      "netPnl": 555.1988603161026,
+      "isWinner": true,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": -9631.63,
+      "moneyflowMainNet": -827.2299999999923,
+      "moneyflowRetailNet": 827.2299999999996,
+      "moneyflowNetMfRank": 0.01020408163265306,
+      "moneyflowMainNetRank": 0.14933281004709575,
+      "moneyflowRetailNetRank": 0.8506671899529042
+    },
+    {
+      "ts_code": "000006.SZ",
+      "name": "深振业Ａ",
+      "industry": "区域地产",
+      "entryDate": "2024-05-17",
+      "priorDate": "2024-05-16",
+      "returnPct": -0.05284596682997068,
+      "netPnl": -777.1720067999977,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 2460.35,
+      "moneyflowMainNet": -134.53999999999996,
+      "moneyflowRetailNet": 134.53999999999996,
+      "moneyflowNetMfRank": 0.9403102297270763,
+      "moneyflowMainNetRank": 0.42411152562340465,
+      "moneyflowRetailNetRank": 0.5758884743765953
+    },
+    {
+      "ts_code": "002706.SZ",
+      "name": "良信股份",
+      "industry": "电气设备",
+      "entryDate": "2024-05-20",
+      "priorDate": "2024-05-17",
+      "returnPct": -0.05284596682997062,
+      "netPnl": -738.2287471999971,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 1670.81,
+      "moneyflowMainNet": 3185.4,
+      "moneyflowRetailNet": -3185.3900000000012,
+      "moneyflowNetMfRank": 0.8329079128215198,
+      "moneyflowMainNetRank": 0.9729039858629491,
+      "moneyflowRetailNetRank": 0.027096014137050855
+    },
+    {
+      "ts_code": "000564.SZ",
+      "name": "供销大集",
+      "industry": "百货",
+      "entryDate": "2024-05-23",
+      "priorDate": "2024-05-22",
+      "returnPct": -0.05284596682997095,
+      "netPnl": -755.5838955000017,
+      "isWinner": false,
+      "windowLabels": [
+        "Y1",
+        "R18-1"
+      ],
+      "moneyflowNetMf": 976.53,
+      "moneyflowMainNet": -681.6100000000001,
+      "moneyflowRetailNet": 681.6200000000008,
+      "moneyflowNetMfRank": 0.8596112311015118,
+      "moneyflowMainNetRank": 0.1729825250343609,
+      "moneyflowRetailNetRank": 0.8270174749656392
+    },
+    {
+      "ts_code": "000617.SZ",
+      "name": "中油资本",
+      "industry": "多元金融",
+      "entryDate": "2024-09-25",
+      "priorDate": "2024-09-24",
+      "returnPct": 0.14987100507481824,
+      "netPnl": 2122.5758034731243,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": 20376.89,
+      "moneyflowMainNet": 12664.199999999997,
+      "moneyflowRetailNet": -12664.2,
+      "moneyflowNetMfRank": 0.981728880157171,
+      "moneyflowMainNetRank": 0.9909626719056974,
+      "moneyflowRetailNetRank": 0.009037328094302554
+    },
+    {
+      "ts_code": "600061.SH",
+      "name": "国投资本",
+      "industry": "证券",
+      "entryDate": "2024-09-25",
+      "priorDate": "2024-09-24",
+      "returnPct": 0.14770143714071476,
+      "netPnl": 2017.166415764499,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": 6222.98,
+      "moneyflowMainNet": 1027.869999999999,
+      "moneyflowRetailNet": -1027.8700000000026,
+      "moneyflowNetMfRank": 0.912573673870334,
+      "moneyflowMainNetRank": 0.862475442043222,
+      "moneyflowRetailNetRank": 0.137524557956778
+    },
+    {
+      "ts_code": "601012.SH",
+      "name": "隆基绿能",
+      "industry": "电气设备",
+      "entryDate": "2024-09-30",
+      "priorDate": "2024-09-27",
+      "returnPct": -0.05284596682997071,
+      "netPnl": -743.3083027999983,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": 39725.85,
+      "moneyflowMainNet": 14402.470000000008,
+      "moneyflowRetailNet": -14402.460000000021,
+      "moneyflowNetMfRank": 0.996662085215001,
+      "moneyflowMainNetRank": 0.9925387787158846,
+      "moneyflowRetailNetRank": 0.007461221284115452
+    },
+    {
+      "ts_code": "600711.SH",
+      "name": "盛屯矿业",
+      "industry": "小金属",
+      "entryDate": "2024-10-08",
+      "priorDate": "2024-09-30",
+      "returnPct": -0.07051297208216203,
+      "netPnl": -1032.1179329999977,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": -18248.86,
+      "moneyflowMainNet": 3173.909999999999,
+      "moneyflowRetailNet": -3173.899999999998,
+      "moneyflowNetMfRank": 0.007465618860510805,
+      "moneyflowMainNetRank": 0.9406679764243615,
+      "moneyflowRetailNetRank": 0.05933202357563851
+    },
+    {
+      "ts_code": "600206.SH",
+      "name": "有研新材",
+      "industry": "半导体",
+      "entryDate": "2024-10-09",
+      "priorDate": "2024-10-08",
+      "returnPct": -0.05284596682997064,
+      "netPnl": -744.1548953999973,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": -13336.13,
+      "moneyflowMainNet": -5383.3499999999985,
+      "moneyflowRetailNet": 5383.359999999997,
+      "moneyflowNetMfRank": 0.08415257569799449,
+      "moneyflowMainNetRank": 0.1616201337003539,
+      "moneyflowRetailNetRank": 0.8383798662996461
+    },
+    {
+      "ts_code": "002583.SZ",
+      "name": "海能达",
+      "industry": "通信设备",
+      "entryDate": "2024-10-15",
+      "priorDate": "2024-10-14",
+      "returnPct": 0.19760149962509396,
+      "netPnl": 2860.890046014003,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": -61084.76,
+      "moneyflowMainNet": -39680.36,
+      "moneyflowRetailNet": 39680.369999999995,
+      "moneyflowNetMfRank": 0.0019650225977598744,
+      "moneyflowMainNetRank": 0.0015720180782078995,
+      "moneyflowRetailNetRank": 0.998427981921792
+    },
+    {
+      "ts_code": "600641.SH",
+      "name": "先导基电",
+      "industry": "半导体",
+      "entryDate": "2024-10-15",
+      "priorDate": "2024-10-14",
+      "returnPct": -0.056627707071302914,
+      "netPnl": -822.1283349999976,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": 3298.86,
+      "moneyflowMainNet": 1649.4500000000016,
+      "moneyflowRetailNet": -1649.4599999999991,
+      "moneyflowNetMfRank": 0.8923167616427589,
+      "moneyflowMainNetRank": 0.9176655531538612,
+      "moneyflowRetailNetRank": 0.08233444684613873
+    },
+    {
+      "ts_code": "603893.SH",
+      "name": "瑞芯微",
+      "industry": "半导体",
+      "entryDate": "2024-10-21",
+      "priorDate": "2024-10-18",
+      "returnPct": -0.052845966829970774,
+      "netPnl": -510.28368964999936,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": 6858.37,
+      "moneyflowMainNet": 7847.450000000008,
+      "moneyflowRetailNet": -7847.460000000006,
+      "moneyflowNetMfRank": 0.8622178606476938,
+      "moneyflowMainNetRank": 0.9682041216879294,
+      "moneyflowRetailNetRank": 0.03179587831207066
+    },
+    {
+      "ts_code": "000503.SZ",
+      "name": "国新健康",
+      "industry": "软件服务",
+      "entryDate": "2024-10-21",
+      "priorDate": "2024-10-18",
+      "returnPct": 0.1477014371407147,
+      "netPnl": 2133.9964354458734,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": 14434.79,
+      "moneyflowMainNet": 11782.06,
+      "moneyflowRetailNet": -11782.07,
+      "moneyflowNetMfRank": 0.9452404317958784,
+      "moneyflowMainNetRank": 0.9774288518155054,
+      "moneyflowRetailNetRank": 0.022571148184494603
+    },
+    {
+      "ts_code": "000021.SZ",
+      "name": "深科技",
+      "industry": "元器件",
+      "entryDate": "2024-10-28",
+      "priorDate": "2024-10-25",
+      "returnPct": 0.0039309602209211016,
+      "netPnl": 57.554298720275256,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": -31922.39,
+      "moneyflowMainNet": 37024.590000000026,
+      "moneyflowRetailNet": -37024.58000000003,
+      "moneyflowNetMfRank": 0.006674519042010208,
+      "moneyflowMainNetRank": 0.996662740478995,
+      "moneyflowRetailNetRank": 0.003337259521005104
+    },
+    {
+      "ts_code": "600438.SH",
+      "name": "通威股份",
+      "industry": "电气设备",
+      "entryDate": "2024-10-28",
+      "priorDate": "2024-10-25",
+      "returnPct": 0.03792129967508116,
+      "netPnl": 546.7494352319991,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": -41889.39,
+      "moneyflowMainNet": 95915.23000000001,
+      "moneyflowRetailNet": -95915.22,
+      "moneyflowNetMfRank": 0.0043188064389477815,
+      "moneyflowMainNetRank": 0.9994110718492344,
+      "moneyflowRetailNetRank": 0.0005889281507656066
+    },
+    {
+      "ts_code": "603366.SH",
+      "name": "日出东方",
+      "industry": "家用电器",
+      "entryDate": "2024-11-05",
+      "priorDate": "2024-11-04",
+      "returnPct": 0.19400464760079364,
+      "netPnl": 2931.5787712477013,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": -85.19,
+      "moneyflowMainNet": 2968.2100000000005,
+      "moneyflowRetailNet": -2968.210000000001,
+      "moneyflowNetMfRank": 0.348586017282011,
+      "moneyflowMainNetRank": 0.9353888452474469,
+      "moneyflowRetailNetRank": 0.06461115475255302
+    },
+    {
+      "ts_code": "300450.SZ",
+      "name": "先导智能",
+      "industry": "专用机械",
+      "entryDate": "2024-11-12",
+      "priorDate": "2024-11-11",
+      "returnPct": -0.052845966829970836,
+      "netPnl": -824.4753683250001,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": 56079.13,
+      "moneyflowMainNet": 55407.36000000001,
+      "moneyflowRetailNet": -55407.36,
+      "moneyflowNetMfRank": 0.9964657372864716,
+      "moneyflowMainNetRank": 0.9980365207147065,
+      "moneyflowRetailNetRank": 0.0019634792852935403
+    },
+    {
+      "ts_code": "002031.SZ",
+      "name": "巨轮智能",
+      "industry": "汽车配件",
+      "entryDate": "2024-11-05",
+      "priorDate": "2024-11-04",
+      "returnPct": 0.0479013121719571,
+      "netPnl": 709.6339268518514,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": -5050.74,
+      "moneyflowMainNet": 23878.75,
+      "moneyflowRetailNet": -23878.75,
+      "moneyflowNetMfRank": 0.0600942655145326,
+      "moneyflowMainNetRank": 0.9946975648075412,
+      "moneyflowRetailNetRank": 0.0053024351924587584
+    },
+    {
+      "ts_code": "600292.SH",
+      "name": "XD电投水",
+      "industry": "水力发电",
+      "entryDate": "2024-11-12",
+      "priorDate": "2024-11-11",
+      "returnPct": -0.05598254096804458,
+      "netPnl": -825.8219707499975,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": -13941.93,
+      "moneyflowMainNet": 205.5899999999965,
+      "moneyflowRetailNet": -205.57000000000698,
+      "moneyflowNetMfRank": 0.037306106420577266,
+      "moneyflowMainNetRank": 0.6622815629295111,
+      "moneyflowRetailNetRank": 0.33771843707048893
+    },
+    {
+      "ts_code": "002354.SZ",
+      "name": "天娱数科",
+      "industry": "互联网",
+      "entryDate": "2024-11-21",
+      "priorDate": "2024-11-20",
+      "returnPct": 0.047901312171957186,
+      "netPnl": 719.8017014188026,
+      "isWinner": true,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": -18281.92,
+      "moneyflowMainNet": 26290.399999999998,
+      "moneyflowRetailNet": -26290.4,
+      "moneyflowNetMfRank": 0.009413610511865072,
+      "moneyflowMainNetRank": 0.9964698960580506,
+      "moneyflowRetailNetRank": 0.003530103941949402
+    },
+    {
+      "ts_code": "002245.SZ",
+      "name": "蔚蓝锂芯",
+      "industry": "电气设备",
+      "entryDate": "2024-11-21",
+      "priorDate": "2024-11-20",
+      "returnPct": -0.05284596682997088,
+      "netPnl": -754.9489510500007,
+      "isWinner": false,
+      "windowLabels": [
+        "R18-1"
+      ],
+      "moneyflowNetMf": -6887.06,
+      "moneyflowMainNet": -5992.859999999997,
+      "moneyflowRetailNet": 5992.860000000008,
+      "moneyflowNetMfRank": 0.03902726024710727,
+      "moneyflowMainNetRank": 0.018827221023730144,
+      "moneyflowRetailNetRank": 0.9811727789762699
+    },
+    {
+      "ts_code": "603667.SH",
+      "name": "五洲新春",
+      "industry": "机械基件",
+      "entryDate": "2024-12-03",
+      "priorDate": "2024-12-02",
+      "returnPct": 0.19760149962509363,
+      "netPnl": 2627.0330588501984,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": 530.74,
+      "moneyflowMainNet": 5734.140000000001,
+      "moneyflowRetailNet": -5734.139999999999,
+      "moneyflowNetMfRank": 0.5686005488043905,
+      "moneyflowMainNetRank": 0.9662877303018425,
+      "moneyflowRetailNetRank": 0.03371226969815758
+    },
+    {
+      "ts_code": "603002.SH",
+      "name": "宏昌电子",
+      "industry": "化工原料",
+      "entryDate": "2024-12-03",
+      "priorDate": "2024-12-02",
+      "returnPct": 0.04573174423785359,
+      "netPnl": 684.54435924875,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": -4617.44,
+      "moneyflowMainNet": -2274.7799999999993,
+      "moneyflowRetailNet": 2274.779999999999,
+      "moneyflowNetMfRank": 0.07036456291650334,
+      "moneyflowMainNetRank": 0.08722069776558213,
+      "moneyflowRetailNetRank": 0.9127793022344178
+    },
+    {
+      "ts_code": "300007.SZ",
+      "name": "汉威科技",
+      "industry": "电器仪表",
+      "entryDate": "2024-12-09",
+      "priorDate": "2024-12-06",
+      "returnPct": 0.15483001749562608,
+      "netPnl": 2270.1655065089,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": -10143.17,
+      "moneyflowMainNet": -7684.289999999999,
+      "moneyflowRetailNet": 7684.290000000001,
+      "moneyflowNetMfRank": 0.03546933176562806,
+      "moneyflowMainNetRank": 0.031746031746031744,
+      "moneyflowRetailNetRank": 0.9682539682539683
+    },
+    {
+      "ts_code": "301018.SZ",
+      "name": "申菱环境",
+      "industry": "专用机械",
+      "entryDate": "2024-12-09",
+      "priorDate": "2024-12-06",
+      "returnPct": 0.15768144963759037,
+      "netPnl": 2297.1334971584965,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": -2338.8,
+      "moneyflowMainNet": 244.09999999999923,
+      "moneyflowRetailNet": -244.11999999999898,
+      "moneyflowNetMfRank": 0.1503037428963355,
+      "moneyflowMainNetRank": 0.7164413090339016,
+      "moneyflowRetailNetRank": 0.28355869096609837
+    },
+    {
+      "ts_code": "300676.SZ",
+      "name": "华大基因",
+      "industry": "医疗保健",
+      "entryDate": "2025-02-10",
+      "priorDate": "2025-02-07",
+      "returnPct": -0.0528459668299709,
+      "netPnl": -860.0322575250011,
+      "isWinner": false,
+      "windowLabels": [],
+      "moneyflowNetMf": 17511.71,
+      "moneyflowMainNet": 5737.59,
+      "moneyflowRetailNet": -5737.600000000006,
+      "moneyflowNetMfRank": 0.984765625,
+      "moneyflowMainNetRank": 0.969140625,
+      "moneyflowRetailNetRank": 0.030859375
+    },
+    {
+      "ts_code": "600588.SH",
+      "name": "用友网络",
+      "industry": "软件服务",
+      "entryDate": "2025-02-10",
+      "priorDate": "2025-02-07",
+      "returnPct": 0.15223780645747664,
+      "netPnl": 2451.3493760255515,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": -56687.49,
+      "moneyflowMainNet": 53650.8,
+      "moneyflowRetailNet": -53650.79,
+      "moneyflowNetMfRank": 0.0015625,
+      "moneyflowMainNetRank": 0.9986328125,
+      "moneyflowRetailNetRank": 0.0013671875
+    },
+    {
+      "ts_code": "000967.SZ",
+      "name": "盈峰环境",
+      "industry": "环境保护",
+      "entryDate": "2025-02-18",
+      "priorDate": "2025-02-17",
+      "returnPct": -0.05284596682997069,
+      "netPnl": -863.7361001499976,
+      "isWinner": false,
+      "windowLabels": [],
+      "moneyflowNetMf": -22948.81,
+      "moneyflowMainNet": 4977.169999999998,
+      "moneyflowRetailNet": -4977.17,
+      "moneyflowNetMfRank": 0.01678376268540203,
+      "moneyflowMainNetRank": 0.9590163934426229,
+      "moneyflowRetailNetRank": 0.040983606557377046
+    },
+    {
+      "ts_code": "603583.SH",
+      "name": "捷昌驱动",
+      "industry": "电气设备",
+      "entryDate": "2025-02-18",
+      "priorDate": "2025-02-17",
+      "returnPct": 0.19760149962509374,
+      "netPnl": 2909.9564866372,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": -4233.8,
+      "moneyflowMainNet": 18169.629999999997,
+      "moneyflowRetailNet": -18169.629999999997,
+      "moneyflowNetMfRank": 0.13407494145199064,
+      "moneyflowMainNetRank": 0.9910226385636222,
+      "moneyflowRetailNetRank": 0.00897736143637783
+    },
+    {
+      "ts_code": "002051.SZ",
+      "name": "中工国际",
+      "industry": "建筑工程",
+      "entryDate": "2025-02-24",
+      "priorDate": "2025-02-21",
+      "returnPct": -0.05284596682997075,
+      "netPnl": -849.1323777999987,
+      "isWinner": false,
+      "windowLabels": [],
+      "moneyflowNetMf": -1506.47,
+      "moneyflowMainNet": -277.9699999999989,
+      "moneyflowRetailNet": 277.9599999999991,
+      "moneyflowNetMfRank": 0.25975800156128026,
+      "moneyflowMainNetRank": 0.4350117096018735,
+      "moneyflowRetailNetRank": 0.5649882903981265
+    },
+    {
+      "ts_code": "000581.SZ",
+      "name": "威孚高科",
+      "industry": "汽车配件",
+      "entryDate": "2025-02-24",
+      "priorDate": "2025-02-21",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -790.7704004375009,
+      "isWinner": false,
+      "windowLabels": [],
+      "moneyflowNetMf": 4247.87,
+      "moneyflowMainNet": 14232.920000000002,
+      "moneyflowRetailNet": -14232.93,
+      "moneyflowNetMfRank": 0.8889539422326308,
+      "moneyflowMainNetRank": 0.9804839968774395,
+      "moneyflowRetailNetRank": 0.0195160031225605
+    },
+    {
+      "ts_code": "601177.SH",
+      "name": "杭齿前进",
+      "industry": "机械基件",
+      "entryDate": "2025-03-05",
+      "priorDate": "2025-03-04",
+      "returnPct": 0.19760149962509369,
+      "netPnl": 3296.948252197599,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": -50358.8,
+      "moneyflowMainNet": 11705.89,
+      "moneyflowRetailNet": -11705.89,
+      "moneyflowNetMfRank": 0.0007815552950371239,
+      "moneyflowMainNetRank": 0.9896443923407581,
+      "moneyflowRetailNetRank": 0.010355607659241891
+    },
+    {
+      "ts_code": "600301.SH",
+      "name": "华锡有色",
+      "industry": "小金属",
+      "entryDate": "2025-03-05",
+      "priorDate": "2025-03-04",
+      "returnPct": 0.15483001749562614,
+      "netPnl": 2336.3605810294757,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": 7372.0,
+      "moneyflowMainNet": 869.2200000000007,
+      "moneyflowRetailNet": -869.2200000000012,
+      "moneyflowNetMfRank": 0.9585775693630324,
+      "moneyflowMainNetRank": 0.8601016021883549,
+      "moneyflowRetailNetRank": 0.13989839781164518
+    },
+    {
+      "ts_code": "603960.SH",
+      "name": "克来机电",
+      "industry": "汽车配件",
+      "entryDate": "2025-03-17",
+      "priorDate": "2025-03-14",
+      "returnPct": -0.05284596682997109,
+      "netPnl": -918.9233552625046,
+      "isWinner": false,
+      "windowLabels": [],
+      "moneyflowNetMf": 10379.82,
+      "moneyflowMainNet": 5040.420000000001,
+      "moneyflowRetailNet": -5040.419999999998,
+      "moneyflowNetMfRank": 0.9298828125,
+      "moneyflowMainNetRank": 0.9375,
+      "moneyflowRetailNetRank": 0.0625
+    },
+    {
+      "ts_code": "002342.SZ",
+      "name": "巨力索具",
+      "industry": "机械基件",
+      "entryDate": "2025-03-19",
+      "priorDate": "2025-03-18",
+      "returnPct": 0.19128392970144495,
+      "netPnl": 3315.6476031070015,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": -14408.08,
+      "moneyflowMainNet": 3992.26,
+      "moneyflowRetailNet": -3992.2599999999998,
+      "moneyflowNetMfRank": 0.023233112065599377,
+      "moneyflowMainNetRank": 0.9636860601327606,
+      "moneyflowRetailNetRank": 0.03631393986723936
+    },
+    {
+      "ts_code": "002773.SZ",
+      "name": "康弘药业",
+      "industry": "化学制药",
+      "entryDate": "2025-03-11",
+      "priorDate": "2025-03-10",
+      "returnPct": 0.1548300174956261,
+      "netPnl": 2463.32490429025,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": -9850.88,
+      "moneyflowMainNet": 9368.900000000001,
+      "moneyflowRetailNet": -9368.9,
+      "moneyflowNetMfRank": 0.05199374511336982,
+      "moneyflowMainNetRank": 0.985340109460516,
+      "moneyflowRetailNetRank": 0.014659890539483971
+    },
+    {
+      "ts_code": "000733.SZ",
+      "name": "振华科技",
+      "industry": "元器件",
+      "entryDate": "2025-03-11",
+      "priorDate": "2025-03-10",
+      "returnPct": 0.16433479130217446,
+      "netPnl": 2533.2617024715,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": -5502.85,
+      "moneyflowMainNet": 1755.8099999999977,
+      "moneyflowRetailNet": -1755.7999999999956,
+      "moneyflowNetMfRank": 0.10340109460516028,
+      "moneyflowMainNetRank": 0.9108678655199375,
+      "moneyflowRetailNetRank": 0.08913213448006255
+    },
+    {
+      "ts_code": "002246.SZ",
+      "name": "北化股份",
+      "industry": "化工原料",
+      "entryDate": "2025-05-07",
+      "priorDate": "2025-05-06",
+      "returnPct": -0.05284596682997076,
+      "netPnl": -926.2252164374986,
+      "isWinner": false,
+      "windowLabels": [],
+      "moneyflowNetMf": -615.59,
+      "moneyflowMainNet": -374.7599999999999,
+      "moneyflowRetailNet": 374.7599999999993,
+      "moneyflowNetMfRank": 0.173828125,
+      "moneyflowMainNetRank": 0.2689453125,
+      "moneyflowRetailNetRank": 0.7310546875
+    },
+    {
+      "ts_code": "600562.SH",
+      "name": "国睿科技",
+      "industry": "通信设备",
+      "entryDate": "2025-05-13",
+      "priorDate": "2025-05-12",
+      "returnPct": -0.05284596682997072,
+      "netPnl": -939.664873962498,
+      "isWinner": false,
+      "windowLabels": [],
+      "moneyflowNetMf": -31603.08,
+      "moneyflowMainNet": 10461.569999999996,
+      "moneyflowRetailNet": -10461.57,
+      "moneyflowNetMfRank": 0.0017567831348819052,
+      "moneyflowMainNetRank": 0.9867265274253367,
+      "moneyflowRetailNetRank": 0.013273472574663284
+    },
+    {
+      "ts_code": "600592.SH",
+      "name": "龙溪股份",
+      "industry": "机械基件",
+      "entryDate": "2025-05-07",
+      "priorDate": "2025-05-06",
+      "returnPct": 0.047901312171957,
+      "netPnl": 781.2879608283747,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": -417.48,
+      "moneyflowMainNet": 836.7899999999972,
+      "moneyflowRetailNet": -836.7900000000009,
+      "moneyflowNetMfRank": 0.200390625,
+      "moneyflowMainNetRank": 0.7927734375,
+      "moneyflowRetailNetRank": 0.2072265625
+    },
+    {
+      "ts_code": "300607.SZ",
+      "name": "拓斯达",
+      "industry": "专用机械",
+      "entryDate": "2025-05-13",
+      "priorDate": "2025-05-12",
+      "returnPct": 0.04714057852755199,
+      "netPnl": 717.810239873299,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": -21279.34,
+      "moneyflowMainNet": 83838.77000000002,
+      "moneyflowRetailNet": -83838.77,
+      "moneyflowNetMfRank": 0.002927971891469842,
+      "moneyflowMainNetRank": 0.999414405621706,
+      "moneyflowRetailNetRank": 0.0005855943782939684
+    },
+    {
+      "ts_code": "600468.SH",
+      "name": "百利电气",
+      "industry": "电气设备",
+      "entryDate": "2025-05-19",
+      "priorDate": "2025-05-16",
+      "returnPct": 0.19144291245541434,
+      "netPnl": 3504.335149656603,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": -15010.51,
+      "moneyflowMainNet": 7489.2599999999975,
+      "moneyflowRetailNet": -7489.26,
+      "moneyflowNetMfRank": 0.010733801717408275,
+      "moneyflowMainNetRank": 0.9859484777517564,
+      "moneyflowRetailNetRank": 0.01405152224824356
+    },
+    {
+      "ts_code": "300255.SZ",
+      "name": "常山药业",
+      "industry": "生物制药",
+      "entryDate": "2025-05-30",
+      "priorDate": "2025-05-29",
+      "returnPct": -0.05284596682997067,
+      "netPnl": -989.1905410624968,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 34292.25,
+      "moneyflowMainNet": -3340.470000000001,
+      "moneyflowRetailNet": 3340.4700000000157,
+      "moneyflowNetMfRank": 0.99609375,
+      "moneyflowMainNetRank": 0.0294921875,
+      "moneyflowRetailNetRank": 0.9705078125
+    },
+    {
+      "ts_code": "688578.SH",
+      "name": "艾力斯",
+      "industry": "化学制药",
+      "entryDate": "2025-05-30",
+      "priorDate": "2025-05-29",
+      "returnPct": -0.05284596682997087,
+      "netPnl": -518.5379675000004,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 5082.96,
+      "moneyflowMainNet": -810.6799999999987,
+      "moneyflowRetailNet": 810.6800000000003,
+      "moneyflowNetMfRank": 0.89453125,
+      "moneyflowMainNetRank": 0.1650390625,
+      "moneyflowRetailNetRank": 0.8349609375
+    },
+    {
+      "ts_code": "600259.SH",
+      "name": "中稀有色",
+      "industry": "小金属",
+      "entryDate": "2025-06-05",
+      "priorDate": "2025-06-04",
+      "returnPct": -0.052845966829970774,
+      "netPnl": -869.715160387499,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 7192.02,
+      "moneyflowMainNet": 3933.1799999999967,
+      "moneyflowRetailNet": -3933.1699999999983,
+      "moneyflowNetMfRank": 0.96015625,
+      "moneyflowMainNetRank": 0.9693359375,
+      "moneyflowRetailNetRank": 0.0306640625
+    },
+    {
+      "ts_code": "003040.SZ",
+      "name": "楚天龙",
+      "industry": "通信设备",
+      "entryDate": "2025-06-06",
+      "priorDate": "2025-06-05",
+      "returnPct": 0.19760149962509385,
+      "netPnl": 3698.976507626401,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 862.89,
+      "moneyflowMainNet": 1000.3099999999997,
+      "moneyflowRetailNet": -1000.3099999999977,
+      "moneyflowNetMfRank": 0.7844591956267083,
+      "moneyflowMainNetRank": 0.8641155798516205,
+      "moneyflowRetailNetRank": 0.13588442014837954
+    },
+    {
+      "ts_code": "002181.SZ",
+      "name": "粤传媒",
+      "industry": "出版业",
+      "entryDate": "2025-06-10",
+      "priorDate": "2025-06-09",
+      "returnPct": 0.19369995515574653,
+      "netPnl": 3701.191580764993,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 4007.51,
+      "moneyflowMainNet": 14849.610000000002,
+      "moneyflowRetailNet": -14849.609999999997,
+      "moneyflowNetMfRank": 0.9039250146455771,
+      "moneyflowMainNetRank": 0.9939464948252295,
+      "moneyflowRetailNetRank": 0.006053505174770553
+    },
+    {
+      "ts_code": "002605.SZ",
+      "name": "姚记科技",
+      "industry": "互联网",
+      "entryDate": "2025-06-10",
+      "priorDate": "2025-06-09",
+      "returnPct": -0.0528459668299707,
+      "netPnl": -1009.5616754999974,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 3129.15,
+      "moneyflowMainNet": 722.7999999999993,
+      "moneyflowRetailNet": -722.7999999999956,
+      "moneyflowNetMfRank": 0.8771724272603008,
+      "moneyflowMainNetRank": 0.8383128295254832,
+      "moneyflowRetailNetRank": 0.1616871704745167
+    },
+    {
+      "ts_code": "002080.SZ",
+      "name": "中材科技",
+      "industry": "玻璃",
+      "entryDate": "2025-05-19",
+      "priorDate": "2025-05-16",
+      "returnPct": 0.1522378064574765,
+      "netPnl": 2743.096839382899,
+      "isWinner": true,
+      "windowLabels": [],
+      "moneyflowNetMf": 17734.96,
+      "moneyflowMainNet": 7090.15,
+      "moneyflowRetailNet": -7090.159999999996,
+      "moneyflowNetMfRank": 0.994535519125683,
+      "moneyflowMainNetRank": 0.9847775175644028,
+      "moneyflowRetailNetRank": 0.01522248243559719
+    },
+    {
+      "ts_code": "002074.SZ",
+      "name": "国轩高科",
+      "industry": "电气设备",
+      "entryDate": "2025-06-25",
+      "priorDate": "2025-06-24",
+      "returnPct": -0.0528459668299708,
+      "netPnl": -873.5777391249994,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 22880.2,
+      "moneyflowMainNet": 57669.360000000015,
+      "moneyflowRetailNet": -57669.359999999986,
+      "moneyflowNetMfRank": 0.9883223043985987,
+      "moneyflowMainNetRank": 0.9996107434799533,
+      "moneyflowRetailNetRank": 0.00038925652004671076
+    },
+    {
+      "ts_code": "002670.SZ",
+      "name": "国盛证券",
+      "industry": "证券",
+      "entryDate": "2025-06-25",
+      "priorDate": "2025-06-24",
+      "returnPct": 0.044062845827004864,
+      "netPnl": 830.4760159696016,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -2062.7,
+      "moneyflowMainNet": 35918.810000000005,
+      "moneyflowRetailNet": -35918.79000000001,
+      "moneyflowNetMfRank": 0.11171662125340599,
+      "moneyflowMainNetRank": 0.9986376021798365,
+      "moneyflowRetailNetRank": 0.0013623978201634877
+    },
+    {
+      "ts_code": "003031.SZ",
+      "name": "中瓷电子",
+      "industry": "元器件",
+      "entryDate": "2025-07-01",
+      "priorDate": "2025-06-30",
+      "returnPct": -0.0528459668299707,
+      "netPnl": -883.0489938374976,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -8303.47,
+      "moneyflowMainNet": 7568.039999999999,
+      "moneyflowRetailNet": -7568.040000000001,
+      "moneyflowNetMfRank": 0.035623905002919995,
+      "moneyflowMainNetRank": 0.9828693790149893,
+      "moneyflowRetailNetRank": 0.017130620985010708
+    },
+    {
+      "ts_code": "603936.SH",
+      "name": "博敏电子",
+      "industry": "元器件",
+      "entryDate": "2025-07-01",
+      "priorDate": "2025-06-30",
+      "returnPct": -0.05284596682997075,
+      "netPnl": -1042.5258748624983,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 5999.09,
+      "moneyflowMainNet": -1629.7500000000007,
+      "moneyflowRetailNet": 1629.7599999999984,
+      "moneyflowNetMfRank": 0.941794821880475,
+      "moneyflowMainNetRank": 0.10219972746739342,
+      "moneyflowRetailNetRank": 0.8978002725326065
+    },
+    {
+      "ts_code": "002716.SZ",
+      "name": "湖南白银",
+      "industry": "小金属",
+      "entryDate": "2025-07-14",
+      "priorDate": "2025-07-11",
+      "returnPct": -0.05284596682997079,
+      "netPnl": -1026.493527499999,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 25312.5,
+      "moneyflowMainNet": 14837.290000000012,
+      "moneyflowRetailNet": -14837.289999999994,
+      "moneyflowNetMfRank": 0.9875534811357448,
+      "moneyflowMainNetRank": 0.9926098794243485,
+      "moneyflowRetailNetRank": 0.007390120575651498
+    },
+    {
+      "ts_code": "300393.SZ",
+      "name": "中来股份",
+      "industry": "塑料",
+      "entryDate": "2025-07-08",
+      "priorDate": "2025-07-07",
+      "returnPct": 0.04629163273697716,
+      "netPnl": 882.216551466252,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -305.44,
+      "moneyflowMainNet": -1883.23,
+      "moneyflowRetailNet": 1883.2399999999989,
+      "moneyflowNetMfRank": 0.43555295950155765,
+      "moneyflowMainNetRank": 0.0926791277258567,
+      "moneyflowRetailNetRank": 0.9073208722741433
+    },
+    {
+      "ts_code": "002645.SZ",
+      "name": "华宏科技",
+      "industry": "专用机械",
+      "entryDate": "2025-07-21",
+      "priorDate": "2025-07-18",
+      "returnPct": -0.05284596682997069,
+      "netPnl": -1000.6724531999971,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 9921.24,
+      "moneyflowMainNet": 13435.290000000005,
+      "moneyflowRetailNet": -13435.290000000008,
+      "moneyflowNetMfRank": 0.9698326196963799,
+      "moneyflowMainNetRank": 0.9947450369793694,
+      "moneyflowRetailNetRank": 0.005254963020630596
+    },
+    {
+      "ts_code": "601399.SH",
+      "name": "国机重装",
+      "industry": "工程机械",
+      "entryDate": "2025-07-22",
+      "priorDate": "2025-07-21",
+      "returnPct": -0.04424896992448345,
+      "netPnl": -857.0222283000003,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 4240.12,
+      "moneyflowMainNet": 4596.090000000004,
+      "moneyflowRetailNet": -4596.09,
+      "moneyflowNetMfRank": 0.8744158878504673,
+      "moneyflowMainNetRank": 0.9612538940809969,
+      "moneyflowRetailNetRank": 0.03874610591900311
+    },
+    {
+      "ts_code": "601138.SH",
+      "name": "工业富联",
+      "industry": "通信设备",
+      "entryDate": "2025-07-08",
+      "priorDate": "2025-07-07",
+      "returnPct": 0.15483001749562622,
+      "netPnl": 2862.6656817258518,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 46824.28,
+      "moneyflowMainNet": -8403.669999999991,
+      "moneyflowRetailNet": 8403.659999999974,
+      "moneyflowNetMfRank": 0.9996105919003115,
+      "moneyflowMainNetRank": 0.01440809968847352,
+      "moneyflowRetailNetRank": 0.9855919003115264
+    },
+    {
+      "ts_code": "002097.SZ",
+      "name": "山河智能",
+      "industry": "工程机械",
+      "entryDate": "2025-08-04",
+      "priorDate": "2025-08-01",
+      "returnPct": 0.19760149962509352,
+      "netPnl": 3706.099055458795,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 53215.45,
+      "moneyflowMainNet": 17389.039999999986,
+      "moneyflowRetailNet": -17389.02999999997,
+      "moneyflowNetMfRank": 0.9988326848249027,
+      "moneyflowMainNetRank": 0.9961089494163424,
+      "moneyflowRetailNetRank": 0.0038910505836575876
+    },
+    {
+      "ts_code": "300304.SZ",
+      "name": "云意电气",
+      "industry": "汽车配件",
+      "entryDate": "2025-07-15",
+      "priorDate": "2025-07-14",
+      "returnPct": 0.1477014371407149,
+      "netPnl": 2784.991051442601,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 6431.04,
+      "moneyflowMainNet": 2641.749999999999,
+      "moneyflowRetailNet": -2641.75,
+      "moneyflowNetMfRank": 0.9634170071998444,
+      "moneyflowMainNetRank": 0.9501848608678731,
+      "moneyflowRetailNetRank": 0.04981513913212687
+    },
+    {
+      "ts_code": "000901.SZ",
+      "name": "航天科技",
+      "industry": "汽车配件",
+      "entryDate": "2025-08-06",
+      "priorDate": "2025-08-05",
+      "returnPct": 0.14770143714071468,
+      "netPnl": 2855.3848354531474,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 5232.77,
+      "moneyflowMainNet": 16487.290000000015,
+      "moneyflowRetailNet": -16487.289999999994,
+      "moneyflowNetMfRank": 0.9367458154924095,
+      "moneyflowMainNetRank": 0.9955235500194628,
+      "moneyflowRetailNetRank": 0.004476449980537174
+    },
+    {
+      "ts_code": "601929.SH",
+      "name": "吉视传媒",
+      "industry": "影视音像",
+      "entryDate": "2025-08-12",
+      "priorDate": "2025-08-11",
+      "returnPct": 0.19135261544729634,
+      "netPnl": 4009.6343216580026,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -7730.7,
+      "moneyflowMainNet": -5793.66,
+      "moneyflowRetailNet": 5793.669999999991,
+      "moneyflowNetMfRank": 0.050758459743290546,
+      "moneyflowMainNetRank": 0.024504084014002333,
+      "moneyflowRetailNetRank": 0.9754959159859977
+    },
+    {
+      "ts_code": "002176.SZ",
+      "name": "江特电机",
+      "industry": "小金属",
+      "entryDate": "2025-08-12",
+      "priorDate": "2025-08-11",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -1111.6819078750013,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -34079.4,
+      "moneyflowMainNet": 18845.83,
+      "moneyflowRetailNet": -18845.83,
+      "moneyflowNetMfRank": 0.003695060287825749,
+      "moneyflowMainNetRank": 0.9914430182808246,
+      "moneyflowRetailNetRank": 0.008556981719175419
+    },
+    {
+      "ts_code": "688261.SH",
+      "name": "东微半导",
+      "industry": "半导体",
+      "entryDate": "2025-07-29",
+      "priorDate": "2025-07-28",
+      "returnPct": 0.16433479130217435,
+      "netPnl": 2670.488271701248,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -614.25,
+      "moneyflowMainNet": 1499.2500000000014,
+      "moneyflowRetailNet": -1499.25,
+      "moneyflowNetMfRank": 0.490272373540856,
+      "moneyflowMainNetRank": 0.8898832684824902,
+      "moneyflowRetailNetRank": 0.11011673151750972
+    },
+    {
+      "ts_code": "600330.SH",
+      "name": "天通股份",
+      "industry": "专用机械",
+      "entryDate": "2025-08-18",
+      "priorDate": "2025-08-15",
+      "returnPct": -0.052845966829970635,
+      "netPnl": -1098.8771947999958,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 4809.29,
+      "moneyflowMainNet": -32.54999999999836,
+      "moneyflowRetailNet": 32.549999999995634,
+      "moneyflowNetMfRank": 0.8414396887159533,
+      "moneyflowMainNetRank": 0.5381322957198443,
+      "moneyflowRetailNetRank": 0.46186770428015567
+    },
+    {
+      "ts_code": "002190.SZ",
+      "name": "成飞集成",
+      "industry": "汽车配件",
+      "entryDate": "2025-08-25",
+      "priorDate": "2025-08-22",
+      "returnPct": -0.05284596682997085,
+      "netPnl": -1135.9156210500005,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 27656.31,
+      "moneyflowMainNet": -28166.88000000002,
+      "moneyflowRetailNet": 28166.869999999995,
+      "moneyflowNetMfRank": 0.968683135576736,
+      "moneyflowMainNetRank": 0.0021396615444466056,
+      "moneyflowRetailNetRank": 0.9978603384555534
+    },
+    {
+      "ts_code": "600737.SH",
+      "name": "中粮糖业",
+      "industry": "食品",
+      "entryDate": "2025-08-18",
+      "priorDate": "2025-08-15",
+      "returnPct": 0.1477014371407147,
+      "netPnl": 3161.509064238522,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -652.11,
+      "moneyflowMainNet": 3150.9100000000108,
+      "moneyflowRetailNet": -3150.8999999999796,
+      "moneyflowNetMfRank": 0.2643968871595331,
+      "moneyflowMainNetRank": 0.9262645914396888,
+      "moneyflowRetailNetRank": 0.07373540856031129
+    },
+    {
+      "ts_code": "002202.SZ",
+      "name": "金风科技",
+      "industry": "电气设备",
+      "entryDate": "2025-08-25",
+      "priorDate": "2025-08-22",
+      "returnPct": -0.05284596682997096,
+      "netPnl": -1106.7081763500028,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 3784.87,
+      "moneyflowMainNet": -787.6899999999991,
+      "moneyflowRetailNet": 787.6899999999987,
+      "moneyflowNetMfRank": 0.8340789729624587,
+      "moneyflowMainNetRank": 0.3158918498346625,
+      "moneyflowRetailNetRank": 0.6841081501653374
+    },
+    {
+      "ts_code": "000981.SZ",
+      "name": "山子高科",
+      "industry": "汽车配件",
+      "entryDate": "2025-09-02",
+      "priorDate": "2025-09-01",
+      "returnPct": -0.05284596682997093,
+      "netPnl": -1135.756884937502,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 64293.86,
+      "moneyflowMainNet": 76565.44,
+      "moneyflowRetailNet": -76565.45,
+      "moneyflowNetMfRank": 0.9972762645914397,
+      "moneyflowMainNetRank": 0.9992217898832685,
+      "moneyflowRetailNetRank": 0.0007782101167315176
+    },
+    {
+      "ts_code": "601069.SH",
+      "name": "西部黄金",
+      "industry": "黄金",
+      "entryDate": "2025-09-02",
+      "priorDate": "2025-09-01",
+      "returnPct": 0.14770143714071476,
+      "netPnl": 2851.244024628999,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -12954.05,
+      "moneyflowMainNet": 14646.439999999999,
+      "moneyflowRetailNet": -14646.45,
+      "moneyflowNetMfRank": 0.05914396887159533,
+      "moneyflowMainNetRank": 0.9896887159533074,
+      "moneyflowRetailNetRank": 0.010311284046692607
+    },
+    {
+      "ts_code": "600977.SH",
+      "name": "中国电影",
+      "industry": "影视音像",
+      "entryDate": "2025-09-09",
+      "priorDate": "2025-09-08",
+      "returnPct": 0.1976014996250939,
+      "netPnl": 4176.1872123972025,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 1979.33,
+      "moneyflowMainNet": -840.7200000000048,
+      "moneyflowRetailNet": 840.7299999999959,
+      "moneyflowNetMfRank": 0.8483670295489891,
+      "moneyflowMainNetRank": 0.24339035769828926,
+      "moneyflowRetailNetRank": 0.7566096423017107
+    },
+    {
+      "ts_code": "600699.SH",
+      "name": "均胜电子",
+      "industry": "汽车配件",
+      "entryDate": "2025-09-09",
+      "priorDate": "2025-09-08",
+      "returnPct": 0.14770143714071488,
+      "netPnl": 3194.339778630001,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -22358.58,
+      "moneyflowMainNet": 11142.499999999985,
+      "moneyflowRetailNet": -11142.5,
+      "moneyflowNetMfRank": 0.024300155520995334,
+      "moneyflowMainNetRank": 0.9871695178849145,
+      "moneyflowRetailNetRank": 0.012830482115085537
+    },
+    {
+      "ts_code": "300857.SZ",
+      "name": "协创数据",
+      "industry": "IT设备",
+      "entryDate": "2025-09-17",
+      "priorDate": "2025-09-16",
+      "returnPct": -0.05284596682997067,
+      "netPnl": -886.8057484999972,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 40004.16,
+      "moneyflowMainNet": 12102.640000000014,
+      "moneyflowRetailNet": -12102.649999999994,
+      "moneyflowNetMfRank": 0.993978243978244,
+      "moneyflowMainNetRank": 0.9831002331002331,
+      "moneyflowRetailNetRank": 0.0168997668997669
+    },
+    {
+      "ts_code": "002050.SZ",
+      "name": "三花智控",
+      "industry": "家用电器",
+      "entryDate": "2025-09-17",
+      "priorDate": "2025-09-16",
+      "returnPct": 0.15768144963759076,
+      "netPnl": 3307.556478726503,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 72309.67,
+      "moneyflowMainNet": 109105.26999999999,
+      "moneyflowRetailNet": -109105.25000000003,
+      "moneyflowNetMfRank": 0.9980574980574981,
+      "moneyflowMainNetRank": 0.9998057498057498,
+      "moneyflowRetailNetRank": 0.00019425019425019425
+    },
+    {
+      "ts_code": "600362.SH",
+      "name": "江西铜业",
+      "industry": "铜",
+      "entryDate": "2025-10-10",
+      "priorDate": "2025-10-09",
+      "returnPct": -0.08185618537312066,
+      "netPnl": -1725.2269737499955,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -25984.23,
+      "moneyflowMainNet": 991.7099999999919,
+      "moneyflowRetailNet": -991.7000000000007,
+      "moneyflowNetMfRank": 0.012640995721509141,
+      "moneyflowMainNetRank": 0.8422792687670168,
+      "moneyflowRetailNetRank": 0.15772073123298327
+    },
+    {
+      "ts_code": "002941.SZ",
+      "name": "新疆交建",
+      "industry": "建筑工程",
+      "entryDate": "2025-10-10",
+      "priorDate": "2025-10-09",
+      "returnPct": -0.05412417740105025,
+      "netPnl": -1162.4150999999947,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -8883.27,
+      "moneyflowMainNet": 27294.160000000003,
+      "moneyflowRetailNet": -27294.149999999998,
+      "moneyflowNetMfRank": 0.049786075457020615,
+      "moneyflowMainNetRank": 0.9959159859976663,
+      "moneyflowRetailNetRank": 0.004084014002333722
+    },
+    {
+      "ts_code": "601699.SH",
+      "name": "潞安环能",
+      "industry": "煤炭开采",
+      "entryDate": "2025-10-16",
+      "priorDate": "2025-10-15",
+      "returnPct": -0.052845966829970725,
+      "netPnl": -1180.0442603249976,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -3198.26,
+      "moneyflowMainNet": -1237.5400000000036,
+      "moneyflowRetailNet": 1237.5399999999936,
+      "moneyflowNetMfRank": 0.08744656043528955,
+      "moneyflowMainNetRank": 0.14885347842984842,
+      "moneyflowRetailNetRank": 0.8511465215701516
+    },
+    {
+      "ts_code": "000543.SZ",
+      "name": "皖能电力",
+      "industry": "火力发电",
+      "entryDate": "2025-10-27",
+      "priorDate": "2025-10-24",
+      "returnPct": -0.05284596682997077,
+      "netPnl": -1189.9917233749984,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -2368.14,
+      "moneyflowMainNet": 2965.9699999999984,
+      "moneyflowRetailNet": -2965.9900000000016,
+      "moneyflowNetMfRank": 0.21599068503784202,
+      "moneyflowMainNetRank": 0.9322724626431205,
+      "moneyflowRetailNetRank": 0.06772753735687949
+    },
+    {
+      "ts_code": "603185.SH",
+      "name": "弘元绿能",
+      "industry": "电气设备",
+      "entryDate": "2025-11-03",
+      "priorDate": "2025-10-31",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -1188.9334826250015,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -46643.25,
+      "moneyflowMainNet": 9526.800000000003,
+      "moneyflowRetailNet": -9526.79,
+      "moneyflowNetMfRank": 0.009122670807453416,
+      "moneyflowMainNetRank": 0.9819487577639752,
+      "moneyflowRetailNetRank": 0.018051242236024844
+    },
+    {
+      "ts_code": "300058.SZ",
+      "name": "蓝色光标",
+      "industry": "广告包装",
+      "entryDate": "2025-11-04",
+      "priorDate": "2025-11-03",
+      "returnPct": 0.1477014371407149,
+      "netPnl": 3254.6773077819016,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 21988.48,
+      "moneyflowMainNet": -64068.67000000001,
+      "moneyflowRetailNet": 64068.67000000001,
+      "moneyflowNetMfRank": 0.9854453716281778,
+      "moneyflowMainNetRank": 0.0009703085581214826,
+      "moneyflowRetailNetRank": 0.9990296914418785
+    },
+    {
+      "ts_code": "600549.SH",
+      "name": "厦门钨业",
+      "industry": "小金属",
+      "entryDate": "2025-10-27",
+      "priorDate": "2025-10-24",
+      "returnPct": -0.052845966829970656,
+      "netPnl": -1096.2315929249962,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 28753.98,
+      "moneyflowMainNet": -662.6800000000003,
+      "moneyflowRetailNet": 662.689999999995,
+      "moneyflowNetMfRank": 0.9852513099165535,
+      "moneyflowMainNetRank": 0.22549970890743257,
+      "moneyflowRetailNetRank": 0.7745002910925675
+    },
+    {
+      "ts_code": "603619.SH",
+      "name": "中曼石油",
+      "industry": "石油开采",
+      "entryDate": "2025-11-18",
+      "priorDate": "2025-11-17",
+      "returnPct": -0.05284596682997069,
+      "netPnl": -1187.1873853874968,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 1093.11,
+      "moneyflowMainNet": -234.7199999999998,
+      "moneyflowRetailNet": 234.7400000000016,
+      "moneyflowNetMfRank": 0.8170708050436469,
+      "moneyflowMainNetRank": 0.45237633365664404,
+      "moneyflowRetailNetRank": 0.547623666343356
+    },
+    {
+      "ts_code": "601898.SH",
+      "name": "中煤能源",
+      "industry": "煤炭开采",
+      "entryDate": "2025-10-16",
+      "priorDate": "2025-10-15",
+      "returnPct": 0.049452643805498964,
+      "netPnl": 1118.6804652954052,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 934.12,
+      "moneyflowMainNet": 3671.619999999998,
+      "moneyflowRetailNet": -3671.620000000001,
+      "moneyflowNetMfRank": 0.6577924601632336,
+      "moneyflowMainNetRank": 0.9551107656432181,
+      "moneyflowRetailNetRank": 0.044889234356781965
+    },
+    {
+      "ts_code": "002131.SZ",
+      "name": "利欧股份",
+      "industry": "互联网",
+      "entryDate": "2026-01-06",
+      "priorDate": "2026-01-05",
+      "returnPct": 0.14770143714071488,
+      "netPnl": 3333.648485642476,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 143109.08,
+      "moneyflowMainNet": -6812.770000000019,
+      "moneyflowRetailNet": 6812.780000000028,
+      "moneyflowNetMfRank": 0.9986460348162476,
+      "moneyflowMainNetRank": 0.033268858800773696,
+      "moneyflowRetailNetRank": 0.9667311411992263
+    },
+    {
+      "ts_code": "002414.SZ",
+      "name": "高德红外",
+      "industry": "电器仪表",
+      "entryDate": "2025-12-23",
+      "priorDate": "2025-12-22",
+      "returnPct": 0.147701437140715,
+      "netPnl": 3144.945820941928,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -26042.27,
+      "moneyflowMainNet": 39933.06,
+      "moneyflowRetailNet": -39933.06,
+      "moneyflowNetMfRank": 0.009889470622454915,
+      "moneyflowMainNetRank": 0.9970913321698662,
+      "moneyflowRetailNetRank": 0.0029086678301337987
+    },
+    {
+      "ts_code": "603882.SH",
+      "name": "金域医学",
+      "industry": "医疗保健",
+      "entryDate": "2026-01-12",
+      "priorDate": "2026-01-09",
+      "returnPct": -0.05284596682997072,
+      "netPnl": -1175.5996491749975,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -5860.45,
+      "moneyflowMainNet": 4404.040000000001,
+      "moneyflowRetailNet": -4404.040000000012,
+      "moneyflowNetMfRank": 0.08392960742602978,
+      "moneyflowMainNetRank": 0.9414039837555599,
+      "moneyflowRetailNetRank": 0.05859601624444015
+    },
+    {
+      "ts_code": "600312.SH",
+      "name": "平高电气",
+      "industry": "电气设备",
+      "entryDate": "2026-01-20",
+      "priorDate": "2026-01-19",
+      "returnPct": -0.05284596682997057,
+      "netPnl": -1243.9620016249937,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -11160.31,
+      "moneyflowMainNet": 2810.989999999998,
+      "moneyflowRetailNet": -2811.0,
+      "moneyflowNetMfRank": 0.049303944315545245,
+      "moneyflowMainNetRank": 0.9220804331013148,
+      "moneyflowRetailNetRank": 0.07791956689868523
+    },
+    {
+      "ts_code": "601212.SH",
+      "name": "白银有色",
+      "industry": "铜",
+      "entryDate": "2026-01-26",
+      "priorDate": "2026-01-23",
+      "returnPct": -0.05284596682997077,
+      "netPnl": -1207.4526957499984,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -4620.24,
+      "moneyflowMainNet": 449.7099999999991,
+      "moneyflowRetailNet": -449.6999999999971,
+      "moneyflowNetMfRank": 0.11572642967542504,
+      "moneyflowMainNetRank": 0.7337712519319938,
+      "moneyflowRetailNetRank": 0.26622874806800617
+    },
+    {
+      "ts_code": "002284.SZ",
+      "name": "亚太股份",
+      "industry": "汽车配件",
+      "entryDate": "2025-12-23",
+      "priorDate": "2025-12-22",
+      "returnPct": 0.14770143714071482,
+      "netPnl": 3138.7346047057,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -9409.32,
+      "moneyflowMainNet": 11150.490000000002,
+      "moneyflowRetailNet": -11150.49,
+      "moneyflowNetMfRank": 0.04440566220670933,
+      "moneyflowMainNetRank": 0.9825479930191972,
+      "moneyflowRetailNetRank": 0.017452006980802792
+    },
+    {
+      "ts_code": "601179.SH",
+      "name": "中国西电",
+      "industry": "电气设备",
+      "entryDate": "2026-01-20",
+      "priorDate": "2026-01-19",
+      "returnPct": -0.052845966829970906,
+      "netPnl": -1240.522719187502,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -58992.03,
+      "moneyflowMainNet": 107611.31999999999,
+      "moneyflowRetailNet": -107611.32999999999,
+      "moneyflowNetMfRank": 0.0032869296210363496,
+      "moneyflowMainNetRank": 1.0,
+      "moneyflowRetailNetRank": 0.0
+    },
+    {
+      "ts_code": "301217.SZ",
+      "name": "铜冠铜箔",
+      "industry": "元器件",
+      "entryDate": "2026-02-25",
+      "priorDate": "2026-02-24",
+      "returnPct": -0.05284596682997074,
+      "netPnl": -1033.266268299998,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 21133.95,
+      "moneyflowMainNet": -13416.299999999996,
+      "moneyflowRetailNet": 13416.300000000003,
+      "moneyflowNetMfRank": 0.9766364162965824,
+      "moneyflowMainNetRank": 0.017184784707472485,
+      "moneyflowRetailNetRank": 0.9828152152925275
+    },
+    {
+      "ts_code": "601872.SH",
+      "name": "招商轮船",
+      "industry": "水运",
+      "entryDate": "2026-02-25",
+      "priorDate": "2026-02-24",
+      "returnPct": 0.15102810797300678,
+      "netPnl": 3345.6745953881255,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -67246.05,
+      "moneyflowMainNet": 22568.32999999998,
+      "moneyflowRetailNet": -22568.32,
+      "moneyflowNetMfRank": 0.0019308746862328635,
+      "moneyflowMainNetRank": 0.9920834137864453,
+      "moneyflowRetailNetRank": 0.00791658621355474
+    },
+    {
+      "ts_code": "000960.SZ",
+      "name": "锡业股份",
+      "industry": "小金属",
+      "entryDate": "2026-03-02",
+      "priorDate": "2026-02-27",
+      "returnPct": -0.0665343447899346,
+      "netPnl": -1300.3741730000002,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 18149.99,
+      "moneyflowMainNet": 26316.559999999998,
+      "moneyflowRetailNet": -26316.559999999983,
+      "moneyflowNetMfRank": 0.9731400966183575,
+      "moneyflowMainNetRank": 0.9942028985507246,
+      "moneyflowRetailNetRank": 0.005797101449275362
+    },
+    {
+      "ts_code": "600452.SH",
+      "name": "涪陵电力",
+      "industry": "水力发电",
+      "entryDate": "2026-03-02",
+      "priorDate": "2026-02-27",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -1236.8717886000013,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -7423.9,
+      "moneyflowMainNet": 2262.3099999999977,
+      "moneyflowRetailNet": -2262.2999999999884,
+      "moneyflowNetMfRank": 0.07091787439613527,
+      "moneyflowMainNetRank": 0.9114975845410628,
+      "moneyflowRetailNetRank": 0.0885024154589372
+    },
+    {
+      "ts_code": "002149.SZ",
+      "name": "西部材料",
+      "industry": "小金属",
+      "entryDate": "2026-04-21",
+      "priorDate": "2026-04-20",
+      "returnPct": -0.05284596682997089,
+      "netPnl": -973.528577962501,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 624.67,
+      "moneyflowMainNet": 66464.55000000002,
+      "moneyflowRetailNet": -66464.55999999998,
+      "moneyflowNetMfRank": 0.7037037037037037,
+      "moneyflowMainNetRank": 0.9982638888888888,
+      "moneyflowRetailNetRank": 0.001736111111111111
+    },
+    {
+      "ts_code": "300806.SZ",
+      "name": "斯迪克",
+      "industry": "塑料",
+      "entryDate": "2026-04-21",
+      "priorDate": "2026-04-20",
+      "returnPct": 0.1976014996250935,
+      "netPnl": 4118.613284085295,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 11054.35,
+      "moneyflowMainNet": -9769.109999999993,
+      "moneyflowRetailNet": 9769.109999999993,
+      "moneyflowNetMfRank": 0.9616126543209876,
+      "moneyflowMainNetRank": 0.02700617283950617,
+      "moneyflowRetailNetRank": 0.9729938271604939
+    },
+    {
+      "ts_code": "600338.SH",
+      "name": "西藏珠峰",
+      "industry": "铅锌",
+      "entryDate": "2026-04-28",
+      "priorDate": "2026-04-27",
+      "returnPct": 0.04235686078480374,
+      "netPnl": 958.0377761954987,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -15592.27,
+      "moneyflowMainNet": 17056.119999999988,
+      "moneyflowRetailNet": -17056.12000000001,
+      "moneyflowNetMfRank": 0.028742283950617283,
+      "moneyflowMainNetRank": 0.9874614197530864,
+      "moneyflowRetailNetRank": 0.01253858024691358
+    },
+    {
+      "ts_code": "000783.SZ",
+      "name": "长江证券",
+      "industry": "证券",
+      "entryDate": "2026-05-06",
+      "priorDate": "2026-04-30",
+      "returnPct": -0.05284596682997091,
+      "netPnl": -1255.7613859875019,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -83821.64,
+      "moneyflowMainNet": 65015.97999999998,
+      "moneyflowRetailNet": -65015.969999999994,
+      "moneyflowNetMfRank": 0.0021359223300970874,
+      "moneyflowMainNetRank": 0.9978640776699029,
+      "moneyflowRetailNetRank": 0.0021359223300970874
+    },
+    {
+      "ts_code": "000060.SZ",
+      "name": "中金岭南",
+      "industry": "铅锌",
+      "entryDate": "2026-05-07",
+      "priorDate": "2026-05-06",
+      "returnPct": -0.052845966829970885,
+      "netPnl": -1239.8348627000014,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -24071.63,
+      "moneyflowMainNet": 46229.19,
+      "moneyflowRetailNet": -46229.19,
+      "moneyflowNetMfRank": 0.016026259895732767,
+      "moneyflowMainNetRank": 0.995945163158911,
+      "moneyflowRetailNetRank": 0.004054836841089014
+    },
+    {
+      "ts_code": "300679.SZ",
+      "name": "电连技术",
+      "industry": "元器件",
+      "entryDate": "2026-04-28",
+      "priorDate": "2026-04-27",
+      "returnPct": 0.15768144963759065,
+      "netPnl": 3624.892446375201,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -2698.24,
+      "moneyflowMainNet": 12724.149999999998,
+      "moneyflowRetailNet": -12724.14,
+      "moneyflowNetMfRank": 0.15856481481481483,
+      "moneyflowMainNetRank": 0.982445987654321,
+      "moneyflowRetailNetRank": 0.017554012345679014
+    },
+    {
+      "ts_code": "002929.SZ",
+      "name": "润建股份",
+      "industry": "通信设备",
+      "entryDate": "2026-05-11",
+      "priorDate": "2026-05-08",
+      "returnPct": 0.16433479130217452,
+      "netPnl": 3832.965144133126,
+      "isWinner": true,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": -135736.25,
+      "moneyflowMainNet": 5209.699999999997,
+      "moneyflowRetailNet": -5209.690000000002,
+      "moneyflowNetMfRank": 0.0011585248117397182,
+      "moneyflowMainNetRank": 0.946707858659973,
+      "moneyflowRetailNetRank": 0.053292141340027036
+    },
+    {
+      "ts_code": "600198.SH",
+      "name": "大唐电信",
+      "industry": "通信设备",
+      "entryDate": "2026-05-12",
+      "priorDate": "2026-05-11",
+      "returnPct": -0.05284596682997085,
+      "netPnl": -1229.1466311250006,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 1496.37,
+      "moneyflowMainNet": 10403.82,
+      "moneyflowRetailNet": -10403.830000000002,
+      "moneyflowNetMfRank": 0.7993821201004054,
+      "moneyflowMainNetRank": 0.9735470167986098,
+      "moneyflowRetailNetRank": 0.02645298320139023
+    },
+    {
+      "ts_code": "688126.SH",
+      "name": "沪硅产业",
+      "industry": "半导体",
+      "entryDate": "2026-05-20",
+      "priorDate": "2026-05-19",
+      "returnPct": -0.0528459668299707,
+      "netPnl": -1240.6814552999967,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 72348.56,
+      "moneyflowMainNet": 20869.23999999999,
+      "moneyflowRetailNet": -20869.24999999997,
+      "moneyflowNetMfRank": 0.9965257672264042,
+      "moneyflowMainNetRank": 0.9926655085890754,
+      "moneyflowRetailNetRank": 0.007334491410924532
+    },
+    {
+      "ts_code": "603078.SH",
+      "name": "江化微",
+      "industry": "半导体",
+      "entryDate": "2026-05-20",
+      "priorDate": "2026-05-19",
+      "returnPct": -0.05284596682997072,
+      "netPnl": -1118.7721208999974,
+      "isWinner": false,
+      "windowLabels": [
+        "Y3"
+      ],
+      "moneyflowNetMf": 4554.47,
+      "moneyflowMainNet": -1740.420000000002,
+      "moneyflowRetailNet": 1740.4300000000076,
+      "moneyflowNetMfRank": 0.8946149392009265,
+      "moneyflowMainNetRank": 0.1459177764910249,
+      "moneyflowRetailNetRank": 0.8540822235089751
+    }
+  ]
+}

@@ -1,0 +1,1874 @@
+{
+  "runId": "002-kpl-concept-count-trade-delta-001",
+  "startedAt": "2026-05-31 12:41 +0800",
+  "finishedAt": "2026-05-31 12:41 +0800",
+  "baselineRun": "002-repair-indicator-ablate-ma-001",
+  "candidateRun": "002-repair-kpl-concept-count-001",
+  "baselineTradeCount": 125,
+  "candidateTradeCount": 126,
+  "commonTradeCount": 113,
+  "baselineOnlyTradeCount": 12,
+  "candidateOnlyTradeCount": 13,
+  "comparisons": [
+    {
+      "label": "ALL",
+      "baselineOnly": {
+        "count": 12,
+        "netPnl": 6080.808473811401,
+        "avgReturnPct": 0.02316704764812428,
+        "winRate": 0.4166666666666667,
+        "profitLossRatio": 2.4521316514918037,
+        "scoreParts": {
+          "return20Rank": 0.9119941202146912,
+          "high60Rank": 0.8841800586208788,
+          "rsiBalanceRank": 0.185237258934484,
+          "macdHistRank": 0.7176139373756855,
+          "bollSqueezeRank": 0.11696930944403061
+        }
+      },
+      "candidateOnly": {
+        "count": 13,
+        "netPnl": 3555.362017959167,
+        "avgReturnPct": 0.013474840790878191,
+        "winRate": 0.3076923076923077,
+        "profitLossRatio": 3.078695834277319,
+        "scoreParts": {
+          "return20Rank": 0.9298489087787033,
+          "high60Rank": 0.9510971882682381,
+          "rsiBalanceRank": 0.13299077618763214,
+          "macdHistRank": 0.7874403248058376,
+          "bollSqueezeRank": 0.10887372551375077,
+          "amountEfficiency20Rank": 0.7568853324321373,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.600176984010688,
+          "industryRelativeReturn20Rank": 0.9281816008135023
+        }
+      },
+      "commonBaseline": {
+        "count": 113,
+        "netPnl": 71512.35901879605,
+        "avgReturnPct": 0.0375238420687769,
+        "winRate": 0.4778761061946903,
+        "profitLossRatio": 2.5504226066863587,
+        "scoreParts": {
+          "return20Rank": 0.9149899793131103,
+          "high60Rank": 0.9296296629397508,
+          "rsiBalanceRank": 0.19093137069072588,
+          "macdHistRank": 0.7600333376409176,
+          "bollSqueezeRank": 0.1500466946850204
+        }
+      },
+      "commonCandidate": {
+        "count": 113,
+        "netPnl": 71465.18568572764,
+        "avgReturnPct": 0.03763608319236591,
+        "winRate": 0.4778761061946903,
+        "profitLossRatio": 2.553517527011472,
+        "scoreParts": {
+          "return20Rank": 0.9149119793366252,
+          "high60Rank": 0.9295895833945144,
+          "rsiBalanceRank": 0.19093992743679233,
+          "macdHistRank": 0.7600936646210914,
+          "bollSqueezeRank": 0.1500258607865252,
+          "amountEfficiency20Rank": 0.7137760739499993,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.660876220540851,
+          "industryRelativeReturn20Rank": 0.8874752971185437
+        }
+      },
+      "replacementNetPnlDelta": -2525.446455852234,
+      "replacementCountDelta": 1,
+      "baselineOnlyWorst": [
+        {
+          "ts_code": "000981.SZ",
+          "name": "山子高科",
+          "industry": "汽车配件",
+          "entryDate": "2025-09-02",
+          "exitDate": "2025-09-03",
+          "returnPct": -0.05284596682997093,
+          "netPnl": -1135.756884937502,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.8551724137931035,
+            "high60Rank": 0.993103448275862,
+            "rsiBalanceRank": 0.2,
+            "macdHistRank": 0.2827586206896552,
+            "bollSqueezeRank": 0.21379310344827587
+          }
+        },
+        {
+          "ts_code": "002149.SZ",
+          "name": "西部材料",
+          "industry": "小金属",
+          "entryDate": "2026-04-21",
+          "exitDate": "2026-04-24",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -973.528577962501,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.956,
+            "high60Rank": 0.844,
+            "rsiBalanceRank": 0.612,
+            "macdHistRank": 0.9,
+            "bollSqueezeRank": 0.096
+          }
+        },
+        {
+          "ts_code": "603185.SH",
+          "name": "弘元绿能",
+          "industry": "电气设备",
+          "entryDate": "2025-11-03",
+          "exitDate": "2025-11-04",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -1188.9334826250015,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9873417721518988,
+            "high60Rank": 0.8860759493670886,
+            "rsiBalanceRank": 0.012658227848101266,
+            "macdHistRank": 0.9620253164556962,
+            "bollSqueezeRank": 0.0189873417721519
+          }
+        },
+        {
+          "ts_code": "600198.SH",
+          "name": "大唐电信",
+          "industry": "通信设备",
+          "entryDate": "2026-05-12",
+          "exitDate": "2026-05-14",
+          "returnPct": -0.05284596682997085,
+          "netPnl": -1229.1466311250006,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.759581881533101,
+            "high60Rank": 0.7038327526132404,
+            "rsiBalanceRank": 0.29965156794425085,
+            "macdHistRank": 0.46689895470383275,
+            "bollSqueezeRank": 0.2857142857142857
+          }
+        },
+        {
+          "ts_code": "000543.SZ",
+          "name": "皖能电力",
+          "industry": "火力发电",
+          "entryDate": "2025-10-27",
+          "exitDate": "2025-10-31",
+          "returnPct": -0.05284596682997077,
+          "netPnl": -1189.9917233749984,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.8633093525179856,
+            "high60Rank": 0.9928057553956835,
+            "rsiBalanceRank": 0.09352517985611511,
+            "macdHistRank": 0.6762589928057554,
+            "bollSqueezeRank": 0.30935251798561153
+          }
+        }
+      ],
+      "candidateOnlyWorst": [
+        {
+          "ts_code": "002334.SZ",
+          "name": "英威腾",
+          "industry": "电气设备",
+          "entryDate": "2025-08-18",
+          "exitDate": "2025-08-21",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -1107.9780652500012,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9283018867924528,
+            "high60Rank": 0.9886792452830189,
+            "rsiBalanceRank": 0.020754716981132074,
+            "macdHistRank": 0.7018867924528301,
+            "bollSqueezeRank": 0.11886792452830189,
+            "amountEfficiency20Rank": 0.7849056603773585,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.3641509433962264,
+            "industryRelativeReturn20Rank": 0.9339622641509434
+          }
+        },
+        {
+          "ts_code": "603993.SH",
+          "name": "洛阳钼业",
+          "industry": "小金属",
+          "entryDate": "2025-09-02",
+          "exitDate": "2025-09-04",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -1096.866537375001,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9794520547945206,
+            "high60Rank": 0.8904109589041096,
+            "rsiBalanceRank": 0.0273972602739726,
+            "macdHistRank": 0.5958904109589042,
+            "bollSqueezeRank": 0.06164383561643835,
+            "amountEfficiency20Rank": 0.9315068493150684,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.952054794520548,
+            "industryRelativeReturn20Rank": 0.9794520547945206
+          }
+        },
+        {
+          "ts_code": "600588.SH",
+          "name": "用友网络",
+          "industry": "软件服务",
+          "entryDate": "2026-01-13",
+          "exitDate": "2026-01-16",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -1188.616010400001,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9745547073791349,
+            "high60Rank": 0.9694656488549618,
+            "rsiBalanceRank": 0.002544529262086514,
+            "macdHistRank": 0.7811704834605598,
+            "bollSqueezeRank": 0.07888040712468193,
+            "amountEfficiency20Rank": 0.5165394402035624,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8447837150127226,
+            "industryRelativeReturn20Rank": 0.9440203562340967
+          }
+        },
+        {
+          "ts_code": "300953.SZ",
+          "name": "震裕科技",
+          "industry": "电气设备",
+          "entryDate": "2026-04-21",
+          "exitDate": "2026-04-29",
+          "returnPct": -0.05284596682997085,
+          "netPnl": -1152.2654406375004,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.928,
+            "high60Rank": 0.976,
+            "rsiBalanceRank": 0.272,
+            "macdHistRank": 0.98,
+            "bollSqueezeRank": 0.188,
+            "amountEfficiency20Rank": 0.896,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.18,
+            "industryRelativeReturn20Rank": 0.96
+          }
+        },
+        {
+          "ts_code": "300820.SZ",
+          "name": "英杰电气",
+          "industry": "电气设备",
+          "entryDate": "2026-05-20",
+          "exitDate": "2026-05-21",
+          "returnPct": -0.05284596682997083,
+          "netPnl": -1148.6145100499998,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9213483146067416,
+            "high60Rank": 0.9662921348314607,
+            "rsiBalanceRank": 0.033707865168539325,
+            "macdHistRank": 0.9213483146067416,
+            "bollSqueezeRank": 0.0449438202247191,
+            "amountEfficiency20Rank": 0.9662921348314607,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.1348314606741573,
+            "industryRelativeReturn20Rank": 0.9662921348314607
+          }
+        }
+      ],
+      "candidateOnlyBest": [
+        {
+          "ts_code": "000066.SZ",
+          "name": "中国长城",
+          "industry": "IT设备",
+          "entryDate": "2026-04-30",
+          "exitDate": "2026-05-07",
+          "returnPct": 0.19760149962509385,
+          "netPnl": 4313.494106721802,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.8888888888888888,
+            "high60Rank": 1.0,
+            "rsiBalanceRank": 0.037037037037037035,
+            "macdHistRank": 0.5703703703703704,
+            "bollSqueezeRank": 0.2074074074074074,
+            "amountEfficiency20Rank": 0.5111111111111111,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.3851851851851852,
+            "industryRelativeReturn20Rank": 0.9259259259259259
+          }
+        },
+        {
+          "ts_code": "002240.SZ",
+          "name": "盛新锂能",
+          "industry": "小金属",
+          "entryDate": "2025-10-27",
+          "exitDate": "2025-11-07",
+          "returnPct": 0.15324588852786802,
+          "netPnl": 3104.3471803344,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.8920863309352518,
+            "high60Rank": 0.8848920863309353,
+            "rsiBalanceRank": 0.6546762589928058,
+            "macdHistRank": 0.9496402877697842,
+            "bollSqueezeRank": 0.11510791366906475,
+            "amountEfficiency20Rank": 0.8489208633093526,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8992805755395683,
+            "industryRelativeReturn20Rank": 0.8345323741007195
+          }
+        },
+        {
+          "ts_code": "002465.SZ",
+          "name": "海格通信",
+          "industry": "通信设备",
+          "entryDate": "2026-01-06",
+          "exitDate": "2026-01-13",
+          "returnPct": 0.15223780645747675,
+          "netPnl": 3195.808420454654,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.9948542024013722,
+            "high60Rank": 0.9948542024013722,
+            "rsiBalanceRank": 0.015437392795883362,
+            "macdHistRank": 0.8267581475128645,
+            "bollSqueezeRank": 0.00686106346483705,
+            "amountEfficiency20Rank": 0.9519725557461407,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8490566037735849,
+            "industryRelativeReturn20Rank": 0.9948542024013722
+          }
+        },
+        {
+          "ts_code": "605358.SH",
+          "name": "立昂微",
+          "industry": "半导体",
+          "entryDate": "2026-05-11",
+          "exitDate": "2026-05-29",
+          "returnPct": 0.1477014371407148,
+          "netPnl": 2966.003638898299,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.9661733615221987,
+            "high60Rank": 0.879492600422833,
+            "rsiBalanceRank": 0.02959830866807611,
+            "macdHistRank": 0.919661733615222,
+            "bollSqueezeRank": 0.03171247357293869,
+            "amountEfficiency20Rank": 0.8202959830866807,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8900634249471459,
+            "industryRelativeReturn20Rank": 0.9408033826638478
+          }
+        },
+        {
+          "ts_code": "002317.SZ",
+          "name": "众生药业",
+          "industry": "中成药",
+          "entryDate": "2025-11-14",
+          "exitDate": "2025-11-18",
+          "returnPct": -0.05284596682997054,
+          "netPnl": -1100.5703799999937,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9879518072289156,
+            "high60Rank": 1.0,
+            "rsiBalanceRank": 0.060240963855421686,
+            "macdHistRank": 0.9156626506024096,
+            "bollSqueezeRank": 0.024096385542168676,
+            "amountEfficiency20Rank": 1.0,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.37349397590361444,
+            "industryRelativeReturn20Rank": 0.9879518072289156
+          }
+        }
+      ]
+    },
+    {
+      "label": "Y1",
+      "baselineOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "candidateOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "commonBaseline": {
+        "count": 25,
+        "netPnl": 6174.7553490778955,
+        "avgReturnPct": 0.018186411066905776,
+        "winRate": 0.4,
+        "profitLossRatio": 2.360350001988782,
+        "scoreParts": {
+          "return20Rank": 0.899817127613535,
+          "high60Rank": 0.893452790923902,
+          "rsiBalanceRank": 0.21980171458988876,
+          "macdHistRank": 0.7408777608750993,
+          "bollSqueezeRank": 0.17627878578929387
+        }
+      },
+      "commonCandidate": {
+        "count": 25,
+        "netPnl": 6174.7553490778955,
+        "avgReturnPct": 0.018186411066905776,
+        "winRate": 0.4,
+        "profitLossRatio": 2.360350001988782,
+        "scoreParts": {
+          "return20Rank": 0.899817127613535,
+          "high60Rank": 0.893452790923902,
+          "rsiBalanceRank": 0.21980171458988876,
+          "macdHistRank": 0.7408777608750993,
+          "bollSqueezeRank": 0.17627878578929387,
+          "amountEfficiency20Rank": 0.7365719274722059,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.6265051537181143,
+          "industryRelativeReturn20Rank": 0.8667927338458292
+        }
+      },
+      "replacementNetPnlDelta": 0,
+      "replacementCountDelta": 0,
+      "baselineOnlyWorst": [],
+      "candidateOnlyWorst": [],
+      "candidateOnlyBest": []
+    },
+    {
+      "label": "Y2",
+      "baselineOnly": {
+        "count": 1,
+        "netPnl": 717.810239873299,
+        "avgReturnPct": 0.04714057852755199,
+        "winRate": 1.0,
+        "profitLossRatio": null,
+        "scoreParts": {
+          "return20Rank": 0.992831541218638,
+          "high60Rank": 0.5949820788530465,
+          "rsiBalanceRank": 0.02867383512544803,
+          "macdHistRank": 0.9713261648745519,
+          "bollSqueezeRank": 0.0035842293906810036
+        }
+      },
+      "candidateOnly": {
+        "count": 1,
+        "netPnl": -966.3854528999982,
+        "avgReturnPct": -0.05284596682997074,
+        "winRate": 0.0,
+        "profitLossRatio": null,
+        "scoreParts": {
+          "return20Rank": 0.942652329749104,
+          "high60Rank": 0.8817204301075269,
+          "rsiBalanceRank": 0.2939068100358423,
+          "macdHistRank": 0.6559139784946236,
+          "bollSqueezeRank": 0.06810035842293907,
+          "amountEfficiency20Rank": 0.6308243727598566,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.6881720430107527,
+          "industryRelativeReturn20Rank": 0.931899641577061
+        }
+      },
+      "commonBaseline": {
+        "count": 40,
+        "netPnl": 34400.93957544844,
+        "avgReturnPct": 0.05529286147161246,
+        "winRate": 0.575,
+        "profitLossRatio": 2.510316080881933,
+        "scoreParts": {
+          "return20Rank": 0.9022411787443786,
+          "high60Rank": 0.9536081358001419,
+          "rsiBalanceRank": 0.23377371024445723,
+          "macdHistRank": 0.780858298767678,
+          "bollSqueezeRank": 0.17414342221680923
+        }
+      },
+      "commonCandidate": {
+        "count": 40,
+        "netPnl": 34347.69750719845,
+        "avgReturnPct": 0.0553674381131203,
+        "winRate": 0.575,
+        "profitLossRatio": 2.5127049801621917,
+        "scoreParts": {
+          "return20Rank": 0.9022411787443786,
+          "high60Rank": 0.9536081358001419,
+          "rsiBalanceRank": 0.23377371024445723,
+          "macdHistRank": 0.780858298767678,
+          "bollSqueezeRank": 0.17414342221680923,
+          "amountEfficiency20Rank": 0.6493400865114011,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.7026632312569342,
+          "industryRelativeReturn20Rank": 0.8715142970546843
+        }
+      },
+      "replacementNetPnlDelta": -1684.1956927732972,
+      "replacementCountDelta": 0,
+      "baselineOnlyWorst": [
+        {
+          "ts_code": "300607.SZ",
+          "name": "拓斯达",
+          "industry": "专用机械",
+          "entryDate": "2025-05-13",
+          "exitDate": "2025-05-19",
+          "returnPct": 0.04714057852755199,
+          "netPnl": 717.810239873299,
+          "exitPriceRule": "gap_open_stop",
+          "scoreParts": {
+            "return20Rank": 0.992831541218638,
+            "high60Rank": 0.5949820788530465,
+            "rsiBalanceRank": 0.02867383512544803,
+            "macdHistRank": 0.9713261648745519,
+            "bollSqueezeRank": 0.0035842293906810036
+          }
+        }
+      ],
+      "candidateOnlyWorst": [
+        {
+          "ts_code": "600184.SH",
+          "name": "光电股份",
+          "industry": "专用机械",
+          "entryDate": "2025-05-13",
+          "exitDate": "2025-05-15",
+          "returnPct": -0.05284596682997074,
+          "netPnl": -966.3854528999982,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.942652329749104,
+            "high60Rank": 0.8817204301075269,
+            "rsiBalanceRank": 0.2939068100358423,
+            "macdHistRank": 0.6559139784946236,
+            "bollSqueezeRank": 0.06810035842293907,
+            "amountEfficiency20Rank": 0.6308243727598566,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.6881720430107527,
+            "industryRelativeReturn20Rank": 0.931899641577061
+          }
+        }
+      ],
+      "candidateOnlyBest": [
+        {
+          "ts_code": "600184.SH",
+          "name": "光电股份",
+          "industry": "专用机械",
+          "entryDate": "2025-05-13",
+          "exitDate": "2025-05-15",
+          "returnPct": -0.05284596682997074,
+          "netPnl": -966.3854528999982,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.942652329749104,
+            "high60Rank": 0.8817204301075269,
+            "rsiBalanceRank": 0.2939068100358423,
+            "macdHistRank": 0.6559139784946236,
+            "bollSqueezeRank": 0.06810035842293907,
+            "amountEfficiency20Rank": 0.6308243727598566,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.6881720430107527,
+            "industryRelativeReturn20Rank": 0.931899641577061
+          }
+        }
+      ]
+    },
+    {
+      "label": "Y3",
+      "baselineOnly": {
+        "count": 11,
+        "netPnl": 5362.998233938102,
+        "avgReturnPct": 0.020987635749994488,
+        "winRate": 0.36363636363636365,
+        "profitLossRatio": 2.842155215897234,
+        "scoreParts": {
+          "return20Rank": 0.9046452637597869,
+          "high60Rank": 0.9104707840543181,
+          "rsiBalanceRank": 0.1994702974625782,
+          "macdHistRank": 0.6945491894212431,
+          "bollSqueezeRank": 0.12727704399433512
+        }
+      },
+      "candidateOnly": {
+        "count": 12,
+        "netPnl": 4521.747470859165,
+        "avgReturnPct": 0.01900157475928227,
+        "winRate": 0.3333333333333333,
+        "profitLossRatio": 3.0786958342773185,
+        "scoreParts": {
+          "return20Rank": 0.9287819570311698,
+          "high60Rank": 0.9568785847816307,
+          "rsiBalanceRank": 0.1195811067002813,
+          "macdHistRank": 0.7984008536651055,
+          "bollSqueezeRank": 0.11227150610465175,
+          "amountEfficiency20Rank": 0.7673904124048273,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.5928440624273493,
+          "industryRelativeReturn20Rank": 0.9278717640832057
+        }
+      },
+      "commonBaseline": {
+        "count": 50,
+        "netPnl": 29428.935585707222,
+        "avgReturnPct": 0.029362549691494117,
+        "winRate": 0.42,
+        "profitLossRatio": 2.6740179666089023,
+        "scoreParts": {
+          "return20Rank": 0.932575846445359,
+          "high60Rank": 0.9273501341417724,
+          "rsiBalanceRank": 0.13538507227053034,
+          "macdHistRank": 0.7613498236167818,
+          "bollSqueezeRank": 0.11845139932005176
+        }
+      },
+      "commonCandidate": {
+        "count": 50,
+        "netPnl": 29435.004320888802,
+        "avgReturnPct": 0.02955655331759899,
+        "winRate": 0.42,
+        "profitLossRatio": 2.6802798373612156,
+        "scoreParts": {
+          "return20Rank": 0.9323995664985025,
+          "high60Rank": 0.927259554369538,
+          "rsiBalanceRank": 0.1354044105166405,
+          "macdHistRank": 0.7614861625919747,
+          "bollSqueezeRank": 0.11840431470945258,
+          "amountEfficiency20Rank": 0.7605758941817746,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.6505970965577188,
+          "industryRelativeReturn20Rank": 0.9102863669212466
+        }
+      },
+      "replacementNetPnlDelta": -841.2507630789369,
+      "replacementCountDelta": 1,
+      "baselineOnlyWorst": [
+        {
+          "ts_code": "000981.SZ",
+          "name": "山子高科",
+          "industry": "汽车配件",
+          "entryDate": "2025-09-02",
+          "exitDate": "2025-09-03",
+          "returnPct": -0.05284596682997093,
+          "netPnl": -1135.756884937502,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.8551724137931035,
+            "high60Rank": 0.993103448275862,
+            "rsiBalanceRank": 0.2,
+            "macdHistRank": 0.2827586206896552,
+            "bollSqueezeRank": 0.21379310344827587
+          }
+        },
+        {
+          "ts_code": "002149.SZ",
+          "name": "西部材料",
+          "industry": "小金属",
+          "entryDate": "2026-04-21",
+          "exitDate": "2026-04-24",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -973.528577962501,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.956,
+            "high60Rank": 0.844,
+            "rsiBalanceRank": 0.612,
+            "macdHistRank": 0.9,
+            "bollSqueezeRank": 0.096
+          }
+        },
+        {
+          "ts_code": "603185.SH",
+          "name": "弘元绿能",
+          "industry": "电气设备",
+          "entryDate": "2025-11-03",
+          "exitDate": "2025-11-04",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -1188.9334826250015,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9873417721518988,
+            "high60Rank": 0.8860759493670886,
+            "rsiBalanceRank": 0.012658227848101266,
+            "macdHistRank": 0.9620253164556962,
+            "bollSqueezeRank": 0.0189873417721519
+          }
+        },
+        {
+          "ts_code": "600198.SH",
+          "name": "大唐电信",
+          "industry": "通信设备",
+          "entryDate": "2026-05-12",
+          "exitDate": "2026-05-14",
+          "returnPct": -0.05284596682997085,
+          "netPnl": -1229.1466311250006,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.759581881533101,
+            "high60Rank": 0.7038327526132404,
+            "rsiBalanceRank": 0.29965156794425085,
+            "macdHistRank": 0.46689895470383275,
+            "bollSqueezeRank": 0.2857142857142857
+          }
+        },
+        {
+          "ts_code": "000543.SZ",
+          "name": "皖能电力",
+          "industry": "火力发电",
+          "entryDate": "2025-10-27",
+          "exitDate": "2025-10-31",
+          "returnPct": -0.05284596682997077,
+          "netPnl": -1189.9917233749984,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.8633093525179856,
+            "high60Rank": 0.9928057553956835,
+            "rsiBalanceRank": 0.09352517985611511,
+            "macdHistRank": 0.6762589928057554,
+            "bollSqueezeRank": 0.30935251798561153
+          }
+        }
+      ],
+      "candidateOnlyWorst": [
+        {
+          "ts_code": "002334.SZ",
+          "name": "英威腾",
+          "industry": "电气设备",
+          "entryDate": "2025-08-18",
+          "exitDate": "2025-08-21",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -1107.9780652500012,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9283018867924528,
+            "high60Rank": 0.9886792452830189,
+            "rsiBalanceRank": 0.020754716981132074,
+            "macdHistRank": 0.7018867924528301,
+            "bollSqueezeRank": 0.11886792452830189,
+            "amountEfficiency20Rank": 0.7849056603773585,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.3641509433962264,
+            "industryRelativeReturn20Rank": 0.9339622641509434
+          }
+        },
+        {
+          "ts_code": "603993.SH",
+          "name": "洛阳钼业",
+          "industry": "小金属",
+          "entryDate": "2025-09-02",
+          "exitDate": "2025-09-04",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -1096.866537375001,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9794520547945206,
+            "high60Rank": 0.8904109589041096,
+            "rsiBalanceRank": 0.0273972602739726,
+            "macdHistRank": 0.5958904109589042,
+            "bollSqueezeRank": 0.06164383561643835,
+            "amountEfficiency20Rank": 0.9315068493150684,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.952054794520548,
+            "industryRelativeReturn20Rank": 0.9794520547945206
+          }
+        },
+        {
+          "ts_code": "600588.SH",
+          "name": "用友网络",
+          "industry": "软件服务",
+          "entryDate": "2026-01-13",
+          "exitDate": "2026-01-16",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -1188.616010400001,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9745547073791349,
+            "high60Rank": 0.9694656488549618,
+            "rsiBalanceRank": 0.002544529262086514,
+            "macdHistRank": 0.7811704834605598,
+            "bollSqueezeRank": 0.07888040712468193,
+            "amountEfficiency20Rank": 0.5165394402035624,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8447837150127226,
+            "industryRelativeReturn20Rank": 0.9440203562340967
+          }
+        },
+        {
+          "ts_code": "300953.SZ",
+          "name": "震裕科技",
+          "industry": "电气设备",
+          "entryDate": "2026-04-21",
+          "exitDate": "2026-04-29",
+          "returnPct": -0.05284596682997085,
+          "netPnl": -1152.2654406375004,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.928,
+            "high60Rank": 0.976,
+            "rsiBalanceRank": 0.272,
+            "macdHistRank": 0.98,
+            "bollSqueezeRank": 0.188,
+            "amountEfficiency20Rank": 0.896,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.18,
+            "industryRelativeReturn20Rank": 0.96
+          }
+        },
+        {
+          "ts_code": "300820.SZ",
+          "name": "英杰电气",
+          "industry": "电气设备",
+          "entryDate": "2026-05-20",
+          "exitDate": "2026-05-21",
+          "returnPct": -0.05284596682997083,
+          "netPnl": -1148.6145100499998,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9213483146067416,
+            "high60Rank": 0.9662921348314607,
+            "rsiBalanceRank": 0.033707865168539325,
+            "macdHistRank": 0.9213483146067416,
+            "bollSqueezeRank": 0.0449438202247191,
+            "amountEfficiency20Rank": 0.9662921348314607,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.1348314606741573,
+            "industryRelativeReturn20Rank": 0.9662921348314607
+          }
+        }
+      ],
+      "candidateOnlyBest": [
+        {
+          "ts_code": "000066.SZ",
+          "name": "中国长城",
+          "industry": "IT设备",
+          "entryDate": "2026-04-30",
+          "exitDate": "2026-05-07",
+          "returnPct": 0.19760149962509385,
+          "netPnl": 4313.494106721802,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.8888888888888888,
+            "high60Rank": 1.0,
+            "rsiBalanceRank": 0.037037037037037035,
+            "macdHistRank": 0.5703703703703704,
+            "bollSqueezeRank": 0.2074074074074074,
+            "amountEfficiency20Rank": 0.5111111111111111,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.3851851851851852,
+            "industryRelativeReturn20Rank": 0.9259259259259259
+          }
+        },
+        {
+          "ts_code": "002240.SZ",
+          "name": "盛新锂能",
+          "industry": "小金属",
+          "entryDate": "2025-10-27",
+          "exitDate": "2025-11-07",
+          "returnPct": 0.15324588852786802,
+          "netPnl": 3104.3471803344,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.8920863309352518,
+            "high60Rank": 0.8848920863309353,
+            "rsiBalanceRank": 0.6546762589928058,
+            "macdHistRank": 0.9496402877697842,
+            "bollSqueezeRank": 0.11510791366906475,
+            "amountEfficiency20Rank": 0.8489208633093526,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8992805755395683,
+            "industryRelativeReturn20Rank": 0.8345323741007195
+          }
+        },
+        {
+          "ts_code": "002465.SZ",
+          "name": "海格通信",
+          "industry": "通信设备",
+          "entryDate": "2026-01-06",
+          "exitDate": "2026-01-13",
+          "returnPct": 0.15223780645747675,
+          "netPnl": 3195.808420454654,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.9948542024013722,
+            "high60Rank": 0.9948542024013722,
+            "rsiBalanceRank": 0.015437392795883362,
+            "macdHistRank": 0.8267581475128645,
+            "bollSqueezeRank": 0.00686106346483705,
+            "amountEfficiency20Rank": 0.9519725557461407,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8490566037735849,
+            "industryRelativeReturn20Rank": 0.9948542024013722
+          }
+        },
+        {
+          "ts_code": "605358.SH",
+          "name": "立昂微",
+          "industry": "半导体",
+          "entryDate": "2026-05-11",
+          "exitDate": "2026-05-29",
+          "returnPct": 0.1477014371407148,
+          "netPnl": 2966.003638898299,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.9661733615221987,
+            "high60Rank": 0.879492600422833,
+            "rsiBalanceRank": 0.02959830866807611,
+            "macdHistRank": 0.919661733615222,
+            "bollSqueezeRank": 0.03171247357293869,
+            "amountEfficiency20Rank": 0.8202959830866807,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8900634249471459,
+            "industryRelativeReturn20Rank": 0.9408033826638478
+          }
+        },
+        {
+          "ts_code": "002317.SZ",
+          "name": "众生药业",
+          "industry": "中成药",
+          "entryDate": "2025-11-14",
+          "exitDate": "2025-11-18",
+          "returnPct": -0.05284596682997054,
+          "netPnl": -1100.5703799999937,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9879518072289156,
+            "high60Rank": 1.0,
+            "rsiBalanceRank": 0.060240963855421686,
+            "macdHistRank": 0.9156626506024096,
+            "bollSqueezeRank": 0.024096385542168676,
+            "amountEfficiency20Rank": 1.0,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.37349397590361444,
+            "industryRelativeReturn20Rank": 0.9879518072289156
+          }
+        }
+      ]
+    },
+    {
+      "label": "R18-1",
+      "baselineOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "candidateOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "commonBaseline": {
+        "count": 42,
+        "netPnl": 14017.462737271037,
+        "avgReturnPct": 0.02337719364817459,
+        "winRate": 0.4523809523809524,
+        "profitLossRatio": 2.168998050308505,
+        "scoreParts": {
+          "return20Rank": 0.9123201950435,
+          "high60Rank": 0.9230132773221728,
+          "rsiBalanceRank": 0.24014733889478487,
+          "macdHistRank": 0.7527718403681753,
+          "bollSqueezeRank": 0.17553888229882572
+        }
+      },
+      "commonCandidate": {
+        "count": 42,
+        "netPnl": 14017.462737271037,
+        "avgReturnPct": 0.02337719364817459,
+        "winRate": 0.4523809523809524,
+        "profitLossRatio": 2.168998050308505,
+        "scoreParts": {
+          "return20Rank": 0.9123201950435,
+          "high60Rank": 0.9230132773221728,
+          "rsiBalanceRank": 0.24014733889478487,
+          "macdHistRank": 0.7527718403681753,
+          "bollSqueezeRank": 0.17553888229882572,
+          "amountEfficiency20Rank": 0.7131497720075063,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.6854468853270034,
+          "industryRelativeReturn20Rank": 0.8642656270148434
+        }
+      },
+      "replacementNetPnlDelta": 0,
+      "replacementCountDelta": 0,
+      "baselineOnlyWorst": [],
+      "candidateOnlyWorst": [],
+      "candidateOnlyBest": []
+    },
+    {
+      "label": "R18-2",
+      "baselineOnly": {
+        "count": 1,
+        "netPnl": 717.810239873299,
+        "avgReturnPct": 0.04714057852755199,
+        "winRate": 1.0,
+        "profitLossRatio": null,
+        "scoreParts": {
+          "return20Rank": 0.992831541218638,
+          "high60Rank": 0.5949820788530465,
+          "rsiBalanceRank": 0.02867383512544803,
+          "macdHistRank": 0.9713261648745519,
+          "bollSqueezeRank": 0.0035842293906810036
+        }
+      },
+      "candidateOnly": {
+        "count": 1,
+        "netPnl": -966.3854528999982,
+        "avgReturnPct": -0.05284596682997074,
+        "winRate": 0.0,
+        "profitLossRatio": null,
+        "scoreParts": {
+          "return20Rank": 0.942652329749104,
+          "high60Rank": 0.8817204301075269,
+          "rsiBalanceRank": 0.2939068100358423,
+          "macdHistRank": 0.6559139784946236,
+          "bollSqueezeRank": 0.06810035842293907,
+          "amountEfficiency20Rank": 0.6308243727598566,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.6881720430107527,
+          "industryRelativeReturn20Rank": 0.931899641577061
+        }
+      },
+      "commonBaseline": {
+        "count": 56,
+        "netPnl": 35326.37942707705,
+        "avgReturnPct": 0.040716375700169206,
+        "winRate": 0.5,
+        "profitLossRatio": 2.515760744561417,
+        "scoreParts": {
+          "return20Rank": 0.8970181334110328,
+          "high60Rank": 0.9383416797025467,
+          "rsiBalanceRank": 0.23013227204869094,
+          "macdHistRank": 0.7636190425132188,
+          "bollSqueezeRank": 0.18283984422722366
+        }
+      },
+      "commonCandidate": {
+        "count": 56,
+        "netPnl": 35273.13735882706,
+        "avgReturnPct": 0.040769644729817665,
+        "winRate": 0.5,
+        "profitLossRatio": 2.5177438067238405,
+        "scoreParts": {
+          "return20Rank": 0.8970181334110328,
+          "high60Rank": 0.9383416797025467,
+          "rsiBalanceRank": 0.23013227204869094,
+          "macdHistRank": 0.7636190425132188,
+          "bollSqueezeRank": 0.18283984422722366,
+          "amountEfficiency20Rank": 0.6706299693800822,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.6720454458995158,
+          "industryRelativeReturn20Rank": 0.8663651959569768
+        }
+      },
+      "replacementNetPnlDelta": -1684.1956927732972,
+      "replacementCountDelta": 0,
+      "baselineOnlyWorst": [
+        {
+          "ts_code": "300607.SZ",
+          "name": "拓斯达",
+          "industry": "专用机械",
+          "entryDate": "2025-05-13",
+          "exitDate": "2025-05-19",
+          "returnPct": 0.04714057852755199,
+          "netPnl": 717.810239873299,
+          "exitPriceRule": "gap_open_stop",
+          "scoreParts": {
+            "return20Rank": 0.992831541218638,
+            "high60Rank": 0.5949820788530465,
+            "rsiBalanceRank": 0.02867383512544803,
+            "macdHistRank": 0.9713261648745519,
+            "bollSqueezeRank": 0.0035842293906810036
+          }
+        }
+      ],
+      "candidateOnlyWorst": [
+        {
+          "ts_code": "600184.SH",
+          "name": "光电股份",
+          "industry": "专用机械",
+          "entryDate": "2025-05-13",
+          "exitDate": "2025-05-15",
+          "returnPct": -0.05284596682997074,
+          "netPnl": -966.3854528999982,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.942652329749104,
+            "high60Rank": 0.8817204301075269,
+            "rsiBalanceRank": 0.2939068100358423,
+            "macdHistRank": 0.6559139784946236,
+            "bollSqueezeRank": 0.06810035842293907,
+            "amountEfficiency20Rank": 0.6308243727598566,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.6881720430107527,
+            "industryRelativeReturn20Rank": 0.931899641577061
+          }
+        }
+      ],
+      "candidateOnlyBest": [
+        {
+          "ts_code": "600184.SH",
+          "name": "光电股份",
+          "industry": "专用机械",
+          "entryDate": "2025-05-13",
+          "exitDate": "2025-05-15",
+          "returnPct": -0.05284596682997074,
+          "netPnl": -966.3854528999982,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.942652329749104,
+            "high60Rank": 0.8817204301075269,
+            "rsiBalanceRank": 0.2939068100358423,
+            "macdHistRank": 0.6559139784946236,
+            "bollSqueezeRank": 0.06810035842293907,
+            "amountEfficiency20Rank": 0.6308243727598566,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.6881720430107527,
+            "industryRelativeReturn20Rank": 0.931899641577061
+          }
+        }
+      ]
+    },
+    {
+      "label": "R18-3",
+      "baselineOnly": {
+        "count": 6,
+        "netPnl": 3619.314520956221,
+        "avgReturnPct": 0.030667592053178167,
+        "winRate": 0.5,
+        "profitLossRatio": 2.160640778958574,
+        "scoreParts": {
+          "return20Rank": 0.9235058901549686,
+          "high60Rank": 0.8916159706757059,
+          "rsiBalanceRank": 0.05901466867673894,
+          "macdHistRank": 0.7583193774394966,
+          "bollSqueezeRank": 0.1085508335024529
+        }
+      },
+      "candidateOnly": {
+        "count": 7,
+        "netPnl": -3430.448187028087,
+        "avgReturnPct": -0.023404273207422336,
+        "winRate": 0.14285714285714285,
+        "profitLossRatio": 2.899859681268185,
+        "scoreParts": {
+          "return20Rank": 0.9163166199035437,
+          "high60Rank": 0.9397369801394954,
+          "rsiBalanceRank": 0.19122213678679936,
+          "macdHistRank": 0.74820216755859,
+          "bollSqueezeRank": 0.12250760855488227,
+          "amountEfficiency20Rank": 0.739614013805547,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.6454829146494497,
+          "industryRelativeReturn20Rank": 0.9049235440741181
+        }
+      },
+      "commonBaseline": {
+        "count": 73,
+        "netPnl": 57797.35979471848,
+        "avgReturnPct": 0.04690564140496354,
+        "winRate": 0.5205479452054794,
+        "profitLossRatio": 2.584542886553805,
+        "scoreParts": {
+          "return20Rank": 0.9171217890226078,
+          "high60Rank": 0.9512393326855486,
+          "rsiBalanceRank": 0.18973685802653684,
+          "macdHistRank": 0.772556328926056,
+          "bollSqueezeRank": 0.15006448939323508
+        }
+      },
+      "commonCandidate": {
+        "count": 73,
+        "netPnl": 57311.125882420056,
+        "avgReturnPct": 0.04700343312521565,
+        "winRate": 0.5205479452054794,
+        "profitLossRatio": 2.585593713577714,
+        "scoreParts": {
+          "return20Rank": 0.9170460809580813,
+          "high60Rank": 0.9512393326855486,
+          "rsiBalanceRank": 0.1898235664081314,
+          "macdHistRank": 0.7725770354052427,
+          "bollSqueezeRank": 0.1501285500632191,
+          "amountEfficiency20Rank": 0.7047964286859346,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.6676769794719083,
+          "industryRelativeReturn20Rank": 0.890035425423877
+        }
+      },
+      "replacementNetPnlDelta": -7049.762707984308,
+      "replacementCountDelta": 1,
+      "baselineOnlyWorst": [
+        {
+          "ts_code": "000981.SZ",
+          "name": "山子高科",
+          "industry": "汽车配件",
+          "entryDate": "2025-09-02",
+          "exitDate": "2025-09-03",
+          "returnPct": -0.05284596682997093,
+          "netPnl": -1135.756884937502,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.8551724137931035,
+            "high60Rank": 0.993103448275862,
+            "rsiBalanceRank": 0.2,
+            "macdHistRank": 0.2827586206896552,
+            "bollSqueezeRank": 0.21379310344827587
+          }
+        },
+        {
+          "ts_code": "603185.SH",
+          "name": "弘元绿能",
+          "industry": "电气设备",
+          "entryDate": "2025-11-03",
+          "exitDate": "2025-11-04",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -1188.9334826250015,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9873417721518988,
+            "high60Rank": 0.8860759493670886,
+            "rsiBalanceRank": 0.012658227848101266,
+            "macdHistRank": 0.9620253164556962,
+            "bollSqueezeRank": 0.0189873417721519
+          }
+        },
+        {
+          "ts_code": "000543.SZ",
+          "name": "皖能电力",
+          "industry": "火力发电",
+          "entryDate": "2025-10-27",
+          "exitDate": "2025-10-31",
+          "returnPct": -0.05284596682997077,
+          "netPnl": -1189.9917233749984,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.8633093525179856,
+            "high60Rank": 0.9928057553956835,
+            "rsiBalanceRank": 0.09352517985611511,
+            "macdHistRank": 0.6762589928057554,
+            "bollSqueezeRank": 0.30935251798561153
+          }
+        },
+        {
+          "ts_code": "300607.SZ",
+          "name": "拓斯达",
+          "industry": "专用机械",
+          "entryDate": "2025-05-13",
+          "exitDate": "2025-05-19",
+          "returnPct": 0.04714057852755199,
+          "netPnl": 717.810239873299,
+          "exitPriceRule": "gap_open_stop",
+          "scoreParts": {
+            "return20Rank": 0.992831541218638,
+            "high60Rank": 0.5949820788530465,
+            "rsiBalanceRank": 0.02867383512544803,
+            "macdHistRank": 0.9713261648745519,
+            "bollSqueezeRank": 0.0035842293906810036
+          }
+        },
+        {
+          "ts_code": "600737.SH",
+          "name": "中粮糖业",
+          "industry": "食品",
+          "entryDate": "2025-08-18",
+          "exitDate": "2025-09-02",
+          "returnPct": 0.1477014371407147,
+          "netPnl": 3161.509064238522,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.9962264150943396,
+            "high60Rank": 0.9981132075471698,
+            "rsiBalanceRank": 0.0,
+            "macdHistRank": 0.9075471698113208,
+            "bollSqueezeRank": 0.009433962264150943
+          }
+        }
+      ],
+      "candidateOnlyWorst": [
+        {
+          "ts_code": "002334.SZ",
+          "name": "英威腾",
+          "industry": "电气设备",
+          "entryDate": "2025-08-18",
+          "exitDate": "2025-08-21",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -1107.9780652500012,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9283018867924528,
+            "high60Rank": 0.9886792452830189,
+            "rsiBalanceRank": 0.020754716981132074,
+            "macdHistRank": 0.7018867924528301,
+            "bollSqueezeRank": 0.11886792452830189,
+            "amountEfficiency20Rank": 0.7849056603773585,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.3641509433962264,
+            "industryRelativeReturn20Rank": 0.9339622641509434
+          }
+        },
+        {
+          "ts_code": "603993.SH",
+          "name": "洛阳钼业",
+          "industry": "小金属",
+          "entryDate": "2025-09-02",
+          "exitDate": "2025-09-04",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -1096.866537375001,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9794520547945206,
+            "high60Rank": 0.8904109589041096,
+            "rsiBalanceRank": 0.0273972602739726,
+            "macdHistRank": 0.5958904109589042,
+            "bollSqueezeRank": 0.06164383561643835,
+            "amountEfficiency20Rank": 0.9315068493150684,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.952054794520548,
+            "industryRelativeReturn20Rank": 0.9794520547945206
+          }
+        },
+        {
+          "ts_code": "600184.SH",
+          "name": "光电股份",
+          "industry": "专用机械",
+          "entryDate": "2025-05-13",
+          "exitDate": "2025-05-15",
+          "returnPct": -0.05284596682997074,
+          "netPnl": -966.3854528999982,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.942652329749104,
+            "high60Rank": 0.8817204301075269,
+            "rsiBalanceRank": 0.2939068100358423,
+            "macdHistRank": 0.6559139784946236,
+            "bollSqueezeRank": 0.06810035842293907,
+            "amountEfficiency20Rank": 0.6308243727598566,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.6881720430107527,
+            "industryRelativeReturn20Rank": 0.931899641577061
+          }
+        },
+        {
+          "ts_code": "000830.SZ",
+          "name": "鲁西化工",
+          "industry": "化工原料",
+          "entryDate": "2025-11-11",
+          "exitDate": "2025-11-12",
+          "returnPct": -0.05284596682997073,
+          "netPnl": -1115.0153662374978,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.8416666666666667,
+            "high60Rank": 0.95,
+            "rsiBalanceRank": 0.15,
+            "macdHistRank": 0.7166666666666667,
+            "bollSqueezeRank": 0.24166666666666667,
+            "amountEfficiency20Rank": 0.525,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.75,
+            "industryRelativeReturn20Rank": 0.8333333333333334
+          }
+        },
+        {
+          "ts_code": "002170.SZ",
+          "name": "芭田股份",
+          "industry": "农药化肥",
+          "entryDate": "2025-11-07",
+          "exitDate": "2025-11-11",
+          "returnPct": -0.05284596682997061,
+          "netPnl": -1147.979565599995,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.8421052631578947,
+            "high60Rank": 0.9824561403508771,
+            "rsiBalanceRank": 0.13157894736842105,
+            "macdHistRank": 0.7017543859649122,
+            "bollSqueezeRank": 0.22807017543859648,
+            "amountEfficiency20Rank": 0.45614035087719296,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.49122807017543857,
+            "industryRelativeReturn20Rank": 0.8333333333333334
+          }
+        }
+      ],
+      "candidateOnlyBest": [
+        {
+          "ts_code": "002240.SZ",
+          "name": "盛新锂能",
+          "industry": "小金属",
+          "entryDate": "2025-10-27",
+          "exitDate": "2025-11-07",
+          "returnPct": 0.15324588852786802,
+          "netPnl": 3104.3471803344,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.8920863309352518,
+            "high60Rank": 0.8848920863309353,
+            "rsiBalanceRank": 0.6546762589928058,
+            "macdHistRank": 0.9496402877697842,
+            "bollSqueezeRank": 0.11510791366906475,
+            "amountEfficiency20Rank": 0.8489208633093526,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8992805755395683,
+            "industryRelativeReturn20Rank": 0.8345323741007195
+          }
+        },
+        {
+          "ts_code": "002317.SZ",
+          "name": "众生药业",
+          "industry": "中成药",
+          "entryDate": "2025-11-14",
+          "exitDate": "2025-11-18",
+          "returnPct": -0.05284596682997054,
+          "netPnl": -1100.5703799999937,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9879518072289156,
+            "high60Rank": 1.0,
+            "rsiBalanceRank": 0.060240963855421686,
+            "macdHistRank": 0.9156626506024096,
+            "bollSqueezeRank": 0.024096385542168676,
+            "amountEfficiency20Rank": 1.0,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.37349397590361444,
+            "industryRelativeReturn20Rank": 0.9879518072289156
+          }
+        },
+        {
+          "ts_code": "002170.SZ",
+          "name": "芭田股份",
+          "industry": "农药化肥",
+          "entryDate": "2025-11-07",
+          "exitDate": "2025-11-11",
+          "returnPct": -0.05284596682997061,
+          "netPnl": -1147.979565599995,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.8421052631578947,
+            "high60Rank": 0.9824561403508771,
+            "rsiBalanceRank": 0.13157894736842105,
+            "macdHistRank": 0.7017543859649122,
+            "bollSqueezeRank": 0.22807017543859648,
+            "amountEfficiency20Rank": 0.45614035087719296,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.49122807017543857,
+            "industryRelativeReturn20Rank": 0.8333333333333334
+          }
+        },
+        {
+          "ts_code": "000830.SZ",
+          "name": "鲁西化工",
+          "industry": "化工原料",
+          "entryDate": "2025-11-11",
+          "exitDate": "2025-11-12",
+          "returnPct": -0.05284596682997073,
+          "netPnl": -1115.0153662374978,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.8416666666666667,
+            "high60Rank": 0.95,
+            "rsiBalanceRank": 0.15,
+            "macdHistRank": 0.7166666666666667,
+            "bollSqueezeRank": 0.24166666666666667,
+            "amountEfficiency20Rank": 0.525,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.75,
+            "industryRelativeReturn20Rank": 0.8333333333333334
+          }
+        },
+        {
+          "ts_code": "600184.SH",
+          "name": "光电股份",
+          "industry": "专用机械",
+          "entryDate": "2025-05-13",
+          "exitDate": "2025-05-15",
+          "returnPct": -0.05284596682997074,
+          "netPnl": -966.3854528999982,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.942652329749104,
+            "high60Rank": 0.8817204301075269,
+            "rsiBalanceRank": 0.2939068100358423,
+            "macdHistRank": 0.6559139784946236,
+            "bollSqueezeRank": 0.06810035842293907,
+            "amountEfficiency20Rank": 0.6308243727598566,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.6881720430107527,
+            "industryRelativeReturn20Rank": 0.931899641577061
+          }
+        }
+      ]
+    },
+    {
+      "label": "R18-4",
+      "baselineOnly": {
+        "count": 12,
+        "netPnl": 6080.808473811401,
+        "avgReturnPct": 0.02316704764812428,
+        "winRate": 0.4166666666666667,
+        "profitLossRatio": 2.4521316514918037,
+        "scoreParts": {
+          "return20Rank": 0.9119941202146912,
+          "high60Rank": 0.8841800586208788,
+          "rsiBalanceRank": 0.185237258934484,
+          "macdHistRank": 0.7176139373756855,
+          "bollSqueezeRank": 0.11696930944403061
+        }
+      },
+      "candidateOnly": {
+        "count": 13,
+        "netPnl": 3555.362017959167,
+        "avgReturnPct": 0.013474840790878191,
+        "winRate": 0.3076923076923077,
+        "profitLossRatio": 3.078695834277319,
+        "scoreParts": {
+          "return20Rank": 0.9298489087787033,
+          "high60Rank": 0.9510971882682381,
+          "rsiBalanceRank": 0.13299077618763214,
+          "macdHistRank": 0.7874403248058376,
+          "bollSqueezeRank": 0.10887372551375077,
+          "amountEfficiency20Rank": 0.7568853324321373,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.600176984010688,
+          "industryRelativeReturn20Rank": 0.9281816008135023
+        }
+      },
+      "commonBaseline": {
+        "count": 71,
+        "netPnl": 57494.89628152502,
+        "avgReturnPct": 0.045892281979555735,
+        "winRate": 0.49295774647887325,
+        "profitLossRatio": 2.7580522443283657,
+        "scoreParts": {
+          "return20Rank": 0.9165692883176685,
+          "high60Rank": 0.9335435811924027,
+          "rsiBalanceRank": 0.16181769935874732,
+          "macdHistRank": 0.7643288712388778,
+          "bollSqueezeRank": 0.13496680905431865
+        }
+      },
+      "commonCandidate": {
+        "count": 71,
+        "netPnl": 57447.722948456605,
+        "avgReturnPct": 0.04607091926076077,
+        "winRate": 0.49295774647887325,
+        "profitLossRatio": 2.762320986342176,
+        "scoreParts": {
+          "return20Rank": 0.9164451475100232,
+          "high60Rank": 0.9334797926204066,
+          "rsiBalanceRank": 0.1618313178419235,
+          "macdHistRank": 0.7644248846016897,
+          "bollSqueezeRank": 0.13493365087784034,
+          "amountEfficiency20Rank": 0.7141465624230233,
+          "moneyflowMainNetRank1Rank": 0.0,
+          "industryReturn20Rank": 0.6463414610898877,
+          "industryRelativeReturn20Rank": 0.9012049611235494
+        }
+      },
+      "replacementNetPnlDelta": -2525.446455852234,
+      "replacementCountDelta": 1,
+      "baselineOnlyWorst": [
+        {
+          "ts_code": "000981.SZ",
+          "name": "山子高科",
+          "industry": "汽车配件",
+          "entryDate": "2025-09-02",
+          "exitDate": "2025-09-03",
+          "returnPct": -0.05284596682997093,
+          "netPnl": -1135.756884937502,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.8551724137931035,
+            "high60Rank": 0.993103448275862,
+            "rsiBalanceRank": 0.2,
+            "macdHistRank": 0.2827586206896552,
+            "bollSqueezeRank": 0.21379310344827587
+          }
+        },
+        {
+          "ts_code": "002149.SZ",
+          "name": "西部材料",
+          "industry": "小金属",
+          "entryDate": "2026-04-21",
+          "exitDate": "2026-04-24",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -973.528577962501,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.956,
+            "high60Rank": 0.844,
+            "rsiBalanceRank": 0.612,
+            "macdHistRank": 0.9,
+            "bollSqueezeRank": 0.096
+          }
+        },
+        {
+          "ts_code": "603185.SH",
+          "name": "弘元绿能",
+          "industry": "电气设备",
+          "entryDate": "2025-11-03",
+          "exitDate": "2025-11-04",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -1188.9334826250015,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9873417721518988,
+            "high60Rank": 0.8860759493670886,
+            "rsiBalanceRank": 0.012658227848101266,
+            "macdHistRank": 0.9620253164556962,
+            "bollSqueezeRank": 0.0189873417721519
+          }
+        },
+        {
+          "ts_code": "600198.SH",
+          "name": "大唐电信",
+          "industry": "通信设备",
+          "entryDate": "2026-05-12",
+          "exitDate": "2026-05-14",
+          "returnPct": -0.05284596682997085,
+          "netPnl": -1229.1466311250006,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.759581881533101,
+            "high60Rank": 0.7038327526132404,
+            "rsiBalanceRank": 0.29965156794425085,
+            "macdHistRank": 0.46689895470383275,
+            "bollSqueezeRank": 0.2857142857142857
+          }
+        },
+        {
+          "ts_code": "000543.SZ",
+          "name": "皖能电力",
+          "industry": "火力发电",
+          "entryDate": "2025-10-27",
+          "exitDate": "2025-10-31",
+          "returnPct": -0.05284596682997077,
+          "netPnl": -1189.9917233749984,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.8633093525179856,
+            "high60Rank": 0.9928057553956835,
+            "rsiBalanceRank": 0.09352517985611511,
+            "macdHistRank": 0.6762589928057554,
+            "bollSqueezeRank": 0.30935251798561153
+          }
+        }
+      ],
+      "candidateOnlyWorst": [
+        {
+          "ts_code": "002334.SZ",
+          "name": "英威腾",
+          "industry": "电气设备",
+          "entryDate": "2025-08-18",
+          "exitDate": "2025-08-21",
+          "returnPct": -0.05284596682997089,
+          "netPnl": -1107.9780652500012,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9283018867924528,
+            "high60Rank": 0.9886792452830189,
+            "rsiBalanceRank": 0.020754716981132074,
+            "macdHistRank": 0.7018867924528301,
+            "bollSqueezeRank": 0.11886792452830189,
+            "amountEfficiency20Rank": 0.7849056603773585,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.3641509433962264,
+            "industryRelativeReturn20Rank": 0.9339622641509434
+          }
+        },
+        {
+          "ts_code": "603993.SH",
+          "name": "洛阳钼业",
+          "industry": "小金属",
+          "entryDate": "2025-09-02",
+          "exitDate": "2025-09-04",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -1096.866537375001,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9794520547945206,
+            "high60Rank": 0.8904109589041096,
+            "rsiBalanceRank": 0.0273972602739726,
+            "macdHistRank": 0.5958904109589042,
+            "bollSqueezeRank": 0.06164383561643835,
+            "amountEfficiency20Rank": 0.9315068493150684,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.952054794520548,
+            "industryRelativeReturn20Rank": 0.9794520547945206
+          }
+        },
+        {
+          "ts_code": "600588.SH",
+          "name": "用友网络",
+          "industry": "软件服务",
+          "entryDate": "2026-01-13",
+          "exitDate": "2026-01-16",
+          "returnPct": -0.05284596682997087,
+          "netPnl": -1188.616010400001,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9745547073791349,
+            "high60Rank": 0.9694656488549618,
+            "rsiBalanceRank": 0.002544529262086514,
+            "macdHistRank": 0.7811704834605598,
+            "bollSqueezeRank": 0.07888040712468193,
+            "amountEfficiency20Rank": 0.5165394402035624,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8447837150127226,
+            "industryRelativeReturn20Rank": 0.9440203562340967
+          }
+        },
+        {
+          "ts_code": "300953.SZ",
+          "name": "震裕科技",
+          "industry": "电气设备",
+          "entryDate": "2026-04-21",
+          "exitDate": "2026-04-29",
+          "returnPct": -0.05284596682997085,
+          "netPnl": -1152.2654406375004,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.928,
+            "high60Rank": 0.976,
+            "rsiBalanceRank": 0.272,
+            "macdHistRank": 0.98,
+            "bollSqueezeRank": 0.188,
+            "amountEfficiency20Rank": 0.896,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.18,
+            "industryRelativeReturn20Rank": 0.96
+          }
+        },
+        {
+          "ts_code": "300820.SZ",
+          "name": "英杰电气",
+          "industry": "电气设备",
+          "entryDate": "2026-05-20",
+          "exitDate": "2026-05-21",
+          "returnPct": -0.05284596682997083,
+          "netPnl": -1148.6145100499998,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9213483146067416,
+            "high60Rank": 0.9662921348314607,
+            "rsiBalanceRank": 0.033707865168539325,
+            "macdHistRank": 0.9213483146067416,
+            "bollSqueezeRank": 0.0449438202247191,
+            "amountEfficiency20Rank": 0.9662921348314607,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.1348314606741573,
+            "industryRelativeReturn20Rank": 0.9662921348314607
+          }
+        }
+      ],
+      "candidateOnlyBest": [
+        {
+          "ts_code": "000066.SZ",
+          "name": "中国长城",
+          "industry": "IT设备",
+          "entryDate": "2026-04-30",
+          "exitDate": "2026-05-07",
+          "returnPct": 0.19760149962509385,
+          "netPnl": 4313.494106721802,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.8888888888888888,
+            "high60Rank": 1.0,
+            "rsiBalanceRank": 0.037037037037037035,
+            "macdHistRank": 0.5703703703703704,
+            "bollSqueezeRank": 0.2074074074074074,
+            "amountEfficiency20Rank": 0.5111111111111111,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.3851851851851852,
+            "industryRelativeReturn20Rank": 0.9259259259259259
+          }
+        },
+        {
+          "ts_code": "002240.SZ",
+          "name": "盛新锂能",
+          "industry": "小金属",
+          "entryDate": "2025-10-27",
+          "exitDate": "2025-11-07",
+          "returnPct": 0.15324588852786802,
+          "netPnl": 3104.3471803344,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.8920863309352518,
+            "high60Rank": 0.8848920863309353,
+            "rsiBalanceRank": 0.6546762589928058,
+            "macdHistRank": 0.9496402877697842,
+            "bollSqueezeRank": 0.11510791366906475,
+            "amountEfficiency20Rank": 0.8489208633093526,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8992805755395683,
+            "industryRelativeReturn20Rank": 0.8345323741007195
+          }
+        },
+        {
+          "ts_code": "002465.SZ",
+          "name": "海格通信",
+          "industry": "通信设备",
+          "entryDate": "2026-01-06",
+          "exitDate": "2026-01-13",
+          "returnPct": 0.15223780645747675,
+          "netPnl": 3195.808420454654,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.9948542024013722,
+            "high60Rank": 0.9948542024013722,
+            "rsiBalanceRank": 0.015437392795883362,
+            "macdHistRank": 0.8267581475128645,
+            "bollSqueezeRank": 0.00686106346483705,
+            "amountEfficiency20Rank": 0.9519725557461407,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8490566037735849,
+            "industryRelativeReturn20Rank": 0.9948542024013722
+          }
+        },
+        {
+          "ts_code": "605358.SH",
+          "name": "立昂微",
+          "industry": "半导体",
+          "entryDate": "2026-05-11",
+          "exitDate": "2026-05-29",
+          "returnPct": 0.1477014371407148,
+          "netPnl": 2966.003638898299,
+          "exitPriceRule": "take_profit",
+          "scoreParts": {
+            "return20Rank": 0.9661733615221987,
+            "high60Rank": 0.879492600422833,
+            "rsiBalanceRank": 0.02959830866807611,
+            "macdHistRank": 0.919661733615222,
+            "bollSqueezeRank": 0.03171247357293869,
+            "amountEfficiency20Rank": 0.8202959830866807,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.8900634249471459,
+            "industryRelativeReturn20Rank": 0.9408033826638478
+          }
+        },
+        {
+          "ts_code": "002317.SZ",
+          "name": "众生药业",
+          "industry": "中成药",
+          "entryDate": "2025-11-14",
+          "exitDate": "2025-11-18",
+          "returnPct": -0.05284596682997054,
+          "netPnl": -1100.5703799999937,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9879518072289156,
+            "high60Rank": 1.0,
+            "rsiBalanceRank": 0.060240963855421686,
+            "macdHistRank": 0.9156626506024096,
+            "bollSqueezeRank": 0.024096385542168676,
+            "amountEfficiency20Rank": 1.0,
+            "moneyflowMainNetRank1Rank": 0.0,
+            "industryReturn20Rank": 0.37349397590361444,
+            "industryRelativeReturn20Rank": 0.9879518072289156
+          }
+        }
+      ]
+    }
+  ]
+}

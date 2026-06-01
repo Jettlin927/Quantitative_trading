@@ -1,0 +1,2147 @@
+{
+  "runId": "002-financial-quality-edge-001",
+  "sourceRun": "002-repair-volume-inefficiency-crowding-penalty-003",
+  "startedAt": "2026-06-01 12:04 +0800",
+  "finishedAt": "2026-06-01 12:04 +0800",
+  "coverage": {
+    "completedTrades": 123,
+    "uniqueSymbols": 119,
+    "coveredTrades": 123,
+    "coveredTradePct": 1.0,
+    "coveredSymbols": 119,
+    "coveredSymbolPct": 1.0,
+    "missingSymbols": [],
+    "byWindow": {
+      "ALL": {
+        "trades": 123,
+        "coveredTrades": 123,
+        "coveragePct": 1.0
+      },
+      "Y1": {
+        "trades": 25,
+        "coveredTrades": 25,
+        "coveragePct": 1.0
+      },
+      "Y2": {
+        "trades": 38,
+        "coveredTrades": 38,
+        "coveragePct": 1.0
+      },
+      "Y3": {
+        "trades": 60,
+        "coveredTrades": 60,
+        "coveragePct": 1.0
+      },
+      "R18-1": {
+        "trades": 42,
+        "coveredTrades": 42,
+        "coveragePct": 1.0
+      },
+      "R18-2": {
+        "trades": 54,
+        "coveredTrades": 54,
+        "coveragePct": 1.0
+      },
+      "R18-3": {
+        "trades": 77,
+        "coveredTrades": 77,
+        "coveragePct": 1.0
+      },
+      "R18-4": {
+        "trades": 81,
+        "coveredTrades": 81,
+        "coveragePct": 1.0
+      }
+    }
+  },
+  "windows": {
+    "ALL": {
+      "trades": 123,
+      "netPnl": 113975.27535250365,
+      "winners": 64,
+      "losers": 59,
+      "fields": {
+        "roe": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 3.0206921875,
+          "loserMean": 4.155464406779661,
+          "meanDiff": -1.134772219279661,
+          "winnerMedian": 2.6264,
+          "loserMedian": 3.7996
+        },
+        "roe_waa": {
+          "winnerCount": 64,
+          "loserCount": 58,
+          "winnerMean": 2.923278125,
+          "loserMean": 4.152051724137931,
+          "meanDiff": -1.2287735991379312,
+          "winnerMedian": 2.6399999999999997,
+          "loserMedian": 4.02695
+        },
+        "roa": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 2.41998125,
+          "loserMean": 2.8781016949152542,
+          "meanDiff": -0.45812044491525405,
+          "winnerMedian": 1.3946,
+          "loserMedian": 2.5708
+        },
+        "grossprofit_margin": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 26.322385937499998,
+          "loserMean": 25.25837627118644,
+          "meanDiff": 1.0640096663135594,
+          "winnerMedian": 22.42125,
+          "loserMedian": 22.1353
+        },
+        "netprofit_margin": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 261.79323125,
+          "loserMean": 4.6371627118644065,
+          "meanDiff": 257.1560685381356,
+          "winnerMedian": 6.30775,
+          "loserMedian": 6.7356
+        },
+        "debt_to_assets": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 46.0995234375,
+          "loserMean": 43.31543220338983,
+          "meanDiff": 2.7840912341101642,
+          "winnerMedian": 46.127700000000004,
+          "loserMedian": 42.5755
+        },
+        "current_ratio": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 2.1427671875,
+          "loserMean": 2.215754237288136,
+          "meanDiff": -0.07298704978813575,
+          "winnerMedian": 1.58515,
+          "loserMedian": 1.4941
+        },
+        "quick_ratio": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 1.781828125,
+          "loserMean": 1.720106779661017,
+          "meanDiff": 0.0617213453389831,
+          "winnerMedian": 1.0986,
+          "loserMedian": 1.1267
+        },
+        "assets_turn": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 0.286721875,
+          "loserMean": 0.3231728813559322,
+          "meanDiff": -0.03645100635593218,
+          "winnerMedian": 0.2223,
+          "loserMedian": 0.2973
+        },
+        "tr_yoy": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 8.9171125,
+          "loserMean": 6.83924406779661,
+          "meanDiff": 2.07786843220339,
+          "winnerMedian": 3.29455,
+          "loserMedian": 6.0723
+        },
+        "netprofit_yoy": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 36.6528953125,
+          "loserMean": 116.17821694915254,
+          "meanDiff": -79.52532163665254,
+          "winnerMedian": -3.0829500000000003,
+          "loserMedian": 15.4241
+        },
+        "q_sales_yoy": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 12.14165,
+          "loserMean": 9.75344745762712,
+          "meanDiff": 2.3882025423728805,
+          "winnerMedian": 4.7521,
+          "loserMedian": 6.0725
+        },
+        "q_profit_yoy": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 23.9809640625,
+          "loserMean": 120.36035254237288,
+          "meanDiff": -96.37938847987289,
+          "winnerMedian": 2.8991,
+          "loserMedian": 12.169
+        },
+        "basic_eps_yoy": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 35.4664640625,
+          "loserMean": 111.06845254237288,
+          "meanDiff": -75.60198847987289,
+          "winnerMedian": -3.4483,
+          "loserMedian": 14.6137
+        },
+        "bps": {
+          "winnerCount": 64,
+          "loserCount": 59,
+          "winnerMean": 7.092346875,
+          "loserMean": 8.778154237288135,
+          "meanDiff": -1.685807362288135,
+          "winnerMedian": 5.7907,
+          "loserMedian": 7.6156
+        },
+        "eps": {
+          "winnerCount": 64,
+          "loserCount": 58,
+          "winnerMean": 0.27514062499999997,
+          "loserMean": 0.37891034482758623,
+          "meanDiff": -0.10376971982758626,
+          "winnerMedian": 0.11499999999999999,
+          "loserMedian": 0.26839999999999997
+        }
+      }
+    },
+    "Y1": {
+      "trades": 25,
+      "netPnl": 11561.540004803966,
+      "winners": 12,
+      "losers": 13,
+      "fields": {
+        "roe": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 4.755041666666666,
+          "loserMean": 4.0549,
+          "meanDiff": 0.7001416666666662,
+          "winnerMedian": 5.46465,
+          "loserMedian": 4.457
+        },
+        "roe_waa": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 4.470833333333333,
+          "loserMean": 4.042930769230769,
+          "meanDiff": 0.4279025641025642,
+          "winnerMedian": 5.465,
+          "loserMedian": 4.45
+        },
+        "roa": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 3.65595,
+          "loserMean": 3.6653384615384614,
+          "meanDiff": -0.009388461538461623,
+          "winnerMedian": 3.52625,
+          "loserMedian": 2.9832
+        },
+        "grossprofit_margin": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 31.132875,
+          "loserMean": 33.43238461538461,
+          "meanDiff": -2.299509615384615,
+          "winnerMedian": 25.731650000000002,
+          "loserMedian": 28.2398
+        },
+        "netprofit_margin": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 6.910425000000001,
+          "loserMean": 3.3206076923076924,
+          "meanDiff": 3.5898173076923086,
+          "winnerMedian": 9.776299999999999,
+          "loserMedian": 6.7193
+        },
+        "debt_to_assets": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 44.698008333333334,
+          "loserMean": 43.32164615384615,
+          "meanDiff": 1.376362179487181,
+          "winnerMedian": 45.1678,
+          "loserMedian": 40.5034
+        },
+        "current_ratio": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 1.9257416666666667,
+          "loserMean": 2.8439923076923077,
+          "meanDiff": -0.918250641025641,
+          "winnerMedian": 1.391,
+          "loserMedian": 1.7529
+        },
+        "quick_ratio": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 1.7101833333333334,
+          "loserMean": 2.1128384615384617,
+          "meanDiff": -0.4026551282051283,
+          "winnerMedian": 1.13265,
+          "loserMedian": 1.1044
+        },
+        "assets_turn": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 0.305825,
+          "loserMean": 0.3250230769230769,
+          "meanDiff": -0.0191980769230769,
+          "winnerMedian": 0.27025,
+          "loserMedian": 0.3667
+        },
+        "tr_yoy": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 12.470291666666666,
+          "loserMean": 7.153338461538461,
+          "meanDiff": 5.316953205128205,
+          "winnerMedian": 1.1347500000000001,
+          "loserMedian": 8.6598
+        },
+        "netprofit_yoy": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 47.580358333333336,
+          "loserMean": -33.580092307692304,
+          "meanDiff": 81.16045064102565,
+          "winnerMedian": -9.5673,
+          "loserMedian": 5.9034
+        },
+        "q_sales_yoy": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 9.9485,
+          "loserMean": 11.71773076923077,
+          "meanDiff": -1.76923076923077,
+          "winnerMedian": 1.2168500000000002,
+          "loserMedian": 6.0725
+        },
+        "q_profit_yoy": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 7.4687666666666725,
+          "loserMean": -3.806907692307691,
+          "meanDiff": 11.275674358974364,
+          "winnerMedian": 5.51885,
+          "loserMedian": 4.848
+        },
+        "basic_eps_yoy": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 46.15564166666667,
+          "loserMean": -34.072,
+          "meanDiff": 80.22764166666667,
+          "winnerMedian": -10.01935,
+          "loserMedian": 7.0096
+        },
+        "bps": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 6.726675,
+          "loserMean": 10.728176923076923,
+          "meanDiff": -4.001501923076923,
+          "winnerMedian": 6.463850000000001,
+          "loserMedian": 8.8938
+        },
+        "eps": {
+          "winnerCount": 12,
+          "loserCount": 13,
+          "winnerMean": 0.5510666666666667,
+          "loserMean": 0.4811461538461539,
+          "meanDiff": 0.06992051282051281,
+          "winnerMedian": 0.32,
+          "loserMedian": 0.45
+        }
+      }
+    },
+    "Y2": {
+      "trades": 38,
+      "netPnl": 47698.06922215072,
+      "winners": 25,
+      "losers": 13,
+      "fields": {
+        "roe": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 2.474968,
+          "loserMean": 4.306976923076923,
+          "meanDiff": -1.832008923076923,
+          "winnerMedian": 2.3378,
+          "loserMedian": 4.275
+        },
+        "roe_waa": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 2.3816,
+          "loserMean": 4.295923076923077,
+          "meanDiff": -1.9143230769230768,
+          "winnerMedian": 2.38,
+          "loserMedian": 4.28
+        },
+        "roa": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 2.250768,
+          "loserMean": 2.4752923076923077,
+          "meanDiff": -0.2245243076923078,
+          "winnerMedian": 1.0869,
+          "loserMedian": 2.5708
+        },
+        "grossprofit_margin": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 29.17866,
+          "loserMean": 28.737,
+          "meanDiff": 0.4416600000000024,
+          "winnerMedian": 26.3656,
+          "loserMedian": 24.7617
+        },
+        "netprofit_margin": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 78.198128,
+          "loserMean": 3.0842846153846155,
+          "meanDiff": 75.11384338461538,
+          "winnerMedian": 6.7461,
+          "loserMedian": 6.7854
+        },
+        "debt_to_assets": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 42.11672,
+          "loserMean": 37.356523076923075,
+          "meanDiff": 4.760196923076926,
+          "winnerMedian": 42.087,
+          "loserMedian": 34.0944
+        },
+        "current_ratio": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 2.405424,
+          "loserMean": 2.6618692307692307,
+          "meanDiff": -0.25644523076923065,
+          "winnerMedian": 1.7565,
+          "loserMedian": 1.9334
+        },
+        "quick_ratio": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 2.050968,
+          "loserMean": 2.0483076923076924,
+          "meanDiff": 0.0026603076923077396,
+          "winnerMedian": 1.3307,
+          "loserMedian": 1.6268
+        },
+        "assets_turn": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 0.253264,
+          "loserMean": 0.2693076923076923,
+          "meanDiff": -0.016043692307692314,
+          "winnerMedian": 0.2345,
+          "loserMedian": 0.2973
+        },
+        "tr_yoy": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 3.7725520000000006,
+          "loserMean": -9.141953846153847,
+          "meanDiff": 12.914505846153848,
+          "winnerMedian": 0.5323,
+          "loserMedian": -8.3352
+        },
+        "netprofit_yoy": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": -6.108616,
+          "loserMean": 207.60946153846155,
+          "meanDiff": -213.71807753846156,
+          "winnerMedian": -15.3797,
+          "loserMedian": -3.3793
+        },
+        "q_sales_yoy": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 9.137732,
+          "loserMean": -13.528292307692306,
+          "meanDiff": 22.666024307692304,
+          "winnerMedian": 1.6876,
+          "loserMedian": -10.9307
+        },
+        "q_profit_yoy": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": -26.708512,
+          "loserMean": -5.612392307692304,
+          "meanDiff": -21.096119692307695,
+          "winnerMedian": -15.2437,
+          "loserMedian": -14.4293
+        },
+        "basic_eps_yoy": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": -7.154896000000001,
+          "loserMean": 207.77836153846155,
+          "meanDiff": -214.93325753846156,
+          "winnerMedian": -15.4195,
+          "loserMedian": -3.6765
+        },
+        "bps": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 6.946596,
+          "loserMean": 8.771007692307693,
+          "meanDiff": -1.8244116923076925,
+          "winnerMedian": 6.2286,
+          "loserMedian": 7.6156
+        },
+        "eps": {
+          "winnerCount": 25,
+          "loserCount": 13,
+          "winnerMean": 0.273112,
+          "loserMean": 0.2837,
+          "meanDiff": -0.010587999999999986,
+          "winnerMedian": 0.0893,
+          "loserMedian": 0.2447
+        }
+      }
+    },
+    "Y3": {
+      "trades": 60,
+      "netPnl": 54715.66612554896,
+      "winners": 27,
+      "losers": 33,
+      "fields": {
+        "roe": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 2.7551703703703705,
+          "loserMean": 4.135393939393939,
+          "meanDiff": -1.3802235690235687,
+          "winnerMedian": 2.1373,
+          "loserMedian": 3.7655
+        },
+        "roe_waa": {
+          "winnerCount": 27,
+          "loserCount": 32,
+          "winnerMean": 2.7370296296296295,
+          "loserMean": 4.137934375,
+          "meanDiff": -1.400904745370371,
+          "winnerMedian": 2.14,
+          "loserMedian": 3.81
+        },
+        "roa": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 2.027340740740741,
+          "loserMean": 2.726660606060606,
+          "meanDiff": -0.6993198653198651,
+          "winnerMedian": 1.4001,
+          "loserMedian": 2.4267
+        },
+        "grossprofit_margin": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 21.539692592592594,
+          "loserMean": 20.667945454545453,
+          "meanDiff": 0.8717471380471409,
+          "winnerMedian": 19.2126,
+          "loserMedian": 18.8019
+        },
+        "netprofit_margin": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 545.0699444444444,
+          "loserMean": 5.767545454545455,
+          "meanDiff": 539.302398989899,
+          "winnerMedian": 3.609,
+          "loserMedian": 6.7356
+        },
+        "debt_to_assets": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 50.410199999999996,
+          "loserMean": 45.66043333333334,
+          "meanDiff": 4.749766666666659,
+          "winnerMedian": 48.8924,
+          "loserMedian": 46.6153
+        },
+        "current_ratio": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 1.9960222222222221,
+          "loserMean": 1.7925242424242425,
+          "meanDiff": 0.20349797979797968,
+          "winnerMedian": 1.5779,
+          "loserMedian": 1.3062
+        },
+        "quick_ratio": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 1.5644666666666667,
+          "loserMean": 1.4361030303030302,
+          "meanDiff": 0.12836363636363646,
+          "winnerMedian": 0.9999,
+          "loserMedian": 0.9735
+        },
+        "assets_turn": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 0.3092111111111111,
+          "loserMean": 0.34366363636363634,
+          "meanDiff": -0.034452525252525235,
+          "winnerMedian": 0.1931,
+          "loserMedian": 0.2807
+        },
+        "tr_yoy": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 12.101403703703705,
+          "loserMean": 13.011133333333333,
+          "meanDiff": -0.9097296296296289,
+          "winnerMedian": 11.5652,
+          "loserMedian": 11.5013
+        },
+        "netprofit_yoy": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 71.39023703703704,
+          "loserMean": 139.15554545454546,
+          "meanDiff": -67.76530841750842,
+          "winnerMedian": 12.1046,
+          "loserMedian": 20.7599
+        },
+        "q_sales_yoy": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 15.897788888888888,
+          "loserMean": 18.151233333333334,
+          "meanDiff": -2.2534444444444457,
+          "winnerMedian": 12.6695,
+          "loserMedian": 15.5759
+        },
+        "q_profit_yoy": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 78.25441851851852,
+          "loserMean": 218.90035454545455,
+          "meanDiff": -140.64593602693603,
+          "winnerMedian": 25.2233,
+          "loserMedian": 31.9692
+        },
+        "basic_eps_yoy": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 70.17994074074075,
+          "loserMean": 130.1471515151515,
+          "meanDiff": -59.96721077441076,
+          "winnerMedian": 13.3333,
+          "loserMedian": 20.4239
+        },
+        "bps": {
+          "winnerCount": 27,
+          "loserCount": 33,
+          "winnerMean": 7.3898222222222225,
+          "loserMean": 8.012778787878787,
+          "meanDiff": -0.6229565656565645,
+          "winnerMedian": 5.5158,
+          "loserMedian": 6.5094
+        },
+        "eps": {
+          "winnerCount": 27,
+          "loserCount": 32,
+          "winnerMean": 0.15438518518518518,
+          "loserMean": 0.37605625,
+          "meanDiff": -0.2216710648148148,
+          "winnerMedian": 0.1,
+          "loserMedian": 0.2206
+        }
+      }
+    },
+    "R18-1": {
+      "trades": 42,
+      "netPnl": 21823.9645823642,
+      "winners": 21,
+      "losers": 21,
+      "fields": {
+        "roe": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 3.369347619047619,
+          "loserMean": 4.359214285714286,
+          "meanDiff": -0.9898666666666669,
+          "winnerMedian": 2.8805,
+          "loserMedian": 4.457
+        },
+        "roe_waa": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 3.201904761904762,
+          "loserMean": 4.348814285714286,
+          "meanDiff": -1.1469095238095242,
+          "winnerMedian": 2.88,
+          "loserMedian": 4.45
+        },
+        "roa": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 2.520890476190476,
+          "loserMean": 3.226495238095238,
+          "meanDiff": -0.7056047619047621,
+          "winnerMedian": 1.3898,
+          "loserMedian": 2.9832
+        },
+        "grossprofit_margin": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 27.246480952380953,
+          "loserMean": 32.0057,
+          "meanDiff": -4.759219047619045,
+          "winnerMedian": 24.6057,
+          "loserMedian": 28.2398
+        },
+        "netprofit_margin": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 90.94638571428571,
+          "loserMean": 2.4368380952380955,
+          "meanDiff": 88.50954761904761,
+          "winnerMedian": 6.6404,
+          "loserMedian": 6.7193
+        },
+        "debt_to_assets": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 46.02795714285715,
+          "loserMean": 42.07544761904762,
+          "meanDiff": 3.9525095238095247,
+          "winnerMedian": 44.623,
+          "loserMedian": 39.8951
+        },
+        "current_ratio": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 1.8835190476190475,
+          "loserMean": 2.812852380952381,
+          "meanDiff": -0.9293333333333336,
+          "winnerMedian": 1.339,
+          "loserMedian": 1.6404
+        },
+        "quick_ratio": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 1.658295238095238,
+          "loserMean": 2.0832809523809526,
+          "meanDiff": -0.4249857142857145,
+          "winnerMedian": 1.1787,
+          "loserMedian": 1.1494
+        },
+        "assets_turn": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 0.27252857142857145,
+          "loserMean": 0.2931809523809524,
+          "meanDiff": -0.020652380952380922,
+          "winnerMedian": 0.2345,
+          "loserMedian": 0.2973
+        },
+        "tr_yoy": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 9.863647619047619,
+          "loserMean": -0.34012380952380933,
+          "meanDiff": 10.203771428571429,
+          "winnerMedian": -0.662,
+          "loserMedian": 6.0723
+        },
+        "netprofit_yoy": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 25.84707619047619,
+          "loserMean": 124.27502857142858,
+          "meanDiff": -98.42795238095239,
+          "winnerMedian": -9.6781,
+          "loserMedian": 5.9034
+        },
+        "q_sales_yoy": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 15.316680952380953,
+          "loserMean": -0.24277619047618967,
+          "meanDiff": 15.559457142857143,
+          "winnerMedian": 4.732,
+          "loserMedian": 2.2137
+        },
+        "q_profit_yoy": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": -4.189452380952378,
+          "loserMean": 39.51154761904762,
+          "meanDiff": -43.70099999999999,
+          "winnerMedian": 1.7246,
+          "loserMedian": 9.2374
+        },
+        "basic_eps_yoy": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 25.284319047619046,
+          "loserMean": 124.06424761904762,
+          "meanDiff": -98.77992857142857,
+          "winnerMedian": -10.3448,
+          "loserMedian": 7.0096
+        },
+        "bps": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 6.144971428571429,
+          "loserMean": 9.104619047619048,
+          "meanDiff": -2.959647619047619,
+          "winnerMedian": 5.4412,
+          "loserMedian": 7.6319
+        },
+        "eps": {
+          "winnerCount": 21,
+          "loserCount": 21,
+          "winnerMean": 0.39257142857142857,
+          "loserMean": 0.38543333333333335,
+          "meanDiff": 0.007138095238095221,
+          "winnerMedian": 0.19,
+          "loserMedian": 0.357
+        }
+      }
+    },
+    "R18-2": {
+      "trades": 54,
+      "netPnl": 54010.29372950541,
+      "winners": 32,
+      "losers": 22,
+      "fields": {
+        "roe": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 3.4214875,
+          "loserMean": 4.2690090909090905,
+          "meanDiff": -0.8475215909090905,
+          "winnerMedian": 2.7606,
+          "loserMedian": 3.8984500000000004
+        },
+        "roe_waa": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 3.2753125,
+          "loserMean": 4.265686363636363,
+          "meanDiff": -0.9903738636363633,
+          "winnerMedian": 2.76,
+          "loserMedian": 3.93
+        },
+        "roa": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 2.925553125,
+          "loserMean": 2.671709090909091,
+          "meanDiff": 0.25384403409090917,
+          "winnerMedian": 1.3646,
+          "loserMedian": 2.5513500000000002
+        },
+        "grossprofit_margin": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 30.598275,
+          "loserMean": 29.32555,
+          "meanDiff": 1.2727250000000012,
+          "winnerMedian": 26.147550000000003,
+          "loserMedian": 25.047400000000003
+        },
+        "netprofit_margin": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 64.221909375,
+          "loserMean": 3.0501181818181817,
+          "meanDiff": 61.17179119318181,
+          "winnerMedian": 6.90565,
+          "loserMedian": 6.6136
+        },
+        "debt_to_assets": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 42.350084375,
+          "loserMean": 40.55912272727273,
+          "meanDiff": 1.790961647727272,
+          "winnerMedian": 43.02565,
+          "loserMedian": 35.91475
+        },
+        "current_ratio": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 2.39569375,
+          "loserMean": 2.8403636363636364,
+          "meanDiff": -0.44466988636363647,
+          "winnerMedian": 1.6052499999999998,
+          "loserMedian": 1.69665
+        },
+        "quick_ratio": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 2.05543125,
+          "loserMean": 2.1258909090909093,
+          "meanDiff": -0.07045965909090945,
+          "winnerMedian": 1.26565,
+          "loserMedian": 1.2702
+        },
+        "assets_turn": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 0.274003125,
+          "loserMean": 0.2812409090909091,
+          "meanDiff": -0.007237784090909083,
+          "winnerMedian": 0.2443,
+          "loserMedian": 0.29555
+        },
+        "tr_yoy": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 8.30285,
+          "loserMean": -0.827722727272727,
+          "meanDiff": 9.130572727272726,
+          "winnerMedian": 1.19185,
+          "loserMedian": -0.30219999999999997
+        },
+        "netprofit_yoy": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 17.27865625,
+          "loserMean": 124.61303636363637,
+          "meanDiff": -107.33438011363637,
+          "winnerMedian": -8.8634,
+          "loserMedian": -1.85765
+        },
+        "q_sales_yoy": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 11.620421875,
+          "loserMean": -1.45195909090909,
+          "meanDiff": 13.07238096590909,
+          "winnerMedian": 2.4382,
+          "loserMedian": -0.7640499999999999
+        },
+        "q_profit_yoy": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": -17.586968749999997,
+          "loserMean": 56.174754545454554,
+          "meanDiff": -73.76172329545454,
+          "winnerMedian": -8.6212,
+          "loserMedian": -7.22515
+        },
+        "basic_eps_yoy": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 16.04254375,
+          "loserMean": 124.68562727272727,
+          "meanDiff": -108.64308352272727,
+          "winnerMedian": -9.2349,
+          "loserMedian": -1.83825
+        },
+        "bps": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 6.855721875,
+          "loserMean": 9.532113636363636,
+          "meanDiff": -2.676391761363636,
+          "winnerMedian": 6.2476,
+          "loserMedian": 7.623749999999999
+        },
+        "eps": {
+          "winnerCount": 32,
+          "loserCount": 22,
+          "winnerMean": 0.331140625,
+          "loserMean": 0.3065045454545455,
+          "meanDiff": 0.024636079545454548,
+          "winnerMedian": 0.21045,
+          "loserMedian": 0.2757
+        }
+      }
+    },
+    "R18-3": {
+      "trades": 77,
+      "netPnl": 81474.14946444673,
+      "winners": 43,
+      "losers": 34,
+      "fields": {
+        "roe": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 2.172567441860465,
+          "loserMean": 4.492838235294117,
+          "meanDiff": -2.3202707934336524,
+          "winnerMedian": 2.1373,
+          "loserMedian": 4.0373
+        },
+        "roe_waa": {
+          "winnerCount": 43,
+          "loserCount": 33,
+          "winnerMean": 2.1111627906976747,
+          "loserMean": 4.523266666666666,
+          "meanDiff": -2.4121038759689917,
+          "winnerMedian": 2.14,
+          "loserMedian": 4.28
+        },
+        "roa": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 1.8445883720930232,
+          "loserMean": 2.762523529411765,
+          "meanDiff": -0.9179351573187418,
+          "winnerMedian": 1.1421,
+          "loserMedian": 2.5513500000000002
+        },
+        "grossprofit_margin": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 25.449158139534884,
+          "loserMean": 24.00486470588235,
+          "meanDiff": 1.4442934336525326,
+          "winnerMedian": 21.0303,
+          "loserMedian": 20.1602
+        },
+        "netprofit_margin": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 386.0120023255814,
+          "loserMean": 5.465455882352941,
+          "meanDiff": 380.54654644322846,
+          "winnerMedian": 5.2028,
+          "loserMedian": 6.588699999999999
+        },
+        "debt_to_assets": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 45.275393023255816,
+          "loserMean": 43.69768529411765,
+          "meanDiff": 1.5777077291381687,
+          "winnerMedian": 45.0207,
+          "loserMedian": 43.64595
+        },
+        "current_ratio": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 2.3597837209302326,
+          "loserMean": 2.0142176470588233,
+          "meanDiff": 0.34556607387140925,
+          "winnerMedian": 1.6045,
+          "loserMedian": 1.3649499999999999
+        },
+        "quick_ratio": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 1.9518116279069768,
+          "loserMean": 1.5494411764705882,
+          "meanDiff": 0.4023704514363886,
+          "winnerMedian": 1.1601,
+          "loserMedian": 1.0441500000000001
+        },
+        "assets_turn": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 0.28095813953488374,
+          "loserMean": 0.29904411764705885,
+          "meanDiff": -0.018085978112175105,
+          "winnerMedian": 0.2082,
+          "loserMedian": 0.28725
+        },
+        "tr_yoy": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 7.684876744186047,
+          "loserMean": 4.725755882352941,
+          "meanDiff": 2.9591208618331057,
+          "winnerMedian": 4.1941,
+          "loserMedian": 0.03805000000000003
+        },
+        "netprofit_yoy": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 5.58846511627907,
+          "loserMean": 160.48522058823528,
+          "meanDiff": -154.8967554719562,
+          "winnerMedian": 2.1801,
+          "loserMedian": 17.9264
+        },
+        "q_sales_yoy": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 12.407858139534884,
+          "loserMean": 5.939582352941177,
+          "meanDiff": 6.468275786593707,
+          "winnerMedian": 5.1254,
+          "loserMedian": 3.52925
+        },
+        "q_profit_yoy": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 6.416730232558139,
+          "loserMean": 108.27188235294118,
+          "meanDiff": -101.85515212038304,
+          "winnerMedian": 0.9273,
+          "loserMedian": 10.1398
+        },
+        "basic_eps_yoy": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 4.244595348837208,
+          "loserMean": 154.2674823529412,
+          "meanDiff": -150.02288700410398,
+          "winnerMedian": 2.6316,
+          "loserMedian": 17.61905
+        },
+        "bps": {
+          "winnerCount": 43,
+          "loserCount": 34,
+          "winnerMean": 7.207067441860465,
+          "loserMean": 8.529347058823529,
+          "meanDiff": -1.3222796169630637,
+          "winnerMedian": 6.1333,
+          "loserMedian": 7.5969999999999995
+        },
+        "eps": {
+          "winnerCount": 43,
+          "loserCount": 33,
+          "winnerMean": 0.2097372093023256,
+          "loserMean": 0.35509090909090907,
+          "meanDiff": -0.14535369978858348,
+          "winnerMedian": 0.0893,
+          "loserMedian": 0.29
+        }
+      }
+    },
+    "R18-4": {
+      "trades": 81,
+      "netPnl": 92151.31077013945,
+      "winners": 43,
+      "losers": 38,
+      "fields": {
+        "roe": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 2.850418604651163,
+          "loserMean": 4.042865789473685,
+          "meanDiff": -1.1924471848225218,
+          "winnerMedian": 2.1373,
+          "loserMedian": 3.7437
+        },
+        "roe_waa": {
+          "winnerCount": 43,
+          "loserCount": 37,
+          "winnerMean": 2.787204651162791,
+          "loserMean": 4.0403756756756755,
+          "meanDiff": -1.2531710245128846,
+          "winnerMedian": 2.14,
+          "loserMedian": 3.77
+        },
+        "roa": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 2.3707000000000003,
+          "loserMean": 2.685568421052632,
+          "meanDiff": -0.3148684210526316,
+          "winnerMedian": 1.3994,
+          "loserMedian": 2.5513500000000002
+        },
+        "grossprofit_margin": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 25.871083720930233,
+          "loserMean": 21.52959210526316,
+          "meanDiff": 4.341491615667074,
+          "winnerMedian": 22.3222,
+          "loserMedian": 19.17125
+        },
+        "netprofit_margin": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 345.2300627906977,
+          "loserMean": 5.853131578947369,
+          "meanDiff": 339.37693121175033,
+          "winnerMedian": 5.9745,
+          "loserMedian": 6.77015
+        },
+        "debt_to_assets": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 46.134474418604654,
+          "loserMean": 44.00068684210527,
+          "meanDiff": 2.1337875764993868,
+          "winnerMedian": 47.0012,
+          "loserMedian": 45.486850000000004
+        },
+        "current_ratio": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 2.2693767441860464,
+          "loserMean": 1.885778947368421,
+          "meanDiff": 0.3835977968176254,
+          "winnerMedian": 1.6045,
+          "loserMedian": 1.3970500000000001
+        },
+        "quick_ratio": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 1.8421581395348836,
+          "loserMean": 1.5194052631578947,
+          "meanDiff": 0.3227528763769889,
+          "winnerMedian": 1.0641,
+          "loserMedian": 1.10935
+        },
+        "assets_turn": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 0.29365348837209304,
+          "loserMean": 0.33974736842105263,
+          "meanDiff": -0.04609388004895959,
+          "winnerMedian": 0.2098,
+          "loserMedian": 0.2975
+        },
+        "tr_yoy": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 8.454851162790698,
+          "loserMean": 10.80678947368421,
+          "meanDiff": -2.3519383108935124,
+          "winnerMedian": 6.1956,
+          "loserMedian": 5.87665
+        },
+        "netprofit_yoy": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 41.93015581395348,
+          "loserMean": 111.70366315789474,
+          "meanDiff": -69.77350734394125,
+          "winnerMedian": 2.1801,
+          "loserMedian": 18.546
+        },
+        "q_sales_yoy": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 10.591053488372093,
+          "loserMean": 15.277676315789474,
+          "meanDiff": -4.686622827417381,
+          "winnerMedian": 6.1425,
+          "loserMedian": 11.785250000000001
+        },
+        "q_profit_yoy": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 37.738609302325585,
+          "loserMean": 165.0399552631579,
+          "meanDiff": -127.30134596083232,
+          "winnerMedian": 4.0736,
+          "loserMedian": 14.7129
+        },
+        "basic_eps_yoy": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 40.43913953488372,
+          "loserMean": 103.88656578947368,
+          "meanDiff": -63.447426254589956,
+          "winnerMedian": 2.6316,
+          "loserMedian": 17.26075
+        },
+        "bps": {
+          "winnerCount": 43,
+          "loserCount": 38,
+          "winnerMean": 7.5550186046511625,
+          "loserMean": 8.59773947368421,
+          "meanDiff": -1.0427208690330483,
+          "winnerMedian": 5.827,
+          "loserMedian": 7.043900000000001
+        },
+        "eps": {
+          "winnerCount": 43,
+          "loserCount": 37,
+          "winnerMean": 0.2177906976744186,
+          "loserMean": 0.3752081081081081,
+          "meanDiff": -0.1574174104336895,
+          "winnerMedian": 0.1,
+          "loserMedian": 0.1944
+        }
+      }
+    }
+  },
+  "thresholdScreens": [
+    {
+      "field": "q_profit_yoy",
+      "operator": ">=",
+      "threshold": 112.9104,
+      "all": {
+        "count": 26,
+        "netPnl": 7555.674386523568,
+        "avgReturnPct": 0.00850605612736424,
+        "winRate": 0.34615384615384615
+      },
+      "Y1": {
+        "count": 4,
+        "netPnl": -1314.9241930838925,
+        "avgReturnPct": -0.027659147079488702,
+        "winRate": 0.25
+      },
+      "R18-1": {
+        "count": 7,
+        "netPnl": -3776.1010085588878,
+        "avgReturnPct": -0.04097735629429405,
+        "winRate": 0.14285714285714285
+      },
+      "R18-4": {
+        "count": 19,
+        "netPnl": 11331.775395082455,
+        "avgReturnPct": 0.026736787019554138,
+        "winRate": 0.42105263157894735
+      }
+    },
+    {
+      "field": "debt_to_assets",
+      "operator": "<=",
+      "threshold": 28.4143,
+      "all": {
+        "count": 25,
+        "netPnl": 4316.586649940084,
+        "avgReturnPct": 0.009827596333362158,
+        "winRate": 0.36
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -2775.82554845889,
+        "avgReturnPct": -0.03605475366298271,
+        "winRate": 0.16666666666666666
+      },
+      "R18-1": {
+        "count": 11,
+        "netPnl": -1719.3899545192871,
+        "avgReturnPct": -0.012593849625010976,
+        "winRate": 0.2727272727272727
+      },
+      "R18-4": {
+        "count": 14,
+        "netPnl": 6035.976604459371,
+        "avgReturnPct": 0.027444446729226763,
+        "winRate": 0.42857142857142855
+      }
+    },
+    {
+      "field": "debt_to_assets",
+      "operator": "<=",
+      "threshold": 34.2309,
+      "all": {
+        "count": 37,
+        "netPnl": 14270.22631373521,
+        "avgReturnPct": 0.02068285822889701,
+        "winRate": 0.40540540540540543
+      },
+      "Y1": {
+        "count": 7,
+        "netPnl": -3455.745230333887,
+        "avgReturnPct": -0.03845349840112384,
+        "winRate": 0.14285714285714285
+      },
+      "R18-1": {
+        "count": 14,
+        "netPnl": -797.6791056372076,
+        "avgReturnPct": -0.00657046236268468,
+        "winRate": 0.2857142857142857
+      },
+      "R18-4": {
+        "count": 23,
+        "netPnl": 15067.905419372417,
+        "avgReturnPct": 0.037271835980294564,
+        "winRate": 0.4782608695652174
+      }
+    },
+    {
+      "field": "q_profit_yoy",
+      "operator": ">=",
+      "threshold": 24.3147,
+      "all": {
+        "count": 50,
+        "netPnl": 35139.905643223356,
+        "avgReturnPct": 0.030370290336270853,
+        "winRate": 0.44
+      },
+      "Y1": {
+        "count": 9,
+        "netPnl": -811.2648528274385,
+        "avgReturnPct": -0.0070657474442577094,
+        "winRate": 0.3333333333333333
+      },
+      "R18-1": {
+        "count": 14,
+        "netPnl": -3342.067511482508,
+        "avgReturnPct": -0.01757291258429196,
+        "winRate": 0.2857142857142857
+      },
+      "R18-4": {
+        "count": 36,
+        "netPnl": 38481.97315470586,
+        "avgReturnPct": 0.049014869249823054,
+        "winRate": 0.5
+      }
+    },
+    {
+      "field": "debt_to_assets",
+      "operator": ">=",
+      "threshold": 63.2434,
+      "all": {
+        "count": 26,
+        "netPnl": 23057.014944814546,
+        "avgReturnPct": 0.038552143384966334,
+        "winRate": 0.46153846153846156
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -3187.7626051151947,
+        "avgReturnPct": -0.036694498053808165,
+        "winRate": 0.16666666666666666
+      },
+      "R18-1": {
+        "count": 10,
+        "netPnl": -466.7786581937453,
+        "avgReturnPct": -0.0030456047701361037,
+        "winRate": 0.3
+      },
+      "R18-4": {
+        "count": 16,
+        "netPnl": 23523.793603008293,
+        "avgReturnPct": 0.06455073598190536,
+        "winRate": 0.5625
+      }
+    },
+    {
+      "field": "quick_ratio",
+      "operator": ">=",
+      "threshold": 1.6268,
+      "all": {
+        "count": 38,
+        "netPnl": 28963.012090947384,
+        "avgReturnPct": 0.03450333425679147,
+        "winRate": 0.47368421052631576
+      },
+      "Y1": {
+        "count": 7,
+        "netPnl": -3502.2019992588903,
+        "avgReturnPct": -0.03845349840112387,
+        "winRate": 0.14285714285714285
+      },
+      "R18-1": {
+        "count": 13,
+        "netPnl": -26.27451092471165,
+        "avgReturnPct": -0.0030108081728934606,
+        "winRate": 0.3076923076923077
+      },
+      "R18-4": {
+        "count": 25,
+        "netPnl": 28989.286601872096,
+        "avgReturnPct": 0.05401068832022763,
+        "winRate": 0.56
+      }
+    },
+    {
+      "field": "current_ratio",
+      "operator": ">=",
+      "threshold": 1.9334,
+      "all": {
+        "count": 38,
+        "netPnl": 32979.88840208458,
+        "avgReturnPct": 0.041094057058240534,
+        "winRate": 0.5
+      },
+      "Y1": {
+        "count": 7,
+        "netPnl": -3502.2019992588903,
+        "avgReturnPct": -0.03845349840112387,
+        "winRate": 0.14285714285714285
+      },
+      "R18-1": {
+        "count": 13,
+        "netPnl": -26.27451092471165,
+        "avgReturnPct": -0.0030108081728934606,
+        "winRate": 0.3076923076923077
+      },
+      "R18-4": {
+        "count": 25,
+        "netPnl": 33006.16291300929,
+        "avgReturnPct": 0.06402858697843021,
+        "winRate": 0.6
+      }
+    },
+    {
+      "field": "q_sales_yoy",
+      "operator": ">=",
+      "threshold": 21.4862,
+      "all": {
+        "count": 38,
+        "netPnl": 32486.591623501765,
+        "avgReturnPct": 0.039925211645821426,
+        "winRate": 0.47368421052631576
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -2752.967548258888,
+        "avgReturnPct": -0.03605475366298269,
+        "winRate": 0.16666666666666666
+      },
+      "R18-1": {
+        "count": 11,
+        "netPnl": -142.16907803138747,
+        "avgReturnPct": -0.006841773965281629,
+        "winRate": 0.36363636363636365
+      },
+      "R18-4": {
+        "count": 27,
+        "netPnl": 32628.760701533152,
+        "avgReturnPct": 0.05897842800590045,
+        "winRate": 0.5185185185185185
+      }
+    },
+    {
+      "field": "current_ratio",
+      "operator": ">=",
+      "threshold": 2.6242,
+      "all": {
+        "count": 26,
+        "netPnl": 15274.453580840833,
+        "avgReturnPct": 0.030457459322230408,
+        "winRate": 0.46153846153846156
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -2775.82554845889,
+        "avgReturnPct": -0.03605475366298271,
+        "winRate": 0.16666666666666666
+      },
+      "R18-1": {
+        "count": 11,
+        "netPnl": -71.11416878770979,
+        "avgReturnPct": -0.003108713780872822,
+        "winRate": 0.2727272727272727
+      },
+      "R18-4": {
+        "count": 15,
+        "netPnl": 15345.567749628543,
+        "avgReturnPct": 0.05507265293117278,
+        "winRate": 0.6
+      }
+    },
+    {
+      "field": "quick_ratio",
+      "operator": ">=",
+      "threshold": 2.0269,
+      "all": {
+        "count": 26,
+        "netPnl": 17775.170481873185,
+        "avgReturnPct": 0.032376692494706524,
+        "winRate": 0.46153846153846156
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -2775.82554845889,
+        "avgReturnPct": -0.03605475366298271,
+        "winRate": 0.16666666666666666
+      },
+      "R18-1": {
+        "count": 11,
+        "netPnl": -71.11416878770979,
+        "avgReturnPct": -0.003108713780872822,
+        "winRate": 0.2727272727272727
+      },
+      "R18-4": {
+        "count": 15,
+        "netPnl": 17846.284650660895,
+        "avgReturnPct": 0.05839932376346471,
+        "winRate": 0.6
+      }
+    },
+    {
+      "field": "q_profit_yoy",
+      "operator": ">=",
+      "threshold": 43.876,
+      "all": {
+        "count": 38,
+        "netPnl": 11775.524392282554,
+        "avgReturnPct": 0.01180903193335099,
+        "winRate": 0.3684210526315789
+      },
+      "Y1": {
+        "count": 8,
+        "netPnl": -53.14117952743982,
+        "avgReturnPct": -0.00134322002104358,
+        "winRate": 0.375
+      },
+      "R18-1": {
+        "count": 13,
+        "netPnl": -2583.9438381825094,
+        "avgReturnPct": -0.014859600719239746,
+        "winRate": 0.3076923076923077
+      },
+      "R18-4": {
+        "count": 25,
+        "netPnl": 14359.468230465063,
+        "avgReturnPct": 0.025676720912698174,
+        "winRate": 0.4
+      }
+    },
+    {
+      "field": "quick_ratio",
+      "operator": "<=",
+      "threshold": 0.727,
+      "all": {
+        "count": 25,
+        "netPnl": 20229.784822627633,
+        "avgReturnPct": 0.03494383887590599,
+        "winRate": 0.4
+      },
+      "Y1": {
+        "count": 5,
+        "netPnl": -977.0519717076968,
+        "avgReturnPct": -0.012211222220208606,
+        "winRate": 0.2
+      },
+      "R18-1": {
+        "count": 9,
+        "netPnl": -714.201325674896,
+        "avgReturnPct": -0.00479248220691167,
+        "winRate": 0.2222222222222222
+      },
+      "R18-4": {
+        "count": 16,
+        "netPnl": 20943.98614830253,
+        "avgReturnPct": 0.057295519484990926,
+        "winRate": 0.5
+      }
+    },
+    {
+      "field": "bps",
+      "operator": ">=",
+      "threshold": 11.3686,
+      "all": {
+        "count": 26,
+        "netPnl": 17529.31850097506,
+        "avgReturnPct": 0.0341658344562702,
+        "winRate": 0.4230769230769231
+      },
+      "Y1": {
+        "count": 7,
+        "netPnl": -2024.238947068965,
+        "avgReturnPct": -0.023177969069171155,
+        "winRate": 0.14285714285714285
+      },
+      "R18-1": {
+        "count": 8,
+        "netPnl": 443.72387685763715,
+        "avgReturnPct": 0.0044194645176119825,
+        "winRate": 0.25
+      },
+      "R18-4": {
+        "count": 18,
+        "netPnl": 17085.59462411742,
+        "avgReturnPct": 0.04738644331789607,
+        "winRate": 0.5
+      }
+    },
+    {
+      "field": "tr_yoy",
+      "operator": ">=",
+      "threshold": 23.1387,
+      "all": {
+        "count": 26,
+        "netPnl": 13904.948484087157,
+        "avgReturnPct": 0.022545192153777014,
+        "winRate": 0.4230769230769231
+      },
+      "Y1": {
+        "count": 4,
+        "netPnl": -1604.7763345088933,
+        "avgReturnPct": -0.027659147079488744,
+        "winRate": 0.25
+      },
+      "R18-1": {
+        "count": 8,
+        "netPnl": 234.80602705560887,
+        "avgReturnPct": -0.0021836115162642052,
+        "winRate": 0.375
+      },
+      "R18-4": {
+        "count": 18,
+        "netPnl": 13670.142457031548,
+        "avgReturnPct": 0.033535771562684225,
+        "winRate": 0.4444444444444444
+      }
+    },
+    {
+      "field": "q_sales_yoy",
+      "operator": ">=",
+      "threshold": 34.828,
+      "all": {
+        "count": 26,
+        "netPnl": 15617.451841951064,
+        "avgReturnPct": 0.02676884477243982,
+        "winRate": 0.4230769230769231
+      },
+      "Y1": {
+        "count": 5,
+        "netPnl": -1994.8438749588895,
+        "avgReturnPct": -0.03269651102958508,
+        "winRate": 0.2
+      },
+      "R18-1": {
+        "count": 8,
+        "netPnl": 662.5998502431121,
+        "avgReturnPct": -0.0021836115162641627,
+        "winRate": 0.375
+      },
+      "R18-4": {
+        "count": 18,
+        "netPnl": 14954.851991707952,
+        "avgReturnPct": 0.03963660312297493,
+        "winRate": 0.4444444444444444
+      }
+    },
+    {
+      "field": "assets_turn",
+      "operator": "<=",
+      "threshold": 0.1452,
+      "all": {
+        "count": 37,
+        "netPnl": 41571.26523950575,
+        "avgReturnPct": 0.0525157831681441,
+        "winRate": 0.5135135135135135
+      },
+      "Y1": {
+        "count": 7,
+        "netPnl": -2442.6516226246695,
+        "avgReturnPct": -0.02354828493176401,
+        "winRate": 0.14285714285714285
+      },
+      "R18-1": {
+        "count": 13,
+        "netPnl": 1849.8399380163573,
+        "avgReturnPct": 0.008853542347867909,
+        "winRate": 0.3076923076923077
+      },
+      "R18-4": {
+        "count": 24,
+        "netPnl": 39721.42530148939,
+        "avgReturnPct": 0.07616616361246037,
+        "winRate": 0.625
+      }
+    },
+    {
+      "field": "basic_eps_yoy",
+      "operator": ">=",
+      "threshold": 106.1103,
+      "all": {
+        "count": 25,
+        "netPnl": 6030.479103293594,
+        "avgReturnPct": 0.008848050164702484,
+        "winRate": 0.36
+      },
+      "Y1": {
+        "count": 2,
+        "netPnl": -166.73297933389767,
+        "avgReturnPct": -0.0024723273290068078,
+        "winRate": 0.5
+      },
+      "R18-1": {
+        "count": 8,
+        "netPnl": 354.08041109263286,
+        "avgReturnPct": 0.0012784744731640088,
+        "winRate": 0.375
+      },
+      "R18-4": {
+        "count": 17,
+        "netPnl": 5676.398692200961,
+        "avgReturnPct": 0.012410203431308825,
+        "winRate": 0.35294117647058826
+      }
+    },
+    {
+      "field": "netprofit_yoy",
+      "operator": ">=",
+      "threshold": 100.9093,
+      "all": {
+        "count": 26,
+        "netPnl": 8577.669304549298,
+        "avgReturnPct": 0.014188565048395276,
+        "winRate": 0.38461538461538464
+      },
+      "Y1": {
+        "count": 2,
+        "netPnl": -166.73297933389767,
+        "avgReturnPct": -0.0024723273290068078,
+        "winRate": 0.5
+      },
+      "R18-1": {
+        "count": 8,
+        "netPnl": 354.08041109263286,
+        "avgReturnPct": 0.0012784744731640088,
+        "winRate": 0.375
+      },
+      "R18-4": {
+        "count": 18,
+        "netPnl": 8223.588893456665,
+        "avgReturnPct": 0.019926383081831395,
+        "winRate": 0.3888888888888889
+      }
+    },
+    {
+      "field": "roa",
+      "operator": "<=",
+      "threshold": 0.3857,
+      "all": {
+        "count": 25,
+        "netPnl": 30317.357120806,
+        "avgReturnPct": 0.05353223948098502,
+        "winRate": 0.52
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -329.5757610764449,
+        "avgReturnPct": -0.002192466488180979,
+        "winRate": 0.3333333333333333
+      },
+      "R18-1": {
+        "count": 8,
+        "netPnl": 1267.7877983181334,
+        "avgReturnPct": 0.010306912557135978,
+        "winRate": 0.375
+      },
+      "R18-4": {
+        "count": 17,
+        "netPnl": 29049.569322487863,
+        "avgReturnPct": 0.07387356979809045,
+        "winRate": 0.5882352941176471
+      }
+    },
+    {
+      "field": "roe",
+      "operator": "<=",
+      "threshold": 1.2453,
+      "all": {
+        "count": 37,
+        "netPnl": 41114.22271231012,
+        "avgReturnPct": 0.052471467607820454,
+        "winRate": 0.5675675675675675
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -329.5757610764449,
+        "avgReturnPct": -0.002192466488180979,
+        "winRate": 0.3333333333333333
+      },
+      "R18-1": {
+        "count": 11,
+        "netPnl": 1936.908113438556,
+        "avgReturnPct": 0.010795043111486307,
+        "winRate": 0.45454545454545453
+      },
+      "R18-4": {
+        "count": 26,
+        "netPnl": 39177.31459887157,
+        "avgReturnPct": 0.07010380104857722,
+        "winRate": 0.6153846153846154
+      }
+    },
+    {
+      "field": "roe_waa",
+      "operator": "<=",
+      "threshold": 1.21,
+      "all": {
+        "count": 37,
+        "netPnl": 41342.558852041824,
+        "avgReturnPct": 0.052471467607820454,
+        "winRate": 0.5675675675675675
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -329.5757610764449,
+        "avgReturnPct": -0.002192466488180979,
+        "winRate": 0.3333333333333333
+      },
+      "R18-1": {
+        "count": 11,
+        "netPnl": 1936.908113438556,
+        "avgReturnPct": 0.010795043111486307,
+        "winRate": 0.45454545454545453
+      },
+      "R18-4": {
+        "count": 26,
+        "netPnl": 39405.65073860326,
+        "avgReturnPct": 0.0701038010485772,
+        "winRate": 0.6153846153846154
+      }
+    },
+    {
+      "field": "eps",
+      "operator": "<=",
+      "threshold": 0.0013,
+      "all": {
+        "count": 22,
+        "netPnl": 22410.556642194002,
+        "avgReturnPct": 0.0472683213147888,
+        "winRate": 0.5
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -329.5757610764449,
+        "avgReturnPct": -0.002192466488180979,
+        "winRate": 0.3333333333333333
+      },
+      "R18-1": {
+        "count": 9,
+        "netPnl": 2039.0039069811319,
+        "avgReturnPct": 0.01448406806989386,
+        "winRate": 0.4444444444444444
+      },
+      "R18-4": {
+        "count": 13,
+        "netPnl": 20371.55273521287,
+        "avgReturnPct": 0.06996511202279299,
+        "winRate": 0.5384615384615384
+      }
+    },
+    {
+      "field": "roe_waa",
+      "operator": "<=",
+      "threshold": 0.0408,
+      "all": {
+        "count": 24,
+        "netPnl": 24253.316205244002,
+        "avgReturnPct": 0.04728160580150407,
+        "winRate": 0.5
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -329.5757610764449,
+        "avgReturnPct": -0.002192466488180979,
+        "winRate": 0.3333333333333333
+      },
+      "R18-1": {
+        "count": 9,
+        "netPnl": 2039.0039069811319,
+        "avgReturnPct": 0.01448406806989386,
+        "winRate": 0.4444444444444444
+      },
+      "R18-4": {
+        "count": 15,
+        "netPnl": 22214.31229826287,
+        "avgReturnPct": 0.0669601284404702,
+        "winRate": 0.5333333333333333
+      }
+    },
+    {
+      "field": "debt_to_assets",
+      "operator": ">=",
+      "threshold": 54.115,
+      "all": {
+        "count": 38,
+        "netPnl": 34525.898574871026,
+        "avgReturnPct": 0.04232325669638858,
+        "winRate": 0.47368421052631576
+      },
+      "Y1": {
+        "count": 9,
+        "netPnl": 256.06278679048046,
+        "avgReturnPct": 0.0032836230581663136,
+        "winRate": 0.3333333333333333
+      },
+      "R18-1": {
+        "count": 14,
+        "netPnl": 1882.3761987119342,
+        "avgReturnPct": 0.01062504114734449,
+        "winRate": 0.35714285714285715
+      },
+      "R18-4": {
+        "count": 24,
+        "netPnl": 32643.52237615909,
+        "avgReturnPct": 0.060813882433330975,
+        "winRate": 0.5416666666666666
+      }
+    },
+    {
+      "field": "roe",
+      "operator": "<=",
+      "threshold": 0.2403,
+      "all": {
+        "count": 25,
+        "netPnl": 26780.32401699743,
+        "avgReturnPct": 0.049251217004431316,
+        "winRate": 0.52
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -329.5757610764449,
+        "avgReturnPct": -0.002192466488180979,
+        "winRate": 0.3333333333333333
+      },
+      "R18-1": {
+        "count": 10,
+        "netPnl": 2787.239427438557,
+        "avgReturnPct": 0.0176978436019351,
+        "winRate": 0.5
+      },
+      "R18-4": {
+        "count": 15,
+        "netPnl": 23993.08458955887,
+        "avgReturnPct": 0.07028679927276213,
+        "winRate": 0.5333333333333333
+      }
+    },
+    {
+      "field": "netprofit_margin",
+      "operator": "<=",
+      "threshold": 0.5382,
+      "all": {
+        "count": 25,
+        "netPnl": 31676.438022191032,
+        "avgReturnPct": 0.05715656322090225,
+        "winRate": 0.56
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -329.5757610764449,
+        "avgReturnPct": -0.002192466488180979,
+        "winRate": 0.3333333333333333
+      },
+      "R18-1": {
+        "count": 10,
+        "netPnl": 2787.239427438557,
+        "avgReturnPct": 0.0176978436019351,
+        "winRate": 0.5
+      },
+      "R18-4": {
+        "count": 15,
+        "netPnl": 28889.198594752474,
+        "avgReturnPct": 0.08346237630021368,
+        "winRate": 0.6
+      }
+    },
+    {
+      "field": "eps",
+      "operator": "<=",
+      "threshold": 0.05,
+      "all": {
+        "count": 35,
+        "netPnl": 33214.834460403414,
+        "avgReturnPct": 0.04577326898388899,
+        "winRate": 0.5142857142857142
+      },
+      "Y1": {
+        "count": 6,
+        "netPnl": -329.5757610764449,
+        "avgReturnPct": -0.002192466488180979,
+        "winRate": 0.3333333333333333
+      },
+      "R18-1": {
+        "count": 10,
+        "netPnl": 2787.239427438557,
+        "avgReturnPct": 0.0176978436019351,
+        "winRate": 0.5
+      },
+      "R18-4": {
+        "count": 25,
+        "netPnl": 30427.595032964855,
+        "avgReturnPct": 0.057003439136670546,
+        "winRate": 0.52
+      }
+    },
+    {
+      "field": "quick_ratio",
+      "operator": "<=",
+      "threshold": 0.8645,
+      "all": {
+        "count": 37,
+        "netPnl": 31223.4422099301,
+        "avgReturnPct": 0.041010841946326794,
+        "winRate": 0.4594594594594595
+      },
+      "Y1": {
+        "count": 9,
+        "netPnl": 282.0745929858549,
+        "avgReturnPct": 0.003206078283520808,
+        "winRate": 0.3333333333333333
+      },
+      "R18-1": {
+        "count": 14,
+        "netPnl": 2727.7240877491568,
+        "avgReturnPct": 0.01389142235223144,
+        "winRate": 0.35714285714285715
+      },
+      "R18-4": {
+        "count": 23,
+        "netPnl": 28495.718122180944,
+        "avgReturnPct": 0.05751831474273266,
+        "winRate": 0.5217391304347826
+      }
+    },
+    {
+      "field": "current_ratio",
+      "operator": ">=",
+      "threshold": 1.6532,
+      "all": {
+        "count": 50,
+        "netPnl": 49232.8748559069,
+        "avgReturnPct": 0.04907697843237891,
+        "winRate": 0.52
+      },
+      "Y1": {
+        "count": 10,
+        "netPnl": -219.2428658286899,
+        "avgReturnPct": -0.0011093117472379273,
+        "winRate": 0.3
+      },
+      "R18-1": {
+        "count": 16,
+        "netPnl": 3256.6846225054887,
+        "avgReturnPct": 0.013683804067992054,
+        "winRate": 0.375
+      },
+      "R18-4": {
+        "count": 34,
+        "netPnl": 45976.19023340141,
+        "avgReturnPct": 0.06573258989797272,
+        "winRate": 0.5882352941176471
+      }
+    },
+    {
+      "field": "netprofit_yoy",
+      "operator": ">=",
+      "threshold": 43.7398,
+      "all": {
+        "count": 38,
+        "netPnl": 31593.872968337768,
+        "avgReturnPct": 0.03936570453829506,
+        "winRate": 0.47368421052631576
+      },
+      "Y1": {
+        "count": 4,
+        "netPnl": 1415.3349894663043,
+        "avgReturnPct": 0.0249727070374016,
+        "winRate": 0.5
+      },
+      "R18-1": {
+        "count": 10,
+        "netPnl": 1936.1483798928348,
+        "avgReturnPct": 0.011506327859293208,
+        "winRate": 0.4
+      },
+      "R18-4": {
+        "count": 28,
+        "netPnl": 29657.72458844493,
+        "avgReturnPct": 0.04931548192365287,
+        "winRate": 0.5
+      }
+    }
+  ]
+}

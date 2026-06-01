@@ -47,7 +47,7 @@
 - `context.cross-section-strength-liquid-14pct-risk8-quality-plus-ms300.json`、`context.cross-section-strength-liquid-14pct-risk8-ultra-liquid-ms100.json`：更高流动性/市值/换手门槛的小池子实验上下文，市场宽度 `minSamples` 已同步降低。
 - `strategy-status-levels.md`：策略状态分级，从淘汰、观察、候选到纸面交易、实盘前验证、实盘。
 - `long-term-goal.md`：长期目标、阶段目标和每达成一阶段后新建下一阶段目录的规则。
-- `stages/`：长期目标的阶段推进目录；当前活跃阶段是 `stages/001-observation-diagnosis/`。
+- `stages/`：长期目标的阶段推进目录；当前活跃阶段是 `stages/002-candidate-repair-30/`。
 - `research-runs.json`：机器可读研究台账，记录当前主线运行、状态、失败原因和下一步动作。
 - `execution-readiness-plan.md`：纸面交易作业单、数据质量报告和运行时风控的落地入口。
 - `executable-strategy-cross-section-risk8.md`、`executable-strategy-cross-section-risk8.json`：当前观察级组合候选规格。文件名沿用历史 API 路径，但当前状态不是“可执行/合格”。
@@ -69,7 +69,29 @@
 
 ## 执行方式
 
-使用本地 API 跑研究：
+研究任务默认通过常驻后端的 Research Job API 执行，避免每轮研究反复创建临时 Docker 容器。接口细节见 `docs/research/research-job-api.md`。
+
+组合全窗口研究示例：
+
+```powershell
+$body = @{
+  jobType = "portfolio_backtest"
+  runId = "002-repair-example-001"
+  baseContextRunId = "002-repair-indicator-ablate-ma-001"
+  moneyflowCacheRunId = "002-moneyflow-cache-mainline-001"
+  params = @{
+    crossSectionScoreWeights = @{
+      moneyflowMarketSurgeQuality = 0.25
+    }
+  }
+} | ConvertTo-Json -Depth 8
+
+Invoke-RestMethod -Uri http://localhost:18000/api/research/jobs -Method Post -ContentType "application/json" -Body $body
+```
+
+提交后用 `GET /api/research/jobs/{jobId}` 轮询状态；完成后用 `GET /api/research/jobs/{jobId}/result` 或 `GET /api/research/runs/{runId}` 读取结果。
+
+早期单轮脚本仍可作为兜底：
 
 ```powershell
 python scripts\research\run_research_round.py --run-id 001-baseline-boll-rebound --strategy boll-rebound
@@ -85,11 +107,13 @@ python scripts\research\run_research_round.py --run-id 000-smoke --strategy boll
 
 正式研究不要因为小样本达标就宣称策略成立。小样本只能作为调试和候选筛选。
 
-组合诊断使用共享资金回测脚本。该脚本需要后端容器里的数据库依赖，推荐在 `api` 容器内运行：
+组合诊断使用共享资金回测脚本。正常研究优先通过 Research Job API 提交；只有在调试脚本本身或 API 不可用时，才在已运行的 `api` 容器内直接执行：
 
 ```powershell
 docker compose exec -T api python scripts/research/run_portfolio_backtest.py --run-id 014-portfolio-diagnostic --strategy trend-follow-maximum-profit-no-macd --source-run 010-filtered-universe-tail-audit
 ```
+
+不要把 `docker compose run --rm api python scripts/research/...` 当作研究主路径；它会额外创建临时容器，长任务被中断时还容易留下后台进程。
 
 组合诊断会记录组合总收益、年化收益、最大回撤、盈亏比、交易次数、最大同时持仓、单票集中度和行业集中度。若逐标的尾部审计未通过，组合诊断只能作为失败证据，不能作为策略落地完成证据。
 

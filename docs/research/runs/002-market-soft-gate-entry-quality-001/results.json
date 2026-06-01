@@ -1,0 +1,1689 @@
+{
+  "runId": "002-market-soft-gate-entry-quality-001",
+  "startedAt": "2026-06-01 03:16 +0800",
+  "finishedAt": "2026-06-01 03:16 +0800",
+  "baselineRun": "002-repair-indicator-pulse-moneyflow-surge-002",
+  "candidateRun": "002-repair-market-breadth-soft-gate-001",
+  "baselineTradeCount": 123,
+  "candidateTradeCount": 142,
+  "commonTradeCount": 84,
+  "baselineOnlyTradeCount": 39,
+  "candidateOnlyTradeCount": 58,
+  "relationSummary": [
+    {
+      "relation": "baseline_only",
+      "count": 39,
+      "netPnl": 37189.75912071176,
+      "avgReturnPct": 0.050708061655984134,
+      "medianReturnPct": 0.04618062036215082,
+      "winRate": 0.5641025641025641,
+      "profitLossRatio": 2.418259923872064,
+      "exitPriceRules": {
+        "stop": 21,
+        "take_profit": 15,
+        "gap_open_stop": 3
+      }
+    },
+    {
+      "relation": "candidate_only",
+      "count": 58,
+      "netPnl": 4384.228019322765,
+      "avgReturnPct": 0.0040788096188994465,
+      "medianReturnPct": -0.05284596682997071,
+      "winRate": 0.3103448275862069,
+      "profitLossRatio": 2.4727020411241756,
+      "exitPriceRules": {
+        "stop": 42,
+        "take_profit": 12,
+        "gap_open_stop": 4
+      }
+    },
+    {
+      "relation": "common",
+      "count": 84,
+      "netPnl": 41976.049251696575,
+      "avgReturnPct": 0.0350393439352535,
+      "medianReturnPct": -0.052845966829970586,
+      "winRate": 0.4523809523809524,
+      "profitLossRatio": 2.6517927544599504,
+      "exitPriceRules": {
+        "stop": 46,
+        "take_profit": 32,
+        "gap_open_stop": 6
+      }
+    }
+  ],
+  "relationStateSummary": [
+    {
+      "relation": "baseline_only",
+      "entryMarketState": "base_risk_on",
+      "count": 39,
+      "netPnl": 37189.75912071176,
+      "avgReturnPct": 0.050708061655984134,
+      "medianReturnPct": 0.04618062036215082,
+      "winRate": 0.5641025641025641,
+      "profitLossRatio": 2.418259923872064,
+      "exitPriceRules": {
+        "stop": 21,
+        "take_profit": 15,
+        "gap_open_stop": 3
+      }
+    },
+    {
+      "relation": "candidate_only",
+      "entryMarketState": "base_risk_on",
+      "count": 32,
+      "netPnl": 7720.163950960141,
+      "avgReturnPct": 0.011973221596457658,
+      "medianReturnPct": -0.052845966829970704,
+      "winRate": 0.34375,
+      "profitLossRatio": 2.580635739102394,
+      "exitPriceRules": {
+        "stop": 21,
+        "take_profit": 8,
+        "gap_open_stop": 3
+      }
+    },
+    {
+      "relation": "candidate_only",
+      "entryMarketState": "soft_risk_on",
+      "count": 26,
+      "netPnl": -3335.9359316373757,
+      "avgReturnPct": -0.0056373897380952755,
+      "medianReturnPct": -0.05284596682997071,
+      "winRate": 0.2692307692307692,
+      "profitLossRatio": 2.320234795702398,
+      "exitPriceRules": {
+        "stop": 21,
+        "take_profit": 4,
+        "gap_open_stop": 1
+      }
+    },
+    {
+      "relation": "common",
+      "entryMarketState": "base_risk_on",
+      "count": 84,
+      "netPnl": 41976.049251696575,
+      "avgReturnPct": 0.0350393439352535,
+      "medianReturnPct": -0.052845966829970586,
+      "winRate": 0.4523809523809524,
+      "profitLossRatio": 2.6517927544599504,
+      "exitPriceRules": {
+        "stop": 46,
+        "take_profit": 32,
+        "gap_open_stop": 6
+      }
+    }
+  ],
+  "candidateOnlyWindows": [
+    {
+      "label": "ALL",
+      "candidateOnly": {
+        "count": 58,
+        "netPnl": 4384.228019322765,
+        "avgReturnPct": 0.0040788096188994465,
+        "medianReturnPct": -0.05284596682997071,
+        "winRate": 0.3103448275862069,
+        "profitLossRatio": 2.4727020411241756,
+        "exitPriceRules": {
+          "stop": 42,
+          "take_profit": 12,
+          "gap_open_stop": 4
+        }
+      },
+      "candidateOnlySoft": {
+        "count": 26,
+        "netPnl": -3335.9359316373757,
+        "avgReturnPct": -0.0056373897380952755,
+        "medianReturnPct": -0.05284596682997071,
+        "winRate": 0.2692307692307692,
+        "profitLossRatio": 2.320234795702398,
+        "exitPriceRules": {
+          "stop": 21,
+          "take_profit": 4,
+          "gap_open_stop": 1
+        }
+      },
+      "candidateOnlyBase": {
+        "count": 32,
+        "netPnl": 7720.163950960141,
+        "avgReturnPct": 0.011973221596457658,
+        "medianReturnPct": -0.052845966829970704,
+        "winRate": 0.34375,
+        "profitLossRatio": 2.580635739102394,
+        "exitPriceRules": {
+          "stop": 21,
+          "take_profit": 8,
+          "gap_open_stop": 3
+        }
+      }
+    },
+    {
+      "label": "Y1",
+      "candidateOnly": {
+        "count": 9,
+        "netPnl": -4983.187815982241,
+        "avgReturnPct": -0.04215586575384119,
+        "medianReturnPct": -0.05284596682997069,
+        "winRate": 0.1111111111111111,
+        "profitLossRatio": 0.8205913422819907,
+        "exitPriceRules": {
+          "stop": 9
+        }
+      },
+      "candidateOnlySoft": {
+        "count": 4,
+        "netPnl": -1530.8361052197488,
+        "avgReturnPct": -0.028793239408679276,
+        "medianReturnPct": -0.05284596682997071,
+        "winRate": 0.25,
+        "profitLossRatio": 0.82059134228199,
+        "exitPriceRules": {
+          "stop": 4
+        }
+      },
+      "candidateOnlyBase": {
+        "count": 5,
+        "netPnl": -3452.351710762492,
+        "avgReturnPct": -0.05284596682997072,
+        "medianReturnPct": -0.05284596682997069,
+        "winRate": 0.0,
+        "profitLossRatio": null,
+        "exitPriceRules": {
+          "stop": 5
+        }
+      }
+    },
+    {
+      "label": "Y2",
+      "candidateOnly": {
+        "count": 13,
+        "netPnl": 1258.511188441158,
+        "avgReturnPct": 0.006571971119310049,
+        "medianReturnPct": -0.05284596682997075,
+        "winRate": 0.3076923076923077,
+        "profitLossRatio": 2.6376660370809106,
+        "exitPriceRules": {
+          "stop": 9,
+          "take_profit": 3,
+          "gap_open_stop": 1
+        }
+      },
+      "candidateOnlySoft": {
+        "count": 9,
+        "netPnl": 1851.138769797457,
+        "avgReturnPct": 0.012155017364540034,
+        "medianReturnPct": -0.05284596682997071,
+        "winRate": 0.3333333333333333,
+        "profitLossRatio": 2.690025261737467,
+        "exitPriceRules": {
+          "stop": 7,
+          "take_profit": 2
+        }
+      },
+      "candidateOnlyBase": {
+        "count": 4,
+        "netPnl": -592.6275813562988,
+        "avgReturnPct": -0.005989882932457417,
+        "medianReturnPct": -0.052845966829970864,
+        "winRate": 0.25,
+        "profitLossRatio": 2.5979709356565963,
+        "exitPriceRules": {
+          "stop": 2,
+          "gap_open_stop": 1,
+          "take_profit": 1
+        }
+      }
+    },
+    {
+      "label": "Y3",
+      "candidateOnly": {
+        "count": 36,
+        "netPnl": 8108.904646863848,
+        "avgReturnPct": 0.014737170142491887,
+        "medianReturnPct": -0.0528459668299707,
+        "winRate": 0.3611111111111111,
+        "profitLossRatio": 2.564562929347056,
+        "exitPriceRules": {
+          "stop": 24,
+          "take_profit": 9,
+          "gap_open_stop": 3
+        }
+      },
+      "candidateOnlySoft": {
+        "count": 13,
+        "netPnl": -3656.238596215084,
+        "avgReturnPct": -0.010830333218201565,
+        "medianReturnPct": -0.052845966829970704,
+        "winRate": 0.23076923076923078,
+        "profitLossRatio": 2.4544650060527293,
+        "exitPriceRules": {
+          "stop": 10,
+          "take_profit": 2,
+          "gap_open_stop": 1
+        }
+      },
+      "candidateOnlyBase": {
+        "count": 23,
+        "netPnl": 11765.143243078932,
+        "avgReturnPct": 0.02918836769418819,
+        "medianReturnPct": -0.052845966829970684,
+        "winRate": 0.43478260869565216,
+        "profitLossRatio": 2.650574981562904,
+        "exitPriceRules": {
+          "stop": 14,
+          "take_profit": 7,
+          "gap_open_stop": 2
+        }
+      }
+    },
+    {
+      "label": "R18-1",
+      "candidateOnly": {
+        "count": 13,
+        "netPnl": -4355.3631052347355,
+        "avgReturnPct": -0.026179937896106852,
+        "medianReturnPct": -0.05284596682997069,
+        "winRate": 0.15384615384615385,
+        "profitLossRatio": 2.279894350836522,
+        "exitPriceRules": {
+          "stop": 12,
+          "take_profit": 1
+        }
+      },
+      "candidateOnlySoft": {
+        "count": 8,
+        "netPnl": -903.0113944722434,
+        "avgReturnPct": -0.009513669812441936,
+        "medianReturnPct": -0.05284596682997071,
+        "winRate": 0.25,
+        "profitLossRatio": 2.2798943508365217,
+        "exitPriceRules": {
+          "stop": 7,
+          "take_profit": 1
+        }
+      },
+      "candidateOnlyBase": {
+        "count": 5,
+        "netPnl": -3452.351710762492,
+        "avgReturnPct": -0.05284596682997072,
+        "medianReturnPct": -0.05284596682997069,
+        "winRate": 0.0,
+        "profitLossRatio": null,
+        "exitPriceRules": {
+          "stop": 5
+        }
+      }
+    },
+    {
+      "label": "R18-2",
+      "candidateOnly": {
+        "count": 17,
+        "netPnl": -1595.9344985713342,
+        "avgReturnPct": -0.007408720162873656,
+        "medianReturnPct": -0.05284596682997071,
+        "winRate": 0.23529411764705882,
+        "profitLossRatio": 2.6712340164459696,
+        "exitPriceRules": {
+          "stop": 13,
+          "take_profit": 3,
+          "gap_open_stop": 1
+        }
+      },
+      "candidateOnlySoft": {
+        "count": 9,
+        "netPnl": 1851.138769797457,
+        "avgReturnPct": 0.012155017364540034,
+        "medianReturnPct": -0.05284596682997071,
+        "winRate": 0.3333333333333333,
+        "profitLossRatio": 2.690025261737467,
+        "exitPriceRules": {
+          "stop": 7,
+          "take_profit": 2
+        }
+      },
+      "candidateOnlyBase": {
+        "count": 8,
+        "netPnl": -3447.073268368791,
+        "avgReturnPct": -0.029417924881214058,
+        "medianReturnPct": -0.05284596682997073,
+        "winRate": 0.125,
+        "profitLossRatio": 2.777765159055739,
+        "exitPriceRules": {
+          "stop": 6,
+          "gap_open_stop": 1,
+          "take_profit": 1
+        }
+      }
+    },
+    {
+      "label": "R18-3",
+      "candidateOnly": {
+        "count": 30,
+        "netPnl": 5041.815061879239,
+        "avgReturnPct": 0.0129228024960721,
+        "medianReturnPct": -0.05284596682997076,
+        "winRate": 0.3333333333333333,
+        "profitLossRatio": 2.7161365674525784,
+        "exitPriceRules": {
+          "stop": 19,
+          "take_profit": 8,
+          "gap_open_stop": 3
+        }
+      },
+      "candidateOnlySoft": {
+        "count": 12,
+        "netPnl": 2294.0313011528688,
+        "avgReturnPct": 0.016313817480944542,
+        "medianReturnPct": -0.05284596682997071,
+        "winRate": 0.3333333333333333,
+        "profitLossRatio": 2.9141385551227534,
+        "exitPriceRules": {
+          "stop": 8,
+          "take_profit": 3,
+          "gap_open_stop": 1
+        }
+      },
+      "candidateOnlyBase": {
+        "count": 18,
+        "netPnl": 2747.78376072637,
+        "avgReturnPct": 0.010662125839490472,
+        "medianReturnPct": -0.05284596682997078,
+        "winRate": 0.3333333333333333,
+        "profitLossRatio": 2.586544351382569,
+        "exitPriceRules": {
+          "stop": 11,
+          "take_profit": 5,
+          "gap_open_stop": 2
+        }
+      }
+    },
+    {
+      "label": "R18-4",
+      "candidateOnly": {
+        "count": 45,
+        "netPnl": 8739.5911245575,
+        "avgReturnPct": 0.012820225567679044,
+        "medianReturnPct": -0.05284596682997071,
+        "winRate": 0.35555555555555557,
+        "profitLossRatio": 2.5015520503460342,
+        "exitPriceRules": {
+          "stop": 30,
+          "take_profit": 11,
+          "gap_open_stop": 4
+        }
+      },
+      "candidateOnlySoft": {
+        "count": 18,
+        "netPnl": -2432.9245371651323,
+        "avgReturnPct": -0.003914598593941204,
+        "medianReturnPct": -0.05284596682997071,
+        "winRate": 0.2777777777777778,
+        "profitLossRatio": 2.335460558175951,
+        "exitPriceRules": {
+          "stop": 14,
+          "take_profit": 3,
+          "gap_open_stop": 1
+        }
+      },
+      "candidateOnlyBase": {
+        "count": 27,
+        "netPnl": 11172.515661722633,
+        "avgReturnPct": 0.02397677500875921,
+        "medianReturnPct": -0.05284596682997072,
+        "winRate": 0.4074074074074074,
+        "profitLossRatio": 2.59594325308109,
+        "exitPriceRules": {
+          "stop": 16,
+          "take_profit": 8,
+          "gap_open_stop": 3
+        }
+      }
+    }
+  ],
+  "stateScoreProfile": [
+    {
+      "label": "candidate_only_soft",
+      "tradeSummary": {
+        "count": 26,
+        "netPnl": -3335.9359316373757,
+        "avgReturnPct": -0.0056373897380952755,
+        "medianReturnPct": -0.05284596682997071,
+        "winRate": 0.2692307692307692,
+        "profitLossRatio": 2.320234795702398,
+        "exitPriceRules": {
+          "stop": 21,
+          "take_profit": 4,
+          "gap_open_stop": 1
+        }
+      },
+      "scoreParts": {
+        "return20Rank": {
+          "mean": 0.8832744760757522,
+          "median": 0.9376940133037694
+        },
+        "high60Rank": {
+          "mean": 0.9010014570522246,
+          "median": 0.9410938532716457
+        },
+        "rsiBalanceRank": {
+          "mean": 0.2902166518825464,
+          "median": 0.13555691554467564
+        },
+        "macdHistRank": {
+          "mean": 0.7662412529265791,
+          "median": 0.8461538461538461
+        },
+        "macdHistDeltaRank": {
+          "mean": 0.8046590493080645,
+          "median": 0.9218033622007132
+        },
+        "bollSqueezeRank": {
+          "mean": 0.1994949791502037,
+          "median": 0.09795805739514349
+        },
+        "maAlignmentRank": {
+          "mean": 0.88710531520799,
+          "median": 0.926450742240216
+        },
+        "indicatorPulseQualityRank": {
+          "mean": 0.40918886786530495,
+          "median": 0.32021963824289407
+        },
+        "indicatorConfluenceQualityRank": {
+          "mean": 0.36014353596152876,
+          "median": 0.21044885945548197
+        },
+        "amountEfficiency20Rank": {
+          "mean": 0.7091510513553465,
+          "median": 0.7251045205121505
+        },
+        "moneyflowMarketSurgeQualityRank": {
+          "mean": 0.053607132273863864,
+          "median": 0.0
+        },
+        "moneyflowMarketSurgeConfirmedQualityRank": {
+          "mean": 0.0,
+          "median": 0.0
+        },
+        "stockSpecificBreakoutQualityRank": {
+          "mean": 0.6164312722363087,
+          "median": 0.6627906976744187
+        },
+        "stockSpecificMatureBreadthQualityRank": {
+          "mean": 0.1629829446571528,
+          "median": 0.0
+        },
+        "industryReturn20Rank": {
+          "mean": 0.6508478870994749,
+          "median": 0.7614738202973497
+        },
+        "industryRelativeReturn20Rank": {
+          "mean": 0.8880427113551769,
+          "median": 0.9321266968325792
+        }
+      },
+      "entryRiskMetrics": {
+        "entryRangePct": {
+          "mean": 0.06497243732449497,
+          "median": 0.0674920097868402
+        },
+        "gapPct": {
+          "mean": 0.018037293331185974,
+          "median": 0.025045185337182474
+        },
+        "intradayReturnPct": {
+          "mean": 0.03449946776463133,
+          "median": 0.042754512273228906
+        },
+        "lowerShadowPct": {
+          "mean": 0.011995187423546176,
+          "median": 0.008413265606011952
+        },
+        "upperShadowPct": {
+          "mean": 0.013118104543981077,
+          "median": 0.008391868680738645
+        },
+        "priorGapDown60Pct": {
+          "mean": 0.03417908022084353,
+          "median": 0.027395012504573657
+        },
+        "priorGapDown3Count60": {
+          "mean": 0.7307692307692307,
+          "median": 0.0
+        },
+        "priorGapDown5Count60": {
+          "mean": 0.15384615384615385,
+          "median": 0.0
+        }
+      },
+      "marketMetrics": {
+        "marketAboveMa20Pct": {
+          "mean": 0.5351724109098749,
+          "median": 0.44052044609665425
+        },
+        "marketAboveMa60Pct": {
+          "mean": 0.6089751426641157,
+          "median": 0.5762863461195716
+        },
+        "marketUpPct": {
+          "mean": 0.5598323489160362,
+          "median": 0.46107366953288403
+        }
+      }
+    },
+    {
+      "label": "candidate_only_base",
+      "tradeSummary": {
+        "count": 32,
+        "netPnl": 7720.163950960141,
+        "avgReturnPct": 0.011973221596457658,
+        "medianReturnPct": -0.052845966829970704,
+        "winRate": 0.34375,
+        "profitLossRatio": 2.580635739102394,
+        "exitPriceRules": {
+          "stop": 21,
+          "take_profit": 8,
+          "gap_open_stop": 3
+        }
+      },
+      "scoreParts": {
+        "return20Rank": {
+          "mean": 0.8815196799399305,
+          "median": 0.9455151964418087
+        },
+        "high60Rank": {
+          "mean": 0.9125315839645046,
+          "median": 0.9648426812585499
+        },
+        "rsiBalanceRank": {
+          "mean": 0.23453972298322762,
+          "median": 0.1543878656554713
+        },
+        "macdHistRank": {
+          "mean": 0.7403896113556165,
+          "median": 0.7696819007025022
+        },
+        "macdHistDeltaRank": {
+          "mean": 0.7655389846891252,
+          "median": 0.8636820925553319
+        },
+        "bollSqueezeRank": {
+          "mean": 0.1522213330921669,
+          "median": 0.10556586270871984
+        },
+        "maAlignmentRank": {
+          "mean": 0.8933140153103609,
+          "median": 0.9594557637084644
+        },
+        "indicatorPulseQualityRank": {
+          "mean": 0.35075227026984906,
+          "median": 0.2729289940828402
+        },
+        "indicatorConfluenceQualityRank": {
+          "mean": 0.3421443658853117,
+          "median": 0.2442550037064492
+        },
+        "amountEfficiency20Rank": {
+          "mean": 0.7565663966181129,
+          "median": 0.830966568642625
+        },
+        "moneyflowMarketSurgeQualityRank": {
+          "mean": 0.1485836263057132,
+          "median": 0.0
+        },
+        "moneyflowMarketSurgeConfirmedQualityRank": {
+          "mean": 0.0,
+          "median": 0.0
+        },
+        "stockSpecificBreakoutQualityRank": {
+          "mean": 0.5816205930549228,
+          "median": 0.6302165936797255
+        },
+        "stockSpecificMatureBreadthQualityRank": {
+          "mean": 0.18230851271138698,
+          "median": 0.0
+        },
+        "industryReturn20Rank": {
+          "mean": 0.7061796728675374,
+          "median": 0.7642154357270636
+        },
+        "industryRelativeReturn20Rank": {
+          "mean": 0.8252148531559291,
+          "median": 0.9247887323943662
+        }
+      },
+      "entryRiskMetrics": {
+        "entryRangePct": {
+          "mean": 0.057692108576931744,
+          "median": 0.059573189188657116
+        },
+        "gapPct": {
+          "mean": 0.01989461148997235,
+          "median": 0.01917031007004555
+        },
+        "intradayReturnPct": {
+          "mean": 0.03223045851859953,
+          "median": 0.03409523809523818
+        },
+        "lowerShadowPct": {
+          "mean": 0.011377784306335114,
+          "median": 0.009867489915787942
+        },
+        "upperShadowPct": {
+          "mean": 0.010789895108834144,
+          "median": 0.008667191272341425
+        },
+        "priorGapDown60Pct": {
+          "mean": 0.03479789404235937,
+          "median": 0.03181681781808482
+        },
+        "priorGapDown3Count60": {
+          "mean": 1.09375,
+          "median": 0.5
+        },
+        "priorGapDown5Count60": {
+          "mean": 0.34375,
+          "median": 0.0
+        }
+      },
+      "marketMetrics": {
+        "marketAboveMa20Pct": {
+          "mean": 0.5711406092046576,
+          "median": 0.5171191163353464
+        },
+        "marketAboveMa60Pct": {
+          "mean": 0.5890625625389211,
+          "median": 0.5431201623603299
+        },
+        "marketUpPct": {
+          "mean": 0.6317042644610751,
+          "median": 0.6218353728136503
+        }
+      }
+    },
+    {
+      "label": "baseline_only_base",
+      "tradeSummary": {
+        "count": 39,
+        "netPnl": 37189.75912071176,
+        "avgReturnPct": 0.050708061655984134,
+        "medianReturnPct": 0.04618062036215082,
+        "winRate": 0.5641025641025641,
+        "profitLossRatio": 2.418259923872064,
+        "exitPriceRules": {
+          "stop": 21,
+          "take_profit": 15,
+          "gap_open_stop": 3
+        }
+      },
+      "scoreParts": {
+        "return20Rank": {
+          "mean": 0.9223269193190917,
+          "median": 0.9385964912280702
+        },
+        "high60Rank": {
+          "mean": 0.9199691986675985,
+          "median": 0.9574468085106383
+        },
+        "rsiBalanceRank": {
+          "mean": 0.18052945715353585,
+          "median": 0.0821917808219178
+        },
+        "macdHistRank": {
+          "mean": 0.7368751250567244,
+          "median": 0.75
+        },
+        "macdHistDeltaRank": {
+          "mean": 0.8538510514589837,
+          "median": 0.8947368421052632
+        },
+        "bollSqueezeRank": {
+          "mean": 0.1431081408716503,
+          "median": 0.11538461538461539
+        },
+        "maAlignmentRank": {
+          "mean": 0.9135695131149805,
+          "median": 0.9385964912280702
+        },
+        "indicatorPulseQualityRank": {
+          "mean": 0.3061894021107034,
+          "median": 0.18382352941176472
+        },
+        "amountEfficiency20Rank": {
+          "mean": 0.730851112709604,
+          "median": 0.7894736842105263
+        },
+        "moneyflowMarketSurgeQualityRank": {
+          "mean": 0.25521200479430955,
+          "median": 0.034782608695652174
+        },
+        "moneyflowMarketSurgeConfirmedQualityRank": {
+          "mean": 0.049430736977906786,
+          "median": 0.0
+        },
+        "industryReturn20Rank": {
+          "mean": 0.6290457390508737,
+          "median": 0.6486486486486487
+        },
+        "industryRelativeReturn20Rank": {
+          "mean": 0.9127972412225674,
+          "median": 0.9389671361502347
+        }
+      },
+      "entryRiskMetrics": {
+        "entryRangePct": {
+          "mean": 0.06448610760168207,
+          "median": 0.06666666666666671
+        },
+        "gapPct": {
+          "mean": 0.026955152270489356,
+          "median": 0.028277634961439535
+        },
+        "intradayReturnPct": {
+          "mean": 0.04797425178986621,
+          "median": 0.04857142857142849
+        },
+        "lowerShadowPct": {
+          "mean": 0.00859920494358135,
+          "median": 0.0053591790193842515
+        },
+        "upperShadowPct": {
+          "mean": 0.010436396551740229,
+          "median": 0.003512014787430642
+        },
+        "priorGapDown60Pct": {
+          "mean": 0.03867081969837416,
+          "median": 0.03244646333549639
+        },
+        "priorGapDown3Count60": {
+          "mean": 0.8205128205128205,
+          "median": 1.0
+        },
+        "priorGapDown5Count60": {
+          "mean": 0.3076923076923077,
+          "median": 0.0
+        }
+      },
+      "marketMetrics": {
+        "marketAboveMa20Pct": {
+          "mean": 0.6444382224730542,
+          "median": 0.6518810961449141
+        },
+        "marketAboveMa60Pct": {
+          "mean": 0.6385252743278972,
+          "median": 0.6302833255921969
+        },
+        "marketUpPct": {
+          "mean": 0.7075385810055465,
+          "median": 0.737624912851499
+        }
+      }
+    },
+    {
+      "label": "common_base",
+      "tradeSummary": {
+        "count": 84,
+        "netPnl": 41976.049251696575,
+        "avgReturnPct": 0.0350393439352535,
+        "medianReturnPct": -0.052845966829970586,
+        "winRate": 0.4523809523809524,
+        "profitLossRatio": 2.6517927544599504,
+        "exitPriceRules": {
+          "stop": 46,
+          "take_profit": 32,
+          "gap_open_stop": 6
+        }
+      },
+      "scoreParts": {
+        "return20Rank": {
+          "mean": 0.9037786514760086,
+          "median": 0.9304293296495565
+        },
+        "high60Rank": {
+          "mean": 0.9391405912390873,
+          "median": 0.9792735042735042
+        },
+        "rsiBalanceRank": {
+          "mean": 0.21689823684232687,
+          "median": 0.08276255707762556
+        },
+        "macdHistRank": {
+          "mean": 0.7399904627857554,
+          "median": 0.7765898206927275
+        },
+        "macdHistDeltaRank": {
+          "mean": 0.8475332078411225,
+          "median": 0.8825384761542846
+        },
+        "bollSqueezeRank": {
+          "mean": 0.16947599793974985,
+          "median": 0.1254489548073693
+        },
+        "maAlignmentRank": {
+          "mean": 0.9023648446890711,
+          "median": 0.9367719760688622
+        },
+        "indicatorPulseQualityRank": {
+          "mean": 0.36600453847265724,
+          "median": 0.3047895500725689
+        },
+        "indicatorConfluenceQualityRank": {
+          "mean": 0.3135551885702174,
+          "median": 0.18213384180362502
+        },
+        "amountEfficiency20Rank": {
+          "mean": 0.6791021922252917,
+          "median": 0.7478518821603928
+        },
+        "moneyflowMarketSurgeQualityRank": {
+          "mean": 0.2532792096793208,
+          "median": 0.1384926944783769
+        },
+        "moneyflowMarketSurgeConfirmedQualityRank": {
+          "mean": 0.07071337217449723,
+          "median": 0.0
+        },
+        "stockSpecificBreakoutQualityRank": {
+          "mean": 0.6217391128564937,
+          "median": 0.6347138751989123
+        },
+        "stockSpecificMatureBreadthQualityRank": {
+          "mean": 0.2172555059999537,
+          "median": 0.0
+        },
+        "industryReturn20Rank": {
+          "mean": 0.6528144835501438,
+          "median": 0.6887067773167358
+        },
+        "industryRelativeReturn20Rank": {
+          "mean": 0.8711502983274854,
+          "median": 0.9264110240380382
+        }
+      },
+      "entryRiskMetrics": {
+        "entryRangePct": {
+          "mean": 0.06052929972353171,
+          "median": 0.06391383185485183
+        },
+        "gapPct": {
+          "mean": 0.02631626634223692,
+          "median": 0.03151561484192533
+        },
+        "intradayReturnPct": {
+          "mean": 0.039552560603378674,
+          "median": 0.04436538461538453
+        },
+        "lowerShadowPct": {
+          "mean": 0.0117111919875632,
+          "median": 0.010139349963768553
+        },
+        "upperShadowPct": {
+          "mean": 0.008062396736514106,
+          "median": 0.0022920518854708987
+        },
+        "priorGapDown60Pct": {
+          "mean": 0.03299235550789899,
+          "median": 0.026219653403462606
+        },
+        "priorGapDown3Count60": {
+          "mean": 0.7380952380952381,
+          "median": 0.0
+        },
+        "priorGapDown5Count60": {
+          "mean": 0.2857142857142857,
+          "median": 0.0
+        }
+      },
+      "marketMetrics": {
+        "marketAboveMa20Pct": {
+          "mean": 0.7216799140143393,
+          "median": 0.7219448779491865
+        },
+        "marketAboveMa60Pct": {
+          "mean": 0.6604679551937727,
+          "median": 0.6406322640632264
+        },
+        "marketUpPct": {
+          "mean": 0.7291409348400831,
+          "median": 0.7359437470791912
+        }
+      }
+    }
+  ],
+  "worstSamples": {
+    "candidateOnlySoft": [
+      {
+        "ts_code": "601618.SH",
+        "name": "中国中冶",
+        "industry": "建筑工程",
+        "entryDate": "2025-10-09",
+        "exitDate": "2025-10-13",
+        "returnPct": -0.05838487930464899,
+        "netPnl": -1113.2717714999926,
+        "exitPriceRule": "gap_open_stop",
+        "entryMarketState": "soft_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": false,
+          "marketSoftRiskOn": true,
+          "marketBreadthFailedChecks": [
+            "aboveMa20"
+          ],
+          "marketAboveMa20Pct": 0.4113821138211382,
+          "marketAboveMa60Pct": 0.4894308943089431,
+          "marketUpPct": 0.489198606271777
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.8262295081967214,
+          "high60Rank": 0.6655737704918033,
+          "rsiBalanceRank": 0.08196721311475409,
+          "macdHistRank": 0.40327868852459015,
+          "macdHistDeltaRank": 0.42295081967213116,
+          "bollSqueezeRank": 0.18688524590163935,
+          "maAlignmentRank": 0.8885245901639345,
+          "indicatorPulseQualityRank": 0.12786885245901639,
+          "indicatorConfluenceQualityRank": 0.01639344262295082,
+          "amountEfficiency20Rank": 0.33114754098360655,
+          "moneyflowMarketSurgeQualityRank": 0.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "stockSpecificBreakoutQualityRank": 0.7180327868852459,
+          "stockSpecificMatureBreadthQualityRank": 0.0,
+          "industryReturn20Rank": 0.35737704918032787,
+          "industryRelativeReturn20Rank": 0.9016393442622951
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.07971014492753625,
+          "gapPct": 0.03896103896103886,
+          "intradayReturnPct": 0.03499999999999992,
+          "lowerShadowPct": 0.021739130434782577,
+          "upperShadowPct": 0.024154589371980808,
+          "priorGapDown60Pct": 0.0060240963855421326,
+          "priorGapDown3Count60": 0.0,
+          "priorGapDown5Count60": 0.0
+        }
+      },
+      {
+        "ts_code": "688800.SH",
+        "name": "瑞可达",
+        "industry": "元器件",
+        "entryDate": "2025-12-09",
+        "exitDate": "2025-12-11",
+        "returnPct": -0.0528459668299712,
+        "netPnl": -950.3001935000066,
+        "exitPriceRule": "stop",
+        "entryMarketState": "soft_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": false,
+          "marketSoftRiskOn": true,
+          "marketBreadthFailedChecks": [
+            "aboveMa20"
+          ],
+          "marketAboveMa20Pct": 0.41827481980934667,
+          "marketAboveMa60Pct": 0.41199720995117417,
+          "marketUpPct": 0.6031155545222041
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.956140350877193,
+          "high60Rank": 0.9649122807017544,
+          "rsiBalanceRank": 0.13157894736842105,
+          "macdHistRank": 0.9210526315789473,
+          "macdHistDeltaRank": 0.956140350877193,
+          "bollSqueezeRank": 0.12280701754385964,
+          "maAlignmentRank": 0.9210526315789473,
+          "indicatorPulseQualityRank": 0.2543859649122807,
+          "indicatorConfluenceQualityRank": 0.2807017543859649,
+          "amountEfficiency20Rank": 0.8859649122807017,
+          "moneyflowMarketSurgeQualityRank": 0.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "stockSpecificBreakoutQualityRank": 0.7456140350877193,
+          "stockSpecificMatureBreadthQualityRank": 0.0,
+          "industryReturn20Rank": 0.7192982456140351,
+          "industryRelativeReturn20Rank": 0.956140350877193
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.0497772828507795,
+          "gapPct": 0.025700126771925902,
+          "intradayReturnPct": 0.008988764044943753,
+          "lowerShadowPct": 0.022048997772828552,
+          "upperShadowPct": 0.018819599109131377,
+          "priorGapDown60Pct": 0.07571801566579628,
+          "priorGapDown3Count60": 3.0,
+          "priorGapDown5Count60": 1.0
+        }
+      },
+      {
+        "ts_code": "603893.SH",
+        "name": "瑞芯微",
+        "industry": "半导体",
+        "entryDate": "2024-12-23",
+        "exitDate": "2025-01-02",
+        "returnPct": -0.05284596682997097,
+        "netPnl": -566.1588012500015,
+        "exitPriceRule": "stop",
+        "entryMarketState": "soft_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": false,
+          "marketSoftRiskOn": true,
+          "marketBreadthFailedChecks": [
+            "aboveMa20"
+          ],
+          "marketAboveMa20Pct": 0.40339061774268464,
+          "marketAboveMa60Pct": 0.7352531351602415,
+          "marketUpPct": 0.6495587552252671
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.9230769230769231,
+          "high60Rank": 0.8461538461538461,
+          "rsiBalanceRank": 0.23076923076923078,
+          "macdHistRank": 1.0,
+          "macdHistDeltaRank": 1.0,
+          "bollSqueezeRank": 0.07692307692307693,
+          "maAlignmentRank": 0.9615384615384616,
+          "indicatorPulseQualityRank": 0.38461538461538464,
+          "indicatorConfluenceQualityRank": 0.5,
+          "amountEfficiency20Rank": 0.8846153846153846,
+          "moneyflowMarketSurgeQualityRank": 0.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "stockSpecificBreakoutQualityRank": 0.7307692307692307,
+          "stockSpecificMatureBreadthQualityRank": 0.7307692307692307,
+          "industryReturn20Rank": 0.7692307692307693,
+          "industryRelativeReturn20Rank": 0.9230769230769231
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.07785046728971962,
+          "gapPct": 0.01191009223605266,
+          "intradayReturnPct": -0.053097345132743334,
+          "lowerShadowPct": 0.021775700934579423,
+          "upperShadowPct": 0.0,
+          "priorGapDown60Pct": 0.04327960401066133,
+          "priorGapDown3Count60": 2.0,
+          "priorGapDown5Count60": 0.0
+        }
+      },
+      {
+        "ts_code": "600487.SH",
+        "name": "亨通光电",
+        "industry": "通信设备",
+        "entryDate": "2025-12-22",
+        "exitDate": "2025-12-29",
+        "returnPct": -0.05284596682997096,
+        "netPnl": -968.1844621750024,
+        "exitPriceRule": "stop",
+        "entryMarketState": "soft_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": false,
+          "marketSoftRiskOn": true,
+          "marketBreadthFailedChecks": [
+            "aboveMa20"
+          ],
+          "marketAboveMa20Pct": 0.44052044609665425,
+          "marketAboveMa60Pct": 0.354089219330855,
+          "marketUpPct": 0.8310873605947955
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.9801324503311258,
+          "high60Rank": 1.0,
+          "rsiBalanceRank": 0.033112582781456956,
+          "macdHistRank": 0.8609271523178808,
+          "macdHistDeltaRank": 0.9205298013245033,
+          "bollSqueezeRank": 0.059602649006622516,
+          "maAlignmentRank": 0.9867549668874173,
+          "indicatorPulseQualityRank": 0.19205298013245034,
+          "indicatorConfluenceQualityRank": 0.09271523178807947,
+          "amountEfficiency20Rank": 0.8278145695364238,
+          "moneyflowMarketSurgeQualityRank": 0.2582781456953642,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "stockSpecificBreakoutQualityRank": 0.3576158940397351,
+          "stockSpecificMatureBreadthQualityRank": 0.0,
+          "industryReturn20Rank": 0.9602649006622517,
+          "industryRelativeReturn20Rank": 0.9470198675496688
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.07230298393267026,
+          "gapPct": 0.026936026936026813,
+          "intradayReturnPct": 0.07131147540983607,
+          "lowerShadowPct": 0.005738332058148377,
+          "upperShadowPct": 0.0,
+          "priorGapDown60Pct": 0.06471631205673745,
+          "priorGapDown3Count60": 1.0,
+          "priorGapDown5Count60": 1.0
+        }
+      },
+      {
+        "ts_code": "603198.SH",
+        "name": "迎驾贡酒",
+        "industry": "白酒",
+        "entryDate": "2026-02-02",
+        "exitDate": "2026-02-13",
+        "returnPct": -0.05284596682997096,
+        "netPnl": -881.0912484500022,
+        "exitPriceRule": "stop",
+        "entryMarketState": "soft_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": false,
+          "marketSoftRiskOn": true,
+          "marketBreadthFailedChecks": [
+            "upPct"
+          ],
+          "marketAboveMa20Pct": 0.46236059479553904,
+          "marketAboveMa60Pct": 0.6377788104089219,
+          "marketUpPct": 0.43564126394052044
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.8888888888888888,
+          "high60Rank": 0.8888888888888888,
+          "rsiBalanceRank": 1.0,
+          "macdHistRank": 0.3333333333333333,
+          "macdHistDeltaRank": 0.4444444444444444,
+          "bollSqueezeRank": 0.6666666666666666,
+          "maAlignmentRank": 0.8888888888888888,
+          "indicatorPulseQualityRank": 0.8888888888888888,
+          "indicatorConfluenceQualityRank": 1.0,
+          "amountEfficiency20Rank": 0.8888888888888888,
+          "moneyflowMarketSurgeQualityRank": 0.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "stockSpecificBreakoutQualityRank": 0.7777777777777778,
+          "stockSpecificMatureBreadthQualityRank": 0.0,
+          "industryReturn20Rank": 0.7777777777777778,
+          "industryRelativeReturn20Rank": 0.8888888888888888
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.05308671631035313,
+          "gapPct": -0.0012306177701206789,
+          "intradayReturnPct": 0.025874815179891764,
+          "lowerShadowPct": 0.004564016334374195,
+          "upperShadowPct": 0.023300504443910613,
+          "priorGapDown60Pct": 0.012770809578107278,
+          "priorGapDown3Count60": 0.0,
+          "priorGapDown5Count60": 0.0
+        }
+      }
+    ],
+    "candidateOnlyBase": [
+      {
+        "ts_code": "000970.SZ",
+        "name": "中科三环",
+        "industry": "矿物制品",
+        "entryDate": "2025-03-04",
+        "exitDate": "2025-04-07",
+        "returnPct": -0.07309761556551418,
+        "netPnl": -1124.1831299999994,
+        "exitPriceRule": "gap_open_stop",
+        "entryMarketState": "base_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": true,
+          "marketSoftRiskOn": false,
+          "marketBreadthFailedChecks": [],
+          "marketAboveMa20Pct": 0.45771375464684017,
+          "marketAboveMa60Pct": 0.48698884758364314,
+          "marketUpPct": 0.5885223048327137
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.8117647058823529,
+          "high60Rank": 0.9529411764705882,
+          "rsiBalanceRank": 0.08235294117647059,
+          "macdHistRank": 0.5294117647058824,
+          "macdHistDeltaRank": 0.8235294117647058,
+          "bollSqueezeRank": 0.4,
+          "maAlignmentRank": 0.7647058823529411,
+          "indicatorPulseQualityRank": 0.6235294117647059,
+          "indicatorConfluenceQualityRank": 0.4470588235294118,
+          "amountEfficiency20Rank": 0.32941176470588235,
+          "moneyflowMarketSurgeQualityRank": 0.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "stockSpecificBreakoutQualityRank": 0.7058823529411765,
+          "stockSpecificMatureBreadthQualityRank": 0.0,
+          "industryReturn20Rank": 0.3058823529411765,
+          "industryRelativeReturn20Rank": 0.8352941176470589
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.07734375000000002,
+          "gapPct": -0.0008264462809917106,
+          "intradayReturnPct": 0.058726220016542596,
+          "lowerShadowPct": 0.0062500000000000056,
+          "upperShadowPct": 0.015624999999999944,
+          "priorGapDown60Pct": 0.012785388127853792,
+          "priorGapDown3Count60": 0.0,
+          "priorGapDown5Count60": 0.0
+        }
+      },
+      {
+        "ts_code": "603131.SH",
+        "name": "上海沪工",
+        "industry": "专用机械",
+        "entryDate": "2025-08-11",
+        "exitDate": "2025-08-12",
+        "returnPct": -0.05284596682997102,
+        "netPnl": -946.9138231000034,
+        "exitPriceRule": "stop",
+        "entryMarketState": "base_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": true,
+          "marketSoftRiskOn": false,
+          "marketBreadthFailedChecks": [],
+          "marketAboveMa20Pct": 0.675644299976782,
+          "marketAboveMa60Pct": 0.828186672858138,
+          "marketUpPct": 0.474111910842814
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.9243697478991597,
+          "high60Rank": 0.8907563025210085,
+          "rsiBalanceRank": 0.0,
+          "macdHistRank": 0.9117647058823529,
+          "macdHistDeltaRank": 0.9285714285714286,
+          "bollSqueezeRank": 0.1134453781512605,
+          "maAlignmentRank": 0.9369747899159664,
+          "indicatorPulseQualityRank": 0.06722689075630252,
+          "indicatorConfluenceQualityRank": 0.012605042016806723,
+          "amountEfficiency20Rank": 0.5084033613445378,
+          "moneyflowMarketSurgeQualityRank": 0.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "stockSpecificBreakoutQualityRank": 0.3319327731092437,
+          "stockSpecificMatureBreadthQualityRank": 0.3319327731092437,
+          "industryReturn20Rank": 0.9117647058823529,
+          "industryRelativeReturn20Rank": 0.8235294117647058
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.05856057219490383,
+          "gapPct": 0.012950971322849059,
+          "intradayReturnPct": 0.021461187214611988,
+          "lowerShadowPct": 0.029056772463120186,
+          "upperShadowPct": 0.008493518104604279,
+          "priorGapDown60Pct": 0.02122905027932953,
+          "priorGapDown3Count60": 0.0,
+          "priorGapDown5Count60": 0.0
+        }
+      },
+      {
+        "ts_code": "002602.SZ",
+        "name": "世纪华通",
+        "industry": "互联网",
+        "entryDate": "2025-06-17",
+        "exitDate": "2025-06-26",
+        "returnPct": -0.05284596682997101,
+        "netPnl": -880.456304000003,
+        "exitPriceRule": "stop",
+        "entryMarketState": "base_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": true,
+          "marketSoftRiskOn": false,
+          "marketBreadthFailedChecks": [],
+          "marketAboveMa20Pct": 0.4657534246575342,
+          "marketAboveMa60Pct": 0.5788251683306246,
+          "marketUpPct": 0.6470861388437428
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.9534883720930233,
+          "high60Rank": 0.9767441860465116,
+          "rsiBalanceRank": 0.4186046511627907,
+          "macdHistRank": 0.2558139534883721,
+          "macdHistDeltaRank": 0.8953488372093024,
+          "bollSqueezeRank": 0.19767441860465115,
+          "maAlignmentRank": 0.9767441860465116,
+          "indicatorPulseQualityRank": 0.313953488372093,
+          "indicatorConfluenceQualityRank": 0.6976744186046512,
+          "amountEfficiency20Rank": 0.9534883720930233,
+          "moneyflowMarketSurgeQualityRank": 0.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "stockSpecificBreakoutQualityRank": 0.6976744186046512,
+          "stockSpecificMatureBreadthQualityRank": 0.0,
+          "industryReturn20Rank": 0.7674418604651163,
+          "industryRelativeReturn20Rank": 0.9418604651162791
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.0432692307692307,
+          "gapPct": 0.011033099297893534,
+          "intradayReturnPct": 0.031746031746031855,
+          "lowerShadowPct": 0.009615384615384581,
+          "upperShadowPct": 0.002884615384615323,
+          "priorGapDown60Pct": 0.05014749262536866,
+          "priorGapDown3Count60": 3.0,
+          "priorGapDown5Count60": 1.0
+        }
+      },
+      {
+        "ts_code": "000899.SZ",
+        "name": "赣能股份",
+        "industry": "火力发电",
+        "entryDate": "2025-10-22",
+        "exitDate": "2025-11-17",
+        "returnPct": -0.05284596682997099,
+        "netPnl": -971.465008500003,
+        "exitPriceRule": "stop",
+        "entryMarketState": "base_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": true,
+          "marketSoftRiskOn": false,
+          "marketBreadthFailedChecks": [],
+          "marketAboveMa20Pct": 0.4697004875783608,
+          "marketAboveMa60Pct": 0.476201532389134,
+          "marketUpPct": 0.8497794288367774
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.7058823529411765,
+          "high60Rank": 0.9411764705882353,
+          "rsiBalanceRank": 0.17647058823529413,
+          "macdHistRank": 0.8823529411764706,
+          "macdHistDeltaRank": 0.35294117647058826,
+          "bollSqueezeRank": 0.29411764705882354,
+          "maAlignmentRank": 0.7058823529411765,
+          "indicatorPulseQualityRank": 0.7058823529411765,
+          "indicatorConfluenceQualityRank": 0.5294117647058824,
+          "amountEfficiency20Rank": 0.7058823529411765,
+          "moneyflowMarketSurgeQualityRank": 0.23529411764705882,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "stockSpecificBreakoutQualityRank": 0.8235294117647058,
+          "stockSpecificMatureBreadthQualityRank": 0.0,
+          "industryReturn20Rank": 0.47058823529411764,
+          "industryRelativeReturn20Rank": 0.7058823529411765
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.02499999999999996,
+          "gapPct": -0.025570776255707695,
+          "intradayReturnPct": 0.012183692596063889,
+          "lowerShadowPct": 0.0037037037037036245,
+          "upperShadowPct": 0.009259259259259226,
+          "priorGapDown60Pct": 0.024169184290030232,
+          "priorGapDown3Count60": 0.0,
+          "priorGapDown5Count60": 0.0
+        }
+      },
+      {
+        "ts_code": "002149.SZ",
+        "name": "西部材料",
+        "industry": "小金属",
+        "entryDate": "2026-04-21",
+        "exitDate": "2026-04-24",
+        "returnPct": -0.05284596682997089,
+        "netPnl": -973.528577962501,
+        "exitPriceRule": "stop",
+        "entryMarketState": "base_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": true,
+          "marketSoftRiskOn": false,
+          "marketBreadthFailedChecks": [],
+          "marketAboveMa20Pct": 0.7384436701509872,
+          "marketAboveMa60Pct": 0.35911730545876885,
+          "marketUpPct": 0.6183507549361208
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.956,
+          "high60Rank": 0.844,
+          "rsiBalanceRank": 0.612,
+          "macdHistRank": 0.9,
+          "macdHistDeltaRank": 0.964,
+          "bollSqueezeRank": 0.096,
+          "maAlignmentRank": 0.964,
+          "indicatorPulseQualityRank": 0.232,
+          "indicatorConfluenceQualityRank": 0.456,
+          "amountEfficiency20Rank": 0.904,
+          "moneyflowMarketSurgeQualityRank": 0.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "stockSpecificBreakoutQualityRank": 0.532,
+          "stockSpecificMatureBreadthQualityRank": 0.0,
+          "industryReturn20Rank": 0.876,
+          "industryRelativeReturn20Rank": 0.92
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.0741888146094896,
+          "gapPct": 0.04163901791639013,
+          "intradayReturnPct": -0.023252110208631938,
+          "lowerShadowPct": 0.034730148377629146,
+          "upperShadowPct": 0.015653024620903323,
+          "priorGapDown60Pct": 0.050037064492216454,
+          "priorGapDown3Count60": 7.0,
+          "priorGapDown5Count60": 1.0
+        }
+      }
+    ],
+    "baselineOnlyBase": [
+      {
+        "ts_code": "600362.SH",
+        "name": "江西铜业",
+        "industry": "铜",
+        "entryDate": "2025-10-10",
+        "exitDate": "2025-10-13",
+        "returnPct": -0.08185618537312066,
+        "netPnl": -1725.2269737499955,
+        "exitPriceRule": "gap_open_stop",
+        "entryMarketState": "base_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": true,
+          "marketSoftRiskOn": false,
+          "marketBreadthFailedChecks": [],
+          "marketAboveMa20Pct": 0.4699047176388566,
+          "marketAboveMa60Pct": 0.5154543341854521,
+          "marketUpPct": 0.5965605391587264
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.9906103286384976,
+          "high60Rank": 0.8685446009389671,
+          "rsiBalanceRank": 0.09389671361502347,
+          "macdHistRank": 0.9671361502347418,
+          "macdHistDeltaRank": 0.9953051643192489,
+          "bollSqueezeRank": 0.004694835680751174,
+          "maAlignmentRank": 1.0,
+          "indicatorPulseQualityRank": 0.07042253521126761,
+          "amountEfficiency20Rank": 0.8497652582159625,
+          "moneyflowMarketSurgeQualityRank": 0.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "industryReturn20Rank": 0.9765258215962441,
+          "industryRelativeReturn20Rank": 0.9389671361502347
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.07933491686460799,
+          "gapPct": 0.024590163934426146,
+          "intradayReturnPct": 0.05249999999999999,
+          "lowerShadowPct": 0.009501187648456023,
+          "upperShadowPct": 0.01995249406175763,
+          "priorGapDown60Pct": 0.032517707662588435,
+          "priorGapDown3Count60": 1.0,
+          "priorGapDown5Count60": 0.0
+        }
+      },
+      {
+        "ts_code": "002941.SZ",
+        "name": "新疆交建",
+        "industry": "建筑工程",
+        "entryDate": "2025-10-10",
+        "exitDate": "2025-10-13",
+        "returnPct": -0.05412417740105043,
+        "netPnl": -1268.0891999999985,
+        "exitPriceRule": "gap_open_stop",
+        "entryMarketState": "base_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": true,
+          "marketSoftRiskOn": false,
+          "marketBreadthFailedChecks": [],
+          "marketAboveMa20Pct": 0.4699047176388566,
+          "marketAboveMa60Pct": 0.5154543341854521,
+          "marketUpPct": 0.5965605391587264
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.9107981220657277,
+          "high60Rank": 1.0,
+          "rsiBalanceRank": 0.8028169014084507,
+          "macdHistRank": 0.6854460093896714,
+          "macdHistDeltaRank": 0.9812206572769953,
+          "bollSqueezeRank": 0.1643192488262911,
+          "maAlignmentRank": 0.892018779342723,
+          "indicatorPulseQualityRank": 0.4131455399061033,
+          "amountEfficiency20Rank": 0.8967136150234741,
+          "moneyflowMarketSurgeQualityRank": 0.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "industryReturn20Rank": 0.49765258215962443,
+          "industryRelativeReturn20Rank": 0.9154929577464789
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.06666666666666671,
+          "gapPct": 0.03891708967851115,
+          "intradayReturnPct": 0.05863192182410404,
+          "lowerShadowPct": 0.011282051282051406,
+          "upperShadowPct": 0.0,
+          "priorGapDown60Pct": 0.026993865030674913,
+          "priorGapDown3Count60": 0.0,
+          "priorGapDown5Count60": 0.0
+        }
+      },
+      {
+        "ts_code": "603960.SH",
+        "name": "克来机电",
+        "industry": "汽车配件",
+        "entryDate": "2025-03-17",
+        "exitDate": "2025-03-19",
+        "returnPct": -0.05284596682997109,
+        "netPnl": -918.9233552625046,
+        "exitPriceRule": "stop",
+        "entryMarketState": "base_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": true,
+          "marketSoftRiskOn": false,
+          "marketBreadthFailedChecks": [],
+          "marketAboveMa20Pct": 0.729089219330855,
+          "marketAboveMa60Pct": 0.7699814126394052,
+          "marketUpPct": 0.8387546468401487
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.9119496855345912,
+          "high60Rank": 1.0,
+          "rsiBalanceRank": 0.6981132075471698,
+          "macdHistRank": 0.7987421383647799,
+          "macdHistDeltaRank": 0.949685534591195,
+          "bollSqueezeRank": 0.16981132075471697,
+          "maAlignmentRank": 0.8553459119496856,
+          "indicatorPulseQualityRank": 0.5786163522012578,
+          "amountEfficiency20Rank": 0.7169811320754716,
+          "moneyflowMarketSurgeQualityRank": 0.9622641509433962,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.9811320754716981,
+          "industryReturn20Rank": 0.9245283018867925,
+          "industryRelativeReturn20Rank": 0.8867924528301887
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.06650544135429257,
+          "gapPct": 0.027937915742793695,
+          "intradayReturnPct": 0.07031924072476259,
+          "lowerShadowPct": 0.0008061265618701965,
+          "upperShadowPct": 0.0,
+          "priorGapDown60Pct": 0.025904421616793294,
+          "priorGapDown3Count60": 0.0,
+          "priorGapDown5Count60": 0.0
+        }
+      },
+      {
+        "ts_code": "601179.SH",
+        "name": "中国西电",
+        "industry": "电气设备",
+        "entryDate": "2026-01-20",
+        "exitDate": "2026-01-29",
+        "returnPct": -0.052845966829970906,
+        "netPnl": -1240.522719187502,
+        "exitPriceRule": "stop",
+        "entryMarketState": "base_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": true,
+          "marketSoftRiskOn": false,
+          "marketBreadthFailedChecks": [],
+          "marketAboveMa20Pct": 0.8065040650406504,
+          "marketAboveMa60Pct": 0.7319396051103368,
+          "marketUpPct": 0.6710801393728223
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.9945945945945946,
+          "high60Rank": 0.9081081081081082,
+          "rsiBalanceRank": 0.0,
+          "macdHistRank": 0.8648648648648649,
+          "macdHistDeltaRank": 0.8540540540540541,
+          "bollSqueezeRank": 0.005405405405405406,
+          "maAlignmentRank": 0.9945945945945946,
+          "indicatorPulseQualityRank": 0.021621621621621623,
+          "amountEfficiency20Rank": 0.9837837837837838,
+          "moneyflowMarketSurgeQualityRank": 0.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "industryReturn20Rank": 0.6648648648648648,
+          "industryRelativeReturn20Rank": 0.9945945945945946
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.06397952655150352,
+          "gapPct": 0.04456824512534818,
+          "intradayReturnPct": 0.04200000000000004,
+          "lowerShadowPct": 0.012795905310300658,
+          "upperShadowPct": 0.010876519513755593,
+          "priorGapDown60Pct": 0.06561085972850678,
+          "priorGapDown3Count60": 2.0,
+          "priorGapDown5Count60": 1.0
+        }
+      },
+      {
+        "ts_code": "000967.SZ",
+        "name": "盈峰环境",
+        "industry": "环境保护",
+        "entryDate": "2025-02-18",
+        "exitDate": "2025-02-19",
+        "returnPct": -0.05284596682997089,
+        "netPnl": -894.5838180125011,
+        "exitPriceRule": "stop",
+        "entryMarketState": "base_risk_on",
+        "entryMarketMetrics": {
+          "marketRiskOn": true,
+          "marketBaseRiskOn": true,
+          "marketSoftRiskOn": false,
+          "marketBreadthFailedChecks": [],
+          "marketAboveMa20Pct": 0.8245939675174014,
+          "marketAboveMa60Pct": 0.49837587006960554,
+          "marketUpPct": 0.6612529002320185
+        },
+        "entryScoreParts": {
+          "return20Rank": 0.7631578947368421,
+          "high60Rank": 1.0,
+          "rsiBalanceRank": 0.03508771929824561,
+          "macdHistRank": 0.37719298245614036,
+          "macdHistDeltaRank": 0.8947368421052632,
+          "bollSqueezeRank": 0.3333333333333333,
+          "maAlignmentRank": 0.8070175438596491,
+          "indicatorPulseQualityRank": 0.0,
+          "amountEfficiency20Rank": 0.11403508771929824,
+          "moneyflowMarketSurgeQualityRank": 0.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "industryReturn20Rank": 0.7631578947368421,
+          "industryRelativeReturn20Rank": 0.7105263157894737
+        },
+        "entryRiskMetrics": {
+          "entryRangePct": 0.07375643224699824,
+          "gapPct": 0.018867924528301883,
+          "intradayReturnPct": 0.0796296296296295,
+          "lowerShadowPct": 0.0,
+          "upperShadowPct": 0.0,
+          "priorGapDown60Pct": 0.010438413361169019,
+          "priorGapDown3Count60": 0.0,
+          "priorGapDown5Count60": 0.0
+        }
+      }
+    ]
+  },
+  "summary": {
+    "candidateOnlyTradeCount": 58,
+    "candidateOnlyNetPnl": 4384.228019322765,
+    "candidateOnlySoftTradeCount": 26,
+    "candidateOnlySoftNetPnl": -3335.9359316373757,
+    "candidateOnlySoftWinRate": 0.2692307692307692,
+    "candidateOnlyBaseTradeCount": 32,
+    "candidateOnlyBaseNetPnl": 7720.163950960141,
+    "candidateOnlyBaseWinRate": 0.34375,
+    "baselineOnlyBaseTradeCount": 39,
+    "baselineOnlyBaseNetPnl": 37189.75912071176
+  }
+}

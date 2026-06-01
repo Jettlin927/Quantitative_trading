@@ -1,0 +1,781 @@
+{
+  "runId": "002-moneyflow-surge-confirmed-quality-trade-delta-001",
+  "startedAt": "2026-05-31 18:17 +0800",
+  "finishedAt": "2026-05-31 18:17 +0800",
+  "baselineRun": "002-repair-indicator-ablate-ma-001",
+  "candidateRun": "002-repair-moneyflow-surge-confirmed-quality-001",
+  "baselineTradeCount": 125,
+  "candidateTradeCount": 125,
+  "commonTradeCount": 124,
+  "baselineOnlyTradeCount": 1,
+  "candidateOnlyTradeCount": 1,
+  "comparisons": [
+    {
+      "label": "ALL",
+      "baselineOnly": {
+        "count": 1,
+        "netPnl": -672.8294688499973,
+        "avgReturnPct": -0.05284596682997062,
+        "winRate": 0.0,
+        "profitLossRatio": null,
+        "scoreParts": {
+          "return20Rank": 0.9555555555555556,
+          "high60Rank": 0.9555555555555556,
+          "rsiBalanceRank": 0.0,
+          "macdHistRank": 0.9555555555555556,
+          "bollSqueezeRank": 0.06666666666666667
+        }
+      },
+      "candidateOnly": {
+        "count": 1,
+        "netPnl": 507.2376595286005,
+        "avgReturnPct": 0.04790131217195706,
+        "winRate": 1.0,
+        "profitLossRatio": null,
+        "scoreParts": {
+          "return20Rank": 0.9333333333333333,
+          "high60Rank": 0.9777777777777777,
+          "rsiBalanceRank": 0.6444444444444445,
+          "macdHistRank": 0.9333333333333333,
+          "bollSqueezeRank": 0.2222222222222222,
+          "amountEfficiency20Rank": 0.9555555555555556,
+          "moneyflowMainNetRank1Rank": 0.8888888888888888,
+          "moneyflowMarketStrongRank": 0.8888888888888888,
+          "moneyflowMarketQualityRank": 0.9777777777777777,
+          "moneyflowMarketSurgeQualityRank": 0.9777777777777777,
+          "moneyflowMarketSurgeRelativeQualityRank": 1.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 1.0,
+          "industryReturn20Rank": 0.8444444444444444,
+          "industryRelativeReturn20Rank": 0.9333333333333333
+        }
+      },
+      "commonBaseline": {
+        "count": 124,
+        "netPnl": 78265.99696145745,
+        "avgReturnPct": 0.03686326364821978,
+        "winRate": 0.47580645161290325,
+        "profitLossRatio": 2.542600338823641,
+        "scoreParts": {
+          "return20Rank": 0.9143729157209856,
+          "high60Rank": 0.925022234355539,
+          "rsiBalanceRank": 0.1919200967360148,
+          "macdHistRank": 0.7543514423094868,
+          "bollSqueezeRank": 0.14751807698442745
+        }
+      },
+      "commonCandidate": {
+        "count": 124,
+        "netPnl": 79663.23525198175,
+        "avgReturnPct": 0.03699912867798968,
+        "winRate": 0.47580645161290325,
+        "profitLossRatio": 2.5492475593355515,
+        "scoreParts": {
+          "return20Rank": 0.9142423615745858,
+          "high60Rank": 0.9250296945924761,
+          "rsiBalanceRank": 0.1919462075652947,
+          "macdHistRank": 0.7542059676892129,
+          "bollSqueezeRank": 0.1476225203015472,
+          "amountEfficiency20Rank": 0.7126742857094227,
+          "moneyflowMainNetRank1Rank": 0.6509240859308175,
+          "moneyflowMarketStrongRank": 0.5569096983991347,
+          "moneyflowMarketQualityRank": 0.395619814763648,
+          "moneyflowMarketSurgeQualityRank": 0.23966469517411246,
+          "moneyflowMarketSurgeRelativeQualityRank": 0.2604271698448463,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.05551020727549778,
+          "industryReturn20Rank": 0.6587152118500628,
+          "industryRelativeReturn20Rank": 0.8875184541396401
+        }
+      },
+      "replacementNetPnlDelta": 1180.0671283785978,
+      "replacementCountDelta": 0,
+      "baselineOnlyWorst": [
+        {
+          "ts_code": "600566.SH",
+          "name": "济川药业",
+          "industry": "中成药",
+          "entryDate": "2023-11-24",
+          "exitDate": "2024-01-22",
+          "returnPct": -0.05284596682997062,
+          "netPnl": -672.8294688499973,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9555555555555556,
+            "high60Rank": 0.9555555555555556,
+            "rsiBalanceRank": 0.0,
+            "macdHistRank": 0.9555555555555556,
+            "bollSqueezeRank": 0.06666666666666667
+          }
+        }
+      ],
+      "candidateOnlyWorst": [
+        {
+          "ts_code": "603087.SH",
+          "name": "XD甘李药",
+          "industry": "生物制药",
+          "entryDate": "2023-11-24",
+          "exitDate": "2023-12-15",
+          "returnPct": 0.04790131217195706,
+          "netPnl": 507.2376595286005,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9333333333333333,
+            "high60Rank": 0.9777777777777777,
+            "rsiBalanceRank": 0.6444444444444445,
+            "macdHistRank": 0.9333333333333333,
+            "bollSqueezeRank": 0.2222222222222222,
+            "amountEfficiency20Rank": 0.9555555555555556,
+            "moneyflowMainNetRank1Rank": 0.8888888888888888,
+            "moneyflowMarketStrongRank": 0.8888888888888888,
+            "moneyflowMarketQualityRank": 0.9777777777777777,
+            "moneyflowMarketSurgeQualityRank": 0.9777777777777777,
+            "moneyflowMarketSurgeRelativeQualityRank": 1.0,
+            "moneyflowMarketSurgeConfirmedQualityRank": 1.0,
+            "industryReturn20Rank": 0.8444444444444444,
+            "industryRelativeReturn20Rank": 0.9333333333333333
+          }
+        }
+      ],
+      "candidateOnlyBest": [
+        {
+          "ts_code": "603087.SH",
+          "name": "XD甘李药",
+          "industry": "生物制药",
+          "entryDate": "2023-11-24",
+          "exitDate": "2023-12-15",
+          "returnPct": 0.04790131217195706,
+          "netPnl": 507.2376595286005,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9333333333333333,
+            "high60Rank": 0.9777777777777777,
+            "rsiBalanceRank": 0.6444444444444445,
+            "macdHistRank": 0.9333333333333333,
+            "bollSqueezeRank": 0.2222222222222222,
+            "amountEfficiency20Rank": 0.9555555555555556,
+            "moneyflowMainNetRank1Rank": 0.8888888888888888,
+            "moneyflowMarketStrongRank": 0.8888888888888888,
+            "moneyflowMarketQualityRank": 0.9777777777777777,
+            "moneyflowMarketSurgeQualityRank": 0.9777777777777777,
+            "moneyflowMarketSurgeRelativeQualityRank": 1.0,
+            "moneyflowMarketSurgeConfirmedQualityRank": 1.0,
+            "industryReturn20Rank": 0.8444444444444444,
+            "industryRelativeReturn20Rank": 0.9333333333333333
+          }
+        }
+      ]
+    },
+    {
+      "label": "Y1",
+      "baselineOnly": {
+        "count": 1,
+        "netPnl": -672.8294688499973,
+        "avgReturnPct": -0.05284596682997062,
+        "winRate": 0.0,
+        "profitLossRatio": null,
+        "scoreParts": {
+          "return20Rank": 0.9555555555555556,
+          "high60Rank": 0.9555555555555556,
+          "rsiBalanceRank": 0.0,
+          "macdHistRank": 0.9555555555555556,
+          "bollSqueezeRank": 0.06666666666666667
+        }
+      },
+      "candidateOnly": {
+        "count": 1,
+        "netPnl": 507.2376595286005,
+        "avgReturnPct": 0.04790131217195706,
+        "winRate": 1.0,
+        "profitLossRatio": null,
+        "scoreParts": {
+          "return20Rank": 0.9333333333333333,
+          "high60Rank": 0.9777777777777777,
+          "rsiBalanceRank": 0.6444444444444445,
+          "macdHistRank": 0.9333333333333333,
+          "bollSqueezeRank": 0.2222222222222222,
+          "amountEfficiency20Rank": 0.9555555555555556,
+          "moneyflowMainNetRank1Rank": 0.8888888888888888,
+          "moneyflowMarketStrongRank": 0.8888888888888888,
+          "moneyflowMarketQualityRank": 0.9777777777777777,
+          "moneyflowMarketSurgeQualityRank": 0.9777777777777777,
+          "moneyflowMarketSurgeRelativeQualityRank": 1.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 1.0,
+          "industryReturn20Rank": 0.8444444444444444,
+          "industryRelativeReturn20Rank": 0.9333333333333333
+        }
+      },
+      "commonBaseline": {
+        "count": 24,
+        "netPnl": 6847.584817927893,
+        "avgReturnPct": 0.021146093479275624,
+        "winRate": 0.4166666666666667,
+        "profitLossRatio": 2.3603500019887815,
+        "scoreParts": {
+          "return20Rank": 0.8974946931159509,
+          "high60Rank": 0.8908651757309164,
+          "rsiBalanceRank": 0.22896011936446745,
+          "macdHistRank": 0.7319328527634136,
+          "bollSqueezeRank": 0.18084595741940335
+        }
+      },
+      "commonCandidate": {
+        "count": 24,
+        "netPnl": 6836.473290052894,
+        "avgReturnPct": 0.02114609347927563,
+        "winRate": 0.4166666666666667,
+        "profitLossRatio": 2.360350001988782,
+        "scoreParts": {
+          "return20Rank": 0.8968201633595525,
+          "high60Rank": 0.8909037202884249,
+          "rsiBalanceRank": 0.22909502531574713,
+          "macdHistRank": 0.7311812338919982,
+          "bollSqueezeRank": 0.18138558122452206,
+          "amountEfficiency20Rank": 0.7313448926723681,
+          "moneyflowMainNetRank1Rank": 0.45265743693665006,
+          "moneyflowMarketStrongRank": 0.38868631120565594,
+          "moneyflowMarketQualityRank": 0.36977470805704027,
+          "moneyflowMarketSurgeQualityRank": 0.2546601072997887,
+          "moneyflowMarketSurgeRelativeQualityRank": 0.30102594334814636,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.041339441535776615,
+          "industryReturn20Rank": 0.6198359544192978,
+          "industryRelativeReturn20Rank": 0.8614167381439161
+        }
+      },
+      "replacementNetPnlDelta": 1180.0671283785978,
+      "replacementCountDelta": 0,
+      "baselineOnlyWorst": [
+        {
+          "ts_code": "600566.SH",
+          "name": "济川药业",
+          "industry": "中成药",
+          "entryDate": "2023-11-24",
+          "exitDate": "2024-01-22",
+          "returnPct": -0.05284596682997062,
+          "netPnl": -672.8294688499973,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9555555555555556,
+            "high60Rank": 0.9555555555555556,
+            "rsiBalanceRank": 0.0,
+            "macdHistRank": 0.9555555555555556,
+            "bollSqueezeRank": 0.06666666666666667
+          }
+        }
+      ],
+      "candidateOnlyWorst": [
+        {
+          "ts_code": "603087.SH",
+          "name": "XD甘李药",
+          "industry": "生物制药",
+          "entryDate": "2023-11-24",
+          "exitDate": "2023-12-15",
+          "returnPct": 0.04790131217195706,
+          "netPnl": 507.2376595286005,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9333333333333333,
+            "high60Rank": 0.9777777777777777,
+            "rsiBalanceRank": 0.6444444444444445,
+            "macdHistRank": 0.9333333333333333,
+            "bollSqueezeRank": 0.2222222222222222,
+            "amountEfficiency20Rank": 0.9555555555555556,
+            "moneyflowMainNetRank1Rank": 0.8888888888888888,
+            "moneyflowMarketStrongRank": 0.8888888888888888,
+            "moneyflowMarketQualityRank": 0.9777777777777777,
+            "moneyflowMarketSurgeQualityRank": 0.9777777777777777,
+            "moneyflowMarketSurgeRelativeQualityRank": 1.0,
+            "moneyflowMarketSurgeConfirmedQualityRank": 1.0,
+            "industryReturn20Rank": 0.8444444444444444,
+            "industryRelativeReturn20Rank": 0.9333333333333333
+          }
+        }
+      ],
+      "candidateOnlyBest": [
+        {
+          "ts_code": "603087.SH",
+          "name": "XD甘李药",
+          "industry": "生物制药",
+          "entryDate": "2023-11-24",
+          "exitDate": "2023-12-15",
+          "returnPct": 0.04790131217195706,
+          "netPnl": 507.2376595286005,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9333333333333333,
+            "high60Rank": 0.9777777777777777,
+            "rsiBalanceRank": 0.6444444444444445,
+            "macdHistRank": 0.9333333333333333,
+            "bollSqueezeRank": 0.2222222222222222,
+            "amountEfficiency20Rank": 0.9555555555555556,
+            "moneyflowMainNetRank1Rank": 0.8888888888888888,
+            "moneyflowMarketStrongRank": 0.8888888888888888,
+            "moneyflowMarketQualityRank": 0.9777777777777777,
+            "moneyflowMarketSurgeQualityRank": 0.9777777777777777,
+            "moneyflowMarketSurgeRelativeQualityRank": 1.0,
+            "moneyflowMarketSurgeConfirmedQualityRank": 1.0,
+            "industryReturn20Rank": 0.8444444444444444,
+            "industryRelativeReturn20Rank": 0.9333333333333333
+          }
+        }
+      ]
+    },
+    {
+      "label": "Y2",
+      "baselineOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "candidateOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "commonBaseline": {
+        "count": 41,
+        "netPnl": 35118.749815321746,
+        "avgReturnPct": 0.05509402530224513,
+        "winRate": 0.5853658536585366,
+        "profitLossRatio": 2.441897742018841,
+        "scoreParts": {
+          "return20Rank": 0.9044506997803361,
+          "high60Rank": 0.9448611588014323,
+          "rsiBalanceRank": 0.22877127426594482,
+          "macdHistRank": 0.7855038564776017,
+          "bollSqueezeRank": 0.16998344190397685
+        }
+      },
+      "commonCandidate": {
+        "count": 41,
+        "netPnl": 35481.89224631049,
+        "avgReturnPct": 0.05522926749373487,
+        "winRate": 0.5853658536585366,
+        "profitLossRatio": 2.4461532134321757,
+        "scoreParts": {
+          "return20Rank": 0.9044506997803361,
+          "high60Rank": 0.9448611588014323,
+          "rsiBalanceRank": 0.22877127426594482,
+          "macdHistRank": 0.7855038564776017,
+          "bollSqueezeRank": 0.16998344190397685,
+          "amountEfficiency20Rank": 0.6522104524405311,
+          "moneyflowMainNetRank1Rank": 0.7034223655773416,
+          "moneyflowMarketStrongRank": 0.7034223655773416,
+          "moneyflowMarketQualityRank": 0.39904876898145325,
+          "moneyflowMarketSurgeQualityRank": 0.32767427097766105,
+          "moneyflowMarketSurgeRelativeQualityRank": 0.3485913007537313,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.14368583183666064,
+          "industryReturn20Rank": 0.7019601067250097,
+          "industryRelativeReturn20Rank": 0.8745606744584559
+        }
+      },
+      "replacementNetPnlDelta": 0,
+      "replacementCountDelta": 0,
+      "baselineOnlyWorst": [],
+      "candidateOnlyWorst": [],
+      "candidateOnlyBest": []
+    },
+    {
+      "label": "Y3",
+      "baselineOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "candidateOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "commonBaseline": {
+        "count": 61,
+        "netPnl": 34791.933819645325,
+        "avgReturnPct": 0.027852319308600743,
+        "winRate": 0.4098360655737705,
+        "profitLossRatio": 2.7025162683167414,
+        "scoreParts": {
+          "return20Rank": 0.9275391839938624,
+          "high60Rank": 0.9243063169128871,
+          "rsiBalanceRank": 0.14694142435434224,
+          "macdHistRank": 0.7493038076143077,
+          "bollSqueezeRank": 0.12004290901541434
+        }
+      },
+      "commonCandidate": {
+        "count": 61,
+        "netPnl": 35837.14120705587,
+        "avgReturnPct": 0.02803760346991859,
+        "winRate": 0.4098360655737705,
+        "profitLossRatio": 2.7130349055083527,
+        "scoreParts": {
+          "return20Rank": 0.9275391839938624,
+          "high60Rank": 0.9243063169128871,
+          "rsiBalanceRank": 0.14694142435434224,
+          "macdHistRank": 0.7493038076143077,
+          "bollSqueezeRank": 0.12004290901541434,
+          "amountEfficiency20Rank": 0.7514541877667181,
+          "moneyflowMainNetRank1Rank": 0.6788605111519799,
+          "moneyflowMarketStrongRank": 0.5129182646538681,
+          "moneyflowMarketQualityRank": 0.3924797460505541,
+          "moneyflowMarketSurgeQualityRank": 0.16872023797231003,
+          "moneyflowMarketSurgeRelativeQualityRank": 0.1789525096639746,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.0,
+          "industryReturn20Rank": 0.6499058850429384,
+          "industryRelativeReturn20Rank": 0.9062508023781098
+        }
+      },
+      "replacementNetPnlDelta": 0,
+      "replacementCountDelta": 0,
+      "baselineOnlyWorst": [],
+      "candidateOnlyWorst": [],
+      "candidateOnlyBest": []
+    },
+    {
+      "label": "R18-1",
+      "baselineOnly": {
+        "count": 1,
+        "netPnl": -672.8294688499973,
+        "avgReturnPct": -0.05284596682997062,
+        "winRate": 0.0,
+        "profitLossRatio": null,
+        "scoreParts": {
+          "return20Rank": 0.9555555555555556,
+          "high60Rank": 0.9555555555555556,
+          "rsiBalanceRank": 0.0,
+          "macdHistRank": 0.9555555555555556,
+          "bollSqueezeRank": 0.06666666666666667
+        }
+      },
+      "candidateOnly": {
+        "count": 1,
+        "netPnl": 507.2376595286005,
+        "avgReturnPct": 0.04790131217195706,
+        "winRate": 1.0,
+        "profitLossRatio": null,
+        "scoreParts": {
+          "return20Rank": 0.9333333333333333,
+          "high60Rank": 0.9777777777777777,
+          "rsiBalanceRank": 0.6444444444444445,
+          "macdHistRank": 0.9333333333333333,
+          "bollSqueezeRank": 0.2222222222222222,
+          "amountEfficiency20Rank": 0.9555555555555556,
+          "moneyflowMainNetRank1Rank": 0.8888888888888888,
+          "moneyflowMarketStrongRank": 0.8888888888888888,
+          "moneyflowMarketQualityRank": 0.9777777777777777,
+          "moneyflowMarketSurgeQualityRank": 0.9777777777777777,
+          "moneyflowMarketSurgeRelativeQualityRank": 1.0,
+          "moneyflowMarketSurgeConfirmedQualityRank": 1.0,
+          "industryReturn20Rank": 0.8444444444444444,
+          "industryRelativeReturn20Rank": 0.9333333333333333
+        }
+      },
+      "commonBaseline": {
+        "count": 41,
+        "netPnl": 14690.292206121034,
+        "avgReturnPct": 0.025236295123251304,
+        "winRate": 0.4634146341463415,
+        "profitLossRatio": 2.1670451298995195,
+        "scoreParts": {
+          "return20Rank": 0.9112656740554012,
+          "high60Rank": 0.9222195632189195,
+          "rsiBalanceRank": 0.24600459106295036,
+          "macdHistRank": 0.7478258960953125,
+          "bollSqueezeRank": 0.17819430219229304
+        }
+      },
+      "commonCandidate": {
+        "count": 41,
+        "netPnl": 14718.029493332586,
+        "avgReturnPct": 0.02521938905750534,
+        "winRate": 0.4634146341463415,
+        "profitLossRatio": 2.1663690891887386,
+        "scoreParts": {
+          "return20Rank": 0.9108708273687289,
+          "high60Rank": 0.9222421258867294,
+          "rsiBalanceRank": 0.2460835604002848,
+          "macdHistRank": 0.7473859240730205,
+          "bollSqueezeRank": 0.17851017954163081,
+          "amountEfficiency20Rank": 0.7095187722352915,
+          "moneyflowMainNetRank1Rank": 0.5728041180883191,
+          "moneyflowMarketStrongRank": 0.5353576054652982,
+          "moneyflowMarketQualityRank": 0.4004472159486581,
+          "moneyflowMarketSurgeQualityRank": 0.33306305940782793,
+          "moneyflowMarketSurgeRelativeQualityRank": 0.36628597534021023,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.09680000715504129,
+          "industryReturn20Rank": 0.6829805669962056,
+          "industryRelativeReturn20Rank": 0.8610570659495531
+        }
+      },
+      "replacementNetPnlDelta": 1180.0671283785978,
+      "replacementCountDelta": 0,
+      "baselineOnlyWorst": [
+        {
+          "ts_code": "600566.SH",
+          "name": "济川药业",
+          "industry": "中成药",
+          "entryDate": "2023-11-24",
+          "exitDate": "2024-01-22",
+          "returnPct": -0.05284596682997062,
+          "netPnl": -672.8294688499973,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9555555555555556,
+            "high60Rank": 0.9555555555555556,
+            "rsiBalanceRank": 0.0,
+            "macdHistRank": 0.9555555555555556,
+            "bollSqueezeRank": 0.06666666666666667
+          }
+        }
+      ],
+      "candidateOnlyWorst": [
+        {
+          "ts_code": "603087.SH",
+          "name": "XD甘李药",
+          "industry": "生物制药",
+          "entryDate": "2023-11-24",
+          "exitDate": "2023-12-15",
+          "returnPct": 0.04790131217195706,
+          "netPnl": 507.2376595286005,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9333333333333333,
+            "high60Rank": 0.9777777777777777,
+            "rsiBalanceRank": 0.6444444444444445,
+            "macdHistRank": 0.9333333333333333,
+            "bollSqueezeRank": 0.2222222222222222,
+            "amountEfficiency20Rank": 0.9555555555555556,
+            "moneyflowMainNetRank1Rank": 0.8888888888888888,
+            "moneyflowMarketStrongRank": 0.8888888888888888,
+            "moneyflowMarketQualityRank": 0.9777777777777777,
+            "moneyflowMarketSurgeQualityRank": 0.9777777777777777,
+            "moneyflowMarketSurgeRelativeQualityRank": 1.0,
+            "moneyflowMarketSurgeConfirmedQualityRank": 1.0,
+            "industryReturn20Rank": 0.8444444444444444,
+            "industryRelativeReturn20Rank": 0.9333333333333333
+          }
+        }
+      ],
+      "candidateOnlyBest": [
+        {
+          "ts_code": "603087.SH",
+          "name": "XD甘李药",
+          "industry": "生物制药",
+          "entryDate": "2023-11-24",
+          "exitDate": "2023-12-15",
+          "returnPct": 0.04790131217195706,
+          "netPnl": 507.2376595286005,
+          "exitPriceRule": "stop",
+          "scoreParts": {
+            "return20Rank": 0.9333333333333333,
+            "high60Rank": 0.9777777777777777,
+            "rsiBalanceRank": 0.6444444444444445,
+            "macdHistRank": 0.9333333333333333,
+            "bollSqueezeRank": 0.2222222222222222,
+            "amountEfficiency20Rank": 0.9555555555555556,
+            "moneyflowMainNetRank1Rank": 0.8888888888888888,
+            "moneyflowMarketStrongRank": 0.8888888888888888,
+            "moneyflowMarketQualityRank": 0.9777777777777777,
+            "moneyflowMarketSurgeQualityRank": 0.9777777777777777,
+            "moneyflowMarketSurgeRelativeQualityRank": 1.0,
+            "moneyflowMarketSurgeConfirmedQualityRank": 1.0,
+            "industryReturn20Rank": 0.8444444444444444,
+            "industryRelativeReturn20Rank": 0.9333333333333333
+          }
+        }
+      ]
+    },
+    {
+      "label": "R18-2",
+      "baselineOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "candidateOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "commonBaseline": {
+        "count": 57,
+        "netPnl": 36044.189666950355,
+        "avgReturnPct": 0.040829081012930306,
+        "winRate": 0.5087719298245614,
+        "profitLossRatio": 2.45926755461594,
+        "scoreParts": {
+          "return20Rank": 0.8986990703901135,
+          "high60Rank": 0.9323178270560643,
+          "rsiBalanceRank": 0.22659791350617792,
+          "macdHistRank": 0.7672630271160491,
+          "bollSqueezeRank": 0.17969500887921414
+        }
+      },
+      "commonCandidate": {
+        "count": 57,
+        "netPnl": 36396.220570064106,
+        "avgReturnPct": 0.04092636048400188,
+        "winRate": 0.5087719298245614,
+        "profitLossRatio": 2.4628265678677606,
+        "scoreParts": {
+          "return20Rank": 0.8986990703901135,
+          "high60Rank": 0.9323178270560643,
+          "rsiBalanceRank": 0.22659791350617792,
+          "macdHistRank": 0.7672630271160491,
+          "bollSqueezeRank": 0.17969500887921414,
+          "amountEfficiency20Rank": 0.6723211118401814,
+          "moneyflowMainNetRank1Rank": 0.6266443631379296,
+          "moneyflowMarketStrongRank": 0.6109664622453472,
+          "moneyflowMarketQualityRank": 0.39267573757455687,
+          "moneyflowMarketSurgeQualityRank": 0.3240049795739557,
+          "moneyflowMarketSurgeRelativeQualityRank": 0.3524433849989514,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.12075904740634605,
+          "industryReturn20Rank": 0.6720768437863317,
+          "industryRelativeReturn20Rank": 0.8686467849859653
+        }
+      },
+      "replacementNetPnlDelta": 0,
+      "replacementCountDelta": 0,
+      "baselineOnlyWorst": [],
+      "candidateOnlyWorst": [],
+      "candidateOnlyBest": []
+    },
+    {
+      "label": "R18-3",
+      "baselineOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "candidateOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "commonBaseline": {
+        "count": 79,
+        "netPnl": 61416.6743156747,
+        "avgReturnPct": 0.04567237183394186,
+        "winRate": 0.5189873417721519,
+        "profitLossRatio": 2.5545894650135628,
+        "scoreParts": {
+          "return20Rank": 0.9176066574630403,
+          "high60Rank": 0.9467109760772061,
+          "rsiBalanceRank": 0.17980859048098258,
+          "macdHistRank": 0.7714750414713806,
+          "bollSqueezeRank": 0.14691155350279592
+        }
+      },
+      "commonCandidate": {
+        "count": 79,
+        "netPnl": 62107.3184152208,
+        "avgReturnPct": 0.04574046106951161,
+        "winRate": 0.5189873417721519,
+        "profitLossRatio": 2.5568874590679878,
+        "scoreParts": {
+          "return20Rank": 0.9176066574630403,
+          "high60Rank": 0.9467109760772061,
+          "rsiBalanceRank": 0.17980859048098258,
+          "macdHistRank": 0.7714750414713806,
+          "bollSqueezeRank": 0.14691155350279592,
+          "amountEfficiency20Rank": 0.7093460061702084,
+          "moneyflowMainNetRank1Rank": 0.6915606221647906,
+          "moneyflowMarketStrongRank": 0.6144075766212657,
+          "moneyflowMarketQualityRank": 0.3838631729860392,
+          "moneyflowMarketSurgeQualityRank": 0.2698305782523451,
+          "moneyflowMarketSurgeRelativeQualityRank": 0.28779157378900844,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.07457112791522894,
+          "industryReturn20Rank": 0.6618260125016648,
+          "industryRelativeReturn20Rank": 0.8925706070564836
+        }
+      },
+      "replacementNetPnlDelta": 0,
+      "replacementCountDelta": 0,
+      "baselineOnlyWorst": [],
+      "candidateOnlyWorst": [],
+      "candidateOnlyBest": []
+    },
+    {
+      "label": "R18-4",
+      "baselineOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "candidateOnly": {
+        "count": 0,
+        "netPnl": 0,
+        "avgReturnPct": null,
+        "winRate": null,
+        "profitLossRatio": null,
+        "scoreParts": {}
+      },
+      "commonBaseline": {
+        "count": 83,
+        "netPnl": 63575.704755336425,
+        "avgReturnPct": 0.042606705931637935,
+        "winRate": 0.4819277108433735,
+        "profitLossRatio": 2.722307039574078,
+        "scoreParts": {
+          "return20Rank": 0.915907818230491,
+          "high60Rank": 0.9264066863627848,
+          "rsiBalanceRank": 0.16520365977933577,
+          "macdHistRank": 0.7575749048972115,
+          "bollSqueezeRank": 0.13236476091789146
+        }
+      },
+      "commonCandidate": {
+        "count": 83,
+        "netPnl": 64945.205758649165,
+        "avgReturnPct": 0.042818036201361466,
+        "winRate": 0.4819277108433735,
+        "profitLossRatio": 2.7327958267935566,
+        "scoreParts": {
+          "return20Rank": 0.915907818230491,
+          "high60Rank": 0.9264066863627848,
+          "rsiBalanceRank": 0.16520365977933577,
+          "macdHistRank": 0.7575749048972115,
+          "bollSqueezeRank": 0.13236476091789146,
+          "amountEfficiency20Rank": 0.7142330333291743,
+          "moneyflowMainNetRank1Rank": 0.6895134676361481,
+          "moneyflowMarketStrongRank": 0.5675559129809093,
+          "moneyflowMarketQualityRank": 0.39323519490117304,
+          "moneyflowMarketSurgeQualityRank": 0.19352815380565058,
+          "moneyflowMarketSurgeRelativeQualityRank": 0.20813547074472682,
+          "moneyflowMarketSurgeConfirmedQualityRank": 0.035114041069940136,
+          "industryReturn20Rank": 0.6467287111152212,
+          "industryRelativeReturn20Rank": 0.9005897422817314
+        }
+      },
+      "replacementNetPnlDelta": 0,
+      "replacementCountDelta": 0,
+      "baselineOnlyWorst": [],
+      "candidateOnlyWorst": [],
+      "candidateOnlyBest": []
+    }
+  ]
+}
