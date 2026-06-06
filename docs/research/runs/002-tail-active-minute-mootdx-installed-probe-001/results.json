@@ -1,0 +1,46 @@
+{
+  "runId": "002-tail-active-minute-mootdx-installed-probe-001",
+  "createdAt": "2026-06-05T03:14:13+08:00",
+  "scope": {
+    "startDate": "2026-06-01",
+    "endDate": "2026-06-04",
+    "targetTime": "14:30:00",
+    "maxStocks": 0,
+    "minBars": 1,
+    "excludeSt": true,
+    "excludeBj": true,
+    "maxCandidates": 5,
+    "maxRequests": 1,
+    "profile": "base",
+    "provider": "mootdx",
+    "dryRun": false,
+    "includeOpenCandidates": true
+  },
+  "summary": {
+    "candidateDates": 7,
+    "selectedCandidates": 5,
+    "minuteMatches": 0,
+    "coverageRate": 0.0,
+    "avgMinuteReturnToNextClose": null,
+    "medianMinuteReturnToNextClose": null,
+    "avgDailyReturnToNextCloseForMatched": null,
+    "medianDailyReturnToNextCloseForMatched": null,
+    "avgDailyCloseVsMinuteEntryPct": null,
+    "medianDailyCloseVsMinuteEntryPct": null,
+    "fetchErrors": 0,
+    "sourceStatus": "insufficient_coverage",
+    "sourceStatusReason": "分钟匹配数或覆盖率不足，不能进入全量分钟回测。",
+    "canPromoteToBacktest": false
+  },
+  "fetchErrors": [],
+  "fetchStats": [
+    {
+      "ts_code": "603065.SH",
+      "rows": 776,
+      "matches": 0,
+      "firstDate": "2023-03-21",
+      "lastDate": "2026-06-04"
+    }
+  ],
+  "minuteRecords": []
+}

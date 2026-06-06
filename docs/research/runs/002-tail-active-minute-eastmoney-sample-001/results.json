@@ -1,0 +1,38 @@
+{
+  "runId": "002-tail-active-minute-eastmoney-sample-001",
+  "createdAt": "2026-06-05T02:40:32+08:00",
+  "scope": {
+    "startDate": "2023-01-01",
+    "endDate": "2026-05-31",
+    "targetTime": "14:30:00",
+    "maxStocks": 0,
+    "minBars": 120,
+    "excludeSt": true,
+    "excludeBj": true,
+    "maxCandidates": 20,
+    "maxRequests": 1,
+    "profile": "best-risk",
+    "provider": "eastmoney-recent",
+    "dryRun": false
+  },
+  "summary": {
+    "candidateDates": 534,
+    "selectedCandidates": 20,
+    "minuteMatches": 0,
+    "coverageRate": 0.0,
+    "avgMinuteReturnToNextClose": null,
+    "medianMinuteReturnToNextClose": null,
+    "avgDailyReturnToNextCloseForMatched": null,
+    "medianDailyReturnToNextCloseForMatched": null,
+    "avgDailyCloseVsMinuteEntryPct": null,
+    "medianDailyCloseVsMinuteEntryPct": null,
+    "fetchErrors": 1
+  },
+  "fetchErrors": [
+    {
+      "ts_code": "603661.SH",
+      "error": "Remote end closed connection without response"
+    }
+  ],
+  "minuteRecords": []
+}

@@ -86,6 +86,7 @@
 - 不全局启用简单锁盈/保本/时间退出保护；已知 `lock2_after_5/lock3_after_5/trail50_after_5/be_after_3` 截断右尾，`time5_no_3` 全样本增量仅 `+0.04%`。
 - 不把入场时的 MACD/BOLL/RSI/振幅粗状态直接当作退出保护触发；已知 `002-exit-protection-state-trigger-001` 最好条件 `time5_no_3 + MACD柱排名>=80%` 的定向全样本增量仅 `+0.05%`，低于 `+0.20%` 观察线。
 - 不从当前最高观察的已成交样本路径均值直接反推全局扣分；`002-run-preentry-path-volume-inefficiency-001` 显示高 `macdHistDelta1d`、高 `entryRangePct`、高 `amountRatio` 在早段可能偏坏，但在 `R18-4` 和完整窗口贡献显著正收益，直接扣分会错杀右尾。
+- 不通过扩大持仓数、放宽周频或释放被挤掉 top 候选来修复收益；`002-candidate-preentry-universe-all-riskon-001` 显示容量/周频满未买 top3 的完整 `Fwd5` 仅 `1.00%`，`Y1` 为 `-0.51%`，明显弱于实际成交。
 - 不扩大仓位、取消滑点、取消跳空止损或取消跌停延迟来提高收益。
 
 ## 必须产物

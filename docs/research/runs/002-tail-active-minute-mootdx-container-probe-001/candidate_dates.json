@@ -1,0 +1,38 @@
+{
+  "total": 3,
+  "selected": [
+    {
+      "ts_code": "603890.SH",
+      "name": "春秋电子",
+      "industry": "元器件",
+      "trade_date": "2026-06-03",
+      "daily_close": 31.33,
+      "next_trade_date": "2026-06-04",
+      "next_close": 29.36,
+      "next_limit_up_close": false,
+      "daily_entry_return_to_next_close": -0.06287902968400894
+    },
+    {
+      "ts_code": "600459.SH",
+      "name": "贵研铂业",
+      "industry": "小金属",
+      "trade_date": "2026-06-03",
+      "daily_close": 24.2,
+      "next_trade_date": "2026-06-04",
+      "next_close": 24.24,
+      "next_limit_up_close": false,
+      "daily_entry_return_to_next_close": 0.0016528925619834212
+    },
+    {
+      "ts_code": "600280.SH",
+      "name": "中央商场",
+      "industry": "百货",
+      "trade_date": "2026-06-03",
+      "daily_close": 3.99,
+      "next_trade_date": "2026-06-04",
+      "next_close": 3.59,
+      "next_limit_up_close": false,
+      "daily_entry_return_to_next_close": -0.10025062656641615
+    }
+  ]
+}

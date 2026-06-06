@@ -73,6 +73,12 @@ const DEFAULT_FORM = {
   trendLongPeriod: "20",
   volumeMaPeriod: "20",
   volumeBreakoutMultiplier: "1.08",
+  tailEntryMinPctChg: "3",
+  tailEntryMaxPctChg: "5",
+  tailPriorLimitUpLookback: "15",
+  tailMinVolumeRatio: "1.5",
+  tailMinTurnoverRatePct: "5",
+  tailLimitUpPct: "9.5",
   useTrendFilter: true,
   useMacdFilter: false,
   macdFastPeriod: "12",
@@ -129,6 +135,19 @@ const RANK_OPTIONS = [
   ["valuation", "估值榜"],
 ];
 
+const ENTRY_MODE_OPTIONS = [
+  ["boll-rebound", "BOLL下轨反弹"],
+  ["midline-confirm", "BOLL中轨确认"],
+  ["trend-follow", "MA多头跟随"],
+  ["trend-pullback-confirm", "MA20回踩确认"],
+  ["macd-cross", "MACD金叉"],
+  ["boll-breakout", "BOLL上轨突破"],
+  ["boll-squeeze", "BOLL收口突破"],
+  ["rsi-reversal", "RSI超卖反转"],
+  ["ma-cross", "均线金叉"],
+  ["tail-active-next-day", "尾盘活跃次日纪律"],
+];
+
 function App() {
   const [form, setForm] = usePersistentForm();
   const [view, setView] = useState(getInitialView);
@@ -141,6 +160,8 @@ function App() {
   const [selectedStock, setSelectedStock] = useState(null);
   const [newsItems, setNewsItems] = useState([]);
   const [newsMessage, setNewsMessage] = useState("");
+  const [marketMainline, setMarketMainline] = useState(null);
+  const [tailCandidates, setTailCandidates] = useState(null);
   const [result, setResult] = useState(null);
   const [marketResult, setMarketResult] = useState(null);
   const [baselineStrategy, setBaselineStrategy] = useState(null);
@@ -630,6 +651,31 @@ function App() {
     });
   }
 
+  async function refreshMarketMainline() {
+    await withBusy(async () => {
+      const data = await apiFetch("/api/market-signals/mainline?top_n=12");
+      setMarketMainline(data);
+      const industryCount = data.industries?.total || 0;
+      setStatus({ text: `主线快照已刷新：热点 ${data.hotStocks?.length || 0} 条 / 行业 ${industryCount} 个`, tone: data.status === "ok" ? "good" : "muted" });
+    });
+  }
+
+  async function refreshTailCandidates() {
+    await withBusy(async () => {
+      const params = new URLSearchParams({
+        min_change_pct: form.tailEntryMinPctChg || "3",
+        max_change_pct: form.tailEntryMaxPctChg || "5",
+        min_volume_ratio: form.tailMinVolumeRatio || "1.5",
+        min_turnover_pct: form.tailMinTurnoverRatePct || "5",
+        lookback_days: form.tailPriorLimitUpLookback || "15",
+        limit: "40",
+      });
+      const data = await apiFetch(`/api/market-signals/tail-candidates?${params.toString()}`);
+      setTailCandidates(data);
+      setStatus({ text: `尾盘候选已刷新：${data.candidates?.length || 0} 只`, tone: data.candidates?.length ? "good" : "muted" });
+    });
+  }
+
   async function runQualityAnalysis() {
     await withBusy(async () => {
       const req = getDataRequest(form);
@@ -947,7 +993,11 @@ function App() {
               }}
               newsItems={newsItems}
               newsMessage={newsMessage}
+              marketMainline={marketMainline}
+              tailCandidates={tailCandidates}
               onRefreshNews={refreshNews}
+              onRefreshMainline={refreshMarketMainline}
+              onRefreshTailCandidates={refreshTailCandidates}
             />
           ) : null}
 
@@ -1492,7 +1542,11 @@ function ScreenerPanel({
   onRunPoolBacktest,
   newsItems,
   newsMessage,
+  marketMainline,
+  tailCandidates,
   onRefreshNews,
+  onRefreshMainline,
+  onRefreshTailCandidates,
 }) {
   const syncedCount = results.filter(hasFundamentalData).length;
   const strongCount = results.filter((stock) => candidateScore(stock) >= 60).length;
@@ -1551,7 +1605,16 @@ function ScreenerPanel({
         />
         <CandidateCards results={results} activePool={activePool} activePoolMemberCodes={activePoolMemberCodes} onSelect={onSelect} onAddToPool={onAddToPool} busy={busy} />
       </section>
-      <NewsPulsePanel items={newsItems} message={newsMessage} busy={busy} onRefresh={onRefreshNews} />
+      <aside className="screen-rail">
+        <MarketSignalPanel
+          mainline={marketMainline}
+          tailCandidates={tailCandidates}
+          busy={busy}
+          onRefreshMainline={onRefreshMainline}
+          onRefreshTailCandidates={onRefreshTailCandidates}
+        />
+        <NewsPulsePanel items={newsItems} message={newsMessage} busy={busy} onRefresh={onRefreshNews} />
+      </aside>
     </section>
   );
 }
@@ -1749,6 +1812,56 @@ function CandidateCards({ results, activePool, activePoolMemberCodes, onSelect, 
   );
 }
 
+function MarketSignalPanel({ mainline, tailCandidates, busy, onRefreshMainline, onRefreshTailCandidates }) {
+  const industries = mainline?.industries?.top || [];
+  const candidates = tailCandidates?.candidates || [];
+  return (
+    <section className="workspace-panel signal-panel">
+      <PanelTitle icon={<TrendingUp size={17} />} title="主线/尾盘" right={tailCandidates?.asOf ? tailCandidates.asOf.slice(11, 16) : "未刷新"} />
+      <div className="signal-actions">
+        <button className="ghost-button" type="button" onClick={onRefreshMainline} disabled={busy}>
+          <RefreshCw size={16} /> 主线
+        </button>
+        <button className="primary-button" type="button" onClick={onRefreshTailCandidates} disabled={busy}>
+          <Filter size={16} /> 尾盘候选
+        </button>
+      </div>
+      <div className="signal-source-row">
+        <span className={mainline?.sources?.thsHotReason ? "good" : ""}>同花顺热点</span>
+        <span className={mainline?.sources?.eastmoneyIndustry ? "good" : ""}>东财行业</span>
+        <span className={tailCandidates?.sources?.tencentQuote ? "good" : ""}>腾讯行情</span>
+      </div>
+      {candidates.length ? (
+        <div className="signal-list">
+          {candidates.slice(0, 8).map((item) => (
+            <article key={item.tsCode}>
+              <div>
+                <strong>{item.name || item.tsCode}</strong>
+                <span>{item.tsCode}</span>
+              </div>
+              <b>{formatPercentPoint(item.changePct)}</b>
+              <em>量比 {formatNumber(item.volumeRatio)} / 换手 {formatPercentPoint(item.turnoverPct)}</em>
+              {item.reason ? <i>{item.reason}</i> : null}
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="news-empty compact">{tailCandidates?.status === "empty" ? "当前阈值下暂无尾盘候选" : "等待尾盘候选"}</div>
+      )}
+      {industries.length ? (
+        <div className="industry-strip">
+          {industries.slice(0, 6).map((item) => (
+            <span key={item.code || item.name}>
+              <strong>{item.name}</strong>
+              <em>{formatPercentPoint(item.changePct)}</em>
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function NewsPulsePanel({ items, message, busy, onRefresh }) {
   return (
     <section className="workspace-panel news-panel">
@@ -1916,10 +2029,17 @@ function StrategyPanel({
         <section className="workspace-panel">
           <PanelTitle icon={<SlidersHorizontal size={17} />} title="技术因子" />
           <div className="field-grid four compact">
+            <SelectField label="入场模型" value={form.entryMode} onChange={(value) => onChange("entryMode", value)} options={ENTRY_MODE_OPTIONS} />
             <TextField label="快线MA" type="number" value={form.trendFastPeriod} onChange={(value) => onChange("trendFastPeriod", value)} />
             <TextField label="慢线MA" type="number" value={form.trendSlowPeriod} onChange={(value) => onChange("trendSlowPeriod", value)} />
             <TextField label="长线MA" type="number" value={form.trendLongPeriod} onChange={(value) => onChange("trendLongPeriod", value)} />
             <TextField label="量均周期" type="number" value={form.volumeMaPeriod} onChange={(value) => onChange("volumeMaPeriod", value)} />
+            <TextField label="尾盘涨幅下限%" type="number" value={form.tailEntryMinPctChg} onChange={(value) => onChange("tailEntryMinPctChg", value)} />
+            <TextField label="尾盘涨幅上限%" type="number" value={form.tailEntryMaxPctChg} onChange={(value) => onChange("tailEntryMaxPctChg", value)} />
+            <TextField label="近涨停天数" type="number" value={form.tailPriorLimitUpLookback} onChange={(value) => onChange("tailPriorLimitUpLookback", value)} />
+            <TextField label="尾盘量比" type="number" value={form.tailMinVolumeRatio} onChange={(value) => onChange("tailMinVolumeRatio", value)} />
+            <TextField label="尾盘换手%" type="number" value={form.tailMinTurnoverRatePct} onChange={(value) => onChange("tailMinTurnoverRatePct", value)} />
+            <TextField label="涨停判定%" type="number" value={form.tailLimitUpPct} onChange={(value) => onChange("tailLimitUpPct", value)} />
             <TextField label="BOLL周期" type="number" value={form.bollPeriod} onChange={(value) => onChange("bollPeriod", value)} />
             <TextField label="BOLL倍数" type="number" value={form.bollDev} onChange={(value) => onChange("bollDev", value)} />
             <TextField label="下轨容差%" type="number" value={form.bollTolerancePct} onChange={(value) => onChange("bollTolerancePct", value)} />
@@ -4216,6 +4336,12 @@ function buildBacktestConfig(form, baseConfig = null) {
     trendLongPeriod: Number(form.trendLongPeriod),
     volumeMaPeriod: Number(form.volumeMaPeriod),
     volumeBreakoutMultiplier: Number(form.volumeBreakoutMultiplier),
+    tailEntryMinPctChg: Number(form.tailEntryMinPctChg) / 100,
+    tailEntryMaxPctChg: Number(form.tailEntryMaxPctChg) / 100,
+    tailPriorLimitUpLookback: Number(form.tailPriorLimitUpLookback),
+    tailMinVolumeRatio: Number(form.tailMinVolumeRatio),
+    tailMinTurnoverRatePct: Number(form.tailMinTurnoverRatePct),
+    tailLimitUpPct: Number(form.tailLimitUpPct) / 100,
     useTrendFilter: form.useTrendFilter,
     useMacdFilter: form.useMacdFilter,
     macdFastPeriod: Number(form.macdFastPeriod),
@@ -4275,6 +4401,12 @@ function mapDocsConfigToForm(config) {
   assignFormNumber(mapped, "trendLongPeriod", config.trendLongPeriod);
   assignFormNumber(mapped, "volumeMaPeriod", config.volumeMaPeriod);
   assignFormNumber(mapped, "volumeBreakoutMultiplier", config.volumeBreakoutMultiplier);
+  assignFormPercent(mapped, "tailEntryMinPctChg", config.tailEntryMinPctChg);
+  assignFormPercent(mapped, "tailEntryMaxPctChg", config.tailEntryMaxPctChg);
+  assignFormNumber(mapped, "tailPriorLimitUpLookback", config.tailPriorLimitUpLookback);
+  assignFormNumber(mapped, "tailMinVolumeRatio", config.tailMinVolumeRatio);
+  assignFormNumber(mapped, "tailMinTurnoverRatePct", config.tailMinTurnoverRatePct);
+  assignFormPercent(mapped, "tailLimitUpPct", config.tailLimitUpPct);
   assignFormValue(mapped, "useTrendFilter", config.useTrendFilter);
   assignFormValue(mapped, "useMacdFilter", config.useMacdFilter);
   assignFormNumber(mapped, "macdFastPeriod", config.macdFastPeriod);

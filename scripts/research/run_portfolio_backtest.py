@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from backend.app.backtest_engine import calc_equity_performance_stats, calc_stop_price, enrich_rows, finite, json_safe, round_to_lot, should_enter
+from backend.app.backtest_engine import calc_equity_performance_stats, calc_stop_price, enrich_rows, finite, json_safe, limit_up_close, round_to_lot, should_enter
 from backend.app.database import SessionLocal
 from backend.app.main import query_backtest_rows_by_code, query_backtest_stocks, stock_to_market_meta
 from backend.app.models import StockDailyBar, StockDailyBasic
@@ -2098,6 +2098,8 @@ def decide_exit(row: dict[str, Any], position: dict[str, Any], cfg: dict[str, An
                 }
             return {"kind": "full", "price": row["open"], "reason": "组合硬止损/保本线跳空开盘成交", "priceRule": "gap_open_stop"}
         return {"kind": "full", "price": stop_price, "reason": "组合硬止损/保本线触发", "priceRule": "stop"}
+    if cfg.get("entryMode") == "tail-active-next-day" and int(position.get("barsHeld", 0)) >= 1 and not limit_up_close(row, cfg):
+        return {"kind": "full", "price": row["close"], "reason": "组合尾盘策略次日未涨停退出", "priceRule": "tail_next_day_close"}
     if row["high"] >= entry_price * (1 + float(cfg["takeProfit2Pct"])):
         return {"kind": "full", "price": entry_price * (1 + float(cfg["takeProfit2Pct"])), "reason": "组合第二止盈清仓", "priceRule": "take_profit"}
     if row["high"] >= entry_price * (1 + float(cfg["takeProfit1Pct"])) and not position["partialTaken"]:

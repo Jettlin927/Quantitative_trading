@@ -4139,6 +4139,45 @@
       "statusTier": "诊断",
       "failureReason": "Completed-trade path screens show state-dependent conditions, with early weakness but later right-tail contribution; no all-window risk threshold is supported.",
       "nextAction": "Do not add a global pre-entry path penalty from completed trades; next diagnose the full candidate universe."
+    },
+    {
+      "runId": "002-candidate-preentry-universe-001",
+      "strategyName": "candidate-preentry-universe-diagnostic",
+      "parameterSummary": "Actual-entry-date candidate-universe pre-entry path diagnostic; compares actual buys against same-day untraded top candidates.",
+      "sample": "Candidate signals of 002-repair-volume-inefficiency-crowding-penalty-003 on actual entry dates, 2023-05-30..2026-05-30",
+      "stage": "002-candidate-repair-30",
+      "diagnosticRun": true,
+      "evidenceRole": "candidate_universe_preentry_path_diagnostic",
+      "sourceRun": "002-repair-volume-inefficiency-crowding-penalty-003",
+      "dateMode": "actual-entry",
+      "actualTradeCount": 123,
+      "untradedTopCount": 390,
+      "actualAvgFwd5": 0.04385860443716937,
+      "sameDayUntradedTopAvgFwd5": 0.009416990531535888,
+      "stagePass": false,
+      "statusTier": "诊断",
+      "failureReason": "Actual traded signals have much stronger forward paths than same-day untraded top candidates, so the evidence does not support buying more same-day top signals.",
+      "nextAction": "Do not loosen buy count from this evidence; look for independent alpha or explicitly non-comparable holding/exit experiments."
+    },
+    {
+      "runId": "002-candidate-preentry-universe-all-riskon-001",
+      "strategyName": "candidate-preentry-universe-diagnostic",
+      "parameterSummary": "All Risk-On candidate-universe pre-entry path diagnostic; compares actual buys, same-day untraded top candidates, and capacity/weekly-blocked top candidates.",
+      "sample": "Risk-On candidate signals of 002-repair-volume-inefficiency-crowding-penalty-003, 2023-05-30..2026-05-30",
+      "stage": "002-candidate-repair-30",
+      "diagnosticRun": true,
+      "evidenceRole": "candidate_universe_capacity_diagnostic",
+      "sourceRun": "002-repair-volume-inefficiency-crowding-penalty-003",
+      "dateMode": "all-risk-on",
+      "actualTradeCount": 123,
+      "capacityBlockedTopCount": 261,
+      "actualAvgFwd5": 0.04385860443716937,
+      "capacityBlockedTopAvgFwd5": 0.009982149706552293,
+      "y1CapacityBlockedTopAvgFwd5": -0.0050552465250489525,
+      "stagePass": false,
+      "statusTier": "诊断",
+      "failureReason": "Capacity/weekly-blocked top candidates are weaker than actual trades and are negative in Y1, so buy-slot relaxation is not supported.",
+      "nextAction": "Do not increase maxPositions or weeklyBuyLimit as a stage repair."
     }
   ]
 }

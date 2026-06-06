@@ -17,13 +17,14 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import delete, func, select
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from .ai_client import analyze_stock_quality_with_deepseek
 from .backtest_engine import DEFAULT_CONFIG, enrich_rows, json_safe, run_backtest
 from .database import Base, SessionLocal, engine, get_db
+from .market_signal_sources import fetch_eastmoney_industries, fetch_tencent_quotes, fetch_ths_hot_reason, normalize_plain_code
 from .models import DataSyncRun, Stock, StockDailyBar, StockDailyBasic, StockFinancialIndicator, StockPool, StockPoolMember
 from .schemas import (
     BacktestRequest,
@@ -950,6 +951,90 @@ def get_news_trends(sources: str = "cls,wallstreetcn,xueqiu", count: int = 6, q:
     return NewsTrendOut(status="ok", items=items[:limit])
 
 
+@app.get("/api/market-signals/mainline")
+def get_market_mainline(top_n: int = 20) -> dict[str, Any]:
+    safe_top_n = max(1, min(int(top_n or 20), 50))
+    hot_items = fetch_ths_hot_reason()
+    industries = fetch_eastmoney_industries(safe_top_n)
+    return json_safe(
+        {
+            "status": "ok" if hot_items or industries.get("total") else "empty",
+            "asOf": datetime.now().isoformat(timespec="seconds"),
+            "sources": {
+                "thsHotReason": bool(hot_items),
+                "eastmoneyIndustry": bool(industries.get("total")),
+            },
+            "hotStocks": hot_items[: safe_top_n * 3],
+            "industries": industries,
+            "note": "主线快照来自同花顺强势股题材归因与东财行业板块排名，仅用于研究筛选，不构成交易指令。",
+        }
+    )
+
+
+@app.get("/api/market-signals/tail-candidates")
+def get_tail_candidates(
+    codes: str | None = None,
+    min_change_pct: float = 3.0,
+    max_change_pct: float = 5.0,
+    min_volume_ratio: float = 1.5,
+    min_turnover_pct: float = 5.0,
+    lookback_days: int = 15,
+    limit: int = 80,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    hot_items = fetch_ths_hot_reason()
+    hot_by_code = {item["code"]: item for item in hot_items}
+    requested_codes = parse_signal_codes(codes)
+    source_codes = requested_codes or [item["code"] for item in hot_items]
+    safe_limit = max(1, min(int(limit or 80), 200))
+    quotes = fetch_tencent_quotes(source_codes[:200])
+    candidates: list[dict[str, Any]] = []
+    for quote in quotes.values():
+        hot = hot_by_code.get(quote["code"], {})
+        prior_limit_up_count = count_prior_limit_up_days(db, quote["tsCode"], max(1, min(int(lookback_days or 15), 60)))
+        checks = {
+            "changeRange": value_between(quote.get("changePct"), min_change_pct, max_change_pct),
+            "volumeRatio": value_gt(quote.get("volumeRatio"), min_volume_ratio),
+            "turnover": value_gt(quote.get("turnoverPct"), min_turnover_pct),
+            "priorLimitUp": prior_limit_up_count > 0,
+        }
+        if all(checks.values()):
+            candidates.append(
+                {
+                    **quote,
+                    "reason": hot.get("reason"),
+                    "hotChangePct": hot.get("changePct"),
+                    "priorLimitUpCount": prior_limit_up_count,
+                    "checks": checks,
+                }
+            )
+
+    candidates.sort(key=lambda item: (item.get("volumeRatio") or 0, item.get("turnoverPct") or 0, item.get("changePct") or 0), reverse=True)
+    return json_safe(
+        {
+            "status": "ok" if candidates else "empty",
+            "asOf": datetime.now().isoformat(timespec="seconds"),
+            "scope": "manual_codes" if requested_codes else "ths_hot_reason",
+            "sourceCount": len(source_codes),
+            "quoteCount": len(quotes),
+            "candidates": candidates[:safe_limit],
+            "filters": {
+                "minChangePct": min_change_pct,
+                "maxChangePct": max_change_pct,
+                "minVolumeRatio": min_volume_ratio,
+                "minTurnoverPct": min_turnover_pct,
+                "lookbackDays": lookback_days,
+            },
+            "sources": {
+                "tencentQuote": bool(quotes),
+                "thsHotReason": bool(hot_items),
+                "localDailyBars": True,
+            },
+            "note": "尾盘候选使用实时行情近似 14:30 条件，并用本地日线检查前期涨停记忆；只输出研究候选，不输出买卖指令。",
+        }
+    )
+
+
 @app.get("/api/stocks/{ts_code}/quality-analysis")
 def analyze_stock_quality(
     ts_code: str,
@@ -995,7 +1080,8 @@ def run_db_backtest(payload: BacktestRequest, db: Session = Depends(get_db)) -> 
     if not bars:
         raise HTTPException(status_code=404, detail="数据库里没有这个区间的行情，请先同步 Tushare 数据。")
     stock = db.get(Stock, ts_code)
-    rows = [bar_to_backtest_row(bar) for bar in bars]
+    daily_basic = query_daily_basic_map(db, ts_code, payload.start_date, payload.end_date)
+    rows = [bar_to_backtest_row(bar, daily_basic.get(bar.trade_date)) for bar in bars]
     config = dict(payload.config)
     config["symbolName"] = config.get("symbolName") or (f"{stock.name} {ts_code}" if stock else ts_code)
     return run_backtest(rows, config)
@@ -1110,6 +1196,8 @@ def query_backtest_stocks(db: Session, payload: MarketBacktestRequest) -> list[S
 def execute_market_backtest(db: Session, payload: MarketBacktestRequest, progress: Any | None = None) -> dict[str, Any]:
     pool = get_stock_pool_or_404(db, payload.pool_id) if payload.pool_id else None
     stocks = [stock_to_market_meta(stock) for stock in query_backtest_stocks(db, payload)]
+    industry_by_code = {stock["ts_code"]: str(stock.get("industry") or "未知") for stock in stocks}
+    tail_mainline_states = query_tail_mainline_states(db, payload) if needs_tail_mainline_states(payload.config) else {}
     total = len(stocks)
     results: list[dict[str, Any]] = []
     processed = 0
@@ -1122,7 +1210,14 @@ def execute_market_backtest(db: Session, payload: MarketBacktestRequest, progres
     with ProcessPoolExecutor(max_workers=workers) as executor:
         for batch_start in range(0, total, MARKET_BACKTEST_BATCH_SIZE):
             batch = stocks[batch_start : batch_start + MARKET_BACKTEST_BATCH_SIZE]
-            bars_by_code = query_backtest_rows_by_code(db, [stock["ts_code"] for stock in batch], payload.start_date, payload.end_date)
+            bars_by_code = query_backtest_rows_by_code(
+                db,
+                [stock["ts_code"] for stock in batch],
+                payload.start_date,
+                payload.end_date,
+                tail_mainline_states,
+                industry_by_code,
+            )
             futures = {}
             for stock in batch:
                 rows = bars_by_code.get(stock["ts_code"], [])
@@ -1201,29 +1296,17 @@ def report_market_backtest_progress(progress: Any | None, processed: int, total:
     )
 
 
-def run_single_market_backtest(stock: dict[str, Any], rows: list[tuple[str, float, float, float, float, float]], base_config: dict[str, Any]) -> dict[str, Any]:
-    backtest_rows = [
-        {
-            "ts_code": stock["ts_code"],
-            "date": row[0],
-            "open": row[1],
-            "high": row[2],
-            "low": row[3],
-            "close": row[4],
-            "volume": row[5],
-        }
-        for row in rows
-    ]
+def run_single_market_backtest(stock: dict[str, Any], rows: list[dict[str, Any]], base_config: dict[str, Any]) -> dict[str, Any]:
     config = dict(base_config)
     config["symbolName"] = config.get("symbolName") or f"{stock['name']} {stock['ts_code']}"
-    summary = run_backtest(backtest_rows, config, include_ai=False, include_details=False)
+    summary = run_backtest(rows, config, include_ai=False, include_details=False)
     return {
         "ts_code": stock["ts_code"],
         "name": stock["name"],
         "industry": stock["industry"],
         "market": stock["market"],
         "dataBars": len(rows),
-        "latestDate": rows[-1][0],
+        "latestDate": rows[-1]["date"],
         "totalReturn": summary["totalReturn"],
         "maxDrawdown": summary["maxDrawdown"],
         "winRate": summary["winRate"],
@@ -1252,7 +1335,77 @@ def stock_to_market_meta(stock: Stock) -> dict[str, Any]:
     }
 
 
-def query_backtest_rows_by_code(db: Session, ts_codes: list[str], start_date: date, end_date: date) -> dict[str, list[tuple[str, float, float, float, float, float]]]:
+def needs_tail_mainline_states(config: dict[str, Any]) -> bool:
+    return config.get("entryMode") == "tail-active-next-day" and bool((config.get("tailMainlineFilter") or {}).get("enabled", False))
+
+
+def query_tail_mainline_states(db: Session, payload: MarketBacktestRequest) -> dict[tuple[str, str], dict[str, float]]:
+    up_case = case((StockDailyBar.pct_chg > 0, 1), else_=0)
+    stmt = (
+        select(
+            StockDailyBar.trade_date,
+            Stock.industry,
+            func.count(StockDailyBar.ts_code).label("samples"),
+            func.avg(StockDailyBar.pct_chg).label("avg_pct_chg"),
+            func.sum(up_case).label("up_count"),
+        )
+        .join(Stock, Stock.ts_code == StockDailyBar.ts_code)
+        .where(
+            StockDailyBar.trade_date >= payload.start_date,
+            StockDailyBar.trade_date <= payload.end_date,
+            StockDailyBar.pct_chg.is_not(None),
+            Stock.industry.is_not(None),
+            Stock.industry != "",
+        )
+    )
+    if payload.pool_id:
+        stmt = stmt.join(StockPoolMember, StockPoolMember.ts_code == Stock.ts_code).where(StockPoolMember.pool_id == payload.pool_id)
+    if payload.market:
+        stmt = stmt.where(Stock.market.ilike(f"%{payload.market.strip()}%"))
+    if payload.exclude_st:
+        stmt = stmt.where(~Stock.name.ilike("ST%"), ~Stock.name.ilike("*ST%"))
+    if payload.exclude_bj:
+        stmt = stmt.where(Stock.market != "北交所", ~Stock.ts_code.ilike("%.BJ"))
+    stmt = stmt.group_by(StockDailyBar.trade_date, Stock.industry).order_by(StockDailyBar.trade_date, Stock.industry)
+
+    by_date: dict[str, list[dict[str, float | str]]] = {}
+    for row in db.execute(stmt):
+        samples = int(row.samples or 0)
+        if samples <= 0:
+            continue
+        trade_date = row.trade_date.isoformat()
+        by_date.setdefault(trade_date, []).append(
+            {
+                "industry": str(row.industry or "未知"),
+                "samples": float(samples),
+                "avgReturn": float(row.avg_pct_chg or 0) / 100,
+                "upPct": float(row.up_count or 0) / samples,
+            }
+        )
+
+    states: dict[tuple[str, str], dict[str, float]] = {}
+    for trade_date, industries in by_date.items():
+        ranked = sorted(industries, key=lambda item: (float(item["avgReturn"]), float(item["upPct"]), float(item["samples"])), reverse=True)
+        total = len(ranked)
+        for index, item in enumerate(ranked, start=1):
+            states[(trade_date, str(item["industry"]))] = {
+                "tailMainlineIndustrySamples": float(item["samples"]),
+                "tailMainlineIndustryAvgReturn": float(item["avgReturn"]),
+                "tailMainlineIndustryUpPct": float(item["upPct"]),
+                "tailMainlineIndustryRank": float(index),
+                "tailMainlineIndustryRankPct": float(index) / total if total else 1.0,
+            }
+    return states
+
+
+def query_backtest_rows_by_code(
+    db: Session,
+    ts_codes: list[str],
+    start_date: date,
+    end_date: date,
+    tail_mainline_states: dict[tuple[str, str], dict[str, float]] | None = None,
+    industry_by_code: dict[str, str] | None = None,
+) -> dict[str, list[dict[str, Any]]]:
     if not ts_codes:
         return {}
     stmt = (
@@ -1263,7 +1416,15 @@ def query_backtest_rows_by_code(db: Session, ts_codes: list[str], start_date: da
             StockDailyBar.high,
             StockDailyBar.low,
             StockDailyBar.close,
+            StockDailyBar.pct_chg,
             StockDailyBar.vol,
+            StockDailyBasic.turnover_rate,
+            StockDailyBasic.turnover_rate_f,
+            StockDailyBasic.volume_ratio,
+        )
+        .outerjoin(
+            StockDailyBasic,
+            (StockDailyBasic.ts_code == StockDailyBar.ts_code) & (StockDailyBasic.trade_date == StockDailyBar.trade_date),
         )
         .where(
             StockDailyBar.ts_code.in_(ts_codes),
@@ -1272,9 +1433,27 @@ def query_backtest_rows_by_code(db: Session, ts_codes: list[str], start_date: da
         )
         .order_by(StockDailyBar.ts_code, StockDailyBar.trade_date)
     )
-    grouped: dict[str, list[tuple[str, float, float, float, float, float]]] = {}
+    grouped: dict[str, list[dict[str, Any]]] = {}
     for row in db.execute(stmt):
-        grouped.setdefault(row.ts_code, []).append((row.trade_date.isoformat(), float(row.open), float(row.high), float(row.low), float(row.close), float(row.vol) if row.vol is not None else 0))
+        item = {
+                "ts_code": row.ts_code,
+                "date": row.trade_date.isoformat(),
+                "open": float(row.open),
+                "high": float(row.high),
+                "low": float(row.low),
+                "close": float(row.close),
+                "dailyReturnPct": float(row.pct_chg) / 100 if row.pct_chg is not None else None,
+                "volume": float(row.vol) if row.vol is not None else 0,
+                "turnoverRate": float(row.turnover_rate) if row.turnover_rate is not None else None,
+                "turnoverRateF": float(row.turnover_rate_f) if row.turnover_rate_f is not None else None,
+                "volumeRatioBasic": float(row.volume_ratio) if row.volume_ratio is not None else None,
+        }
+        if tail_mainline_states is not None and industry_by_code is not None:
+            industry = industry_by_code.get(row.ts_code, "未知")
+            state = tail_mainline_states.get((row.trade_date.isoformat(), industry))
+            if state:
+                item.update(state)
+        grouped.setdefault(row.ts_code, []).append(item)
     return grouped
 
 
@@ -1830,6 +2009,19 @@ def query_daily_bars(db: Session, ts_code: str, start_date: date, end_date: date
         .order_by(StockDailyBar.trade_date)
     )
     return list(db.scalars(stmt).all())
+
+
+def query_daily_basic_map(db: Session, ts_code: str, start_date: date, end_date: date) -> dict[date, StockDailyBasic]:
+    stmt = (
+        select(StockDailyBasic)
+        .where(
+            StockDailyBasic.ts_code == ts_code,
+            StockDailyBasic.trade_date >= start_date,
+            StockDailyBasic.trade_date <= end_date,
+        )
+        .order_by(StockDailyBasic.trade_date)
+    )
+    return {row.trade_date: row for row in db.scalars(stmt)}
 
 
 def query_screen_bars_by_code(db: Session, ts_codes: list[str], start_date: date, end_date: date) -> dict[str, list[tuple[date, float, float, float, float, float | None, float]]]:
@@ -3575,6 +3767,44 @@ def decimal_to_float(value: Any) -> float | None:
     return float(value)
 
 
+def parse_signal_codes(text: str | None) -> list[str]:
+    if not text:
+        return []
+    codes: list[str] = []
+    for item in re.split(r"[\s,，;；]+", text):
+        code = normalize_plain_code(item)
+        if code and code not in codes:
+            codes.append(code)
+    return codes
+
+
+def value_between(value: Any, lower: float, upper: float) -> bool:
+    number = decimal_to_float(value) if value is not None else None
+    return number is not None and float(lower) <= number <= float(upper)
+
+
+def value_gt(value: Any, threshold: float) -> bool:
+    number = decimal_to_float(value) if value is not None else None
+    return number is not None and number > float(threshold)
+
+
+def count_prior_limit_up_days(db: Session, ts_code: str, lookback_days: int) -> int:
+    stmt = (
+        select(StockDailyBar)
+        .where(StockDailyBar.ts_code == ts_code, StockDailyBar.trade_date < date.today())
+        .order_by(StockDailyBar.trade_date.desc())
+        .limit(max(1, min(lookback_days, 60)))
+    )
+    count = 0
+    for bar in db.scalars(stmt):
+        pct_chg = decimal_to_float(bar.pct_chg)
+        close = decimal_to_float(bar.close)
+        high = decimal_to_float(bar.high)
+        if pct_chg is not None and pct_chg >= 9.5 and close is not None and high is not None and close >= high * 0.998:
+            count += 1
+    return count
+
+
 def collect_news_items(sources: list[str], count: int) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     selected_sources = sources[:6]
@@ -3718,16 +3948,26 @@ def bar_to_schema(row: dict, bar: StockDailyBar) -> DailyBarOut:
     )
 
 
-def bar_to_backtest_row(bar: StockDailyBar) -> dict:
-    return {
+def bar_to_backtest_row(bar: StockDailyBar, daily_basic: StockDailyBasic | None = None) -> dict:
+    row = {
         "ts_code": bar.ts_code,
         "date": bar.trade_date.isoformat(),
         "open": float(bar.open),
         "high": float(bar.high),
         "low": float(bar.low),
         "close": float(bar.close),
+        "dailyReturnPct": float(bar.pct_chg) / 100 if bar.pct_chg is not None else None,
         "volume": float(bar.vol) if bar.vol is not None else 0,
     }
+    if daily_basic:
+        row.update(
+            {
+                "turnoverRate": float(daily_basic.turnover_rate) if daily_basic.turnover_rate is not None else None,
+                "turnoverRateF": float(daily_basic.turnover_rate_f) if daily_basic.turnover_rate_f is not None else None,
+                "volumeRatioBasic": float(daily_basic.volume_ratio) if daily_basic.volume_ratio is not None else None,
+            }
+        )
+    return row
 
 
 def screen_bar_to_backtest_row(ts_code: str, bar: tuple[date, float, float, float, float, float | None, float]) -> dict:
@@ -3738,5 +3978,6 @@ def screen_bar_to_backtest_row(ts_code: str, bar: tuple[date, float, float, floa
         "high": bar[2],
         "low": bar[3],
         "close": bar[4],
+        "dailyReturnPct": bar[5] / 100 if bar[5] is not None else None,
         "volume": bar[6],
     }

@@ -1,0 +1,16 @@
+{
+  "total": 7,
+  "selected": [
+    {
+      "ts_code": "603065.SH",
+      "name": "宿迁联盛",
+      "industry": "化工原料",
+      "trade_date": "2026-06-04",
+      "daily_close": 8.68,
+      "next_trade_date": null,
+      "next_close": null,
+      "next_limit_up_close": null,
+      "daily_entry_return_to_next_close": null
+    }
+  ]
+}

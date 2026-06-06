@@ -5,3 +5,4 @@ psycopg[binary]==3.2.13
 pydantic==2.12.5
 tushare==1.4.24
 pandas==2.3.3
+mootdx==0.11.7

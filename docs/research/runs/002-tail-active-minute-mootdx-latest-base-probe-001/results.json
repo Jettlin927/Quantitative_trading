@@ -1,0 +1,255 @@
+{
+  "runId": "002-tail-active-minute-mootdx-latest-base-probe-001",
+  "createdAt": "2026-06-05T03:15:38+08:00",
+  "scope": {
+    "startDate": "2026-05-25",
+    "endDate": "2026-06-04",
+    "targetTime": "14:30:00",
+    "maxStocks": 0,
+    "minBars": 1,
+    "excludeSt": true,
+    "excludeBj": true,
+    "maxCandidates": 20,
+    "maxRequests": 20,
+    "profile": "base",
+    "provider": "mootdx",
+    "dryRun": false,
+    "includeOpenCandidates": false
+  },
+  "summary": {
+    "candidateDates": 15,
+    "selectedCandidates": 15,
+    "minuteMatches": 5,
+    "coverageRate": 0.3333333333333333,
+    "avgMinuteReturnToNextClose": -0.036372244480687675,
+    "medianMinuteReturnToNextClose": -0.02328675981370587,
+    "avgDailyReturnToNextCloseForMatched": -0.04186123140089271,
+    "medianDailyReturnToNextCloseForMatched": -0.037307692307692264,
+    "avgDailyCloseVsMinuteEntryPct": 0.005318934175088707,
+    "medianDailyCloseVsMinuteEntryPct": 0.00917431192660545,
+    "fetchErrors": 0,
+    "sourceStatus": "insufficient_coverage",
+    "sourceStatusReason": "分钟匹配数或覆盖率不足，不能进入全量分钟回测。",
+    "canPromoteToBacktest": false
+  },
+  "fetchErrors": [],
+  "fetchStats": [
+    {
+      "ts_code": "603890.SH",
+      "rows": 800,
+      "matches": 1,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "600459.SH",
+      "rows": 800,
+      "matches": 1,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "600280.SH",
+      "rows": 800,
+      "matches": 1,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "002995.SZ",
+      "rows": 800,
+      "matches": 1,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "002871.SZ",
+      "rows": 800,
+      "matches": 1,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "301565.SZ",
+      "rows": 800,
+      "matches": 0,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "002639.SZ",
+      "rows": 800,
+      "matches": 0,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "000720.SZ",
+      "rows": 800,
+      "matches": 0,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "600173.SH",
+      "rows": 800,
+      "matches": 0,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "603990.SH",
+      "rows": 800,
+      "matches": 0,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "603661.SH",
+      "rows": 800,
+      "matches": 0,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "600592.SH",
+      "rows": 800,
+      "matches": 0,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "300196.SZ",
+      "rows": 800,
+      "matches": 0,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "002056.SZ",
+      "rows": 800,
+      "matches": 0,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    },
+    {
+      "ts_code": "000926.SZ",
+      "rows": 800,
+      "matches": 0,
+      "firstDate": "2026-06-01",
+      "lastDate": "2026-06-04"
+    }
+  ],
+  "minuteRecords": [
+    {
+      "ts_code": "603890.SH",
+      "name": "春秋电子",
+      "industry": "元器件",
+      "trade_date": "2026-06-03",
+      "daily_close": 31.33,
+      "next_trade_date": "2026-06-04",
+      "next_close": 29.36,
+      "next_limit_up_close": false,
+      "daily_entry_return_to_next_close": -0.06287902968400894,
+      "source": "mootdx",
+      "target_time": "14:30:00",
+      "matched_trade_time": "2026-06-03 14:30",
+      "minute_open": 30.04,
+      "minute_high": 30.07,
+      "minute_low": 30.04,
+      "minute_close": 30.06,
+      "minute_vol": 135300.0,
+      "minute_amount": 4066660.0,
+      "minute_entry_return_to_next_close": -0.02328675981370587,
+      "daily_close_vs_minute_entry_pct": 0.04224883566200921
+    },
+    {
+      "ts_code": "600459.SH",
+      "name": "贵研铂业",
+      "industry": "小金属",
+      "trade_date": "2026-06-03",
+      "daily_close": 24.2,
+      "next_trade_date": "2026-06-04",
+      "next_close": 24.24,
+      "next_limit_up_close": false,
+      "daily_entry_return_to_next_close": 0.0016528925619834212,
+      "source": "mootdx",
+      "target_time": "14:30:00",
+      "matched_trade_time": "2026-06-03 14:30",
+      "minute_open": 24.0,
+      "minute_high": 24.0,
+      "minute_low": 23.97,
+      "minute_close": 23.98,
+      "minute_vol": 199100.0,
+      "minute_amount": 4775191.0,
+      "minute_entry_return_to_next_close": 0.010842368640533673,
+      "daily_close_vs_minute_entry_pct": 0.00917431192660545
+    },
+    {
+      "ts_code": "600280.SH",
+      "name": "中央商场",
+      "industry": "百货",
+      "trade_date": "2026-06-03",
+      "daily_close": 3.99,
+      "next_trade_date": "2026-06-04",
+      "next_close": 3.59,
+      "next_limit_up_close": false,
+      "daily_entry_return_to_next_close": -0.10025062656641615,
+      "source": "mootdx",
+      "target_time": "14:30:00",
+      "matched_trade_time": "2026-06-03 14:30",
+      "minute_open": 4.14,
+      "minute_high": 4.14,
+      "minute_low": 4.13,
+      "minute_close": 4.14,
+      "minute_vol": 305900.0,
+      "minute_amount": 1265052.0,
+      "minute_entry_return_to_next_close": -0.13285024154589364,
+      "daily_close_vs_minute_entry_pct": -0.03623188405797084
+    },
+    {
+      "ts_code": "002995.SZ",
+      "name": "天地在线",
+      "industry": "互联网",
+      "trade_date": "2026-06-02",
+      "daily_close": 26.0,
+      "next_trade_date": "2026-06-03",
+      "next_close": 25.03,
+      "next_limit_up_close": false,
+      "daily_entry_return_to_next_close": -0.037307692307692264,
+      "source": "mootdx",
+      "target_time": "14:30:00",
+      "matched_trade_time": "2026-06-02 14:30",
+      "minute_open": 25.98,
+      "minute_high": 26.0,
+      "minute_low": 25.98,
+      "minute_close": 25.98,
+      "minute_vol": 31100.0,
+      "minute_amount": 808302.0,
+      "minute_entry_return_to_next_close": -0.03656658968437254,
+      "daily_close_vs_minute_entry_pct": 0.0007698229407235857
+    },
+    {
+      "ts_code": "002871.SZ",
+      "name": "伟隆股份",
+      "industry": "机械基件",
+      "trade_date": "2026-06-02",
+      "daily_close": 22.81,
+      "next_trade_date": "2026-06-03",
+      "next_close": 22.57,
+      "next_limit_up_close": false,
+      "daily_entry_return_to_next_close": -0.01052170100832961,
+      "source": "mootdx",
+      "target_time": "14:30:00",
+      "matched_trade_time": "2026-06-02 14:30",
+      "minute_open": 22.6,
+      "minute_high": 22.62,
+      "minute_low": 22.57,
+      "minute_close": 22.57,
+      "minute_vol": 62400.0,
+      "minute_amount": 1410288.0,
+      "minute_entry_return_to_next_close": 0.0,
+      "daily_close_vs_minute_entry_pct": 0.010633584404076135
+    }
+  ]
+}

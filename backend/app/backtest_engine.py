@@ -49,6 +49,21 @@ DEFAULT_CONFIG = {
     "useTrendFilter": True,
     "useMacdFilter": False,
     "useRsiFilter": False,
+    "tailEntryMinPctChg": 0.03,
+    "tailEntryMaxPctChg": 0.05,
+    "tailPriorLimitUpLookback": 15,
+    "tailMinVolumeRatio": 1.5,
+    "tailMinTurnoverRatePct": 5.0,
+    "tailLimitUpPct": 0.095,
+    "tailLimitCloseTolerancePct": 0.002,
+    "tailMainlineFilter": {
+        "enabled": False,
+        "minSamples": 20,
+        "maxRank": None,
+        "maxRankPct": None,
+        "minAvgReturnPct": None,
+        "minUpPct": None,
+    },
     "allowedEntryDates": [],
     "entryScoreMode": "default",
     "minEntrySignalScore": None,
@@ -78,6 +93,7 @@ def run_backtest(rows: list[dict[str, Any]], cfg: dict[str, Any], include_ai: bo
     cash = float(cfg["initialCash"])
     shares = 0
     entry_price = 0.0
+    entry_row_index = -1
     stop_price = 0.0
     partial_taken = False
     weekly_actions: dict[str, int] = {}
@@ -101,7 +117,7 @@ def run_backtest(rows: list[dict[str, Any]], cfg: dict[str, Any], include_ai: bo
         profitable_exit_today = False
 
         def execute_sell(price: float, quantity: int, reason: str, force: bool = False) -> None:
-            nonlocal cash, shares, entry_price, stop_price, partial_taken, profitable_exit_today
+            nonlocal cash, shares, entry_price, entry_row_index, stop_price, partial_taken, profitable_exit_today
             if not force and not can_trade(row["date"]):
                 blocked["weekly"] += 1
                 return
@@ -136,11 +152,12 @@ def run_backtest(rows: list[dict[str, Any]], cfg: dict[str, Any], include_ai: bo
                     }
                 )
                 entry_price = 0
+                entry_row_index = -1
                 stop_price = 0
                 partial_taken = False
 
         def execute_buy(price: float, quantity: int, reason: str, stop: float) -> None:
-            nonlocal cash, shares, entry_price, stop_price, partial_taken
+            nonlocal cash, shares, entry_price, entry_row_index, stop_price, partial_taken
             if not can_trade(row["date"]):
                 blocked["weekly"] += 1
                 return
@@ -150,6 +167,7 @@ def run_backtest(rows: list[dict[str, Any]], cfg: dict[str, Any], include_ai: bo
             cash -= gross + fee
             shares += quantity
             entry_price = price
+            entry_row_index = index
             stop_price = stop
             partial_taken = False
             record_action(row["date"])
@@ -171,6 +189,7 @@ def run_backtest(rows: list[dict[str, Any]], cfg: dict[str, Any], include_ai: bo
             tp2_hit = row["high"] >= entry_price * (1 + float(cfg["takeProfit2Pct"]))
             tp1_hit = row["high"] >= entry_price * (1 + float(cfg["takeProfit1Pct"])) and not partial_taken
             weak_exit = cfg["marketState"] == "weak" and row["close"] < row["trendSlowMa"]
+            tail_next_day_exit = cfg["entryMode"] == "tail-active-next-day" and entry_row_index >= 0 and index > entry_row_index
 
             if stop_hit:
                 execute_sell(
@@ -179,6 +198,9 @@ def run_backtest(rows: list[dict[str, Any]], cfg: dict[str, Any], include_ai: bo
                     "保本线触发" if stop_price >= entry_price else "硬止损触发",
                     bool(cfg.get("forceStopOverridesLimit", True)),
                 )
+            elif tail_next_day_exit:
+                if not limit_up_close(row, cfg):
+                    execute_sell(row["close"], shares, "尾盘策略次日未涨停退出", True)
             elif tp2_hit:
                 execute_sell(entry_price * (1 + float(cfg["takeProfit2Pct"])), shares, "第二止盈清仓")
             elif tp1_hit:
@@ -286,6 +308,7 @@ def enrich_rows(rows: list[dict[str, Any]], cfg: dict[str, Any]) -> list[dict[st
     closes: list[float] = []
     highs: list[float] = []
     lows: list[float] = []
+    limit_up_flags: list[bool] = []
     overnight_gaps: list[float] = []
     close_windows = {period: RollingStats(period) for period in {5, 10, 20, 30, 60, trend_fast_period, trend_slow_period, trend_long_period, boll_period}}
     volume_window = RollingStats(volume_ma_period)
@@ -307,10 +330,20 @@ def enrich_rows(rows: list[dict[str, Any]], cfg: dict[str, Any]) -> list[dict[st
         previous_close = closes[-1] if closes else close
         has_previous = bool(closes)
         prior_gaps = overnight_gaps[-60:]
+        daily_return = daily_return_pct(row, previous_close, close)
+        current["dailyReturnPct"] = daily_return
+        current["volumeRatioBasic"] = first_finite_value(row.get("volumeRatioBasic"), row.get("volume_ratio"))
+        current["turnoverRate"] = first_finite_value(row.get("turnoverRate"), row.get("turnover_rate"))
+        current["turnoverRateF"] = first_finite_value(row.get("turnoverRateF"), row.get("turnover_rate_f"))
+        lookback = max(1, int(cfg.get("tailPriorLimitUpLookback", 15)))
+        current["priorLimitUpCount"] = sum(1 for flag in limit_up_flags[-lookback:] if flag)
+        current["priorLimitUp15Count"] = current["priorLimitUpCount"]
+        current["priorLimitUp15"] = current["priorLimitUpCount"] > 0
 
         closes.append(close)
         highs.append(high)
         lows.append(low)
+        limit_up_flags.append(limit_up_close(current, cfg))
         true_range = max(high - low, abs(high - previous_close), abs(low - previous_close))
         for window in close_windows.values():
             window.add(close)
@@ -399,8 +432,10 @@ def should_enter(row: dict[str, Any], prev_row: dict[str, Any] | None, cfg: dict
     if bool(cfg.get("blockWeakMarket", True)) and cfg["marketState"] == "weak":
         return {"ok": False, "reason": "退潮期禁止开新仓", "blockedByMarket": True}
 
+    mode = cfg["entryMode"]
     trend_ok = (
-        not bool(cfg.get("useTrendFilter", True))
+        mode == "tail-active-next-day"
+        or not bool(cfg.get("useTrendFilter", True))
         or row["trendFastMa"] >= row["trendSlowMa"]
         or row["close"] >= row["trendLongMa"]
     )
@@ -415,8 +450,10 @@ def should_enter(row: dict[str, Any], prev_row: dict[str, Any] | None, cfg: dict
     if not risk_ok:
         return {"ok": False, "reason": risk_reason, "blockedByRisk": True}
 
-    mode = cfg["entryMode"]
     volume_ok = volume_breakout(row, cfg, fallback_ok=True)
+
+    if mode == "tail-active-next-day":
+        return tail_active_entry_signal(row, cfg)
 
     if mode == "boll-rebound":
         if not finite(row["bollLower"]) or not finite(prev_row["bollLower"]):
@@ -584,6 +621,93 @@ def volume_breakout(row: dict[str, Any], cfg: dict[str, Any], fallback_ok: bool 
     return row["volume"] >= row["volMa"] * float(cfg["volumeBreakoutMultiplier"])
 
 
+def tail_active_entry_signal(row: dict[str, Any], cfg: dict[str, Any]) -> dict[str, Any]:
+    daily_return = row.get("dailyReturnPct")
+    if not finite(daily_return):
+        return {"ok": False, "reason": "尾盘涨幅指标不足"}
+    if daily_return < float(cfg["tailEntryMinPctChg"]) or daily_return > float(cfg["tailEntryMaxPctChg"]):
+        return {"ok": False, "reason": "尾盘涨幅不在目标区间"}
+
+    if int(row.get("priorLimitUpCount") or row.get("priorLimitUp15Count") or 0) <= 0:
+        return {"ok": False, "reason": "近 15 日无涨停辨识度"}
+
+    volume_ratio = row.get("volumeRatioBasic")
+    if not finite(volume_ratio):
+        return {"ok": False, "reason": "量比数据不足"}
+    if volume_ratio <= float(cfg["tailMinVolumeRatio"]):
+        return {"ok": False, "reason": "量比不足"}
+
+    turnover_rate = first_finite_value(row.get("turnoverRate"), row.get("turnoverRateF"))
+    if not finite(turnover_rate):
+        return {"ok": False, "reason": "换手率数据不足"}
+    if turnover_rate <= float(cfg["tailMinTurnoverRatePct"]):
+        return {"ok": False, "reason": "换手率不足"}
+
+    mainline_ok, mainline_reason = tail_mainline_filter_ok(row, cfg)
+    if not mainline_ok:
+        return {"ok": False, "reason": mainline_reason}
+
+    return {"ok": True, "reason": "尾盘主线活跃票：涨幅/涨停记忆/量比/换手共振"}
+
+
+def tail_mainline_filter_ok(row: dict[str, Any], cfg: dict[str, Any]) -> tuple[bool, str]:
+    rules = cfg.get("tailMainlineFilter") or {}
+    if not bool(rules.get("enabled", False)):
+        return True, ""
+
+    samples = row.get("tailMainlineIndustrySamples")
+    if not finite(samples) or float(samples) < float(rules.get("minSamples") or 0):
+        return False, "行业主线样本不足"
+
+    rank = row.get("tailMainlineIndustryRank")
+    max_rank = rules.get("maxRank")
+    if max_rank is not None and (not finite(rank) or float(rank) > float(max_rank)):
+        return False, "行业主线排名不足"
+
+    rank_pct = row.get("tailMainlineIndustryRankPct")
+    max_rank_pct = rules.get("maxRankPct")
+    if max_rank_pct is not None and (not finite(rank_pct) or float(rank_pct) > float(max_rank_pct)):
+        return False, "行业主线相对排名不足"
+
+    avg_return = row.get("tailMainlineIndustryAvgReturn")
+    min_avg_return = rules.get("minAvgReturnPct")
+    if min_avg_return is not None and (not finite(avg_return) or float(avg_return) < float(min_avg_return)):
+        return False, "行业主线涨幅不足"
+
+    up_pct = row.get("tailMainlineIndustryUpPct")
+    min_up_pct = rules.get("minUpPct")
+    if min_up_pct is not None and (not finite(up_pct) or float(up_pct) < float(min_up_pct)):
+        return False, "行业主线上涨家数不足"
+
+    return True, ""
+
+
+def limit_up_close(row: dict[str, Any], cfg: dict[str, Any]) -> bool:
+    daily_return = row.get("dailyReturnPct")
+    if not finite(daily_return) or daily_return < float(cfg["tailLimitUpPct"]):
+        return False
+    close = row.get("close")
+    high = row.get("high")
+    return finite(close) and finite(high) and close >= high * (1 - float(cfg["tailLimitCloseTolerancePct"]))
+
+
+def daily_return_pct(row: dict[str, Any], previous_close: float, close: float) -> float:
+    if finite(row.get("dailyReturnPct")):
+        return float(row["dailyReturnPct"])
+    if finite(row.get("pct_chg")):
+        return float(row["pct_chg"]) / 100
+    if previous_close:
+        return close / previous_close - 1
+    return 0.0
+
+
+def first_finite_value(*values: Any) -> float:
+    for value in values:
+        if finite(value):
+            return float(value)
+    return float("nan")
+
+
 def crossed_above(row: dict[str, Any], prev_row: dict[str, Any], fast_key: str, slow_key: str) -> bool:
     values = [row.get(fast_key), row.get(slow_key), prev_row.get(fast_key), prev_row.get(slow_key)]
     if not all(finite(value) for value in values):
@@ -686,6 +810,8 @@ def build_strategy_analysis(result: dict[str, Any], rows: list[dict[str, Any]], 
 
 
 def describe_market_fit(entry_mode: str, latest: dict[str, Any]) -> str:
+    if entry_mode == "tail-active-next-day":
+        return "偏尾盘活跃度：依赖当日辨识度和次日纪律退出，必须用全市场和弱市窗口验证。"
     if entry_mode in {"macd-cross", "ma-cross", "trend-follow", "trend-pullback-confirm", "boll-breakout", "boll-squeeze"}:
         if finite(latest.get("trendFastMa")) and finite(latest.get("trendSlowMa")) and latest["trendFastMa"] >= latest["trendSlowMa"]:
             return "偏趋势跟随：更适合有持续方向和成交量配合的阶段。"
@@ -706,6 +832,7 @@ def entry_mode_label(entry_mode: str) -> str:
         "boll-squeeze": "BOLL 收口突破",
         "rsi-reversal": "RSI 超卖反转",
         "ma-cross": "均线金叉",
+        "tail-active-next-day": "尾盘活跃次日纪律",
     }.get(entry_mode, entry_mode)
 
 

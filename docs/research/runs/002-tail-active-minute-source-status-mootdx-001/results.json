@@ -1,0 +1,50 @@
+{
+  "runId": "002-tail-active-minute-source-status-mootdx-001",
+  "createdAt": "2026-06-05T03:06:11+08:00",
+  "scope": {
+    "startDate": "2026-06-01",
+    "endDate": "2026-06-04",
+    "targetTime": "14:30:00",
+    "maxStocks": 0,
+    "minBars": 1,
+    "excludeSt": true,
+    "excludeBj": true,
+    "maxCandidates": 1,
+    "maxRequests": 1,
+    "profile": "base",
+    "provider": "mootdx",
+    "dryRun": false,
+    "includeOpenCandidates": true
+  },
+  "summary": {
+    "candidateDates": 7,
+    "selectedCandidates": 1,
+    "minuteMatches": 0,
+    "coverageRate": 0.0,
+    "avgMinuteReturnToNextClose": null,
+    "medianMinuteReturnToNextClose": null,
+    "avgDailyReturnToNextCloseForMatched": null,
+    "medianDailyReturnToNextCloseForMatched": null,
+    "avgDailyCloseVsMinuteEntryPct": null,
+    "medianDailyCloseVsMinuteEntryPct": null,
+    "fetchErrors": 1,
+    "sourceStatus": "source_failed",
+    "sourceStatusReason": "分钟源请求失败且没有任何匹配记录。",
+    "canPromoteToBacktest": false
+  },
+  "fetchErrors": [
+    {
+      "ts_code": "603065.SH",
+      "error": "mootdx is not installed; install and verify it before using provider=mootdx"
+    }
+  ],
+  "fetchStats": [
+    {
+      "ts_code": "603065.SH",
+      "rows": 0,
+      "matches": 0,
+      "error": "mootdx is not installed; install and verify it before using provider=mootdx"
+    }
+  ],
+  "minuteRecords": []
+}

@@ -1,0 +1,39 @@
+{
+  "runId": "002-tail-active-minute-best-risk-mar-jun-dryrun-001",
+  "createdAt": "2026-06-05T03:30:39+08:00",
+  "scope": {
+    "startDate": "2026-03-01",
+    "endDate": "2026-06-04",
+    "targetTime": "14:30:00",
+    "maxStocks": 0,
+    "minBars": 1,
+    "excludeSt": true,
+    "excludeBj": true,
+    "maxCandidates": 0,
+    "maxRequests": 0,
+    "profile": "best-risk",
+    "provider": "tushare",
+    "mootdxPages": 1,
+    "dryRun": true,
+    "includeOpenCandidates": false
+  },
+  "summary": {
+    "candidateDates": 71,
+    "selectedCandidates": 71,
+    "minuteMatches": 0,
+    "coverageRate": 0.0,
+    "avgMinuteReturnToNextClose": null,
+    "medianMinuteReturnToNextClose": null,
+    "avgDailyReturnToNextCloseForMatched": null,
+    "medianDailyReturnToNextCloseForMatched": null,
+    "avgDailyCloseVsMinuteEntryPct": null,
+    "medianDailyCloseVsMinuteEntryPct": null,
+    "fetchErrors": 0,
+    "sourceStatus": "candidate_rebuild_only",
+    "sourceStatusReason": "dry-run 只验证候选日期重建，不验证分钟源。",
+    "canPromoteToBacktest": false
+  },
+  "fetchErrors": [],
+  "fetchStats": [],
+  "minuteRecords": []
+}

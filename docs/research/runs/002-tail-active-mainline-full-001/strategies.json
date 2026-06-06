@@ -1,0 +1,117 @@
+{
+  "strategy": {
+    "name": "tail-active-next-day-grid",
+    "label": "尾盘活跃次日纪律参数网格",
+    "hypothesis": "尾盘 3%-5% 强势但未涨停、近 15 日有涨停记忆、量比和换手率同时达标的股票，若叠加历史可复现的行业主线状态，次日若未继续涨停则退出，可降低隔夜不确定性。"
+  },
+  "variants": [
+    {
+      "tailEntryMinPctChg": 0.025,
+      "tailEntryMaxPctChg": 0.05,
+      "tailMinVolumeRatio": 2.0,
+      "tailMinTurnoverRatePct": 7.0,
+      "tailPriorLimitUpLookback": 15,
+      "entryRiskFilter": {
+        "enabled": true,
+        "maxEntryRangePct": 0.06
+      },
+      "tailMainlineFilter": {
+        "enabled": true,
+        "minSamples": 20,
+        "maxRank": 10,
+        "minAvgReturnPct": 0.01,
+        "minUpPct": 0.55
+      }
+    },
+    {
+      "tailEntryMinPctChg": 0.025,
+      "tailEntryMaxPctChg": 0.05,
+      "tailMinVolumeRatio": 2.0,
+      "tailMinTurnoverRatePct": 7.0,
+      "tailPriorLimitUpLookback": 15,
+      "entryRiskFilter": {
+        "enabled": true,
+        "maxEntryRangePct": 0.06
+      },
+      "tailMainlineFilter": {
+        "enabled": true,
+        "minSamples": 20,
+        "maxRank": 10,
+        "minAvgReturnPct": 0.005,
+        "minUpPct": 0.6
+      }
+    },
+    {
+      "tailEntryMinPctChg": 0.025,
+      "tailEntryMaxPctChg": 0.05,
+      "tailMinVolumeRatio": 2.0,
+      "tailMinTurnoverRatePct": 7.0,
+      "tailPriorLimitUpLookback": 15,
+      "entryRiskFilter": {
+        "enabled": true,
+        "maxEntryRangePct": 0.06
+      },
+      "tailMainlineFilter": {
+        "enabled": true,
+        "minSamples": 20,
+        "maxRank": 10,
+        "minAvgReturnPct": 0.005,
+        "minUpPct": 0.55
+      }
+    },
+    {
+      "tailEntryMinPctChg": 0.025,
+      "tailEntryMaxPctChg": 0.05,
+      "tailMinVolumeRatio": 2.0,
+      "tailMinTurnoverRatePct": 7.0,
+      "tailPriorLimitUpLookback": 15,
+      "entryRiskFilter": {
+        "enabled": true,
+        "maxEntryRangePct": 0.06
+      },
+      "tailMainlineFilter": {
+        "enabled": true,
+        "minSamples": 20,
+        "maxRank": 8,
+        "minAvgReturnPct": 0.005,
+        "minUpPct": 0.55
+      }
+    },
+    {
+      "tailEntryMinPctChg": 0.025,
+      "tailEntryMaxPctChg": 0.05,
+      "tailMinVolumeRatio": 2.0,
+      "tailMinTurnoverRatePct": 7.0,
+      "tailPriorLimitUpLookback": 15,
+      "entryRiskFilter": {
+        "enabled": true,
+        "maxEntryRangePct": 0.06
+      },
+      "tailMainlineFilter": {
+        "enabled": true,
+        "minSamples": 20,
+        "maxRank": 5,
+        "minAvgReturnPct": 0.005,
+        "minUpPct": 0.55
+      }
+    },
+    {
+      "tailEntryMinPctChg": 0.025,
+      "tailEntryMaxPctChg": 0.05,
+      "tailMinVolumeRatio": 2.0,
+      "tailMinTurnoverRatePct": 7.0,
+      "tailPriorLimitUpLookback": 15,
+      "entryRiskFilter": {
+        "enabled": true,
+        "maxEntryRangePct": 0.06
+      },
+      "tailMainlineFilter": {
+        "enabled": true,
+        "minSamples": 20,
+        "maxRank": 15,
+        "minAvgReturnPct": 0.003,
+        "minUpPct": 0.55
+      }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "runId": "002-tail-active-minute-mootdx-diagnostic-001",
+  "createdAt": "2026-06-05T03:03:02+08:00",
+  "scope": {
+    "startDate": "2023-01-01",
+    "endDate": "2026-06-04",
+    "targetTime": "14:30:00",
+    "maxStocks": 0,
+    "minBars": 120,
+    "excludeSt": true,
+    "excludeBj": true,
+    "maxCandidates": 5,
+    "maxRequests": 1,
+    "profile": "base",
+    "provider": "mootdx",
+    "dryRun": false,
+    "includeOpenCandidates": true
+  },
+  "summary": {
+    "candidateDates": 3753,
+    "selectedCandidates": 5,
+    "minuteMatches": 0,
+    "coverageRate": 0.0,
+    "avgMinuteReturnToNextClose": null,
+    "medianMinuteReturnToNextClose": null,
+    "avgDailyReturnToNextCloseForMatched": null,
+    "medianDailyReturnToNextCloseForMatched": null,
+    "avgDailyCloseVsMinuteEntryPct": null,
+    "medianDailyCloseVsMinuteEntryPct": null,
+    "fetchErrors": 1
+  },
+  "fetchErrors": [
+    {
+      "ts_code": "603065.SH",
+      "error": "mootdx is not installed; install and verify it before using provider=mootdx"
+    }
+  ],
+  "fetchStats": [
+    {
+      "ts_code": "603065.SH",
+      "rows": 0,
+      "matches": 0,
+      "error": "mootdx is not installed; install and verify it before using provider=mootdx"
+    }
+  ],
+  "minuteRecords": []
+}

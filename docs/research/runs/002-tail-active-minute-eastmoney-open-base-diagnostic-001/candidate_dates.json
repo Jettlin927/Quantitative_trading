@@ -1,0 +1,60 @@
+{
+  "total": 3753,
+  "selected": [
+    {
+      "ts_code": "603065.SH",
+      "name": "宿迁联盛",
+      "industry": "化工原料",
+      "trade_date": "2026-06-04",
+      "daily_close": 8.68,
+      "next_trade_date": null,
+      "next_close": null,
+      "next_limit_up_close": null,
+      "daily_entry_return_to_next_close": null
+    },
+    {
+      "ts_code": "601137.SH",
+      "name": "博威合金",
+      "industry": "小金属",
+      "trade_date": "2026-06-04",
+      "daily_close": 23.3,
+      "next_trade_date": null,
+      "next_close": null,
+      "next_limit_up_close": null,
+      "daily_entry_return_to_next_close": null
+    },
+    {
+      "ts_code": "600198.SH",
+      "name": "大唐电信",
+      "industry": "通信设备",
+      "trade_date": "2026-06-04",
+      "daily_close": 9.25,
+      "next_trade_date": null,
+      "next_close": null,
+      "next_limit_up_close": null,
+      "daily_entry_return_to_next_close": null
+    },
+    {
+      "ts_code": "002965.SZ",
+      "name": "祥鑫科技",
+      "industry": "汽车配件",
+      "trade_date": "2026-06-04",
+      "daily_close": 36.67,
+      "next_trade_date": null,
+      "next_close": null,
+      "next_limit_up_close": null,
+      "daily_entry_return_to_next_close": null
+    },
+    {
+      "ts_code": "603890.SH",
+      "name": "春秋电子",
+      "industry": "元器件",
+      "trade_date": "2026-06-03",
+      "daily_close": 31.33,
+      "next_trade_date": "2026-06-04",
+      "next_close": 29.36,
+      "next_limit_up_close": false,
+      "daily_entry_return_to_next_close": -0.06287902968400894
+    }
+  ]
+}
