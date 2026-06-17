@@ -108,6 +108,32 @@ POST /api/strategies/b1-trend-pullback/backtest
 
 该接口从 PostgreSQL 读取候选池日线和市场门控标的，复用 `my_quant` B1 组合引擎，默认采用现实主口径。它只返回研究回测结果、净值曲线、候选和交易流水，不连接券商，不产生真实交易动作。
 
+### B1 小本金主板观察口径
+
+2026-06-17 按 2 万元本金和普通权限账户约束新增 `B1 small-capital mainboard` 口径：
+
+- 本金：`20,000`。
+- 股票池：剔除创业板 `30*`、科创板 `68*`、北交所/新三板 `43/83/87/92*`，只保留普通主板样本。
+- 仓位：`Top1`，单票最多 `100%`，但必须买得起至少 100 股；最高分候选买不起时跳过，使用下一只可买候选。
+- 执行：次日开盘买入，收盘卖出，100 股一手，10% 涨停买入阻断，10% 跌停卖出阻断。
+- 风控：5% 固定止损，5% 一次性止盈。
+- 风格门控：沪深 300 `close > BBI` 且 `MA20 > MA60`，并要求主板候选池站上 BBI 比例不低于 `30%`、20 日动量中位数不低于 `0%`、有效样本不少于 `20`。
+
+默认复现入口：
+
+```bash
+.venv/bin/python -m my_quant.strategy_research.run_b1_small_capital_mainboard --output-prefix b1_small_capital_mainboard_final_20260617
+```
+
+本轮最终结果仍是 `观察`，不是阶段通过：`6/6` 窗口通过 -30% 回撤门槛，但只有 `4/6` 窗口通过 50% 年化门槛。失败窗口是 `train_2025` 年化 `29.11%` 和 `wf_2025_h1` 年化 `20.91%`。主板-only 约束下，2025H1 仍未证明稳定正期望。
+
+产物：
+
+- `results/b1_small_capital_mainboard_final_20260617.md`
+- `results/b1_small_capital_mainboard_final_20260617_summary.csv`
+- `results/b1_small_capital_mainboard_final_20260617_details.csv`
+- `results/b1_small_capital_mainboard_final_20260617_full_*`
+
 默认 ETF 组合实验脚本会读取或刷新 AkShare ETF 日线数据，并生成：
 
 - `results/base_strategy_comparison.csv`

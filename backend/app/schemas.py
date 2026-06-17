@@ -160,6 +160,10 @@ class B1BacktestRequest(BaseModel):
     market_ts_code: str | None = Field(default="000300.SH")
     require_market_gate: bool = True
     market_ma20_gt_ma60: bool = True
+    use_mainboard_style_gate: bool = True
+    style_gate_min_above_bbi_pct: float = Field(default=0.30, ge=0, le=1)
+    style_gate_min_median_mom20: float = 0.0
+    style_gate_min_sample_size: int = Field(default=20, ge=1)
     volume_unit: str = Field(default="hand", pattern="^(hand|share)$")
     pool_id: int | None = Field(default=None, ge=1)
     q: str | None = None
@@ -169,6 +173,7 @@ class B1BacktestRequest(BaseModel):
     max_stocks: int = Field(default=300, ge=0)
     exclude_st: bool = True
     exclude_bj: bool = True
+    exclude_permission_boards: bool = True
     min_list_days: int = Field(default=180, ge=0)
     min_avg_amount: float | None = Field(default=None, ge=0)
     min_avg_circ_mv: float | None = Field(default=None, ge=0)

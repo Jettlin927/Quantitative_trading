@@ -632,6 +632,57 @@ class ExperimentEngineTest(unittest.TestCase):
         self.assertEqual([row["symbol"] for row in candidates], ["000002", "000003"])
         self.assertEqual([row["target_weight"] for row in candidates], [0.5, 0.5])
 
+    def test_b1_mainboard_filter_excludes_permission_required_boards(self):
+        from my_quant.strategy_research.experiment.b1_trend_pullback import filter_mainboard_a_share_symbols
+
+        symbols = ["000001", "002130", "300750", "688981", "430047", "830799", "870001", "920001", "600519"]
+
+        self.assertEqual(filter_mainboard_a_share_symbols(symbols), ["000001", "002130", "600519"])
+
+    def test_b1_small_capital_affordable_filter_uses_next_candidate(self):
+        from my_quant.strategy_research.experiment.b1_trend_pullback import B1BacktestConfig, run_b1_backtest
+
+        dates = pd.date_range("2025-01-01", periods=3)
+        expensive = pd.DataFrame(
+            {
+                "open": [300.0, 300.0, 300.0],
+                "close": [300.0, 300.0, 300.0],
+                "bbi": [250.0, 250.0, 250.0],
+                "entry_signal": [True, False, False],
+                "b1_score": [100.0, 0.0, 0.0],
+            },
+            index=dates,
+        )
+        affordable = pd.DataFrame(
+            {
+                "open": [50.0, 50.0, 50.0],
+                "close": [50.0, 50.0, 50.0],
+                "bbi": [40.0, 40.0, 40.0],
+                "entry_signal": [True, False, False],
+                "b1_score": [90.0, 0.0, 0.0],
+            },
+            index=dates,
+        )
+        market = pd.DataFrame({"close": [1.0, 1.0, 1.0], "bbi": [0.5, 0.5, 0.5]}, index=dates)
+
+        result = run_b1_backtest(
+            {"600999": expensive, "000001": affordable},
+            market,
+            B1BacktestConfig(
+                initial_cash=20_000.0,
+                top_n=1,
+                max_position=1.0,
+                lot_size=100,
+                buy_price_column="open",
+                require_affordable_lot=True,
+                cost_rate=0.0,
+            ),
+        )
+
+        buys = result.trades[result.trades["side"] == "buy"]
+        self.assertEqual(buys.iloc[0]["symbol"], "000001")
+        self.assertEqual(float(buys.iloc[0]["shares"]), 400.0)
+
     def test_b1_market_filter_blocks_new_entries_below_bbi(self):
         from my_quant.strategy_research.experiment.b1_trend_pullback import market_allows_entry
 
@@ -653,6 +704,33 @@ class ExperimentEngineTest(unittest.TestCase):
         filtered = apply_market_regime_filter(market, require_ma20_gt_ma60=True)
 
         self.assertFalse(market_allows_entry(filtered, date))
+
+    def test_b1_mainboard_style_gate_blocks_weak_candidate_breadth(self):
+        from my_quant.strategy_research.experiment.b1_trend_pullback import apply_mainboard_style_gate
+
+        dates = pd.date_range("2025-01-01", periods=2)
+        market = pd.DataFrame({"close": [100.0, 100.0], "bbi": [90.0, 90.0]}, index=dates)
+        weak_panel = pd.DataFrame(
+            {"close": [9.0, 12.0], "bbi": [10.0, 10.0], "entry_mom20": [-0.05, 0.08]},
+            index=dates,
+        )
+        strong_panel = pd.DataFrame(
+            {"close": [9.5, 13.0], "bbi": [10.0, 10.0], "entry_mom20": [-0.04, 0.10]},
+            index=dates,
+        )
+
+        gated = apply_mainboard_style_gate(
+            market,
+            {"000001": weak_panel, "600519": strong_panel},
+            min_above_bbi_pct=0.5,
+            min_median_mom20=0.0,
+            min_sample_size=2,
+        )
+
+        self.assertFalse(bool(gated.loc[dates[0], "style_gate_pass"]))
+        self.assertTrue(bool(gated.loc[dates[1], "style_gate_pass"]))
+        self.assertEqual(float(gated.loc[dates[0], "bbi"]), 200.0)
+        self.assertEqual(float(gated.loc[dates[1], "bbi"]), 90.0)
 
     def test_b1_backtest_buys_next_day_and_sells_partial_take_profit(self):
         from my_quant.strategy_research.experiment.b1_trend_pullback import B1BacktestConfig, run_b1_backtest
@@ -766,6 +844,31 @@ class ExperimentEngineTest(unittest.TestCase):
         self.assertEqual(trades.iloc[0]["date"], dates[2])
         self.assertEqual(trades.iloc[1]["symbol"], "000002")
         self.assertEqual(trades.iloc[1]["date"], dates[4])
+
+    def test_b1_fixed_stop_loss_exits_when_cost_basis_breaks(self):
+        from my_quant.strategy_research.experiment.b1_trend_pullback import B1BacktestConfig, run_b1_backtest
+
+        dates = pd.date_range("2025-01-01", periods=4)
+        frame = pd.DataFrame(
+            {
+                "open": [10.0, 10.0, 9.4, 9.4],
+                "close": [10.0, 10.0, 9.4, 9.4],
+                "bbi": [8.0, 8.0, 8.0, 8.0],
+                "entry_signal": [True, False, False, False],
+                "b1_score": [10.0, 0.0, 0.0, 0.0],
+            },
+            index=dates,
+        )
+        market = pd.DataFrame({"close": [1.0, 1.0, 1.0, 1.0], "bbi": [0.5, 0.5, 0.5, 0.5]}, index=dates)
+
+        result = run_b1_backtest(
+            {"000001": frame},
+            market,
+            B1BacktestConfig(cost_rate=0.0, stop_loss_pct=0.05),
+        )
+
+        sells = result.trades[result.trades["side"] == "sell"]
+        self.assertEqual(sells.iloc[0]["reason"], "stop_loss_5")
 
     def test_b1_retry_call_recovers_from_transient_error(self):
         from my_quant.strategy_research.experiment.b1_trend_pullback import retry_call
@@ -944,6 +1047,24 @@ class ExperimentEngineTest(unittest.TestCase):
         args = parse_args(["--data-provider", "tushare"])
 
         self.assertEqual(args.data_provider, "tushare")
+
+    def test_b1_small_capital_mainboard_cli_defaults_to_goal_constraints(self):
+        from my_quant.strategy_research.run_b1_small_capital_mainboard import build_small_capital_config, parse_args
+
+        args = parse_args([])
+        config = build_small_capital_config(args)
+
+        self.assertEqual(config.initial_cash, 20_000.0)
+        self.assertEqual(config.top_n, 1)
+        self.assertEqual(config.max_position, 1.0)
+        self.assertEqual(config.lot_size, 100)
+        self.assertTrue(config.require_affordable_lot)
+        self.assertEqual(config.stop_loss_pct, 0.05)
+        self.assertEqual(config.take_profit_levels, (0.05,))
+        self.assertTrue(args.exclude_permission_boards)
+        self.assertTrue(args.use_mainboard_style_gate)
+        self.assertEqual(args.style_gate_min_above_bbi_pct, 0.30)
+        self.assertEqual(args.style_gate_min_sample_size, 20)
 
     def test_b1_walk_forward_cli_accepts_entry_quality_and_market_filters(self):
         from my_quant.strategy_research.run_b1_walk_forward import parse_args

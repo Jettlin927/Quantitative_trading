@@ -23,10 +23,12 @@ from .ai_client import analyze_stock_quality_with_deepseek
 from .b1_strategy import (
     B1_STRATEGY_ID,
     B1_STRATEGY_LABEL,
+    apply_mainboard_style_gate,
     build_b1_config,
     build_b1_market_frame_from_rows,
     build_b1_panels_from_rows,
     build_permissive_market_frame,
+    filter_mainboard_stock_codes,
     run_backend_b1_backtest,
 )
 from .backtest_engine import DEFAULT_CONFIG, enrich_rows, json_safe, run_backtest
@@ -275,6 +277,9 @@ def run_b1_research_backtest(payload: B1BacktestRequest, db: Session = Depends(g
     )
     pool = get_stock_pool_or_404(db, payload.pool_id) if payload.pool_id else None
     stocks = query_backtest_stocks(db, stock_payload)
+    if payload.exclude_permission_boards:
+        mainboard_codes = set(filter_mainboard_stock_codes(stock.ts_code for stock in stocks))
+        stocks = [stock for stock in stocks if stock.ts_code in mainboard_codes]
     if not stocks:
         raise HTTPException(status_code=404, detail="没有符合 B1 回测条件的候选标的。")
 
@@ -315,6 +320,14 @@ def run_b1_research_backtest(payload: B1BacktestRequest, db: Session = Depends(g
         }
     if market_frame.empty:
         raise HTTPException(status_code=404, detail="市场门控日期为空，无法运行 B1 回测。")
+    if payload.use_mainboard_style_gate:
+        market_frame = apply_mainboard_style_gate(
+            market_frame,
+            panels,
+            min_above_bbi_pct=payload.style_gate_min_above_bbi_pct,
+            min_median_mom20=payload.style_gate_min_median_mom20,
+            min_sample_size=payload.style_gate_min_sample_size,
+        )
 
     try:
         result = run_backend_b1_backtest(panels, market_frame, config)
@@ -342,12 +355,19 @@ def run_b1_research_backtest(payload: B1BacktestRequest, db: Session = Depends(g
                 "maxStocks": payload.max_stocks,
                 "excludeSt": payload.exclude_st,
                 "excludeBj": payload.exclude_bj,
+                "excludePermissionBoards": payload.exclude_permission_boards,
                 "minListDays": payload.min_list_days,
                 "minAvgAmount": payload.min_avg_amount,
                 "minAvgCircMv": payload.min_avg_circ_mv,
                 "minAvgTurnoverRateF": payload.min_avg_turnover_rate_f,
                 "volumeUnit": payload.volume_unit,
                 "marketGate": market_gate,
+                "mainboardStyleGate": {
+                    "enabled": payload.use_mainboard_style_gate,
+                    "minAboveBbiPct": payload.style_gate_min_above_bbi_pct,
+                    "minMedianMom20": payload.style_gate_min_median_mom20,
+                    "minSampleSize": payload.style_gate_min_sample_size,
+                },
             },
             "diagnostics": {
                 "skippedByBars": skipped_by_bars,

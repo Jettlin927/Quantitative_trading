@@ -9,8 +9,10 @@ import pandas as pd
 from my_quant.strategy_research.experiment.b1_trend_pullback import (
     B1BacktestConfig,
     B1BacktestResult,
+    apply_mainboard_style_gate,
     calculate_bbi,
     compute_b1_frame,
+    is_mainboard_a_share,
     run_b1_backtest,
 )
 
@@ -19,23 +21,29 @@ B1_STRATEGY_ID = "b1-trend-pullback"
 B1_STRATEGY_LABEL = "B1 趋势回踩组合策略"
 B1_RESPONSE_ROW_LIMIT = 500
 B1_DEFAULT_CONFIG: dict[str, Any] = {
-    "top_n": 2,
-    "max_position": 0.5,
-    "initial_cash": 1_000_000.0,
+    "top_n": 1,
+    "max_position": 1.0,
+    "initial_cash": 20_000.0,
     "buy_price_column": "open",
     "sell_price_column": "close",
     "lot_size": 100,
+    "require_affordable_lot": True,
     "limit_up_pct": 0.10,
     "limit_down_pct": 0.10,
     "max_entry_close_bbi": 0.275,
     "min_entry_mom20": 0.02,
     "max_entry_mom20": 0.75,
-    "take_profit_levels": (0.08, 0.16, 0.24),
-    "take_profit_fractions": (1.0, 1.0, 1.0),
+    "stop_loss_pct": 0.05,
+    "take_profit_levels": (0.05,),
+    "take_profit_fractions": (1.0,),
 }
 
 
 BacktestRow = tuple[str, float, float, float, float, float]
+
+
+def filter_mainboard_stock_codes(codes: Iterable[str]) -> list[str]:
+    return [str(code) for code in codes if is_mainboard_a_share(str(code))]
 
 
 def build_b1_config(raw_config: dict[str, Any] | None) -> B1BacktestConfig:
@@ -48,6 +56,7 @@ def build_b1_config(raw_config: dict[str, Any] | None) -> B1BacktestConfig:
         buy_price_column=_price_column(payload["buy_price_column"], "buy_price_column"),
         sell_price_column=_price_column(payload["sell_price_column"], "sell_price_column"),
         lot_size=_optional_int(payload.get("lot_size")),
+        require_affordable_lot=bool(payload.get("require_affordable_lot", False)),
         limit_up_pct=_optional_float(payload.get("limit_up_pct")),
         limit_down_pct=_optional_float(payload.get("limit_down_pct")),
         volume_limit_pct=_optional_float(payload.get("volume_limit_pct")),
@@ -61,6 +70,7 @@ def build_b1_config(raw_config: dict[str, Any] | None) -> B1BacktestConfig:
         max_entry_close_bbi=_optional_float(payload.get("max_entry_close_bbi")),
         min_entry_mom20=_optional_float(payload.get("min_entry_mom20")),
         max_entry_mom20=_optional_float(payload.get("max_entry_mom20")),
+        stop_loss_pct=_optional_float(payload.get("stop_loss_pct")),
         take_profit_levels=_tuple_float(payload["take_profit_levels"]),
         take_profit_fractions=_tuple_float(payload["take_profit_fractions"]),
     )

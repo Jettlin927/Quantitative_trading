@@ -41,6 +41,7 @@ class B1BacktestConfig:
     buy_price_column: str = "close"
     sell_price_column: str = "close"
     lot_size: int | None = None
+    require_affordable_lot: bool = False
     limit_up_pct: float | None = None
     limit_down_pct: float | None = None
     volume_limit_pct: float | None = None
@@ -54,6 +55,7 @@ class B1BacktestConfig:
     max_entry_close_bbi: float | None = None
     min_entry_mom20: float | None = None
     max_entry_mom20: float | None = None
+    stop_loss_pct: float | None = None
     take_profit_levels: tuple[float, ...] = (0.08, 0.16, 0.24)
     take_profit_fractions: tuple[float, ...] = (0.33, 0.33, 1.0)
 
@@ -148,10 +150,59 @@ def market_allows_entry(market_frame: pd.DataFrame, date: pd.Timestamp) -> bool:
     return bool(float(row["close"]) > float(row["bbi"]))
 
 
+def apply_mainboard_style_gate(
+    market_frame: pd.DataFrame,
+    panels: dict[str, pd.DataFrame],
+    min_above_bbi_pct: float = 0.35,
+    min_median_mom20: float = 0.0,
+    min_sample_size: int = 30,
+) -> pd.DataFrame:
+    gated = market_frame.copy()
+    diagnostics: list[dict[str, float | bool | pd.Timestamp]] = []
+    for date in gated.index:
+        rows = []
+        for frame in panels.values():
+            if date not in frame.index:
+                continue
+            row = frame.loc[date]
+            close = row.get("close")
+            bbi = row.get("bbi")
+            mom20 = row.get("entry_mom20")
+            if pd.isna(close) or pd.isna(bbi) or pd.isna(mom20) or float(bbi) <= 0:
+                continue
+            rows.append((float(close), float(bbi), float(mom20)))
+        sample_size = len(rows)
+        above_bbi_pct = sum(1 for close, bbi, _mom20 in rows if close > bbi) / sample_size if sample_size else 0.0
+        median_mom20 = float(pd.Series([mom20 for _close, _bbi, mom20 in rows]).median()) if rows else float("nan")
+        passes = sample_size >= min_sample_size and above_bbi_pct >= min_above_bbi_pct and median_mom20 >= min_median_mom20
+        diagnostics.append(
+            {
+                "date": date,
+                "style_sample_size": float(sample_size),
+                "style_above_bbi_pct": above_bbi_pct,
+                "style_median_mom20": median_mom20,
+                "style_gate_pass": bool(passes),
+            }
+        )
+    if diagnostics:
+        diag = pd.DataFrame(diagnostics).set_index("date")
+        gated = gated.join(diag, how="left")
+    else:
+        gated["style_sample_size"] = 0.0
+        gated["style_above_bbi_pct"] = 0.0
+        gated["style_median_mom20"] = float("nan")
+        gated["style_gate_pass"] = False
+    blocked = ~gated["style_gate_pass"].fillna(False).astype(bool)
+    gated.loc[blocked, "bbi"] = gated.loc[blocked, "close"] * 2.0
+    return gated
+
+
 def rank_b1_candidates(
     panels: dict[str, pd.DataFrame],
     date: pd.Timestamp,
     config: B1BacktestConfig,
+    portfolio_value: float | None = None,
+    available_cash: float | None = None,
 ) -> list[dict[str, float | str | pd.Timestamp]]:
     rows: list[dict[str, float | str | pd.Timestamp]] = []
     for symbol, frame in panels.items():
@@ -164,6 +215,8 @@ def rank_b1_candidates(
         close = float(row.get("close", 0.0)) if "close" in row else 0.0
         if pd.isna(score) or score <= 0:
             continue
+        if config.require_affordable_lot and not _candidate_is_affordable(row, config, portfolio_value, available_cash):
+            continue
         rows.append({"date": date, "symbol": symbol, "score": score, "close": close})
 
     selected = sorted(rows, key=lambda item: float(item["score"]), reverse=True)[: config.top_n]
@@ -173,6 +226,27 @@ def rank_b1_candidates(
     for row in selected:
         row["target_weight"] = target_weight
     return selected
+
+
+def _candidate_is_affordable(
+    row: pd.Series,
+    config: B1BacktestConfig,
+    portfolio_value: float | None,
+    available_cash: float | None,
+) -> bool:
+    if config.lot_size is None:
+        return True
+    price = _row_price(row, config.buy_price_column)
+    if pd.isna(price) or price <= 0:
+        price = _row_price(row, "close")
+    if pd.isna(price) or price <= 0:
+        return False
+    lot_size = max(int(config.lot_size), 1)
+    target_weight = min(config.max_position, 1.0 / max(int(config.top_n), 1))
+    equity_budget = float("inf") if portfolio_value is None else portfolio_value * target_weight
+    cash_budget = float("inf") if available_cash is None else available_cash / (1.0 + config.cost_rate)
+    budget = min(equity_budget, cash_budget)
+    return price * lot_size <= budget + 1e-9
 
 
 def _empty_trades() -> pd.DataFrame:
@@ -305,7 +379,10 @@ def _process_sells(
             continue
         reason = ""
         shares_to_sell = 0.0
-        if pd.notna(row.get("bbi")) and price < float(row["bbi"]):
+        if config.stop_loss_pct is not None and price / position.cost_basis - 1.0 <= -float(config.stop_loss_pct):
+            reason = f"stop_loss_{int(float(config.stop_loss_pct) * 100)}"
+            shares_to_sell = position.shares
+        elif pd.notna(row.get("bbi")) and price < float(row["bbi"]):
             reason = "break_bbi"
             shares_to_sell = position.shares
         elif position.next_take_profit_index < len(config.take_profit_levels):
@@ -399,7 +476,7 @@ def run_b1_backtest(
         nav_values.append(equity / cfg.initial_cash)
 
         if market_allows_entry(market_frame, date):
-            ranked = rank_b1_candidates(panels, date, cfg)
+            ranked = rank_b1_candidates(panels, date, cfg, portfolio_value=equity, available_cash=cash)
             for row in ranked:
                 candidate_rows.append(row)
             pending_buys = [row for row in ranked if str(row["symbol"]) not in positions]
@@ -626,6 +703,19 @@ def is_eligible_a_share(symbol: str, name: str = "") -> bool:
     if "ST" in name.upper() or "退" in name:
         return False
     return code.startswith(("00", "30", "60", "68"))
+
+
+def is_permission_required_a_share(symbol: str) -> bool:
+    code = normalize_a_share_code(symbol)
+    return code.startswith(("30", "68", "43", "83", "87", "92"))
+
+
+def is_mainboard_a_share(symbol: str, name: str = "") -> bool:
+    return is_eligible_a_share(symbol, name) and not is_permission_required_a_share(symbol)
+
+
+def filter_mainboard_a_share_symbols(symbols: Iterable[str]) -> list[str]:
+    return [normalize_a_share_code(symbol) for symbol in symbols if is_mainboard_a_share(symbol)]
 
 
 def fetch_a_share_bars(
