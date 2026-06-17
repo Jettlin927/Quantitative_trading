@@ -152,6 +152,29 @@ class MarketBacktestRequest(BaseModel):
     min_avg_turnover_rate_f: float | None = Field(default=None, ge=0)
 
 
+class B1BacktestRequest(BaseModel):
+    start_date: date
+    end_date: date
+    config: dict = Field(default_factory=dict)
+    history_start_date: date | None = None
+    market_ts_code: str | None = Field(default="000300.SH")
+    require_market_gate: bool = True
+    market_ma20_gt_ma60: bool = True
+    volume_unit: str = Field(default="hand", pattern="^(hand|share)$")
+    pool_id: int | None = Field(default=None, ge=1)
+    q: str | None = None
+    industry: str | None = None
+    market: str | None = None
+    min_bars: int = Field(default=120, ge=1)
+    max_stocks: int = Field(default=300, ge=0)
+    exclude_st: bool = True
+    exclude_bj: bool = True
+    min_list_days: int = Field(default=180, ge=0)
+    min_avg_amount: float | None = Field(default=None, ge=0)
+    min_avg_circ_mv: float | None = Field(default=None, ge=0)
+    min_avg_turnover_rate_f: float | None = Field(default=None, ge=0)
+
+
 class StockFundamentalsOut(BaseModel):
     ts_code: str
     valuation: dict[str, Any] = Field(default_factory=dict)

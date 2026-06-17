@@ -20,10 +20,20 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from .ai_client import analyze_stock_quality_with_deepseek
+from .b1_strategy import (
+    B1_STRATEGY_ID,
+    B1_STRATEGY_LABEL,
+    build_b1_config,
+    build_b1_market_frame_from_rows,
+    build_b1_panels_from_rows,
+    build_permissive_market_frame,
+    run_backend_b1_backtest,
+)
 from .backtest_engine import DEFAULT_CONFIG, enrich_rows, json_safe, run_backtest
 from .database import Base, SessionLocal, engine, get_db
 from .models import DataSyncRun, Stock, StockDailyBar, StockDailyBasic, StockFinancialIndicator, StockPool, StockPoolMember
 from .schemas import (
+    B1BacktestRequest,
     BacktestRequest,
     DailyBarOut,
     MarketBacktestRequest,
@@ -230,6 +240,122 @@ def get_executable_strategy(strategy_id: str, db: Session = Depends(get_db)) -> 
         "aiAnalysis": build_executable_strategy_ai_analysis(spec, analysis, robustness),
     }
     return json_safe(response)
+
+
+@app.post("/api/strategies/b1-trend-pullback/backtest")
+def run_b1_research_backtest(payload: B1BacktestRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    if payload.end_date < payload.start_date:
+        raise HTTPException(status_code=400, detail="end_date 不能早于 start_date。")
+
+    history_start = payload.history_start_date or (payload.start_date - timedelta(days=260))
+    if history_start > payload.start_date:
+        raise HTTPException(status_code=400, detail="history_start_date 不能晚于 start_date。")
+
+    try:
+        config = build_b1_config(payload.config)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=compact_error(exc)) from exc
+
+    stock_payload = MarketBacktestRequest(
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        config={},
+        pool_id=payload.pool_id,
+        q=payload.q,
+        industry=payload.industry,
+        market=payload.market,
+        min_bars=payload.min_bars,
+        max_stocks=payload.max_stocks,
+        exclude_st=payload.exclude_st,
+        exclude_bj=payload.exclude_bj,
+        min_list_days=payload.min_list_days,
+        min_avg_amount=payload.min_avg_amount,
+        min_avg_circ_mv=payload.min_avg_circ_mv,
+        min_avg_turnover_rate_f=payload.min_avg_turnover_rate_f,
+    )
+    pool = get_stock_pool_or_404(db, payload.pool_id) if payload.pool_id else None
+    stocks = query_backtest_stocks(db, stock_payload)
+    if not stocks:
+        raise HTTPException(status_code=404, detail="没有符合 B1 回测条件的候选标的。")
+
+    stock_codes = [stock.ts_code for stock in stocks]
+    rows_by_code = query_backtest_rows_by_code(db, stock_codes, history_start, payload.end_date)
+    panels, skipped_by_bars = build_b1_panels_from_rows(rows_by_code, config, payload.min_bars, volume_unit=payload.volume_unit)
+    skipped_by_bars = {**{code: 0 for code in stock_codes if code not in rows_by_code}, **skipped_by_bars}
+    if not panels:
+        raise HTTPException(status_code=404, detail="候选标的日线不足，无法构建 B1 指标。")
+
+    if payload.require_market_gate:
+        market_code = resolve_ts_code(db, payload.market_ts_code or "")
+        market_rows = query_backtest_rows_by_code(db, [market_code], history_start, payload.end_date).get(market_code, [])
+        if not market_rows:
+            raise HTTPException(
+                status_code=404,
+                detail=f"没有找到市场门控标的 {market_code} 的日线；可同步指数/ETF数据，或设置 require_market_gate=false 做无门控研究。",
+            )
+        market_frame = build_b1_market_frame_from_rows(
+            market_rows,
+            config,
+            payload.start_date,
+            payload.end_date,
+            require_ma20_gt_ma60=payload.market_ma20_gt_ma60,
+            volume_unit=payload.volume_unit,
+        )
+        market_gate = {
+            "enabled": True,
+            "marketTsCode": market_code,
+            "requireMa20GtMa60": payload.market_ma20_gt_ma60,
+        }
+    else:
+        market_frame = build_permissive_market_frame(panels, payload.start_date, payload.end_date)
+        market_gate = {
+            "enabled": False,
+            "marketTsCode": None,
+            "requireMa20GtMa60": False,
+        }
+    if market_frame.empty:
+        raise HTTPException(status_code=404, detail="市场门控日期为空，无法运行 B1 回测。")
+
+    try:
+        result = run_backend_b1_backtest(panels, market_frame, config)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=compact_error(exc)) from exc
+
+    return json_safe(
+        {
+            "status": "ok",
+            "scope": {
+                "strategyId": B1_STRATEGY_ID,
+                "strategyLabel": B1_STRATEGY_LABEL,
+                "startDate": payload.start_date.isoformat(),
+                "endDate": payload.end_date.isoformat(),
+                "historyStartDate": history_start.isoformat(),
+                "candidateStocks": len(stocks),
+                "testedStocks": len(panels),
+                "skippedStocks": len(skipped_by_bars),
+                "poolId": payload.pool_id,
+                "poolName": pool.name if pool else None,
+                "q": payload.q,
+                "industry": payload.industry,
+                "market": payload.market,
+                "minBars": payload.min_bars,
+                "maxStocks": payload.max_stocks,
+                "excludeSt": payload.exclude_st,
+                "excludeBj": payload.exclude_bj,
+                "minListDays": payload.min_list_days,
+                "minAvgAmount": payload.min_avg_amount,
+                "minAvgCircMv": payload.min_avg_circ_mv,
+                "minAvgTurnoverRateF": payload.min_avg_turnover_rate_f,
+                "volumeUnit": payload.volume_unit,
+                "marketGate": market_gate,
+            },
+            "diagnostics": {
+                "skippedByBars": skipped_by_bars,
+                "note": "B1 backend 接入为研究回测接口，不连接真实券商，也不产生真实交易动作。",
+            },
+            **result,
+        }
+    )
 
 
 @app.get("/api/research/runs")
