@@ -589,6 +589,34 @@ class ExperimentEngineTest(unittest.TestCase):
 
         self.assertFalse(bool(filtered["entry_signal"].iloc[-1]))
 
+    def test_b1_score_weights_are_configurable_for_calibration(self):
+        from my_quant.strategy_research.experiment.b1_trend_pullback import B1BacktestConfig, compute_b1_frame
+
+        dates = pd.date_range("2024-01-01", periods=160, freq="B")
+        close = pd.Series([100 + i * 0.45 for i in range(160)], index=dates, dtype=float)
+        close.iloc[-10:] = [200, 196, 192, 188, 184, 180, 176, 172, 168, 165]
+        high = close + 3.0
+        high.iloc[-10:] = 200.0
+        bars = pd.DataFrame({"open": close, "high": high, "low": close - 1.0, "close": close}, index=dates)
+        config = B1BacktestConfig(
+            score_trend_weight=1.0,
+            score_pullback_weight=2.0,
+            score_price_buffer_weight=3.0,
+        )
+
+        frame = compute_b1_frame(bars, config)
+        row = frame.iloc[-1]
+        expected_score = (
+            (float(row["double_ema10"]) / float(row["bbi"]) - 1.0) * config.score_trend_weight
+            + max(config.kdj_j_threshold - float(row["kdj_j"]), 0.0)
+            / config.kdj_j_threshold
+            * config.score_pullback_weight
+            + (float(row["close"]) / float(row["bbi"]) - 1.0) * config.score_price_buffer_weight
+        )
+
+        self.assertTrue(bool(row["entry_signal"]))
+        self.assertAlmostEqual(float(row["b1_score"]), expected_score)
+
     def test_b1_candidate_ranking_limits_top_two_to_half_weight(self):
         from my_quant.strategy_research.experiment.b1_trend_pullback import B1BacktestConfig, rank_b1_candidates
 
@@ -655,6 +683,89 @@ class ExperimentEngineTest(unittest.TestCase):
         self.assertEqual(trades.iloc[1]["side"], "sell")
         self.assertEqual(trades.iloc[1]["reason"], "take_profit_10")
         self.assertLess(float(trades.iloc[1]["shares"]), float(trades.iloc[0]["shares"]))
+
+    def test_b1_realistic_execution_uses_open_price_and_round_lot(self):
+        from my_quant.strategy_research.experiment.b1_trend_pullback import B1BacktestConfig, run_b1_backtest
+
+        dates = pd.date_range("2024-01-01", periods=3, freq="B")
+        symbol_frame = pd.DataFrame(
+            {
+                "open": [10.0, 11.0, 12.0],
+                "close": [10.0, 12.0, 13.0],
+                "bbi": [9.0, 9.0, 9.0],
+                "entry_signal": [True, False, False],
+                "b1_score": [10.0, 0.0, 0.0],
+            },
+            index=dates,
+        )
+        market = pd.DataFrame({"close": [100.0] * 3, "bbi": [90.0] * 3}, index=dates)
+
+        result = run_b1_backtest(
+            {"000001": symbol_frame},
+            market,
+            B1BacktestConfig(
+                initial_cash=100_000.0,
+                cost_rate=0.0,
+                buy_price_column="open",
+                sell_price_column="open",
+                lot_size=100,
+            ),
+        )
+
+        first_trade = result.trades.iloc[0]
+        self.assertEqual(first_trade["side"], "buy")
+        self.assertEqual(first_trade["date"], dates[1])
+        self.assertAlmostEqual(float(first_trade["price"]), 11.0)
+        self.assertEqual(float(first_trade["shares"]), 4500.0)
+        self.assertEqual(float(first_trade["value"]), 49_500.0)
+
+    def test_b1_realistic_execution_blocks_limit_up_buy_and_limit_down_sell(self):
+        from my_quant.strategy_research.experiment.b1_trend_pullback import B1BacktestConfig, run_b1_backtest
+
+        dates = pd.date_range("2024-01-01", periods=5, freq="B")
+        limit_up_frame = pd.DataFrame(
+            {
+                "open": [10.0, 11.0, 12.0, 12.0, 12.0],
+                "close": [10.0, 11.0, 12.0, 12.0, 12.0],
+                "bbi": [9.0] * 5,
+                "entry_signal": [True, False, False, False, False],
+                "b1_score": [10.0, 0.0, 0.0, 0.0, 0.0],
+            },
+            index=dates,
+        )
+        sell_block_frame = pd.DataFrame(
+            {
+                "open": [10.0, 9.5, 10.5, 9.45, 9.0],
+                "close": [10.0, 10.0, 10.5, 9.5, 9.0],
+                "bbi": [9.0, 9.0, 9.0, 10.0, 10.0],
+                "entry_signal": [False, True, False, False, False],
+                "b1_score": [0.0, 10.0, 0.0, 0.0, 0.0],
+            },
+            index=dates,
+        )
+        market = pd.DataFrame({"close": [100.0] * 5, "bbi": [90.0] * 5}, index=dates)
+
+        result = run_b1_backtest(
+            {"000001": limit_up_frame, "000002": sell_block_frame},
+            market,
+            B1BacktestConfig(
+                initial_cash=100_000.0,
+                cost_rate=0.0,
+                buy_price_column="open",
+                sell_price_column="open",
+                lot_size=100,
+                limit_up_pct=0.10,
+                limit_down_pct=0.10,
+            ),
+        )
+
+        trades = result.trades
+        self.assertNotIn("000001", set(trades["symbol"]))
+        self.assertEqual(list(trades["side"]), ["buy", "sell"])
+        self.assertEqual(trades.iloc[0]["symbol"], "000002")
+        self.assertEqual(trades.iloc[0]["date"], dates[2])
+        self.assertEqual(trades.iloc[1]["symbol"], "000002")
+        self.assertEqual(trades.iloc[1]["date"], dates[4])
 
     def test_b1_retry_call_recovers_from_transient_error(self):
         from my_quant.strategy_research.experiment.b1_trend_pullback import retry_call
@@ -796,6 +907,37 @@ class ExperimentEngineTest(unittest.TestCase):
 
         self.assertEqual(select_eligible_tushare_symbols(raw), ["000001", "300750", "688702"])
 
+    def test_b1_active_universe_uses_asof_daily_basic_without_future_rows(self):
+        from my_quant.strategy_research.experiment.b1_trend_pullback import select_active_tushare_universe
+
+        stock_basic = pd.DataFrame(
+            {
+                "ts_code": ["000001.SZ", "300001.SZ", "600001.SH", "300002.SZ"],
+                "symbol": ["000001", "300001", "600001", "300002"],
+                "name": ["平安银行", "特锐德", "ST测试", "低市值"],
+            }
+        )
+        daily_basic = pd.DataFrame(
+            {
+                "ts_code": ["000001.SZ", "000001.SZ", "300001.SZ", "600001.SH", "300002.SZ"],
+                "trade_date": ["20240105", "20240110", "20240105", "20240105", "20240105"],
+                "turnover_rate": [2.0, 100.0, 5.0, 9.0, 20.0],
+                "circ_mv": [400_000.0, 400_000.0, 300_000.0, 300_000.0, 100_000.0],
+                "pb": [1.2, 1.2, 2.0, 1.0, 1.5],
+            }
+        )
+
+        universe = select_active_tushare_universe(
+            daily_basic=daily_basic,
+            stock_basic=stock_basic,
+            as_of_date="2024-01-05",
+            limit=10,
+        )
+
+        self.assertEqual(list(universe["symbol"]), ["300001", "000001"])
+        self.assertAlmostEqual(float(universe.loc[universe["symbol"] == "000001", "turnover_rate"].iloc[0]), 2.0)
+        self.assertTrue((universe["active_score"] > 0).all())
+
     def test_b1_trend_pullback_cli_accepts_tushare_provider(self):
         from my_quant.strategy_research.run_b1_trend_pullback import parse_args
 
@@ -825,6 +967,46 @@ class ExperimentEngineTest(unittest.TestCase):
         self.assertAlmostEqual(args.min_entry_mom20, 0.02)
         self.assertAlmostEqual(args.max_entry_mom20, 0.75)
         self.assertTrue(args.market_ma20_gt_ma60)
+
+    def test_b1_walk_forward_builds_rolling_active_universe_map(self):
+        from my_quant.strategy_research.run_b1_walk_forward import build_active_universe_symbol_map
+
+        windows = [
+            ("early", "2024-01-05", "2024-01-31"),
+            ("late", "2024-02-05", "2024-02-29"),
+        ]
+        stock_basic = pd.DataFrame(
+            {
+                "ts_code": ["000001.SZ", "300001.SZ"],
+                "symbol": ["000001", "300001"],
+                "name": ["平安银行", "特锐德"],
+            }
+        )
+        daily_basic = pd.DataFrame(
+            {
+                "ts_code": ["000001.SZ", "300001.SZ", "000001.SZ", "300001.SZ"],
+                "trade_date": ["20240105", "20240105", "20240205", "20240205"],
+                "turnover_rate": [5.0, 1.0, 1.0, 9.0],
+                "circ_mv": [300_000.0, 300_000.0, 300_000.0, 300_000.0],
+                "pb": [1.0, 1.0, 1.0, 1.0],
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            daily_path = Path(tmpdir) / "daily_basic.csv"
+            stock_path = Path(tmpdir) / "stock_basic.csv"
+            daily_basic.to_csv(daily_path, index=False)
+            stock_basic.to_csv(stock_path, index=False)
+
+            symbol_map = build_active_universe_symbol_map(
+                daily_basic_file=daily_path,
+                stock_basic_file=stock_path,
+                windows=windows,
+                limit=1,
+                rolling=True,
+            )
+
+        self.assertEqual(symbol_map, {"early": ["000001"], "late": ["300001"]})
 
     def test_b1_load_symbols_from_csv_file_reads_symbol_column(self):
         from my_quant.strategy_research.run_b1_walk_forward import load_symbols_from_csv_file

@@ -12,6 +12,7 @@ from my_quant.strategy_research.experiment.b1_trend_pullback import (
     load_a_share_symbols,
     normalize_a_share_code,
     run_b1_backtest,
+    select_active_tushare_universe,
 )
 from my_quant.strategy_research.experiment.config import DATA_DIR, RESULTS_DIR
 from my_quant.strategy_research.experiment.reports import markdown_table
@@ -64,6 +65,34 @@ def load_symbols_from_csv_file(path: Path) -> list[str]:
     return [normalize_a_share_code(str(symbol)) for symbol in source.dropna().tolist()]
 
 
+def build_active_universe_symbol_map(
+    daily_basic_file: Path,
+    stock_basic_file: Path,
+    windows: list[tuple[str, str, str]],
+    limit: int,
+    rolling: bool = False,
+    universe_as_of: str | None = None,
+) -> dict[str, list[str]]:
+    daily_basic = pd.read_csv(daily_basic_file, dtype={"ts_code": str, "trade_date": str})
+    stock_basic = pd.read_csv(stock_basic_file, dtype={"ts_code": str, "symbol": str, "name": str})
+    if rolling:
+        as_of_by_window = {window_name: start for window_name, start, _end in windows}
+    else:
+        as_of = universe_as_of or windows[0][1]
+        as_of_by_window = {window_name: as_of for window_name, _start, _end in windows}
+
+    symbol_map: dict[str, list[str]] = {}
+    for window_name, as_of in as_of_by_window.items():
+        universe = select_active_tushare_universe(
+            daily_basic=daily_basic,
+            stock_basic=stock_basic,
+            as_of_date=as_of,
+            limit=limit,
+        )
+        symbol_map[window_name] = universe["symbol"].astype(str).map(normalize_a_share_code).tolist()
+    return symbol_map
+
+
 def build_b1_config_from_exit_config(
     raw_config: dict[str, tuple[float, ...] | str],
     max_entry_close_bbi: float | None = None,
@@ -86,6 +115,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--stride", type=int, default=10)
     parser.add_argument("--symbols-file", type=Path, default=None, help="Optional CSV with symbol or ts_code column.")
+    parser.add_argument("--daily-basic-file", type=Path, default=None, help="Optional Tushare daily_basic CSV for active universe construction.")
+    parser.add_argument("--stock-basic-file", type=Path, default=None, help="Optional Tushare stock_basic CSV for active universe construction.")
+    parser.add_argument("--rolling-active-universe", action="store_true", help="Build an active universe as of each validation window start.")
+    parser.add_argument("--universe-as-of", default=None, help="Fixed as-of date for active universe construction when not rolling.")
     parser.add_argument("--data-provider", choices=["akshare", "tushare"], default="akshare")
     parser.add_argument("--data-dir", type=Path, default=DATA_DIR / "b1_a_share")
     parser.add_argument("--results-dir", type=Path, default=RESULTS_DIR)
@@ -101,8 +134,22 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     windows = DEFAULT_WINDOWS
     last_end = max(end for _name, _start, end in windows)
-    raw_symbols = load_symbols_from_csv_file(args.symbols_file) if args.symbols_file else load_a_share_symbols(data_provider=args.data_provider)
-    symbols = select_symbol_sample(raw_symbols, args.max_symbols, args.offset, args.stride)
+    window_symbol_map: dict[str, list[str]] | None = None
+    if args.daily_basic_file or args.stock_basic_file:
+        if not args.daily_basic_file or not args.stock_basic_file:
+            raise ValueError("--daily-basic-file and --stock-basic-file must be provided together")
+        window_symbol_map = build_active_universe_symbol_map(
+            daily_basic_file=args.daily_basic_file,
+            stock_basic_file=args.stock_basic_file,
+            windows=windows,
+            limit=args.max_symbols,
+            rolling=args.rolling_active_universe,
+            universe_as_of=args.universe_as_of,
+        )
+        symbols = sorted({symbol for values in window_symbol_map.values() for symbol in values})
+    else:
+        raw_symbols = load_symbols_from_csv_file(args.symbols_file) if args.symbols_file else load_a_share_symbols(data_provider=args.data_provider)
+        symbols = select_symbol_sample(raw_symbols, args.max_symbols, args.offset, args.stride)
     base_config = B1BacktestConfig(
         max_entry_close_bbi=args.max_entry_close_bbi,
         min_entry_mom20=args.min_entry_mom20,
@@ -136,7 +183,11 @@ def main(argv: list[str] | None = None) -> int:
                 args.data_dir,
                 require_ma20_gt_ma60=args.market_ma20_gt_ma60,
             )
-            result = run_b1_backtest(panels, market, config)
+            active_panels = panels
+            if window_symbol_map is not None:
+                active_symbols = set(window_symbol_map.get(window_name, []))
+                active_panels = {symbol: frame for symbol, frame in panels.items() if symbol in active_symbols}
+            result = run_b1_backtest(active_panels, market, config)
             rows.append(
                 {
                     "strategy": raw_config["name"],
@@ -170,6 +221,10 @@ def main(argv: list[str] | None = None) -> int:
         f"- Passing all-window configs: `{int(summary['passes_all_windows'].sum()) if not summary.empty else 0}`.",
         f"- Best strategy by strict gate ordering: `{best_strategy}`.",
         f"- Symbols file: `{args.symbols_file}`.",
+        f"- Daily basic file: `{args.daily_basic_file}`.",
+        f"- Stock basic file: `{args.stock_basic_file}`.",
+        f"- Rolling active universe: `{args.rolling_active_universe}`.",
+        f"- Universe as-of: `{args.universe_as_of}`.",
         f"- Market MA20 > MA60 filter: `{args.market_ma20_gt_ma60}`.",
         f"- Max entry close/BBI: `{args.max_entry_close_bbi}`.",
         f"- Min entry 20-day momentum: `{args.min_entry_mom20}`.",
