@@ -85,6 +85,29 @@ Tushare 路径会使用：
 - `index_daily(000300.SH)` 作为大盘长均线过滤。
 - 本地 CSV 缓存，避免重复消耗接口频率。
 
+## B1 现实约束复核与 backend 接入
+
+2026-06-17 使用 Tushare 缓存、2024-12-31 active Top300 股票池、沪深 300 `close > BBI` 且 `MA20 > MA60` 市场门控，重新跑到 `2026-06-17`：
+
+- 旧收盘价/碎股口径：最终净值 `3.12x`，总收益 `212.07%`，年化 `127.45%`，最大回撤 `-15.06%`，闭环胜率 `52.33%`，profit factor `2.34`。
+- 现实主口径：次日开盘买入、收盘卖出、100 股一手、10% 涨停买入阻断、10% 跌停卖出阻断；最终净值 `1.74x`，总收益 `73.55%`，年化 `48.90%`，最大回撤 `-22.14%`，闭环胜率 `48.21%`，profit factor `1.45`。
+- 容量压力口径：现实主口径再叠加 5% 成交量上限；最终净值 `1.50x`，总收益 `49.58%`，年化 `33.74%`，最大回撤 `-25.46%`，闭环胜率 `48.34%`，profit factor `1.28`。Tushare `vol` 单位在 `my_quant` 缓存里仍需统一，因此该行只作为压力测试，不作为主结论。
+- Walk-forward 现实主口径 6 个窗口中只有 `2/6` 通过 50% 年化门槛，但 `6/6` 均通过 -30% 回撤门槛；结论应标为 `观察`，不是阶段通过。
+
+产物：
+
+- `results/b1_tushare_quality_gate_top300_realistic_compare_20260617.json`
+- `results/b1_tushare_quality_gate_top300_realistic_walkforward_20260617.md`
+- `results/b1_tushare_quality_gate_top300_realistic_lot_limit_20260617_*`
+
+backend 已接入 B1 组合研究回测接口：
+
+```http
+POST /api/strategies/b1-trend-pullback/backtest
+```
+
+该接口从 PostgreSQL 读取候选池日线和市场门控标的，复用 `my_quant` B1 组合引擎，默认采用现实主口径。它只返回研究回测结果、净值曲线、候选和交易流水，不连接券商，不产生真实交易动作。
+
 默认 ETF 组合实验脚本会读取或刷新 AkShare ETF 日线数据，并生成：
 
 - `results/base_strategy_comparison.csv`
