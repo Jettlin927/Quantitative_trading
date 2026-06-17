@@ -1,0 +1,2 @@
+strategy,windows,return_pass_windows,drawdown_pass_windows,mean_annual_return,min_annual_return,worst_drawdown,mean_calmar,return_fail_windows,drawdown_fail_windows,passes_all_windows
+b1_small_capital_mainboard_final_20260617,6,4,6,0.5872860172794593,0.20911419847588575,-0.19089224354296408,5.822698239434922,2,0,False
