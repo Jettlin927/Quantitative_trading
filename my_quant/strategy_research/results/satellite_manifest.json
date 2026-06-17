@@ -1,0 +1,26 @@
+{
+  "experiment": "satellite_50pct_dd30",
+  "target_annual_return": 0.5,
+  "max_drawdown_floor": -0.3,
+  "latest_price_date": "2026-06-15",
+  "windows": {
+    "eval_start": "2021-01-04",
+    "eval_end": "2026-06-15",
+    "train_start": "2017-09-01",
+    "train_end": "2020-12-31",
+    "oos_start": "2021-01-04",
+    "oos_end": "2026-06-15"
+  },
+  "best_candidate": "fixed_513100_518880_50_50_x2_0",
+  "has_passing_candidate": false,
+  "artifacts": [
+    "satellite_asset_diagnostics.csv",
+    "satellite_parameter_scan.csv",
+    "satellite_fixed_blend_scan.csv",
+    "satellite_train_parameter_scan.csv",
+    "satellite_oos_result.csv",
+    "satellite_walk_forward.csv",
+    "satellite_final_candidate.md",
+    "satellite_manifest.json"
+  ]
+}

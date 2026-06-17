@@ -27,6 +27,12 @@
 - AI 评价：DeepSeek `deepseek-v4-flash`
 - 运行方式：Docker Compose
 
+## my_quant 研究档案
+
+`my_quant/` 是迁入本仓库的独立策略研究工作区，包含 ETF 组合实验、A 股 B1 趋势回调复刻、Tushare 质量过滤结果、Web 报告和盘前预案自动化脚本。
+
+这部分不走 Docker 后端依赖，单独使用 [my_quant/requirements.txt](my_quant/requirements.txt) 或 [my_quant/pyproject.toml](my_quant/pyproject.toml) 建 Python 3.12 环境。接手入口见 [my_quant/README.md](my_quant/README.md)。
+
 ## 快速启动
 
 先复制环境变量模板，不要把真实 `.env` 提交到 Git：
