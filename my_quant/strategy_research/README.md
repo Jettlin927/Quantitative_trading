@@ -115,6 +115,10 @@ Tushare 路径会使用：
 - manifest 记录候选策略和结果产物。
 - shortlist Walk-Forward 输出 rolling / anchored 两类窗口。
 - 因子 IC 输出 momentum / RAM / low volatility / trend strength。
+- B1 指标、入场质量过滤、候选排序、大盘过滤、Tushare 缓存和 token 校验。
+- B1 现实成交约束：开盘价成交、100 股一手取整、涨停买入阻断和跌停卖出阻断。
+- B1 分数权重可配置，用于校准本地 `B1_proxy_score`。
+- B1 active universe 支持按 as-of 日期或 walk-forward 窗口起点构建，避免固定股票池默认化。
 
 ## 研究纪律
 

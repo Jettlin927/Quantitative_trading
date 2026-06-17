@@ -38,10 +38,19 @@ class B1BacktestConfig:
     max_position: float = 0.5
     initial_cash: float = 1.0
     cost_rate: float = COST_RATE
+    buy_price_column: str = "close"
+    sell_price_column: str = "close"
+    lot_size: int | None = None
+    limit_up_pct: float | None = None
+    limit_down_pct: float | None = None
+    volume_limit_pct: float | None = None
     bbi_windows: tuple[int, ...] = DEFAULT_BBI_WINDOWS
     ema_span: int = 10
     kdj_window: int = 9
     kdj_j_threshold: float = 13.0
+    score_trend_weight: float = 100.0
+    score_pullback_weight: float = 20.0
+    score_price_buffer_weight: float = 50.0
     max_entry_close_bbi: float | None = None
     min_entry_mom20: float | None = None
     max_entry_mom20: float | None = None
@@ -109,7 +118,11 @@ def compute_b1_frame(bars: pd.DataFrame, config: B1BacktestConfig | None = None)
     price_buffer = frame["close"] / frame["bbi"] - 1.0
     frame["entry_close_bbi"] = price_buffer
     frame["entry_mom20"] = frame["close"] / frame["close"].shift(20) - 1.0
-    frame["b1_score"] = trend_strength * 100.0 + pullback_depth * 20.0 + price_buffer * 50.0
+    frame["b1_score"] = (
+        trend_strength * cfg.score_trend_weight
+        + pullback_depth * cfg.score_pullback_weight
+        + price_buffer * cfg.score_price_buffer_weight
+    )
     entry_signal = (
         (frame["close"] > frame["bbi"])
         & (frame["double_ema10"] > frame["bbi"])
@@ -201,6 +214,64 @@ def _portfolio_value(
     return value
 
 
+def _row_price(row: pd.Series, column: str) -> float:
+    value = row.get(column)
+    if pd.isna(value):
+        return float("nan")
+    return float(value)
+
+
+def _previous_close(frame: pd.DataFrame, date: pd.Timestamp) -> float | None:
+    loc = frame.index.get_loc(date)
+    if isinstance(loc, slice) or not isinstance(loc, int) or loc <= 0:
+        return None
+    previous = frame.iloc[loc - 1].get("close")
+    if pd.isna(previous):
+        return None
+    return float(previous)
+
+
+def _is_limit_up_blocked(frame: pd.DataFrame, date: pd.Timestamp, price: float, config: B1BacktestConfig) -> bool:
+    if config.limit_up_pct is None:
+        return False
+    previous_close = _previous_close(frame, date)
+    if previous_close is None or previous_close <= 0:
+        return False
+    return price >= previous_close * (1.0 + config.limit_up_pct) - 1e-9
+
+
+def _is_limit_down_blocked(frame: pd.DataFrame, date: pd.Timestamp, price: float, config: B1BacktestConfig) -> bool:
+    if config.limit_down_pct is None:
+        return False
+    previous_close = _previous_close(frame, date)
+    if previous_close is None or previous_close <= 0:
+        return False
+    return price <= previous_close * (1.0 - config.limit_down_pct) + 1e-9
+
+
+def _volume_cap_shares(row: pd.Series, config: B1BacktestConfig) -> float | None:
+    if config.volume_limit_pct is None:
+        return None
+    volume = row.get("volume")
+    if pd.isna(volume) or float(volume) <= 0:
+        return 0.0
+    return float(volume) * config.volume_limit_pct
+
+
+def _round_buy_shares(shares: float, config: B1BacktestConfig) -> float:
+    if config.lot_size is None:
+        return shares
+    lot_size = max(int(config.lot_size), 1)
+    return float(int(shares // lot_size) * lot_size)
+
+
+def _round_sell_shares(shares: float, position: _Position, config: B1BacktestConfig) -> float:
+    if config.lot_size is None or shares >= position.shares - 1e-12:
+        return shares
+    lot_size = max(int(config.lot_size), 1)
+    return float(int(shares // lot_size) * lot_size)
+
+
 def _sell_position(
     cash: float,
     position: _Position,
@@ -226,10 +297,12 @@ def _process_sells(
         if date not in panels[symbol].index:
             continue
         row = panels[symbol].loc[date]
-        if pd.isna(row["close"]):
+        price = _row_price(row, config.sell_price_column)
+        if pd.isna(price) or price <= 0:
             continue
         position = positions[symbol]
-        price = float(row["close"])
+        if _is_limit_down_blocked(panels[symbol], date, price, config):
+            continue
         reason = ""
         shares_to_sell = 0.0
         if pd.notna(row.get("bbi")) and price < float(row["bbi"]):
@@ -243,6 +316,12 @@ def _process_sells(
                 reason = f"take_profit_{int(level * 100)}"
                 position.next_take_profit_index += 1
 
+        if shares_to_sell <= 0:
+            continue
+        volume_cap = _volume_cap_shares(row, config)
+        if volume_cap is not None:
+            shares_to_sell = min(shares_to_sell, volume_cap)
+        shares_to_sell = _round_sell_shares(shares_to_sell, position, config)
         if shares_to_sell <= 0:
             continue
         cash, sold_shares = _sell_position(cash, position, shares_to_sell, price, config.cost_rate)
@@ -268,14 +347,24 @@ def _execute_pending_buys(
         symbol = str(candidate["symbol"])
         if symbol in positions or symbol not in panels or date not in panels[symbol].index:
             continue
-        price = float(panels[symbol].loc[date, "close"])
+        row = panels[symbol].loc[date]
+        price = _row_price(row, config.buy_price_column)
         if pd.isna(price) or price <= 0:
+            continue
+        if _is_limit_up_blocked(panels[symbol], date, price, config):
             continue
         target_value = equity * float(candidate["target_weight"])
         spendable = min(cash / (1.0 + config.cost_rate), target_value)
         if spendable <= 0:
             continue
         shares = spendable / price
+        volume_cap = _volume_cap_shares(row, config)
+        if volume_cap is not None:
+            shares = min(shares, volume_cap)
+        shares = _round_buy_shares(shares, config)
+        if shares <= 0:
+            continue
+        spendable = shares * price
         cash -= spendable * (1.0 + config.cost_rate)
         positions[symbol] = _Position(shares=shares, cost_basis=price)
         trades.append(_trade_row(date, symbol, "buy", shares, price, "next_day_entry", cash))
@@ -468,6 +557,52 @@ def select_eligible_tushare_symbols(raw: pd.DataFrame, limit: int | None = None)
         if is_eligible_a_share(symbol, name):
             symbols.append(symbol)
     return symbols[:limit] if limit else symbols
+
+
+def select_active_tushare_universe(
+    daily_basic: pd.DataFrame,
+    stock_basic: pd.DataFrame,
+    as_of_date: str | pd.Timestamp,
+    limit: int = 300,
+    min_circ_mv: float = 200_000.0,
+    max_circ_mv: float = 5_000_000.0,
+    min_turnover_rate: float = 1.0,
+    min_pb: float = 0.0,
+) -> pd.DataFrame:
+    required_daily = {"ts_code", "trade_date", "turnover_rate", "circ_mv", "pb"}
+    missing_daily = required_daily.difference(daily_basic.columns)
+    if missing_daily:
+        raise ValueError(f"daily_basic missing required columns: {sorted(missing_daily)}")
+    required_stock = {"ts_code", "symbol", "name"}
+    missing_stock = required_stock.difference(stock_basic.columns)
+    if missing_stock:
+        raise ValueError(f"stock_basic missing required columns: {sorted(missing_stock)}")
+
+    as_of = pd.Timestamp(as_of_date)
+    daily = daily_basic.copy()
+    daily["trade_date"] = pd.to_datetime(daily["trade_date"].astype(str), format="%Y%m%d", errors="coerce")
+    for column in ["turnover_rate", "circ_mv", "pb"]:
+        daily[column] = pd.to_numeric(daily[column], errors="coerce")
+    daily = daily.dropna(subset=["trade_date", "turnover_rate", "circ_mv", "pb"])
+    daily = daily[daily["trade_date"] <= as_of]
+    if daily.empty:
+        return pd.DataFrame(columns=["ts_code", "turnover_rate", "circ_mv", "pb", "symbol", "name", "active_score"])
+
+    latest = daily.sort_values(["ts_code", "trade_date"]).groupby("ts_code", as_index=False).tail(1)
+    stocks = stock_basic[["ts_code", "symbol", "name"]].copy()
+    stocks["symbol"] = stocks["symbol"].astype(str).map(normalize_a_share_code)
+    merged = latest.merge(stocks, on="ts_code", how="inner")
+    eligible = merged[
+        merged.apply(lambda row: is_eligible_a_share(str(row["symbol"]), str(row["name"])), axis=1)
+        & (merged["circ_mv"] >= min_circ_mv)
+        & (merged["circ_mv"] <= max_circ_mv)
+        & (merged["turnover_rate"] >= min_turnover_rate)
+        & (merged["pb"] > min_pb)
+    ].copy()
+    if eligible.empty:
+        return eligible.assign(active_score=pd.Series(dtype=float)).head(0)
+    eligible["active_score"] = eligible["turnover_rate"] * (eligible["circ_mv"] ** 0.5)
+    return eligible.sort_values("active_score", ascending=False).head(limit).reset_index(drop=True)
 
 
 def load_a_share_symbols_tushare(limit: int | None = None, token: str | None = None) -> list[str]:
