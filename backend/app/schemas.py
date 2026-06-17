@@ -115,6 +115,14 @@ class SyncMarketDataRequest(BaseModel):
     min_existing_rows: int = Field(default=5000, ge=1)
 
 
+class SyncMarketFundamentalsRequest(BaseModel):
+    start_date: date
+    end_date: date
+    token: str | None = Field(default=None, repr=False)
+    max_stocks: int = Field(default=0, ge=0)
+    skip_existing: bool = True
+
+
 class SyncStockBasicRequest(BaseModel):
     token: str | None = Field(default=None, repr=False)
 

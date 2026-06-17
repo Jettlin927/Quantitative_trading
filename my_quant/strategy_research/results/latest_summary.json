@@ -1,0 +1,15 @@
+{
+  "evaluation_start": "2021-01-04",
+  "evaluation_end": "2026-06-15",
+  "latest_price_date": "2026-06-15",
+  "baseline_strategy": "baseline_china_permanent_25_annual_no_cost",
+  "best_research_candidate": "ram_top2_m20_v120_f21_cost",
+  "baseline_annual_return": 0.0529623989989092,
+  "best_annual_return": 0.12129339226600644,
+  "best_max_drawdown": -0.10570745484244448,
+  "best_calmar": 1.1474440704942956,
+  "train_best_strategy": "ram_top2_m180_v20_f10_cost",
+  "train_best_oos_annual_return": 0.03376854304231114,
+  "train_best_oos_max_drawdown": -0.21423697114752338,
+  "train_best_oos_calmar": 0.15762238824342859
+}
