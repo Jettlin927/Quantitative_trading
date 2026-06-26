@@ -9,6 +9,7 @@
 - `data/snapshots/`：yfinance 快照 JSON/CSV 输出目录。
 - `reports/`：HTML + Markdown 美股操作报告输出目录。
 - `scripts/refresh_us_snapshot.py`：使用 yfinance 拉取历史行情并计算趋势、新鲜度和风险字段。
+- `scripts/build_us_watchlist_backtest.py`：使用 yfinance 历史行情生成 sample 关注池规则回测。
 - `scripts/build_us_operations_report.py`：从快照和 sample 持仓生成研究辅助报告。
 - `tests/`：标准库 `unittest` 测试，不依赖网络。
 
@@ -18,6 +19,7 @@
 
 ```bash
 .venv/bin/python -m my_quant.us_research.scripts.refresh_us_snapshot
+.venv/bin/python -m my_quant.us_research.scripts.build_us_watchlist_backtest --period 2y --interval 1d
 .venv/bin/python -m my_quant.us_research.scripts.build_us_operations_report
 ```
 
@@ -25,8 +27,23 @@
 
 - `my_quant/us_research/data/snapshots/us_snapshot_latest.json`
 - `my_quant/us_research/data/snapshots/us_snapshot_latest.csv`
+- `my_quant/us_research/reports/latest_us_watchlist_backtest.json`
+- `my_quant/us_research/reports/latest_us_watchlist_backtest.csv`
+- `my_quant/us_research/reports/latest_us_watchlist_backtest.html`
 - `my_quant/us_research/reports/latest_us_operations.html`
 - `my_quant/us_research/reports/latest_us_operations.md`
+
+## 规则回测
+
+当前 sample 回测策略为 `trend_pullback_no_chase`：
+
+- 使用 2 年 yfinance 日线。
+- 以 MA50/MA200 判断趋势。
+- 使用 `只等回调` 纪律过滤过热追高。
+- 扣除 `0.1%` 单边换手成本。
+- 输出策略收益、买入持有收益、最大回撤、交易数和暴露比例。
+
+规则证据来自 `docs/research/backtest-reports/no-chase-validation-2026-06-26/`，只能说明“新增仓位等待回调或止跌确认”的研究纪律，不能证明美股单票未来收益。
 
 ## 数据状态
 

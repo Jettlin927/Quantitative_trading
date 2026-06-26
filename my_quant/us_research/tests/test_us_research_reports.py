@@ -111,14 +111,60 @@ class UsResearchReportsTest(unittest.TestCase):
             }
         ]
 
-        markdown, html = build_report_text(snapshot, holdings)
+        backtest_rows = [
+            {
+                "ticker": "AAA",
+                "strategy": "trend_pullback_no_chase",
+                "annual_return": 0.18,
+                "max_drawdown": -0.12,
+                "trade_count": 4,
+                "evidence_label": "只等回调",
+            }
+        ]
+
+        markdown, html = build_report_text(snapshot, holdings, backtest_rows=backtest_rows)
 
         self.assertIn("研究辅助", markdown)
         self.assertIn("partial", markdown)
         self.assertIn("继续持有", markdown)
         self.assertIn("观察不动", markdown)
+        self.assertIn("规则证据", markdown)
+        self.assertIn("18.00%", markdown)
         self.assertIn("数据新鲜度", html)
+        self.assertIn("规则证据", html)
         self.assertIn("RuntimeError: network down", html)
+
+    def test_us_watchlist_backtest_outputs_metrics_and_rule_label(self):
+        from my_quant.us_research.scripts.build_us_watchlist_backtest import run_watchlist_backtest
+
+        watchlist = [
+            {
+                "ticker": "AAA",
+                "name": "Alpha AI",
+                "role": "watch",
+                "theme": "AI infrastructure",
+                "subtheme": "storage",
+                "instrument_type": "equity",
+                "leverage_factor": "1",
+                "risk_tag": "core",
+                "notes": "sample row",
+            }
+        ]
+        bars = []
+        for index in range(260):
+            close = 100 + index * 0.2
+            if 80 <= index <= 90:
+                close -= 4
+            bars.append({"date": f"2025-01-{(index % 28) + 1:02d}", "close": close, "high": close * 1.01, "low": close * 0.99})
+
+        rows = run_watchlist_backtest(watchlist, {"AAA": bars})
+
+        self.assertEqual(rows[0]["ticker"], "AAA")
+        self.assertEqual(rows[0]["strategy"], "trend_pullback_no_chase")
+        self.assertEqual(rows[0]["evidence_label"], "只等回调")
+        self.assertIn("annual_return", rows[0])
+        self.assertIn("max_drawdown", rows[0])
+        self.assertGreaterEqual(rows[0]["trade_count"], 0)
 
     def test_cli_round_trip_writes_snapshot_and_reports_without_real_holdings(self):
         from my_quant.us_research.scripts.build_us_operations_report import write_reports

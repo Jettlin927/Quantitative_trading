@@ -11,6 +11,7 @@ from typing import Any
 US_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SNAPSHOT = US_ROOT / "data" / "snapshots" / "us_snapshot_latest.json"
 DEFAULT_HOLDINGS = US_ROOT / "data" / "holdings_sample.csv"
+DEFAULT_BACKTEST = US_ROOT / "reports" / "latest_us_watchlist_backtest.json"
 DEFAULT_HTML = US_ROOT / "reports" / "latest_us_operations.html"
 DEFAULT_MD = US_ROOT / "reports" / "latest_us_operations.md"
 
@@ -38,6 +39,13 @@ def fmt(value: Any, digits: int = 2, suffix: str = "") -> str:
     return f"{number:.{digits}f}{suffix}"
 
 
+def fmt_decimal_pct(value: Any) -> str:
+    number = parse_float(value)
+    if number is None:
+        return "N/A"
+    return f"{number * 100:.2f}%"
+
+
 def decide_action(row: dict[str, Any], held: bool) -> tuple[str, str]:
     if row.get("is_stale"):
         return "观察不动", "数据源 stale/partial，先刷新数据再判断。"
@@ -62,17 +70,43 @@ def holdings_by_ticker(holdings: list[dict[str, Any]]) -> dict[str, dict[str, An
     return {str(row.get("ticker", "")).strip().upper(): row for row in holdings if row.get("ticker")}
 
 
-def build_rows(snapshot: dict[str, Any], holdings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def backtest_by_ticker(backtest_rows: list[dict[str, Any]] | None) -> dict[str, dict[str, Any]]:
+    return {str(row.get("ticker", "")).strip().upper(): row for row in (backtest_rows or []) if row.get("ticker")}
+
+
+def format_backtest_evidence(row: dict[str, Any] | None) -> str:
+    if not row:
+        return "规则证据待接入。"
+    status = row.get("status") or ("ok" if row.get("annual_return") is not None else "unknown")
+    if status != "ok":
+        return f"规则证据 {row.get('evidence_label', '只等回调')}；回测状态 {status}。"
+    return (
+        f"规则证据 {row.get('evidence_label', '只等回调')}；"
+        f"策略年化 {fmt_decimal_pct(row.get('annual_return'))}；"
+        f"最大回撤 {fmt_decimal_pct(row.get('max_drawdown'))}；"
+        f"交易数 {row.get('trade_count', 'N/A')}。"
+    )
+
+
+def build_rows(
+    snapshot: dict[str, Any],
+    holdings: list[dict[str, Any]],
+    backtest_rows: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     holding_map = holdings_by_ticker(holdings)
+    backtest_map = backtest_by_ticker(backtest_rows)
     rows = []
     for row in snapshot.get("symbols", []):
         ticker = str(row.get("ticker", "")).upper()
         held = ticker in holding_map or row.get("role") == "holding"
         action, evidence = decide_action(row, held)
+        backtest = backtest_map.get(ticker)
         output = dict(row)
         output["held"] = held
         output["action_label"] = action
         output["evidence"] = evidence
+        output["backtest"] = backtest or {}
+        output["rule_evidence"] = format_backtest_evidence(backtest)
         rows.append(output)
     return rows
 
@@ -88,14 +122,14 @@ def build_markdown(snapshot: dict[str, Any], holdings: list[dict[str, Any]], row
         f"- 抓取时间：`{snapshot.get('fetched_at', '')}`",
         f"- sample 持仓数：`{len(holdings)}`",
         "",
-        "| ticker | 主题 | 趋势 | 风险 | 操作标签 | 数据新鲜度 | 证据 |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| ticker | 主题 | 趋势 | 风险 | 操作标签 | 数据新鲜度 | 证据 | 规则证据/回测 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         freshness = "stale" if row.get("is_stale") else "fresh"
         trend = f"close {fmt(row.get('close'))} / MA20 {fmt(row.get('ma20'))} / MA50 {fmt(row.get('ma50'))}"
         lines.append(
-            "| {ticker} | {theme} | {trend} | {risk} | {action} | {freshness} | {evidence} |".format(
+            "| {ticker} | {theme} | {trend} | {risk} | {action} | {freshness} | {evidence} | {rule_evidence} |".format(
                 ticker=row.get("ticker", ""),
                 theme=row.get("theme", ""),
                 trend=trend,
@@ -103,6 +137,7 @@ def build_markdown(snapshot: dict[str, Any], holdings: list[dict[str, Any]], row
                 action=row.get("action_label", ""),
                 freshness=freshness,
                 evidence=row.get("evidence", ""),
+                rule_evidence=row.get("rule_evidence", ""),
             )
         )
     return "\n".join(lines) + "\n"
@@ -120,6 +155,7 @@ def build_html(snapshot: dict[str, Any], rows: list[dict[str, Any]]) -> str:
             f"<td>{trend}</td>"
             f"<td>{html.escape(str(row.get('risk_tag', '')))}<br>leverage {fmt(row.get('leverage_factor'), 1)}x</td>"
             f"<td><strong>{html.escape(str(row.get('action_label', '')))}</strong><br>{html.escape(str(row.get('evidence', '')))}</td>"
+            f"<td>{html.escape(str(row.get('rule_evidence', '')))}</td>"
             f"<td>{freshness}<br>{html.escape(str(row.get('stale_reason', '')))}</td>"
             "</tr>"
         )
@@ -145,7 +181,7 @@ def build_html(snapshot: dict[str, Any], rows: list[dict[str, Any]]) -> str:
   <div class="notice">本报告是研究辅助，不是交易指令；它不连接券商、不读取真实持仓、不自动下单。数据源失败时会显示 partial 或 stale。</div>
   <table>
     <thead>
-      <tr><th>Ticker</th><th>主题</th><th>趋势</th><th>风险</th><th>操作标签</th><th>数据新鲜度</th></tr>
+      <tr><th>Ticker</th><th>主题</th><th>趋势</th><th>风险</th><th>操作标签</th><th>规则证据/回测</th><th>数据新鲜度</th></tr>
     </thead>
     <tbody>
       {''.join(table_rows)}
@@ -156,13 +192,23 @@ def build_html(snapshot: dict[str, Any], rows: list[dict[str, Any]]) -> str:
 """
 
 
-def build_report_text(snapshot: dict[str, Any], holdings: list[dict[str, Any]]) -> tuple[str, str]:
-    rows = build_rows(snapshot, holdings)
+def build_report_text(
+    snapshot: dict[str, Any],
+    holdings: list[dict[str, Any]],
+    backtest_rows: list[dict[str, Any]] | None = None,
+) -> tuple[str, str]:
+    rows = build_rows(snapshot, holdings, backtest_rows=backtest_rows)
     return build_markdown(snapshot, holdings, rows), build_html(snapshot, rows)
 
 
-def write_reports(snapshot: dict[str, Any], holdings: list[dict[str, Any]], html_path: Path, md_path: Path) -> None:
-    markdown, html_text = build_report_text(snapshot, holdings)
+def write_reports(
+    snapshot: dict[str, Any],
+    holdings: list[dict[str, Any]],
+    html_path: Path,
+    md_path: Path,
+    backtest_rows: list[dict[str, Any]] | None = None,
+) -> None:
+    markdown, html_text = build_report_text(snapshot, holdings, backtest_rows=backtest_rows)
     html_path.parent.mkdir(parents=True, exist_ok=True)
     md_path.parent.mkdir(parents=True, exist_ok=True)
     html_path.write_text(html_text, encoding="utf-8")
@@ -173,6 +219,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build sample US operations report from yfinance snapshot.")
     parser.add_argument("--snapshot", type=Path, default=DEFAULT_SNAPSHOT)
     parser.add_argument("--holdings", type=Path, default=DEFAULT_HOLDINGS)
+    parser.add_argument("--backtest", type=Path, default=DEFAULT_BACKTEST)
     parser.add_argument("--html", type=Path, default=DEFAULT_HTML)
     parser.add_argument("--md", type=Path, default=DEFAULT_MD)
     return parser.parse_args(argv)
@@ -182,7 +229,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
     holdings = read_csv_rows(args.holdings)
-    write_reports(snapshot, holdings=holdings, html_path=args.html, md_path=args.md)
+    backtest_rows = []
+    if args.backtest.exists():
+        backtest_payload = json.loads(args.backtest.read_text(encoding="utf-8"))
+        backtest_rows = list(backtest_payload.get("rows", []))
+    write_reports(snapshot, holdings=holdings, html_path=args.html, md_path=args.md, backtest_rows=backtest_rows)
     print(f"wrote {args.html}")
     print(f"wrote {args.md}")
     return 0
