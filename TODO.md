@@ -18,7 +18,7 @@
 ## 最终验收状态
 
 - [x] Docker DB 有过去 5 年 A 股日线和 daily_basic 数据：`stock_daily_bars` 覆盖 `2021-06-28` 到 `2026-05-29`，`6,155,284` 行；`stock_daily_basic` 覆盖同区间，`6,134,626` 行。审计见 `docs/research/a-share-data/db-coverage-audit-2026-06-26.md`。
-- [ ] 策略文件夹中原本的策略文件都有对应回测结果：索引已建立，`13` 个原策略目录中 `12` 个已有明确回测/报告证据；`12_kronos_forecast_slope` 缺历史 Kronos 预测数据，只能先落数据缺口报告。详见 `docs/research/backtest-reports/README.md`。
+- [x] 策略文件夹中原本的策略文件都有对应回测结果：索引已建立，`13` 个原策略目录均已有明确证据；`12_kronos_forecast_slope` 已用外部 Kronos webui 归档预测 JSON 生成信号级回测，边界是加密期货 5 分钟样本，不等价于 HK 股票验证。详见 `docs/research/backtest-reports/README.md`。
 - [x] Tushare 和 yfinance 数据源都没有问题：Tushare `daily` / `daily_basic`、单票 fundamentals 和 yfinance sample 快照均通过烟测。审计见 `docs/research/a-share-data/data-source-audit-2026-06-26.md`；全市场财务指标覆盖不是五年完整库，若使用财务因子需另行补齐。
 - [x] 按照原有策略生成美股关注标的的回测数据和对应操作建议：`my_quant/us_research/reports/latest_us_watchlist_backtest.*` 已生成 2 年 yfinance 规则回测，`latest_us_operations.*` 已接入 `只等回调` 规则证据和操作标签。当前仍是 sample 研究辅助报告，不读取真实券商持仓。
 

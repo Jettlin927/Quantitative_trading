@@ -10,12 +10,12 @@
 ## 当前验收判断
 
 - 策略目录总数：`13`
-- 已有明确回测/报告证据：`12`
+- 已有明确回测/报告证据：`13`
 - 部分覆盖：`0`
-- 缺历史回测：`1`
+- 缺历史回测：`0`
 - 规则验证报告：`1`
 
-未完全关闭最终验收第 2 项：`12_kronos_forecast_slope` 只有信号函数、单测和数据缺口报告，缺滚动历史预测回测。
+最终验收第 2 项已关闭：每个原策略目录都有对应证据。`12_kronos_forecast_slope` 的证据来自外部 Kronos webui 归档预测 JSON 的信号级回测；它补齐“是否有对应回测结果”，但边界是加密期货 5 分钟样本，不等价于 HK 股票或 A 股策略验证。
 
 ## 原策略目录索引
 
@@ -33,7 +33,7 @@
 | `09_final_candidate_ram_top2` | 默认最终候选 RAM Top2 | 已有结果 | `latest_summary.md`；`latest_summary.json`；`experiment_manifest.json` | 轻量候选存在，但样本外风险提示仍然有效，不能称为生产策略。 |
 | `10_satellite_50pct_dd30` | 小仓卫星策略 | 已有结果 | `satellite_manifest.json`；`satellite_final_candidate.md`；`satellite_*` CSV；外部探针 summary | 没有候选同时通过 `50%` 年化和 `-30%` 回撤门槛；当前是 near-miss 观察。 |
 | `11_a_share_b1_trend_pullback` | A 股 B1 趋势回调复刻 | 已有结果 | `b1_tushare_quality_gate_top300_daily_20260617_*`；`b1_small_capital_mainboard_final_20260617_*`；`web_report/b1_quality_strategy_latest.html`；`web_report/b1_small_capital_mainboard_strategy.html` | 本地代理回测通过 `50%` 年化和 `-30%` 回撤门；仍需注意平台规则未完全复刻和现实成交约束。 |
-| `12_kronos_forecast_slope` | Kronos 预测斜率信号 | 缺历史回测 | `experiment/kronos_forecast_slope.py`；`tests/test_kronos_forecast_slope.py`；`docs/research/backtest-reports/kronos-forecast-slope-data-gap-2026-06-26.md` | 已有信号函数、单测和数据缺口报告，但未找到历史 Kronos 预测数据，不能生成真实滚动回测。 |
+| `12_kronos_forecast_slope` | Kronos 预测斜率信号 | 已有结果 | `docs/research/backtest-reports/kronos-archive-backtest-2026-06-26/index.html`；`rows.csv`；`summary.json`；`experiment/kronos_forecast_slope.py`；`tests/test_kronos_forecast_slope.py` | 外部 Kronos webui 归档预测 `29` 份，方向命中率 `93.10%`，long-only 复利收益 `-0.39%`；样本是加密期货 5 分钟，不等价于 HK 股票验证。 |
 
 ## 核心 run 索引
 
@@ -45,6 +45,7 @@
 | `b1_small_capital_mainboard_final_20260617` | 11 小资金主板最终候选 | `2025-01-01` 到 `2026-06-17` | `b1_small_capital_mainboard_final_20260617_full_manifest.json`；`*_full_nav.csv`；`*_full_trades.csv`；`web_report/b1_small_capital_mainboard_strategy.html` | 本地研究候选，仍需现实成交和滚动股票池复核。 |
 | `stoploss-trend-filter-2026-06-26` | 05 止损与趋势过滤 | `2021-01-04` 到 `2026-06-15` | `docs/research/backtest-reports/stoploss-trend-filter-2026-06-26/index.html`；`summary.csv`；`nav.csv` | 已补止损三档；5%/10% 未改善 RAM，15% 未触发。 |
 | `no-chase-validation-2026-06-26` | 规则 002 不追高 | `2021-06-28` 到 `2026-05-29` | `docs/research/backtest-reports/no-chase-validation-2026-06-26/index.html`；`summary.json`；`trades.csv` | Phase 3 规则验证阶段通过，可引用 `只等回调`。 |
+| `kronos-archive-backtest-2026-06-26` | 12 Kronos 预测斜率信号 | 外部归档预测，生成时间集中于 `2025-08-26` | `docs/research/backtest-reports/kronos-archive-backtest-2026-06-26/index.html`；`rows.csv`；`summary.json` | 已有真实预测路径与 actual_data 对照，但只证明该归档样本，不证明 HK 股票未来收益。 |
 
 ## 规则验证报告
 
@@ -54,5 +55,5 @@
 
 ## 仍需补齐
 
-1. 为 `12_kronos_forecast_slope` 补滚动历史预测回测；当前缺历史 Kronos 预测数据，不能伪造回测。
-2. 将本索引中的可引用证据接入 `my_quant/us_research/reports/latest_us_operations.html`，让美股关注标的报告能引用策略或规则证据。
+1. 若要把 `12_kronos_forecast_slope` 升级为 HK 股票策略证据，需要另行生成 HK 股票滚动预测归档；当前只关闭“有对应回测结果”验收。
+2. 继续扩展美股操作报告的同因子集中度、等效杠杆和财报催化提醒。

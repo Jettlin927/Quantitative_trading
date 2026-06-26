@@ -42,12 +42,30 @@
 - 和现有 B1 盘前预案分开评估，不能把模型预测信号直接混入 B1 规则。
 - 明确交易成本、滑点、持仓上限和人工确认流程。
 
-## 当前数据缺口
+## HK 股票预测数据缺口
 
 缺口报告：`docs/research/backtest-reports/kronos-forecast-slope-data-gap-2026-06-26.md`
 
-当前仓库和已知本地相关仓库中未找到 `*_forecast_stats.csv` 或同结构历史 Kronos 预测文件。因此本策略目前只有信号函数和单测，不能生成真实滚动历史回测结果。
+当前仓库和已知本地相关仓库中未找到 HK 股票口径的 `*_forecast_stats.csv` 或同结构历史 Kronos 预测文件。因此，本策略仍不能生成 HK 股票滚动历史回测结果。
 
-后续关闭本策略验收前，必须先提供或重新生成历史预测数据；不得用未来真实价格、合成预测或单次当前预测冒充历史回测。
+后续若要做 HK 股票专项验证，必须先提供或重新生成 HK 股票历史预测数据；不得用未来真实价格、合成预测或单次当前预测冒充历史回测。
+
+## 当前归档预测回测
+
+报告：`docs/research/backtest-reports/kronos-archive-backtest-2026-06-26/index.html`
+
+产物：
+
+- `docs/research/backtest-reports/kronos-archive-backtest-2026-06-26/rows.csv`
+- `docs/research/backtest-reports/kronos-archive-backtest-2026-06-26/summary.json`
+
+说明：
+
+- 使用外部 Kronos webui 已落盘的 `29` 份预测 JSON。
+- 每份 JSON 包含 `prediction_results` 和对应 `actual_data`，不是合成预测。
+- 样本是加密期货 `5m` 预测归档，不等价于 HK 股票或 A 股策略验证。
+- 结果：方向命中率 `93.10%`，long-only 复利收益 `-0.39%`，大多数信号为 `hold`。
+
+因此本策略目录已有对应信号级回测证据；若要升级为 HK 股票策略证据，仍需另行生成 HK 股票滚动预测归档。
 
 所有结论只用于课程研究和回测学习，不构成投资建议。
