@@ -8,7 +8,7 @@
 
 ## 四区导航
 
-- 美股操作层：`my_quant/us_research/`，后续放 sample 持仓、观察池、yfinance 快照脚本、HTML/Markdown 操作报告和规则证据引用。
+- 美股操作层：`my_quant/us_research/`，已包含 sample 持仓、观察池、yfinance 快照脚本、HTML/Markdown 操作报告和规则证据引用入口。
 - A 股数据沙盘：`backend/app/`、`docker-compose.yml`、PostgreSQL volume 和 `docs/research/a-share-data/`，继续服务 Tushare 同步、A 股研究池和大样本验证。
 - 策略思想库：`docs/research/strategy-lab/`，后续放“不追高”“止跌后加仓”“同因子杠杆预算”等规则卡片和负证据。
 - 回测证据档案：`docs/research/backtest-reports/`、`docs/research/runs/`、`my_quant/strategy_research/results/`、`my_quant/strategy_research/web_report/`。
@@ -111,6 +111,11 @@
 - `my_quant/`
   - 从 `xquant-beginner` 收拢来的独立研究工作区，依赖和运行方式与主 FastAPI/React 栈分开。
   - 接手说明看 `my_quant/README.md`，策略研究说明看 `my_quant/strategy_research/README.md`。
+
+- `my_quant/us_research/`
+  - 文件化美股操作层，只使用 sample 持仓和 sample 观察池，不读取真实券商导出。
+  - `scripts/refresh_us_snapshot.py` 使用 yfinance 生成 `data/snapshots/us_snapshot_latest.{json,csv}`，字段包含 `fetched_at`、`source`、`is_stale` 和趋势指标。
+  - `scripts/build_us_operations_report.py` 从快照生成 `reports/latest_us_operations.html` 和 `reports/latest_us_operations.md`，报告中的动作标签只作研究辅助。
 
 - `my_quant/strategy_research/experiment/b1_trend_pullback.py`
   - B1 A 股趋势回调组合实验核心，包含 Tushare/AkShare 数据读取、候选排序、现实成交约束和组合回测。
