@@ -15,7 +15,7 @@
 **Files:**
 - Modify: `README.md`
 
-- [ ] **Step 1: 在 README 的项目介绍后新增“四区闭环”小节**
+- [x] **Step 1: 在 README 的项目介绍后新增“四区闭环”小节**
 
 Insert after the opening paragraph and screenshots stay unchanged below the introduction:
 
@@ -32,7 +32,7 @@ Insert after the opening paragraph and screenshots stay unchanged below the intr
 边界不变：本仓库只做研究、复盘、模拟和人工辅助分析，不连接券商，不自动下单，不处理真实资金。
 ```
 
-- [ ] **Step 2: 检查 README 中没有真实持仓、token 或绝对敏感路径**
+- [x] **Step 2: 检查 README 中没有真实持仓、token 或绝对敏感路径**
 
 Run:
 
@@ -47,7 +47,7 @@ Expected: only placeholder token examples may appear; no real holdings file path
 **Files:**
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: 在“默认架构”后新增“四区职责”小节**
+- [x] **Step 1: 在“默认架构”后新增“四区职责”小节**
 
 Add a short Agent rule section:
 
@@ -64,7 +64,7 @@ Add a short Agent rule section:
 Phase 0 只立边界和盘点，不搬大文件、不迁移真实持仓、不改 Docker DB、不改变回测语义。
 ```
 
-- [ ] **Step 2: 确认 AGENTS 没有把美股报告升级为交易指令**
+- [x] **Step 2: 确认 AGENTS 没有把美股报告升级为交易指令**
 
 Run:
 
@@ -79,7 +79,7 @@ Expected: red-line language remains present and unchanged in meaning.
 **Files:**
 - Modify: `docs/agent-code-map.md`
 
-- [ ] **Step 1: 在“一句话架构”后新增“四区导航”**
+- [x] **Step 1: 在“一句话架构”后新增“四区导航”**
 
 Add:
 
@@ -92,7 +92,7 @@ Add:
 - 回测证据档案：`docs/research/backtest-reports/`、`docs/research/runs/`、`my_quant/strategy_research/results/`、`my_quant/strategy_research/web_report/`。
 ```
 
-- [ ] **Step 2: 检查导航与 TODO Phase 0 一致**
+- [x] **Step 2: 检查导航与 TODO Phase 0 一致**
 
 Run:
 
@@ -107,7 +107,7 @@ Expected: both files expose the same core directories.
 **Files:**
 - Create: `docs/research/us-research-migration-inventory-2026-06-26.md`
 
-- [ ] **Step 1: 写明可迁移、需脱敏、禁止迁移三类资产**
+- [x] **Step 1: 写明可迁移、需脱敏、禁止迁移三类资产**
 
 The document must include:
 
@@ -145,7 +145,7 @@ Phase 0 不迁移 `/Users/jettlin/code/投资分析` 的真实数据，只记录
 Phase 1 创建 `my_quant/us_research/`，只使用 sample 持仓和 sample 观察池，脚本复用前先写测试。
 ```
 
-- [ ] **Step 2: 确认没有误包含真实持仓数据**
+- [x] **Step 2: 确认没有误包含真实持仓数据**
 
 Run:
 
@@ -160,7 +160,7 @@ Expected: only filenames in the "禁止直接迁移" section appear; no row-leve
 **Files:**
 - Modify: `操作日志.md`
 
-- [ ] **Step 1: 追加 Phase 0 事实日志**
+- [x] **Step 1: 追加 Phase 0 事实日志**
 
 Append a dated entry with:
 
@@ -169,7 +169,7 @@ Append a dated entry with:
 - 验证结果：`git diff --check` and required `rg` checks.
 - 后续事项：Phase 1 创建 `my_quant/us_research/` 文件化闭环。
 
-- [ ] **Step 2: 运行文档验证**
+- [x] **Step 2: 运行文档验证**
 
 Run:
 
