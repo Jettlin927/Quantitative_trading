@@ -33,6 +33,17 @@
 
 后端是策略和数据语义的准绳，前端只负责提交参数和展示结果。不要让前后端各维护一套分叉的策略逻辑。
 
+## 四区职责
+
+后续改造按四区推进：
+
+- 美股操作层：默认落在 `my_quant/us_research/`，只保存 sample、脱敏结构、观察池配置、数据快照和研究辅助报告；不要提交真实持仓、成交明细或券商导出。
+- A 股数据沙盘：默认仍由 `backend/`、`docker-compose.yml` 和 PostgreSQL volume 承载，Tushare 数据用于大样本验证；不要为了美股第一版改 A 股表结构或删除 volume。
+- 策略思想库：默认落在 `docs/research/strategy-lab/`，每条规则必须写清假设、A 股验证口径、美股映射边界、失败条件和负证据。
+- 回测证据档案：默认落在 `docs/research/backtest-reports/`、`my_quant/strategy_research/results/` 和 `my_quant/strategy_research/web_report/`，指标应来自已落盘 CSV/JSON/manifest 或数据库结果。
+
+Phase 0 只立边界和盘点，不搬大文件、不迁移真实持仓、不改 Docker DB、不改变回测语义。
+
 ## AI 研究闭环规则
 
 新增或修改策略时，先写清楚假设和成功标准，再动代码。例：`假设：BOLL 收口后放量突破在当前样本中提高胜率；验证：同一日期区间全市场回测，比较收益、最大回撤、胜率、纪律评分和交易数。`

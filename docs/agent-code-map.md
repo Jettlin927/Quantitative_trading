@@ -6,6 +6,13 @@
 
 本仓库是本地量化研究工作台：React/Vite 前端负责人机交互，FastAPI 后端负责数据同步、指标计算、策略回测、AI/本地复盘，PostgreSQL 负责持久化 Tushare 行情、基本面、同步记录和自选标的池。
 
+## 四区导航
+
+- 美股操作层：`my_quant/us_research/`，后续放 sample 持仓、观察池、yfinance 快照脚本、HTML/Markdown 操作报告和规则证据引用。
+- A 股数据沙盘：`backend/app/`、`docker-compose.yml`、PostgreSQL volume 和 `docs/research/a-share-data/`，继续服务 Tushare 同步、A 股研究池和大样本验证。
+- 策略思想库：`docs/research/strategy-lab/`，后续放“不追高”“止跌后加仓”“同因子杠杆预算”等规则卡片和负证据。
+- 回测证据档案：`docs/research/backtest-reports/`、`docs/research/runs/`、`my_quant/strategy_research/results/`、`my_quant/strategy_research/web_report/`。
+
 ```text
 人类/AI Agent
   -> frontend/ React 工作台，或直接调用 http://localhost:18000 API

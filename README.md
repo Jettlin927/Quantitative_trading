@@ -2,6 +2,17 @@
 
 一个本地运行的 A 股量化研究工作台，用来把交易纪律、技术形态、基本面数据和消息面热点放到同一个页面里复盘。它不是自动交易系统，也不会连接券商或真实账户，只用于研究、回测和策略验证。
 
+## 四区闭环
+
+本仓库后续按四个区域收拢，目标是：用 A 股数据验证交易纪律，再把验证过的规则反哺美股持仓和观察池分析。
+
+- `my_quant/us_research/`：美股操作层，保存 sample 持仓、观察池、快照、操作报告和规则证据；真实持仓和成交记录默认只读本地脱敏 CSV，不提交。
+- `backend/`、`docker-compose.yml`、`docs/research/a-share-data/`：A 股数据沙盘，继续使用 Docker PostgreSQL 和 Tushare 做大样本验证。
+- `docs/research/strategy-lab/`：策略思想库，沉淀规则卡片、假设、失败条件和负证据。
+- `docs/research/backtest-reports/`、`my_quant/strategy_research/results/`、`my_quant/strategy_research/web_report/`：回测证据档案，保存 run 索引、HTML、CSV、manifest 和阶段结论。
+
+边界不变：本仓库只做研究、复盘、模拟和人工辅助分析，不连接券商，不自动下单，不处理真实资金。
+
 ![选股池与消息面](docs/images/readme-screener.png)
 
 ![策略实验与交互 K 线](docs/images/readme-lab.png)
