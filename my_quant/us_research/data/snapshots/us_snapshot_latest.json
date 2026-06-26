@@ -1,7 +1,7 @@
 {
   "status": "ok",
   "source": "yfinance",
-  "fetched_at": "2026-06-26T10:47:02.689077+00:00",
+  "fetched_at": "2026-06-26T11:53:29.206328+00:00",
   "symbol_count": 4,
   "ok_count": 4,
   "stale_count": 0,
@@ -26,7 +26,7 @@
       "return_60d_pct": 18.508208308478636,
       "volatility_20d_pct": 46.919451703210335,
       "source": "yfinance",
-      "fetched_at": "2026-06-26T10:47:02.689077+00:00",
+      "fetched_at": "2026-06-26T11:53:29.206328+00:00",
       "is_stale": false,
       "stale_reason": ""
     },
@@ -50,7 +50,7 @@
       "return_60d_pct": 277.11625376894,
       "volatility_20d_pct": 127.47087517193538,
       "source": "yfinance",
-      "fetched_at": "2026-06-26T10:47:02.689077+00:00",
+      "fetched_at": "2026-06-26T11:53:29.206328+00:00",
       "is_stale": false,
       "stale_reason": ""
     },
@@ -74,7 +74,7 @@
       "return_60d_pct": 39.001795588514845,
       "volatility_20d_pct": 73.85358476758246,
       "source": "yfinance",
-      "fetched_at": "2026-06-26T10:47:02.689077+00:00",
+      "fetched_at": "2026-06-26T11:53:29.206328+00:00",
       "is_stale": false,
       "stale_reason": ""
     },
@@ -98,7 +98,7 @@
       "return_60d_pct": 521.8857884116405,
       "volatility_20d_pct": 226.17028501258014,
       "source": "yfinance",
-      "fetched_at": "2026-06-26T10:47:02.689077+00:00",
+      "fetched_at": "2026-06-26T11:53:29.206328+00:00",
       "is_stale": false,
       "stale_reason": ""
     }
