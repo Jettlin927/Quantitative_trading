@@ -18,7 +18,7 @@
 ## 最终验收状态
 
 - [x] Docker DB 有过去 5 年 A 股日线和 daily_basic 数据：`stock_daily_bars` 覆盖 `2021-06-28` 到 `2026-05-29`，`6,155,284` 行；`stock_daily_basic` 覆盖同区间，`6,134,626` 行。审计见 `docs/research/a-share-data/db-coverage-audit-2026-06-26.md`。
-- [ ] 策略文件夹中原本的策略文件都有对应回测结果：待建立回测报告索引并逐项核对。
+- [ ] 策略文件夹中原本的策略文件都有对应回测结果：索引已建立，`13` 个原策略目录中 `11` 个已有明确回测/报告证据，`05_stoploss_trend_filter` 部分覆盖，`12_kronos_forecast_slope` 缺历史滚动回测。详见 `docs/research/backtest-reports/README.md`。
 - [ ] Tushare 和 yfinance 数据源都没有问题：Tushare `daily` / `daily_basic` 和 yfinance sample 快照已通过烟测；Tushare 财务指标完整性仍需单独审计。
 - [ ] 按照原有策略生成美股关注标的的回测数据和对应操作建议：已建立 sample 美股操作报告，并完成规则 002 `只等回调` 的 A 股验证证据；仍需接入美股关注标的回测和正式操作建议。
 
@@ -194,11 +194,11 @@ my_quant/strategy_research/results/
 
 ### Phase 4: 建立回测报告索引
 
-- [ ] 新增 `docs/research/backtest-reports/README.md`。
-- [ ] 索引现有 `my_quant/strategy_research/results/` 和 `web_report/` 中的重要产物。
-- [ ] 为每个重要 run 记录：run id、策略、窗口、参数、关键指标、结论、报告路径。
-- [ ] 区分 `阶段通过`、`观察`、`淘汰`。
-- [ ] 标出哪些报告能服务美股操作纪律，哪些只是历史 A 股实验。
+- [x] 新增 `docs/research/backtest-reports/README.md`。
+- [x] 索引现有 `my_quant/strategy_research/results/` 和 `web_report/` 中的重要产物。
+- [x] 为每个重要 run 记录：run id、策略、窗口、参数、关键指标、结论、报告路径。
+- [x] 区分 `阶段通过`、`观察`、`淘汰`。
+- [x] 标出哪些报告能服务美股操作纪律，哪些只是历史 A 股实验。
 
 验收：
 
