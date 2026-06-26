@@ -34,3 +34,20 @@
 - 无保护 vs 止损三档 vs 均线过滤。
 - 最大回撤区间标注。
 - 交易次数和成本变化。
+
+## 当前本地结果
+
+报告：`docs/research/backtest-reports/stoploss-trend-filter-2026-06-26/index.html`
+
+产物：
+
+- `docs/research/backtest-reports/stoploss-trend-filter-2026-06-26/summary.csv`
+- `docs/research/backtest-reports/stoploss-trend-filter-2026-06-26/nav.csv`
+
+当前结论：
+
+- `5%` 止损触发 `18` 次，年化 `-0.06%`，最大回撤 `-24.22%`，明显弱于原 RAM。
+- `10%` 止损触发 `2` 次，年化 `4.85%`，最大回撤 `-19.18%`，弱于原 RAM。
+- `15%` 止损未触发，表现与原 RAM 相同。
+
+因此本策略目录已有对应回测证据，但止损三档当前不能提升该 ETF RAM 口径的风险收益。
