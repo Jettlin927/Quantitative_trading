@@ -30,6 +30,7 @@
 - `strategies/07_oos_walk_forward/`：样本外与 Walk-Forward。
 - `strategies/08_factor_diagnostics/`：因子 IC 诊断。
 - `strategies/09_final_candidate_ram_top2/`：TODO 中优先级最高的候选路线。
+- `strategies/12_kronos_forecast_slope/`：Kronos 预测路径斜率信号，只输出研究用 `buy` / `sell` / `hold`。
 
 ## 运行方式
 
@@ -84,6 +85,15 @@ Tushare 路径会使用：
 - `pro_bar(adj=qfq)` 拉取个股前复权日线。
 - `index_daily(000300.SH)` 作为大盘长均线过滤。
 - 本地 CSV 缓存，避免重复消耗接口频率。
+
+Kronos 港股预测包装脚本已收拢为可选实验入口。它依赖外部 Kronos checkout，不把第三方模型仓库纳入本仓默认依赖：
+
+```bash
+.venv/bin/python my_quant/strategy_research/run_kronos_hk_forecast.py \
+  --kronos-dir ~/Documents/kronos-预测/Kronos
+```
+
+该入口只生成研究报告和预测路径摘要，不自动下单。
 
 ## B1 现实约束复核与 backend 接入
 

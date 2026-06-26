@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -972,11 +973,56 @@ class ExperimentEngineTest(unittest.TestCase):
         self.assertEqual(list(bars.index), [pd.Timestamp("2024-01-02"), pd.Timestamp("2024-01-03")])
         self.assertAlmostEqual(float(bars.loc[pd.Timestamp("2024-01-02"), "close"]), 3005.0)
 
+    def test_b1_tushare_index_fetch_refreshes_stale_cache_for_requested_end_date(self):
+        from my_quant.strategy_research.experiment.b1_trend_pullback import fetch_tushare_index_bars
+
+        class FakeApi:
+            def __init__(self):
+                self.calls = 0
+
+            def index_daily(self, ts_code, start_date, end_date):
+                self.calls += 1
+                self.ts_code = ts_code
+                self.start_date = start_date
+                self.end_date = end_date
+                return pd.DataFrame(
+                    {
+                        "trade_date": ["20260617", "20260616"],
+                        "open": [4930.0, 4880.0],
+                        "high": [4940.0, 4890.0],
+                        "low": [4920.0, 4870.0],
+                        "close": [4931.0, 4884.0],
+                    }
+                )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "000300.SH_20240601_20260617_tushare_index.csv"
+            pd.DataFrame(
+                {
+                    "date": ["2026-06-16"],
+                    "open": [4880.0],
+                    "high": [4890.0],
+                    "low": [4870.0],
+                    "close": [4884.0],
+                }
+            ).to_csv(cache_path, index=False)
+
+            fake_api = FakeApi()
+            with patch("my_quant.strategy_research.experiment.b1_trend_pullback.tushare_pro_api", return_value=fake_api):
+                bars = fetch_tushare_index_bars("000300.SH", "20240601", "20260617", Path(tmpdir))
+
+        self.assertEqual(fake_api.calls, 1)
+        self.assertEqual(fake_api.ts_code, "000300.SH")
+        self.assertEqual(fake_api.start_date, "20240601")
+        self.assertEqual(fake_api.end_date, "20260617")
+        self.assertEqual(list(bars.index), [pd.Timestamp("2026-06-16"), pd.Timestamp("2026-06-17")])
+        self.assertAlmostEqual(float(bars.loc[pd.Timestamp("2026-06-17"), "close"]), 4931.0)
+
     def test_b1_market_frame_can_use_tushare_index_cache(self):
         from my_quant.strategy_research.run_b1_trend_pullback import build_market_frame
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            dates = pd.date_range("2023-08-01", periods=130, freq="B")
+            dates = pd.bdate_range("2023-08-01", "2024-01-31")
             pd.DataFrame(
                 {
                     "date": [date.strftime("%Y-%m-%d") for date in dates],
