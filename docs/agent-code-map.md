@@ -10,7 +10,7 @@
 
 - 美股操作层：`my_quant/us_research/`，已包含 sample 持仓、观察池、yfinance 快照脚本、HTML/Markdown 操作报告和规则证据引用入口。
 - A 股数据沙盘：`backend/app/`、`docker-compose.yml`、PostgreSQL volume 和 `docs/research/a-share-data/`，继续服务 Tushare 同步、A 股研究池和大样本验证。
-- 策略思想库：`docs/research/strategy-lab/`，后续放“不追高”“止跌后加仓”“同因子杠杆预算”等规则卡片和负证据。
+- 策略思想库：`docs/research/strategy-lab/`，已放“不追高”“止跌后加仓”“同因子杠杆预算”等规则卡片和负证据入口。
 - 回测证据档案：`docs/research/backtest-reports/`、`docs/research/runs/`、`my_quant/strategy_research/results/`、`my_quant/strategy_research/web_report/`。
 
 ```text
