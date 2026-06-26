@@ -134,11 +134,11 @@ my_quant/strategy_research/results/
 
 ### Phase 0: 先立边界，不搬大文件
 
-- [ ] 在根 README 中写清四区架构和最终闭环。
-- [ ] 在 `AGENTS.md` 中补充四区职责，明确美股是操作层、A 股是验证沙盘。
-- [ ] 更新 `docs/agent-code-map.md`，让后续 Agent 能按四区找代码。
-- [ ] 保留现有 Docker PostgreSQL 和 A 股表，不做破坏性迁移。
-- [ ] 盘点 `/Users/jettlin/code/投资分析` 中可迁移的脚本、配置、报告和敏感文件。
+- [x] 在根 README 中写清四区架构和最终闭环。
+- [x] 在 `AGENTS.md` 中补充四区职责，明确美股是操作层、A 股是验证沙盘。
+- [x] 更新 `docs/agent-code-map.md`，让后续 Agent 能按四区找代码。
+- [x] 保留现有 Docker PostgreSQL 和 A 股表，不做破坏性迁移。
+- [x] 盘点 `/Users/jettlin/code/投资分析` 中可迁移的脚本、配置、报告和敏感文件。
 
 验收：
 
@@ -147,12 +147,12 @@ my_quant/strategy_research/results/
 
 ### Phase 1: 建立美股操作层的文件化闭环
 
-- [ ] 新增 `my_quant/us_research/README.md`。
-- [ ] 新增 sample 级别的 `holdings_sample.csv`，不提交真实持仓。
-- [ ] 新增美股观察池配置，优先从 `/Users/jettlin/code/投资分析/watchlist_symbols_2026.csv` 的结构迁移，不直接搬敏感数据。
-- [ ] 新增美股快照脚本，优先使用 `yfinance`，可选 Finnhub，输出带 `fetched_at`、`source`、`is_stale` 的 JSON/CSV。
-- [ ] 新增美股操作报告生成脚本，输出 HTML + Markdown。
-- [ ] 报告必须显示：持仓、主题、趋势、风险、操作标签、数据新鲜度。
+- [x] 新增 `my_quant/us_research/README.md`。
+- [x] 新增 sample 级别的 `holdings_sample.csv`，不提交真实持仓。
+- [x] 新增美股观察池配置，优先从 `/Users/jettlin/code/投资分析/watchlist_symbols_2026.csv` 的结构迁移，不直接搬敏感数据。
+- [x] 新增美股快照脚本，优先使用 `yfinance`，可选 Finnhub，输出带 `fetched_at`、`source`、`is_stale` 的 JSON/CSV。
+- [x] 新增美股操作报告生成脚本，输出 HTML + Markdown。
+- [x] 报告必须显示：持仓、主题、趋势、风险、操作标签、数据新鲜度。
 
 验收：
 
