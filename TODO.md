@@ -20,7 +20,7 @@
 - [x] Docker DB 有过去 5 年 A 股日线和 daily_basic 数据：`stock_daily_bars` 覆盖 `2021-06-28` 到 `2026-05-29`，`6,155,284` 行；`stock_daily_basic` 覆盖同区间，`6,134,626` 行。审计见 `docs/research/a-share-data/db-coverage-audit-2026-06-26.md`。
 - [ ] 策略文件夹中原本的策略文件都有对应回测结果：索引已建立，`13` 个原策略目录中 `12` 个已有明确回测/报告证据；`12_kronos_forecast_slope` 缺历史 Kronos 预测数据，只能先落数据缺口报告。详见 `docs/research/backtest-reports/README.md`。
 - [x] Tushare 和 yfinance 数据源都没有问题：Tushare `daily` / `daily_basic`、单票 fundamentals 和 yfinance sample 快照均通过烟测。审计见 `docs/research/a-share-data/data-source-audit-2026-06-26.md`；全市场财务指标覆盖不是五年完整库，若使用财务因子需另行补齐。
-- [ ] 按照原有策略生成美股关注标的的回测数据和对应操作建议：已建立 sample 美股操作报告，并完成规则 002 `只等回调` 的 A 股验证证据；仍需接入美股关注标的回测和正式操作建议。
+- [x] 按照原有策略生成美股关注标的的回测数据和对应操作建议：`my_quant/us_research/reports/latest_us_watchlist_backtest.*` 已生成 2 年 yfinance 规则回测，`latest_us_operations.*` 已接入 `只等回调` 规则证据和操作标签。当前仍是 sample 研究辅助报告，不读取真实券商持仓。
 
 ## 四区架构
 
@@ -206,8 +206,8 @@ my_quant/strategy_research/results/
 
 ### Phase 5: 把验证结论反哺美股持仓报告
 
-- [ ] 在美股操作报告中新增“规则证据”区。
-- [ ] 每个持仓动作标签必须引用至少一个证据来源：美股本地趋势/基本面证据，或 A 股规则验证卡片。
+- [x] 在美股操作报告中新增“规则证据”区。
+- [x] 每个持仓动作标签必须引用至少一个证据来源：美股本地趋势/基本面证据，或 A 股规则验证卡片。
 - [ ] 增加同因子集中度检查，例如 AI 硬件、存储、互联、供电、空间/国防。
 - [ ] 增加杠杆敞口折算，例如 2x 单股 ETF 按等效敞口显示。
 - [ ] 增加催化/财报前风险提醒。
