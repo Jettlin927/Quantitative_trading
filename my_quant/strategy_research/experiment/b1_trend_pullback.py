@@ -611,7 +611,10 @@ def fetch_tushare_index_bars(
     ts_code = symbol.upper()
     cache_path = data_dir / f"{ts_code}_{start}_{end}_tushare_index.csv"
     if cache_path.exists() and not refresh:
-        return _read_normalized_bar_cache(cache_path)
+        bars = _read_normalized_bar_cache(cache_path)
+        requested_end = pd.to_datetime(end, format="%Y%m%d", errors="coerce")
+        if pd.isna(requested_end) or bars.index.max() >= requested_end:
+            return bars
 
     api = tushare_pro_api(token)
     raw = retry_call(

@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>B1 小本金主板策略执行报告</title>
+  <style>
+    :root {
+      --ink: #1f2933;
+      --muted: #66727f;
+      --paper: #f5f7fa;
+      --surface: #ffffff;
+      --line: #dce3ea;
+      --soft-line: #edf1f5;
+      --red: #d83b2d;
+      --red-dark: #a92d24;
+      --green: #16865f;
+      --blue: #2e6f9e;
+      --amber: #b7791f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      line-height: 1.56;
+    }
+    a { color: inherit; }
+    .topbar {
+      min-height: 56px;
+      background: var(--red);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+    .layout { display: grid; grid-template-columns: 78px minmax(0, 1fr); min-height: calc(100vh - 56px); }
+    .rail {
+      background: #151a1f;
+      color: #b9c2cc;
+      border-right: 1px solid #252c33;
+      padding: 18px 10px;
+    }
+    .rail a {
+      display: block;
+      text-decoration: none;
+      color: #b9c2cc;
+      font-size: 12px;
+      text-align: center;
+      padding: 12px 4px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    .rail a:hover { background: #222a31; color: #fff; }
+    .content { min-width: 0; }
+    .shell { width: min(1380px, calc(100% - 48px)); margin: 0 auto; }
+    .subnav {
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 4;
+    }
+    .subnav .shell {
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+    .subnav strong { color: var(--red); }
+    .subnav span { color: var(--muted); font-size: 13px; }
+    .hero { background: #fff; border-bottom: 1px solid var(--line); padding: 28px 0 24px; }
+    h1 { margin: 0 0 10px; font-size: clamp(28px, 3.2vw, 44px); line-height: 1.12; letter-spacing: 0; }
+    h2 { margin: 0 0 14px; font-size: 25px; line-height: 1.2; letter-spacing: 0; }
+    h3 { margin: 0 0 10px; font-size: 17px; }
+    .lead { margin: 0; max-width: 940px; color: var(--muted); font-size: 16px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: var(--muted);
+      background: #fff;
+      font-size: 12px;
+    }
+    .pill.strong { color: var(--red-dark); border-color: #f2bbb5; background: #fff5f3; font-weight: 700; }
+    section { padding: 28px 0; }
+    .metric-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+    .metric {
+      min-height: 82px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .metric span { display: block; color: var(--muted); font-size: 12px; }
+    .metric strong { display: block; margin-top: 4px; font-size: 21px; line-height: 1.15; overflow-wrap: anywhere; }
+    .panel {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .panel + .panel { margin-top: 14px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .grid-2 > *, .grid-3 > * { min-width: 0; }
+    .plan-step { border-left: 4px solid var(--blue); }
+    .plan-step:nth-child(2) { border-left-color: var(--red); }
+    .plan-step:nth-child(3) { border-left-color: var(--amber); }
+    .muted { color: var(--muted); }
+    .chart-svg { width: 100%; height: auto; display: block; }
+    .table-wrap {
+      width: 100%;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .table-wrap.tall { max-height: 560px; }
+    table { width: 100%; border-collapse: collapse; min-width: 980px; }
+    th, td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--soft-line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    th {
+      color: var(--muted);
+      background: #f8fafc;
+      font-weight: 700;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    tr:last-child td { border-bottom: none; }
+    code {
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 12px;
+      background: #eef2f6;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+    .pos, .sell, .pass { color: var(--red-dark); font-weight: 700; }
+    .neg, .buy, .fail { color: var(--green); font-weight: 700; }
+    .artifact-list { margin: 0; padding-left: 18px; columns: 2; }
+    .artifact-list li { margin: 6px 0; break-inside: avoid; }
+    .artifact-list span { display: inline-block; min-width: 86px; color: var(--muted); }
+    .empty { color: var(--muted); margin: 0; }
+    .foot { color: var(--muted); font-size: 13px; padding: 18px 0 34px; }
+    @media (max-width: 1120px) {
+      .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .grid-3 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 760px) {
+      .layout { grid-template-columns: 1fr; }
+      .rail { display: none; }
+      .shell { width: min(100% - 28px, 1380px); }
+      .subnav .shell { align-items: flex-start; flex-direction: column; padding: 12px 0; }
+      .metric-grid, .grid-2 { grid-template-columns: 1fr; }
+      table { min-width: 880px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">投资科学 · B1 小本金主板策略回测报告</div>
+  <div class="layout">
+    <aside class="rail" aria-label="报告导航">
+      <a href="#overview">概览</a>
+      <a href="#plan">方案</a>
+      <a href="#nav">净值</a>
+      <a href="#dist">分布</a>
+      <a href="#trades">明细</a>
+    </aside>
+    <main class="content">
+      <div class="subnav">
+        <div class="shell">
+          <strong>B1 Trend Pullback · 20k Mainboard</strong>
+          <span>生成时间：2026-06-17 18:22 +08:00</span>
+        </div>
+      </div>
+
+      <section class="hero" id="overview">
+        <div class="shell">
+          <h1>新策略与执行方案：2 万本金主板可买口径</h1>
+          <p class="lead">本页描述的是本地研究回测结果，不是实盘买卖指令。策略把 B1 趋势回调逻辑约束到 20,000 元本金、A 股 100 股一手、剔除科创板/创业板/新三板/北交所等权限票，并在候选股买不起时顺延到下一只可买主板票。</p>
+          <div class="meta">
+            <span class="pill strong">主口径：观察</span>
+            <span class="pill">最终净值：1.77x</span>
+            <span class="pill">本金：20,000 元</span>
+            <span class="pill">交易成本：0.10%</span>
+            <span class="pill">收益门失败 2 个窗口，回撤门失败 0 个窗口。</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="shell">
+          <div class="metric-grid">
+            <div class='metric'><span>主口径结论</span><strong>观察</strong></div><div class='metric'><span>起始本金</span><strong>20,000 元</strong></div><div class='metric'><span>最终净值</span><strong>1.77x</strong></div><div class='metric'><span>累计盈亏</span><strong>15,391.38 元</strong></div><div class='metric'><span>全窗口年化</span><strong>51.00%</strong></div><div class='metric'><span>最大回撤</span><strong>-19.09%</strong></div><div class='metric'><span>收益门通过</span><strong>4/6</strong></div><div class='metric'><span>回撤门通过</span><strong>6/6</strong></div><div class='metric'><span>闭环交易胜率</span><strong>56.82%</strong></div><div class='metric'><span>闭环交易数</span><strong>44 笔</strong></div><div class='metric'><span>买卖流水数</span><strong>88 行</strong></div><div class='metric'><span>标的池数量</span><strong>179 只</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="plan">
+        <div class="shell">
+          <h2>策略假设与执行方案</h2>
+          <div class="grid-3">
+            <article class="panel plan-step">
+              <h3>1. 先过滤可交易股票</h3>
+              <p class="muted">标的池只保留普通主板股票，剔除 <code>30*</code> 创业板、<code>68*</code> 科创板、北交所和新三板相关代码；同时保留上市时间、流动性和候选质量过滤。</p>
+            </article>
+            <article class="panel plan-step">
+              <h3>2. 只在强势环境开仓</h3>
+              <p class="muted">市场门槛要求指数处在 BBI 上方、短中期均线结构偏强，并用候选股广度过滤弱势窗口。弱势环境不新增仓位。</p>
+            </article>
+            <article class="panel plan-step">
+              <h3>3. 用小账户真实约束成交</h3>
+              <p class="muted">初始本金固定为 20,000 元；按 100 股一手取整；优先买 Top1，若 Top1 一手都买不起，则顺延到下一只可买候选；止损 5%，止盈 5% 一次性退出，跌破 BBI 退出。</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="shell">
+          <h2>全窗口复核</h2>
+          <p class="muted">阶段判断按窗口硬门槛看，不只看全窗口净值曲线。本次回撤门 6/6 通过，收益门 4/6 通过，所以结论是观察。</p>
+          <div class='table-wrap'><table><thead><tr><th>窗口</th><th>开始</th><th>结束</th><th>标的数</th><th>年化</th><th>最大回撤</th><th>Calmar</th><th>50% 年化门</th><th>-30% 回撤门</th><th>买卖行</th><th>候选数</th></tr></thead><tbody><tr><td>full</td><td>2025-01-01</td><td>2026-06-17</td><td>179</td><td>51.00%</td><td>-19.09%</td><td>2.67</td><td class='pass'>通过</td><td class='pass'>通过</td><td>88</td><td>46</td></tr><tr><td>train_2025</td><td>2025-01-01</td><td>2025-12-31</td><td>179</td><td>29.11%</td><td>-19.09%</td><td>1.52</td><td class='fail'>未通过</td><td class='pass'>通过</td><td>58</td><td>29</td></tr><tr><td>oos_2026</td><td>2026-01-01</td><td>2026-06-17</td><td>179</td><td>72.28%</td><td>-6.86%</td><td>10.53</td><td class='pass'>通过</td><td class='pass'>通过</td><td>30</td><td>23</td></tr><tr><td>wf_2025_h1</td><td>2025-01-01</td><td>2025-06-30</td><td>179</td><td>20.91%</td><td>-14.73%</td><td>1.42</td><td class='fail'>未通过</td><td class='pass'>通过</td><td>17</td><td>9</td></tr><tr><td>wf_2025_h2</td><td>2025-07-01</td><td>2025-12-31</td><td>179</td><td>106.78%</td><td>-12.93%</td><td>8.26</td><td class='pass'>通过</td><td class='pass'>通过</td><td>44</td><td>24</td></tr><tr><td>wf_2026_h1</td><td>2026-01-01</td><td>2026-06-17</td><td>179</td><td>72.28%</td><td>-6.86%</td><td>10.53</td><td class='pass'>通过</td><td class='pass'>通过</td><td>30</td><td>23</td></tr></tbody></table></div>
+        </div>
+      </section>
+
+      <section id="nav">
+        <div class="shell">
+          <h2>净值曲线</h2>
+          <div class="panel">
+
+<svg class="chart-svg" viewBox="0 0 1120 390" role="img" aria-label="B1 策略净值曲线">
+  <rect x="0" y="0" width="1120" height="390" fill="#fff"/>
+  <line x1='68' y1='342.0' x2='1096' y2='342.0' stroke='#e4e9f0'/><text x='58' y='346.0' text-anchor='end' fill='#66727f' font-size='12'>0.86</text><line x1='68' y1='263.0' x2='1096' y2='263.0' stroke='#e4e9f0'/><text x='58' y='267.0' text-anchor='end' fill='#66727f' font-size='12'>1.14</text><line x1='68' y1='184.0' x2='1096' y2='184.0' stroke='#e4e9f0'/><text x='58' y='188.0' text-anchor='end' fill='#66727f' font-size='12'>1.42</text><line x1='68' y1='105.0' x2='1096' y2='105.0' stroke='#e4e9f0'/><text x='58' y='109.0' text-anchor='end' fill='#66727f' font-size='12'>1.70</text><line x1='68' y1='26.0' x2='1096' y2='26.0' stroke='#e4e9f0'/><text x='58' y='30.0' text-anchor='end' fill='#66727f' font-size='12'>1.97</text><line x1='68.0' y1='26' x2='68.0' y2='342' stroke='#eef2f6'/><text x='68.0' y='372' text-anchor='middle' fill='#66727f' font-size='12'>2025-01</text><line x1='274.2' y1='26' x2='274.2' y2='342' stroke='#eef2f6'/><text x='274.2' y='372' text-anchor='middle' fill='#66727f' font-size='12'>2025-04</text><line x1='480.4' y1='26' x2='480.4' y2='342' stroke='#eef2f6'/><text x='480.4' y='372' text-anchor='middle' fill='#66727f' font-size='12'>2025-08</text><line x1='683.6' y1='26' x2='683.6' y2='342' stroke='#eef2f6'/><text x='683.6' y='372' text-anchor='middle' fill='#66727f' font-size='12'>2025-11</text><line x1='889.8' y1='26' x2='889.8' y2='342' stroke='#eef2f6'/><text x='889.8' y='372' text-anchor='middle' fill='#66727f' font-size='12'>2026-03</text><line x1='1096.0' y1='26' x2='1096.0' y2='342' stroke='#eef2f6'/><text x='1096.0' y='372' text-anchor='middle' fill='#66727f' font-size='12'>2026-06</text>
+  <line x1="68" y1="303.0" x2="1096" y2="303.0" stroke="#99a6b2" stroke-dasharray="4 5"/>
+  <polygon points="68,303.0 68.0,303.0 70.9,303.0 73.9,303.0 76.8,303.0 79.8,303.0 82.7,303.0 85.7,303.0 88.6,303.0 91.6,303.0 94.5,303.0 97.5,303.0 100.4,303.0 103.3,303.0 106.3,303.0 109.2,303.0 112.2,303.0 115.1,303.0 118.1,303.0 121.0,303.0 124.0,303.0 126.9,303.0 129.9,303.0 132.8,303.0 135.7,303.0 138.7,303.0 141.6,303.0 144.6,303.0 147.5,303.0 150.5,303.0 153.4,303.0 156.4,303.0 159.3,303.0 162.3,303.0 165.2,303.0 168.1,296.8 171.1,325.0 174.0,337.0 177.0,325.7 179.9,310.5 182.9,300.7 185.8,273.0 188.8,267.0 191.7,263.3 194.7,268.3 197.6,254.1 200.6,249.6 203.5,235.3 206.4,232.6 209.4,233.0 212.3,238.3 215.3,250.2 218.2,255.8 221.2,255.8 224.1,255.8 227.1,255.8 230.0,255.8 233.0,255.8 235.9,255.8 238.8,255.8 241.8,255.8 244.7,255.8 247.7,255.8 250.6,255.8 253.6,255.8 256.5,255.8 259.5,255.8 262.4,255.8 265.4,255.8 268.3,255.8 271.2,255.8 274.2,255.8 277.1,255.8 280.1,255.8 283.0,255.8 286.0,255.8 288.9,255.8 291.9,255.8 294.8,255.8 297.8,255.8 300.7,255.8 303.6,255.8 306.6,255.8 309.5,255.8 312.5,255.8 315.4,255.8 318.4,255.8 321.3,255.8 324.3,255.8 327.2,255.8 330.2,255.8 333.1,255.8 336.0,255.8 339.0,255.8 341.9,255.8 344.9,255.8 347.8,255.8 350.8,255.8 353.7,255.8 356.7,255.8 359.6,255.8 362.6,255.8 365.5,255.8 368.4,264.5 371.4,263.9 374.3,272.2 377.3,272.2 380.2,272.2 383.2,272.2 386.1,272.2 389.1,272.2 392.0,272.2 395.0,272.2 397.9,272.2 400.8,277.7 403.8,284.8 406.7,277.0 409.7,277.0 412.6,275.3 415.6,283.5 418.5,287.9 421.5,290.9 424.4,289.1 427.4,285.0 430.3,286.9 433.2,288.5 436.2,289.9 439.1,285.9 442.1,289.6 445.0,286.1 448.0,276.3 450.9,277.3 453.9,274.8 456.8,279.5 459.8,276.2 462.7,262.9 465.7,269.5 468.6,276.5 471.5,280.8 474.5,285.9 477.4,285.6 480.4,283.2 483.3,280.8 486.3,280.8 489.2,280.8 492.2,284.1 495.1,276.6 498.1,259.5 501.0,270.7 503.9,256.3 506.9,270.7 509.8,264.8 512.8,259.4 515.7,260.4 518.7,262.6 521.6,251.3 524.6,243.2 527.5,242.5 530.5,234.9 533.4,234.1 536.3,223.6 539.3,222.4 542.2,218.8 545.2,238.8 548.1,233.5 551.1,239.4 554.0,220.6 557.0,223.3 559.9,222.4 562.9,228.7 565.8,217.1 568.7,196.6 571.7,214.6 574.6,177.7 577.6,177.7 580.5,182.0 583.5,181.1 586.4,181.1 589.4,181.1 592.3,181.1 595.3,181.1 598.2,181.1 601.1,181.1 604.1,181.1 607.0,181.1 610.0,172.1 612.9,138.0 615.9,184.7 618.8,177.5 621.8,185.1 624.7,201.5 627.7,201.5 630.6,201.5 633.5,201.5 636.5,201.5 639.4,201.5 642.4,201.5 645.3,201.5 648.3,201.5 651.2,201.5 654.2,201.5 657.1,201.5 660.1,207.7 663.0,212.4 665.9,214.7 668.9,197.8 671.8,174.8 674.8,193.7 677.7,202.9 680.7,202.9 683.6,207.9 686.6,207.1 689.5,218.2 692.5,221.6 695.4,223.6 698.3,223.8 701.3,223.8 704.2,223.8 707.2,223.8 710.1,223.8 713.1,223.8 716.0,223.8 719.0,223.8 721.9,223.8 724.9,223.8 727.8,223.8 730.8,223.8 733.7,223.8 736.6,223.8 739.6,223.8 742.5,223.8 745.5,223.8 748.4,223.8 751.4,223.8 754.3,223.8 757.3,223.8 760.2,223.8 763.2,223.8 766.1,223.8 769.0,223.8 772.0,223.8 774.9,223.8 777.9,223.8 780.8,223.8 783.8,223.8 786.7,218.6 789.7,216.8 792.6,204.5 795.6,193.3 798.5,189.8 801.4,199.1 804.4,199.7 807.3,201.5 810.3,213.0 813.2,199.4 816.2,205.5 819.1,194.6 822.1,179.1 825.0,152.4 828.0,189.0 830.9,178.1 833.8,167.5 836.8,184.2 839.7,176.3 842.7,166.6 845.6,153.8 848.6,153.8 851.5,153.8 854.5,153.8 857.4,153.8 860.4,153.8 863.3,153.8 866.2,153.8 869.2,153.8 872.1,153.8 875.1,153.8 878.0,153.8 881.0,153.8 883.9,153.8 886.9,153.8 889.8,153.8 892.8,153.8 895.7,153.8 898.6,153.8 901.6,153.8 904.5,156.9 907.5,147.4 910.4,154.7 913.4,161.5 916.3,161.5 919.3,161.5 922.2,161.5 925.2,161.5 928.1,161.5 931.0,161.5 934.0,161.5 936.9,161.5 939.9,161.5 942.8,161.5 945.8,161.5 948.7,161.5 951.7,161.5 954.6,161.5 957.6,161.5 960.5,161.5 963.4,161.5 966.4,161.5 969.3,161.5 972.3,161.5 975.2,161.5 978.2,161.5 981.1,161.5 984.1,161.5 987.0,161.5 990.0,161.5 992.9,161.5 995.9,161.5 998.8,161.5 1001.7,161.5 1004.7,158.5 1007.6,148.1 1010.6,81.8 1013.5,77.2 1016.5,63.9 1019.4,80.7 1022.4,88.0 1025.3,72.8 1028.3,52.4 1031.2,37.0 1034.1,37.1 1037.1,54.9 1040.0,73.8 1043.0,84.0 1045.9,84.0 1048.9,84.0 1051.8,84.0 1054.8,84.0 1057.7,84.0 1060.7,84.0 1063.6,84.0 1066.5,84.0 1069.5,84.0 1072.4,84.0 1075.4,84.0 1078.3,84.0 1081.3,84.0 1084.2,84.0 1087.2,84.0 1090.1,84.0 1093.1,84.0 1096.0,84.0 1096,303.0" fill="#dcefea" opacity="0.75"/>
+  <polyline points="68.0,303.0 70.9,303.0 73.9,303.0 76.8,303.0 79.8,303.0 82.7,303.0 85.7,303.0 88.6,303.0 91.6,303.0 94.5,303.0 97.5,303.0 100.4,303.0 103.3,303.0 106.3,303.0 109.2,303.0 112.2,303.0 115.1,303.0 118.1,303.0 121.0,303.0 124.0,303.0 126.9,303.0 129.9,303.0 132.8,303.0 135.7,303.0 138.7,303.0 141.6,303.0 144.6,303.0 147.5,303.0 150.5,303.0 153.4,303.0 156.4,303.0 159.3,303.0 162.3,303.0 165.2,303.0 168.1,296.8 171.1,325.0 174.0,337.0 177.0,325.7 179.9,310.5 182.9,300.7 185.8,273.0 188.8,267.0 191.7,263.3 194.7,268.3 197.6,254.1 200.6,249.6 203.5,235.3 206.4,232.6 209.4,233.0 212.3,238.3 215.3,250.2 218.2,255.8 221.2,255.8 224.1,255.8 227.1,255.8 230.0,255.8 233.0,255.8 235.9,255.8 238.8,255.8 241.8,255.8 244.7,255.8 247.7,255.8 250.6,255.8 253.6,255.8 256.5,255.8 259.5,255.8 262.4,255.8 265.4,255.8 268.3,255.8 271.2,255.8 274.2,255.8 277.1,255.8 280.1,255.8 283.0,255.8 286.0,255.8 288.9,255.8 291.9,255.8 294.8,255.8 297.8,255.8 300.7,255.8 303.6,255.8 306.6,255.8 309.5,255.8 312.5,255.8 315.4,255.8 318.4,255.8 321.3,255.8 324.3,255.8 327.2,255.8 330.2,255.8 333.1,255.8 336.0,255.8 339.0,255.8 341.9,255.8 344.9,255.8 347.8,255.8 350.8,255.8 353.7,255.8 356.7,255.8 359.6,255.8 362.6,255.8 365.5,255.8 368.4,264.5 371.4,263.9 374.3,272.2 377.3,272.2 380.2,272.2 383.2,272.2 386.1,272.2 389.1,272.2 392.0,272.2 395.0,272.2 397.9,272.2 400.8,277.7 403.8,284.8 406.7,277.0 409.7,277.0 412.6,275.3 415.6,283.5 418.5,287.9 421.5,290.9 424.4,289.1 427.4,285.0 430.3,286.9 433.2,288.5 436.2,289.9 439.1,285.9 442.1,289.6 445.0,286.1 448.0,276.3 450.9,277.3 453.9,274.8 456.8,279.5 459.8,276.2 462.7,262.9 465.7,269.5 468.6,276.5 471.5,280.8 474.5,285.9 477.4,285.6 480.4,283.2 483.3,280.8 486.3,280.8 489.2,280.8 492.2,284.1 495.1,276.6 498.1,259.5 501.0,270.7 503.9,256.3 506.9,270.7 509.8,264.8 512.8,259.4 515.7,260.4 518.7,262.6 521.6,251.3 524.6,243.2 527.5,242.5 530.5,234.9 533.4,234.1 536.3,223.6 539.3,222.4 542.2,218.8 545.2,238.8 548.1,233.5 551.1,239.4 554.0,220.6 557.0,223.3 559.9,222.4 562.9,228.7 565.8,217.1 568.7,196.6 571.7,214.6 574.6,177.7 577.6,177.7 580.5,182.0 583.5,181.1 586.4,181.1 589.4,181.1 592.3,181.1 595.3,181.1 598.2,181.1 601.1,181.1 604.1,181.1 607.0,181.1 610.0,172.1 612.9,138.0 615.9,184.7 618.8,177.5 621.8,185.1 624.7,201.5 627.7,201.5 630.6,201.5 633.5,201.5 636.5,201.5 639.4,201.5 642.4,201.5 645.3,201.5 648.3,201.5 651.2,201.5 654.2,201.5 657.1,201.5 660.1,207.7 663.0,212.4 665.9,214.7 668.9,197.8 671.8,174.8 674.8,193.7 677.7,202.9 680.7,202.9 683.6,207.9 686.6,207.1 689.5,218.2 692.5,221.6 695.4,223.6 698.3,223.8 701.3,223.8 704.2,223.8 707.2,223.8 710.1,223.8 713.1,223.8 716.0,223.8 719.0,223.8 721.9,223.8 724.9,223.8 727.8,223.8 730.8,223.8 733.7,223.8 736.6,223.8 739.6,223.8 742.5,223.8 745.5,223.8 748.4,223.8 751.4,223.8 754.3,223.8 757.3,223.8 760.2,223.8 763.2,223.8 766.1,223.8 769.0,223.8 772.0,223.8 774.9,223.8 777.9,223.8 780.8,223.8 783.8,223.8 786.7,218.6 789.7,216.8 792.6,204.5 795.6,193.3 798.5,189.8 801.4,199.1 804.4,199.7 807.3,201.5 810.3,213.0 813.2,199.4 816.2,205.5 819.1,194.6 822.1,179.1 825.0,152.4 828.0,189.0 830.9,178.1 833.8,167.5 836.8,184.2 839.7,176.3 842.7,166.6 845.6,153.8 848.6,153.8 851.5,153.8 854.5,153.8 857.4,153.8 860.4,153.8 863.3,153.8 866.2,153.8 869.2,153.8 872.1,153.8 875.1,153.8 878.0,153.8 881.0,153.8 883.9,153.8 886.9,153.8 889.8,153.8 892.8,153.8 895.7,153.8 898.6,153.8 901.6,153.8 904.5,156.9 907.5,147.4 910.4,154.7 913.4,161.5 916.3,161.5 919.3,161.5 922.2,161.5 925.2,161.5 928.1,161.5 931.0,161.5 934.0,161.5 936.9,161.5 939.9,161.5 942.8,161.5 945.8,161.5 948.7,161.5 951.7,161.5 954.6,161.5 957.6,161.5 960.5,161.5 963.4,161.5 966.4,161.5 969.3,161.5 972.3,161.5 975.2,161.5 978.2,161.5 981.1,161.5 984.1,161.5 987.0,161.5 990.0,161.5 992.9,161.5 995.9,161.5 998.8,161.5 1001.7,161.5 1004.7,158.5 1007.6,148.1 1010.6,81.8 1013.5,77.2 1016.5,63.9 1019.4,80.7 1022.4,88.0 1025.3,72.8 1028.3,52.4 1031.2,37.0 1034.1,37.1 1037.1,54.9 1040.0,73.8 1043.0,84.0 1045.9,84.0 1048.9,84.0 1051.8,84.0 1054.8,84.0 1057.7,84.0 1060.7,84.0 1063.6,84.0 1066.5,84.0 1069.5,84.0 1072.4,84.0 1075.4,84.0 1078.3,84.0 1081.3,84.0 1084.2,84.0 1087.2,84.0 1090.1,84.0 1093.1,84.0 1096.0,84.0" fill="none" stroke="#c0392b" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="1096.0" cy="84.0" r="4.5" fill="#c0392b"/>
+  <text x="1086.0" y="72.0" text-anchor="end" fill="#9f2f24" font-size="13" font-weight="700">1.77x</text>
+</svg>
+          </div>
+        </div>
+      </section>
+
+      <section id="dist">
+        <div class="shell">
+          <h2>每笔交易盈亏分布</h2>
+          <div class="grid-2">
+            <div class="panel">
+              <h3>每笔交易盈亏金额分布</h3>
+
+<svg class="chart-svg" viewBox="0 0 1120 330" role="img" aria-label="每笔交易盈亏金额分布">
+  <rect x="0" y="0" width="1120" height="330" fill="#fff"/>
+  <line x1='72' y1='276.3' x2='1096' y2='276.3' stroke='#e4e9f0'/><text x='62' y='280.3' text-anchor='end' fill='#66727f' font-size='12'>-4k</text><line x1='72' y1='215.6' x2='1096' y2='215.6' stroke='#e4e9f0'/><text x='62' y='219.6' text-anchor='end' fill='#66727f' font-size='12'>-2k</text><line x1='72' y1='155.0' x2='1096' y2='155.0' stroke='#e4e9f0'/><text x='62' y='159.0' text-anchor='end' fill='#66727f' font-size='12'>0</text><line x1='72' y1='94.4' x2='1096' y2='94.4' stroke='#e4e9f0'/><text x='62' y='98.4' text-anchor='end' fill='#66727f' font-size='12'>2k</text><line x1='72' y1='33.7' x2='1096' y2='33.7' stroke='#e4e9f0'/><text x='62' y='37.7' text-anchor='end' fill='#66727f' font-size='12'>4k</text>
+  <rect x='72.0' y='155.0' width='20.0' height='77.7' fill='#16865f' opacity='0.82'><title>-2,411 元</title></rect><rect x='95.3' y='155.0' width='20.0' height='72.2' fill='#16865f' opacity='0.82'><title>-2,241 元</title></rect><rect x='118.5' y='155.0' width='20.0' height='70.0' fill='#16865f' opacity='0.82'><title>-2,171 元</title></rect><rect x='141.8' y='155.0' width='20.0' height='63.7' fill='#16865f' opacity='0.82'><title>-1,976 元</title></rect><rect x='165.1' y='155.0' width='20.0' height='55.2' fill='#16865f' opacity='0.82'><title>-1,713 元</title></rect><rect x='188.4' y='155.0' width='20.0' height='46.5' fill='#16865f' opacity='0.82'><title>-1,442 元</title></rect><rect x='211.6' y='155.0' width='20.0' height='46.1' fill='#16865f' opacity='0.82'><title>-1,431 元</title></rect><rect x='234.9' y='155.0' width='20.0' height='42.4' fill='#16865f' opacity='0.82'><title>-1,315 元</title></rect><rect x='258.2' y='155.0' width='20.0' height='37.2' fill='#16865f' opacity='0.82'><title>-1,153 元</title></rect><rect x='281.5' y='155.0' width='20.0' height='36.7' fill='#16865f' opacity='0.82'><title>-1,137 元</title></rect><rect x='304.7' y='155.0' width='20.0' height='17.9' fill='#16865f' opacity='0.82'><title>-556 元</title></rect><rect x='328.0' y='155.0' width='20.0' height='17.4' fill='#16865f' opacity='0.82'><title>-540 元</title></rect><rect x='351.3' y='155.0' width='20.0' height='7.6' fill='#16865f' opacity='0.82'><title>-236 元</title></rect><rect x='374.5' y='155.0' width='20.0' height='1.2' fill='#16865f' opacity='0.82'><title>-37 元</title></rect><rect x='397.8' y='155.0' width='20.0' height='0.9' fill='#16865f' opacity='0.82'><title>-29 元</title></rect><rect x='421.1' y='155.0' width='20.0' height='0.9' fill='#16865f' opacity='0.82'><title>-28 元</title></rect><rect x='444.4' y='155.0' width='20.0' height='0.6' fill='#16865f' opacity='0.82'><title>-17 元</title></rect><rect x='467.6' y='155.0' width='20.0' height='0.5' fill='#16865f' opacity='0.82'><title>-15 元</title></rect><rect x='490.9' y='155.0' width='20.0' height='0.3' fill='#16865f' opacity='0.82'><title>-10 元</title></rect><rect x='514.2' y='154.4' width='20.0' height='0.6' fill='#c0392b' opacity='0.82'><title>17 元</title></rect><rect x='537.5' y='153.9' width='20.0' height='1.1' fill='#c0392b' opacity='0.82'><title>36 元</title></rect><rect x='560.7' y='152.5' width='20.0' height='2.5' fill='#c0392b' opacity='0.82'><title>77 元</title></rect><rect x='584.0' y='152.2' width='20.0' height='2.8' fill='#c0392b' opacity='0.82'><title>88 元</title></rect><rect x='607.3' y='152.0' width='20.0' height='3.0' fill='#c0392b' opacity='0.82'><title>94 元</title></rect><rect x='630.5' y='151.6' width='20.0' height='3.4' fill='#c0392b' opacity='0.82'><title>104 元</title></rect><rect x='653.8' y='149.4' width='20.0' height='5.6' fill='#c0392b' opacity='0.82'><title>174 元</title></rect><rect x='677.1' y='119.6' width='20.0' height='35.4' fill='#c0392b' opacity='0.82'><title>1,099 元</title></rect><rect x='700.4' y='119.2' width='20.0' height='35.8' fill='#c0392b' opacity='0.82'><title>1,111 元</title></rect><rect x='723.6' y='114.7' width='20.0' height='40.3' fill='#c0392b' opacity='0.82'><title>1,252 元</title></rect><rect x='746.9' y='112.6' width='20.0' height='42.4' fill='#c0392b' opacity='0.82'><title>1,315 元</title></rect><rect x='770.2' y='112.5' width='20.0' height='42.5' fill='#c0392b' opacity='0.82'><title>1,320 元</title></rect><rect x='793.5' y='112.1' width='20.0' height='42.9' fill='#c0392b' opacity='0.82'><title>1,330 元</title></rect><rect x='816.7' y='112.1' width='20.0' height='42.9' fill='#c0392b' opacity='0.82'><title>1,331 元</title></rect><rect x='840.0' y='108.3' width='20.0' height='46.7' fill='#c0392b' opacity='0.82'><title>1,450 元</title></rect><rect x='863.3' y='103.0' width='20.0' height='52.0' fill='#c0392b' opacity='0.82'><title>1,615 元</title></rect><rect x='886.5' y='98.8' width='20.0' height='56.2' fill='#c0392b' opacity='0.82'><title>1,744 元</title></rect><rect x='909.8' y='95.4' width='20.0' height='59.6' fill='#c0392b' opacity='0.82'><title>1,849 元</title></rect><rect x='933.1' y='94.7' width='20.0' height='60.3' fill='#c0392b' opacity='0.82'><title>1,872 元</title></rect><rect x='956.4' y='92.3' width='20.0' height='62.7' fill='#c0392b' opacity='0.82'><title>1,946 元</title></rect><rect x='979.6' y='85.5' width='20.0' height='69.5' fill='#c0392b' opacity='0.82'><title>2,157 元</title></rect><rect x='1002.9' y='70.2' width='20.0' height='84.8' fill='#c0392b' opacity='0.82'><title>2,631 元</title></rect><rect x='1026.2' y='68.3' width='20.0' height='86.7' fill='#c0392b' opacity='0.82'><title>2,690 元</title></rect><rect x='1049.5' y='65.2' width='20.0' height='89.8' fill='#c0392b' opacity='0.82'><title>2,786 元</title></rect><rect x='1072.7' y='33.7' width='20.0' height='121.3' fill='#c0392b' opacity='0.82'><title>3,763 元</title></rect>
+  <line x1="72" y1="155.0" x2="1096" y2="155.0" stroke="#34495e" stroke-width="1.2"/>
+  <text x="72" y="315" fill="#66727f" font-size="12">按闭环交易净盈亏从低到高排序；红色为盈利，绿色为亏损</text>
+</svg>
+            </div>
+            <div class="panel">
+              <h3>每笔交易盈亏比例分布</h3>
+
+<svg class="chart-svg" viewBox="0 0 1120 330" role="img" aria-label="每笔交易盈亏比例分布">
+  <rect x="0" y="0" width="1120" height="330" fill="#fff"/>
+  <line x1='54' y1='276.0' x2='1096' y2='276.0' stroke='#e4e9f0'/><text x='45' y='280.0' text-anchor='end' fill='#66727f' font-size='12'>0</text><line x1='54' y1='164.0' x2='1096' y2='164.0' stroke='#e4e9f0'/><text x='45' y='168.0' text-anchor='end' fill='#66727f' font-size='12'>4</text><line x1='54' y1='24.0' x2='1096' y2='24.0' stroke='#e4e9f0'/><text x='45' y='28.0' text-anchor='end' fill='#66727f' font-size='12'>9</text>
+  <rect x='57.5' y='276.0' width='36.5' height='0.0' fill='#16865f' opacity='0.82'><title>-14.5% 到 -13.3%: 0 笔</title></rect><rect x='100.9' y='248.0' width='36.5' height='28.0' fill='#16865f' opacity='0.82'><title>-13.3% 到 -12.1%: 1 笔</title></rect><rect x='144.3' y='276.0' width='36.5' height='0.0' fill='#16865f' opacity='0.82'><title>-12.1% 到 -10.9%: 0 笔</title></rect><rect x='187.7' y='276.0' width='36.5' height='0.0' fill='#16865f' opacity='0.82'><title>-10.9% 到 -9.7%: 0 笔</title></rect><rect x='231.1' y='248.0' width='36.5' height='28.0' fill='#16865f' opacity='0.82'><title>-9.7% 到 -8.5%: 1 笔</title></rect><rect x='274.6' y='248.0' width='36.5' height='28.0' fill='#16865f' opacity='0.82'><title>-8.5% 到 -7.3%: 1 笔</title></rect><rect x='318.0' y='248.0' width='36.5' height='28.0' fill='#16865f' opacity='0.82'><title>-7.3% 到 -6.0%: 1 笔</title></rect><rect x='361.4' y='108.0' width='36.5' height='168.0' fill='#16865f' opacity='0.82'><title>-6.0% 到 -4.8%: 6 笔</title></rect><rect x='404.8' y='220.0' width='36.5' height='56.0' fill='#16865f' opacity='0.82'><title>-4.8% 到 -3.6%: 2 笔</title></rect><rect x='448.2' y='164.0' width='36.5' height='112.0' fill='#16865f' opacity='0.82'><title>-3.6% 到 -2.4%: 4 笔</title></rect><rect x='491.6' y='220.0' width='36.5' height='56.0' fill='#16865f' opacity='0.82'><title>-2.4% 到 -1.2%: 2 笔</title></rect><rect x='535.1' y='248.0' width='36.5' height='28.0' fill='#16865f' opacity='0.82'><title>-1.2% 到 0.0%: 1 笔</title></rect><rect x='578.5' y='276.0' width='36.5' height='0.0' fill='#c0392b' opacity='0.82'><title>0.0% 到 1.2%: 0 笔</title></rect><rect x='621.9' y='276.0' width='36.5' height='0.0' fill='#c0392b' opacity='0.82'><title>1.2% 到 2.4%: 0 笔</title></rect><rect x='665.3' y='276.0' width='36.5' height='0.0' fill='#c0392b' opacity='0.82'><title>2.4% 到 3.6%: 0 笔</title></rect><rect x='708.7' y='276.0' width='36.5' height='0.0' fill='#c0392b' opacity='0.82'><title>3.6% 到 4.8%: 0 笔</title></rect><rect x='752.1' y='24.0' width='36.5' height='252.0' fill='#c0392b' opacity='0.82'><title>4.8% 到 6.0%: 9 笔</title></rect><rect x='795.6' y='80.0' width='36.5' height='196.0' fill='#c0392b' opacity='0.82'><title>6.0% 到 7.3%: 7 笔</title></rect><rect x='839.0' y='248.0' width='36.5' height='28.0' fill='#c0392b' opacity='0.82'><title>7.3% 到 8.5%: 1 笔</title></rect><rect x='882.4' y='248.0' width='36.5' height='28.0' fill='#c0392b' opacity='0.82'><title>8.5% 到 9.7%: 1 笔</title></rect><rect x='925.8' y='248.0' width='36.5' height='28.0' fill='#c0392b' opacity='0.82'><title>9.7% 到 10.9%: 1 笔</title></rect><rect x='969.2' y='164.0' width='36.5' height='112.0' fill='#c0392b' opacity='0.82'><title>10.9% 到 12.1%: 4 笔</title></rect><rect x='1012.6' y='276.0' width='36.5' height='0.0' fill='#c0392b' opacity='0.82'><title>12.1% 到 13.3%: 0 笔</title></rect><rect x='1056.1' y='220.0' width='36.5' height='56.0' fill='#c0392b' opacity='0.82'><title>13.3% 到 14.5%: 2 笔</title></rect>
+  <line x1="575.0" y1="24" x2="575.0" y2="276" stroke="#34495e" stroke-width="1.2"/>
+  <line x1='78.8' y1='276' x2='78.8' y2='281' stroke='#99a6b2'/><text x='78.8' y='310' text-anchor='middle' fill='#66727f' font-size='12'>-14%</text><line x1='326.9' y1='276' x2='326.9' y2='281' stroke='#99a6b2'/><text x='326.9' y='310' text-anchor='middle' fill='#66727f' font-size='12'>-7%</text><line x1='575.0' y1='276' x2='575.0' y2='281' stroke='#99a6b2'/><text x='575.0' y='310' text-anchor='middle' fill='#66727f' font-size='12'>0%</text><line x1='823.1' y1='276' x2='823.1' y2='281' stroke='#99a6b2'/><text x='823.1' y='310' text-anchor='middle' fill='#66727f' font-size='12'>7%</text><line x1='1071.2' y1='276' x2='1071.2' y2='281' stroke='#99a6b2'/><text x='1071.2' y='310' text-anchor='middle' fill='#66727f' font-size='12'>14%</text>
+  <text x="54" y="322" fill="#66727f" font-size="12">按闭环交易净收益率分桶；红色为盈利，绿色为亏损</text>
+</svg>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="trades">
+        <div class="shell">
+          <h2>闭环交易盈亏明细</h2>
+          <p class="muted">这里把一次买入及其对应卖出合并成一笔经济交易，盈亏金额已扣双边成本，并保持 20,000 元本金的真实金额口径。</p>
+          <div class='table-wrap tall'><table><thead><tr><th>#</th><th>代码</th><th>状态</th><th>买入日</th><th>卖出日</th><th>持有天数</th><th>股数</th><th>买入价</th><th>均卖价</th><th>买入金额</th><th>卖出金额</th><th>净盈亏(元)</th><th>净盈亏率</th><th>退出原因</th></tr></thead><tbody><tr><td>1</td><td><code>002354</code></td><td>closed</td><td>2025-02-27</td><td>2025-03-03</td><td>4</td><td>2,500</td><td>7.700</td><td>6.750</td><td>19,250.00</td><td>16,875.00</td><td class='neg'>-2,411.12</td><td class='neg'>-12.51%</td><td>stop_loss_5</td></tr><tr><td>2</td><td><code>600186</code></td><td>closed</td><td>2025-02-28</td><td>2025-03-05</td><td>5</td><td>100</td><td>6.710</td><td>7.080</td><td>671.00</td><td>708.00</td><td class='pos'>35.62</td><td class='pos'>5.30%</td><td>take_profit_5</td></tr><tr><td>3</td><td><code>603881</code></td><td>closed</td><td>2025-03-04</td><td>2025-03-05</td><td>1</td><td>600</td><td>27.440</td><td>30.580</td><td>16,464.00</td><td>18,348.00</td><td class='pos'>1,849.19</td><td class='pos'>11.22%</td><td>take_profit_5</td></tr><tr><td>4</td><td><code>600602</code></td><td>closed</td><td>2025-03-06</td><td>2025-03-07</td><td>1</td><td>800</td><td>23.770</td><td>27.110</td><td>19,016.00</td><td>21,688.00</td><td class='pos'>2,631.30</td><td class='pos'>13.82%</td><td>take_profit_5</td></tr><tr><td>5</td><td><code>000679</code></td><td>closed</td><td>2025-03-10</td><td>2025-03-13</td><td>3</td><td>3,200</td><td>6.780</td><td>7.210</td><td>21,696.00</td><td>23,072.00</td><td class='pos'>1,331.23</td><td class='pos'>6.13%</td><td>take_profit_5</td></tr><tr><td>6</td><td><code>002575</code></td><td>closed</td><td>2025-03-14</td><td>2025-03-17</td><td>3</td><td>2,400</td><td>9.720</td><td>10.290</td><td>23,328.00</td><td>24,696.00</td><td class='pos'>1,319.98</td><td class='pos'>5.65%</td><td>take_profit_5</td></tr><tr><td>7</td><td><code>605066</code></td><td>closed</td><td>2025-03-18</td><td>2025-03-24</td><td>6</td><td>3,100</td><td>7.860</td><td>7.410</td><td>24,366.00</td><td>22,971.00</td><td class='neg'>-1,442.34</td><td class='neg'>-5.91%</td><td>stop_loss_5</td></tr><tr><td>8</td><td><code>600793</code></td><td>closed</td><td>2025-06-10</td><td>2025-06-12</td><td>2</td><td>700</td><td>29.290</td><td>27.700</td><td>20,503.00</td><td>19,390.00</td><td class='neg'>-1,152.89</td><td class='neg'>-5.62%</td><td>stop_loss_5</td></tr><tr><td>9</td><td><code>600530</code></td><td>closed</td><td>2025-06-25</td><td>2025-07-04</td><td>9</td><td>2,400</td><td>9.210</td><td>8.680</td><td>22,104.00</td><td>20,832.00</td><td class='neg'>-1,314.94</td><td class='neg'>-5.94%</td><td>stop_loss_5</td></tr><tr><td>10</td><td><code>002272</code></td><td>closed</td><td>2025-07-07</td><td>2025-07-17</td><td>10</td><td>1,900</td><td>10.550</td><td>11.150</td><td>20,045.00</td><td>21,185.00</td><td class='pos'>1,098.77</td><td class='pos'>5.48%</td><td>take_profit_5</td></tr><tr><td>11</td><td><code>002277</code></td><td>closed</td><td>2025-07-14</td><td>2025-07-15</td><td>1</td><td>100</td><td>6.040</td><td>5.880</td><td>604.00</td><td>588.00</td><td class='neg'>-17.19</td><td class='neg'>-2.84%</td><td>break_bbi</td></tr><tr><td>12</td><td><code>000530</code></td><td>closed</td><td>2025-07-17</td><td>2025-08-11</td><td>25</td><td>3,300</td><td>6.520</td><td>6.870</td><td>21,516.00</td><td>22,671.00</td><td class='pos'>1,110.81</td><td class='pos'>5.16%</td><td>take_profit_5</td></tr><tr><td>13</td><td><code>002210</code></td><td>closed</td><td>2025-07-18</td><td>2025-07-24</td><td>6</td><td>100</td><td>2.840</td><td>3.020</td><td>284.00</td><td>302.00</td><td class='pos'>17.41</td><td class='pos'>6.13%</td><td>take_profit_5</td></tr><tr><td>14</td><td><code>601011</code></td><td>closed</td><td>2025-07-31</td><td>2025-08-14</td><td>14</td><td>100</td><td>2.780</td><td>2.690</td><td>278.00</td><td>269.00</td><td class='neg'>-9.55</td><td class='neg'>-3.43%</td><td>break_bbi</td></tr><tr><td>15</td><td><code>002436</code></td><td>closed</td><td>2025-08-12</td><td>2025-08-26</td><td>14</td><td>1,300</td><td>16.610</td><td>17.760</td><td>21,593.00</td><td>23,088.00</td><td class='pos'>1,450.32</td><td class='pos'>6.71%</td><td>take_profit_5</td></tr><tr><td>16</td><td><code>000679</code></td><td>closed</td><td>2025-08-13</td><td>2025-08-18</td><td>5</td><td>100</td><td>9.010</td><td>10.070</td><td>901.00</td><td>1,007.00</td><td class='pos'>104.09</td><td class='pos'>11.54%</td><td>take_profit_5</td></tr><tr><td>17</td><td><code>600629</code></td><td>closed</td><td>2025-08-19</td><td>2025-08-21</td><td>2</td><td>100</td><td>13.590</td><td>14.500</td><td>1,359.00</td><td>1,450.00</td><td class='pos'>88.19</td><td class='pos'>6.48%</td><td>take_profit_5</td></tr><tr><td>18</td><td><code>002796</code></td><td>closed</td><td>2025-08-22</td><td>2025-08-26</td><td>4</td><td>100</td><td>13.290</td><td>14.260</td><td>1,329.00</td><td>1,426.00</td><td class='pos'>94.25</td><td class='pos'>7.08%</td><td>take_profit_5</td></tr><tr><td>19</td><td><code>002245</code></td><td>closed</td><td>2025-08-27</td><td>2025-09-11</td><td>15</td><td>2,100</td><td>11.680</td><td>12.300</td><td>24,528.00</td><td>25,830.00</td><td class='pos'>1,251.64</td><td class='pos'>5.10%</td><td>take_profit_5</td></tr><tr><td>20</td><td><code>600410</code></td><td>closed</td><td>2025-09-12</td><td>2025-09-16</td><td>4</td><td>1,300</td><td>19.400</td><td>21.510</td><td>25,220.00</td><td>27,963.00</td><td class='pos'>2,689.82</td><td class='pos'>10.65%</td><td>take_profit_5</td></tr><tr><td>21</td><td><code>002210</code></td><td>closed</td><td>2025-09-15</td><td>2025-09-16</td><td>1</td><td>200</td><td>3.480</td><td>3.870</td><td>696.00</td><td>774.00</td><td class='pos'>76.53</td><td class='pos'>10.98%</td><td>take_profit_5</td></tr><tr><td>22</td><td><code>600693</code></td><td>closed</td><td>2025-09-18</td><td>2025-09-19</td><td>1</td><td>4,500</td><td>6.260</td><td>6.220</td><td>28,170.00</td><td>27,990.00</td><td class='neg'>-236.16</td><td class='neg'>-0.84%</td><td>break_bbi</td></tr><tr><td>23</td><td><code>002364</code></td><td>closed</td><td>2025-10-10</td><td>2025-10-13</td><td>3</td><td>1,000</td><td>26.050</td><td>28.050</td><td>26,050.00</td><td>28,050.00</td><td class='pos'>1,945.90</td><td class='pos'>7.46%</td><td>take_profit_5</td></tr><tr><td>24</td><td><code>002436</code></td><td>closed</td><td>2025-10-13</td><td>2025-10-14</td><td>1</td><td>1,500</td><td>19.460</td><td>18.740</td><td>29,190.00</td><td>28,110.00</td><td class='neg'>-1,137.30</td><td class='neg'>-3.89%</td><td>break_bbi</td></tr><tr><td>25</td><td><code>002245</code></td><td>closed</td><td>2025-10-14</td><td>2025-10-17</td><td>3</td><td>2,300</td><td>12.600</td><td>11.650</td><td>28,980.00</td><td>26,795.00</td><td class='neg'>-2,240.78</td><td class='neg'>-7.72%</td><td>stop_loss_5</td></tr><tr><td>26</td><td><code>600172</code></td><td>closed</td><td>2025-11-04</td><td>2025-11-10</td><td>6</td><td>4,100</td><td>6.460</td><td>6.930</td><td>26,486.00</td><td>28,413.00</td><td class='pos'>1,872.10</td><td class='pos'>7.06%</td><td>take_profit_5</td></tr><tr><td>27</td><td><code>600601</code></td><td>closed</td><td>2025-11-11</td><td>2025-11-12</td><td>1</td><td>2,400</td><td>11.990</td><td>11.190</td><td>28,776.00</td><td>26,856.00</td><td class='neg'>-1,975.63</td><td class='neg'>-6.86%</td><td>stop_loss_5</td></tr><tr><td>28</td><td><code>603759</code></td><td>closed</td><td>2025-11-14</td><td>2025-11-20</td><td>6</td><td>2,300</td><td>11.470</td><td>10.870</td><td>26,381.00</td><td>25,001.00</td><td class='neg'>-1,431.38</td><td class='neg'>-5.42%</td><td>stop_loss_5</td></tr><tr><td>29</td><td><code>002210</code></td><td>closed</td><td>2025-11-17</td><td>2025-11-21</td><td>4</td><td>100</td><td>4.210</td><td>3.850</td><td>421.00</td><td>385.00</td><td class='neg'>-36.81</td><td class='neg'>-8.73%</td><td>stop_loss_5</td></tr><tr><td>30</td><td><code>600865</code></td><td>closed</td><td>2026-01-06</td><td>2026-01-08</td><td>2</td><td>1,500</td><td>16.260</td><td>17.180</td><td>24,390.00</td><td>25,770.00</td><td class='pos'>1,329.84</td><td class='pos'>5.45%</td><td>take_profit_5</td></tr><tr><td>31</td><td><code>002491</code></td><td>closed</td><td>2026-01-07</td><td>2026-01-20</td><td>13</td><td>100</td><td>6.150</td><td>5.880</td><td>615.00</td><td>588.00</td><td class='neg'>-28.20</td><td class='neg'>-4.58%</td><td>break_bbi</td></tr><tr><td>32</td><td><code>600824</code></td><td>closed</td><td>2026-01-08</td><td>2026-01-16</td><td>8</td><td>5,600</td><td>4.670</td><td>4.580</td><td>26,152.00</td><td>25,648.00</td><td class='neg'>-555.80</td><td class='neg'>-2.12%</td><td>break_bbi</td></tr><tr><td>33</td><td><code>002009</code></td><td>closed</td><td>2026-01-19</td><td>2026-01-21</td><td>2</td><td>1,100</td><td>21.800</td><td>23.040</td><td>23,980.00</td><td>25,344.00</td><td class='pos'>1,314.68</td><td class='pos'>5.48%</td><td>take_profit_5</td></tr><tr><td>34</td><td><code>002195</code></td><td>closed</td><td>2026-01-20</td><td>2026-01-23</td><td>3</td><td>200</td><td>9.620</td><td>10.510</td><td>1,924.00</td><td>2,102.00</td><td class='pos'>173.97</td><td class='pos'>9.03%</td><td>take_profit_5</td></tr><tr><td>35</td><td><code>002361</code></td><td>closed</td><td>2026-01-22</td><td>2026-01-23</td><td>1</td><td>2,200</td><td>11.170</td><td>12.460</td><td>24,574.00</td><td>27,412.00</td><td class='pos'>2,786.01</td><td class='pos'>11.33%</td><td>take_profit_5</td></tr><tr><td>36</td><td><code>002361</code></td><td>closed</td><td>2026-01-26</td><td>2026-01-27</td><td>1</td><td>2,400</td><td>12.270</td><td>11.580</td><td>29,448.00</td><td>27,792.00</td><td class='neg'>-1,713.24</td><td class='neg'>-5.81%</td><td>stop_loss_5</td></tr><tr><td>37</td><td><code>000981</code></td><td>closed</td><td>2026-01-27</td><td>2026-02-03</td><td>7</td><td>6,200</td><td>4.650</td><td>4.920</td><td>28,830.00</td><td>30,504.00</td><td class='pos'>1,614.67</td><td class='pos'>5.60%</td><td>take_profit_5</td></tr><tr><td>38</td><td><code>000852</code></td><td>closed</td><td>2026-03-11</td><td>2026-03-16</td><td>5</td><td>3,700</td><td>8.020</td><td>7.890</td><td>29,674.00</td><td>29,193.00</td><td class='neg'>-539.87</td><td class='neg'>-1.82%</td><td>break_bbi</td></tr><tr><td>39</td><td><code>002364</code></td><td>closed</td><td>2026-04-29</td><td>2026-05-06</td><td>7</td><td>700</td><td>39.410</td><td>44.870</td><td>27,587.00</td><td>31,409.00</td><td class='pos'>3,763.00</td><td class='pos'>13.63%</td><td>take_profit_5</td></tr><tr><td>40</td><td><code>600590</code></td><td>closed</td><td>2026-05-06</td><td>2026-05-07</td><td>1</td><td>2,100</td><td>15.940</td><td>17.000</td><td>33,474.00</td><td>35,700.00</td><td class='pos'>2,156.83</td><td class='pos'>6.44%</td><td>take_profit_5</td></tr><tr><td>41</td><td><code>603958</code></td><td>closed</td><td>2026-05-08</td><td>2026-05-14</td><td>6</td><td>1,500</td><td>23.210</td><td>24.420</td><td>34,815.00</td><td>36,630.00</td><td class='pos'>1,743.55</td><td class='pos'>5.00%</td><td>take_profit_5</td></tr><tr><td>42</td><td><code>002361</code></td><td>closed</td><td>2026-05-15</td><td>2026-05-21</td><td>6</td><td>2,000</td><td>18.350</td><td>17.300</td><td>36,700.00</td><td>34,600.00</td><td class='neg'>-2,171.30</td><td class='neg'>-5.91%</td><td>stop_loss_5</td></tr><tr><td>43</td><td><code>002210</code></td><td>closed</td><td>2026-05-18</td><td>2026-05-19</td><td>1</td><td>200</td><td>3.020</td><td>2.950</td><td>604.00</td><td>590.00</td><td class='neg'>-15.19</td><td class='neg'>-2.51%</td><td>break_bbi</td></tr><tr><td>44</td><td><code>603126</code></td><td>closed</td><td>2026-05-20</td><td>2026-05-21</td><td>1</td><td>100</td><td>8.280</td><td>8.010</td><td>828.00</td><td>801.00</td><td class='neg'>-28.63</td><td class='neg'>-3.45%</td><td>break_bbi</td></tr></tbody></table></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="shell">
+          <h2>买卖明细</h2>
+          <p class="muted">以下为回测引擎输出的原始买入/卖出流水，成交金额和成交后现金不做展示倍数放大。</p>
+          <div class='table-wrap tall'><table><thead><tr><th>#</th><th>日期</th><th>代码</th><th>方向</th><th>股数</th><th>价格</th><th>成交金额(元)</th><th>原因</th><th>成交后现金(元)</th></tr></thead><tbody><tr><td>1</td><td>2025-02-27</td><td><code>002354</code></td><td class='buy'>买入</td><td>2,500</td><td>7.700</td><td>19,250.00</td><td>next_day_entry</td><td>730.75</td></tr><tr><td>2</td><td>2025-02-28</td><td><code>600186</code></td><td class='buy'>买入</td><td>100</td><td>6.710</td><td>671.00</td><td>next_day_entry</td><td>59.08</td></tr><tr><td>3</td><td>2025-03-03</td><td><code>002354</code></td><td class='sell'>卖出</td><td>2,500</td><td>6.750</td><td>16,875.00</td><td>stop_loss_5</td><td>16,917.20</td></tr><tr><td>4</td><td>2025-03-04</td><td><code>603881</code></td><td class='buy'>买入</td><td>600</td><td>27.440</td><td>16,464.00</td><td>next_day_entry</td><td>436.74</td></tr><tr><td>5</td><td>2025-03-05</td><td><code>600186</code></td><td class='sell'>卖出</td><td>100</td><td>7.080</td><td>708.00</td><td>take_profit_5</td><td>1,144.03</td></tr><tr><td>6</td><td>2025-03-05</td><td><code>603881</code></td><td class='sell'>卖出</td><td>600</td><td>30.580</td><td>18,348.00</td><td>take_profit_5</td><td>19,473.68</td></tr><tr><td>7</td><td>2025-03-06</td><td><code>600602</code></td><td class='buy'>买入</td><td>800</td><td>23.770</td><td>19,016.00</td><td>next_day_entry</td><td>438.67</td></tr><tr><td>8</td><td>2025-03-07</td><td><code>600602</code></td><td class='sell'>卖出</td><td>800</td><td>27.110</td><td>21,688.00</td><td>take_profit_5</td><td>22,104.98</td></tr><tr><td>9</td><td>2025-03-10</td><td><code>000679</code></td><td class='buy'>买入</td><td>3,200</td><td>6.780</td><td>21,696.00</td><td>next_day_entry</td><td>387.28</td></tr><tr><td>10</td><td>2025-03-13</td><td><code>000679</code></td><td class='sell'>卖出</td><td>3,200</td><td>7.210</td><td>23,072.00</td><td>take_profit_5</td><td>23,436.21</td></tr><tr><td>11</td><td>2025-03-14</td><td><code>002575</code></td><td class='buy'>买入</td><td>2,400</td><td>9.720</td><td>23,328.00</td><td>next_day_entry</td><td>84.88</td></tr><tr><td>12</td><td>2025-03-17</td><td><code>002575</code></td><td class='sell'>卖出</td><td>2,400</td><td>10.290</td><td>24,696.00</td><td>take_profit_5</td><td>24,756.19</td></tr><tr><td>13</td><td>2025-03-18</td><td><code>605066</code></td><td class='buy'>买入</td><td>3,100</td><td>7.860</td><td>24,366.00</td><td>next_day_entry</td><td>365.82</td></tr><tr><td>14</td><td>2025-03-24</td><td><code>605066</code></td><td class='sell'>卖出</td><td>3,100</td><td>7.410</td><td>22,971.00</td><td>stop_loss_5</td><td>23,313.85</td></tr><tr><td>15</td><td>2025-06-10</td><td><code>600793</code></td><td class='buy'>买入</td><td>700</td><td>29.290</td><td>20,503.00</td><td>next_day_entry</td><td>2,790.35</td></tr><tr><td>16</td><td>2025-06-12</td><td><code>600793</code></td><td class='sell'>卖出</td><td>700</td><td>27.700</td><td>19,390.00</td><td>stop_loss_5</td><td>22,160.96</td></tr><tr><td>17</td><td>2025-06-25</td><td><code>600530</code></td><td class='buy'>买入</td><td>2,400</td><td>9.210</td><td>22,104.00</td><td>next_day_entry</td><td>34.85</td></tr><tr><td>18</td><td>2025-07-04</td><td><code>600530</code></td><td class='sell'>卖出</td><td>2,400</td><td>8.680</td><td>20,832.00</td><td>stop_loss_5</td><td>20,846.02</td></tr><tr><td>19</td><td>2025-07-07</td><td><code>002272</code></td><td class='buy'>买入</td><td>1,900</td><td>10.550</td><td>20,045.00</td><td>next_day_entry</td><td>780.98</td></tr><tr><td>20</td><td>2025-07-14</td><td><code>002277</code></td><td class='buy'>买入</td><td>100</td><td>6.040</td><td>604.00</td><td>next_day_entry</td><td>176.37</td></tr><tr><td>21</td><td>2025-07-15</td><td><code>002277</code></td><td class='sell'>卖出</td><td>100</td><td>5.880</td><td>588.00</td><td>break_bbi</td><td>763.79</td></tr><tr><td>22</td><td>2025-07-17</td><td><code>002272</code></td><td class='sell'>卖出</td><td>1,900</td><td>11.150</td><td>21,185.00</td><td>take_profit_5</td><td>21,927.60</td></tr><tr><td>23</td><td>2025-07-17</td><td><code>000530</code></td><td class='buy'>买入</td><td>3,300</td><td>6.520</td><td>21,516.00</td><td>next_day_entry</td><td>390.08</td></tr><tr><td>24</td><td>2025-07-18</td><td><code>002210</code></td><td class='buy'>买入</td><td>100</td><td>2.840</td><td>284.00</td><td>next_day_entry</td><td>105.80</td></tr><tr><td>25</td><td>2025-07-24</td><td><code>002210</code></td><td class='sell'>卖出</td><td>100</td><td>3.020</td><td>302.00</td><td>take_profit_5</td><td>407.50</td></tr><tr><td>26</td><td>2025-07-31</td><td><code>601011</code></td><td class='buy'>买入</td><td>100</td><td>2.780</td><td>278.00</td><td>next_day_entry</td><td>129.22</td></tr><tr><td>27</td><td>2025-08-11</td><td><code>000530</code></td><td class='sell'>卖出</td><td>3,300</td><td>6.870</td><td>22,671.00</td><td>take_profit_5</td><td>22,777.55</td></tr><tr><td>28</td><td>2025-08-12</td><td><code>002436</code></td><td class='buy'>买入</td><td>1,300</td><td>16.610</td><td>21,593.00</td><td>next_day_entry</td><td>1,162.96</td></tr><tr><td>29</td><td>2025-08-13</td><td><code>000679</code></td><td class='buy'>买入</td><td>100</td><td>9.010</td><td>901.00</td><td>next_day_entry</td><td>261.06</td></tr><tr><td>30</td><td>2025-08-14</td><td><code>601011</code></td><td class='sell'>卖出</td><td>100</td><td>2.690</td><td>269.00</td><td>break_bbi</td><td>529.79</td></tr><tr><td>31</td><td>2025-08-18</td><td><code>000679</code></td><td class='sell'>卖出</td><td>100</td><td>10.070</td><td>1,007.00</td><td>take_profit_5</td><td>1,535.78</td></tr><tr><td>32</td><td>2025-08-19</td><td><code>600629</code></td><td class='buy'>买入</td><td>100</td><td>13.590</td><td>1,359.00</td><td>next_day_entry</td><td>175.42</td></tr><tr><td>33</td><td>2025-08-21</td><td><code>600629</code></td><td class='sell'>卖出</td><td>100</td><td>14.500</td><td>1,450.00</td><td>take_profit_5</td><td>1,623.97</td></tr><tr><td>34</td><td>2025-08-22</td><td><code>002796</code></td><td class='buy'>买入</td><td>100</td><td>13.290</td><td>1,329.00</td><td>next_day_entry</td><td>293.64</td></tr><tr><td>35</td><td>2025-08-26</td><td><code>002436</code></td><td class='sell'>卖出</td><td>1,300</td><td>17.760</td><td>23,088.00</td><td>take_profit_5</td><td>23,358.55</td></tr><tr><td>36</td><td>2025-08-26</td><td><code>002796</code></td><td class='sell'>卖出</td><td>100</td><td>14.260</td><td>1,426.00</td><td>take_profit_5</td><td>24,783.13</td></tr><tr><td>37</td><td>2025-08-27</td><td><code>002245</code></td><td class='buy'>买入</td><td>2,100</td><td>11.680</td><td>24,528.00</td><td>next_day_entry</td><td>230.60</td></tr><tr><td>38</td><td>2025-09-11</td><td><code>002245</code></td><td class='sell'>卖出</td><td>2,100</td><td>12.300</td><td>25,830.00</td><td>take_profit_5</td><td>26,034.77</td></tr><tr><td>39</td><td>2025-09-12</td><td><code>600410</code></td><td class='buy'>买入</td><td>1,300</td><td>19.400</td><td>25,220.00</td><td>next_day_entry</td><td>789.55</td></tr><tr><td>40</td><td>2025-09-15</td><td><code>002210</code></td><td class='buy'>买入</td><td>200</td><td>3.480</td><td>696.00</td><td>next_day_entry</td><td>92.85</td></tr><tr><td>41</td><td>2025-09-16</td><td><code>600410</code></td><td class='sell'>卖出</td><td>1,300</td><td>21.510</td><td>27,963.00</td><td>take_profit_5</td><td>28,027.89</td></tr><tr><td>42</td><td>2025-09-16</td><td><code>002210</code></td><td class='sell'>卖出</td><td>200</td><td>3.870</td><td>774.00</td><td>take_profit_5</td><td>28,801.12</td></tr><tr><td>43</td><td>2025-09-18</td><td><code>600693</code></td><td class='buy'>买入</td><td>4,500</td><td>6.260</td><td>28,170.00</td><td>next_day_entry</td><td>602.95</td></tr><tr><td>44</td><td>2025-09-19</td><td><code>600693</code></td><td class='sell'>卖出</td><td>4,500</td><td>6.220</td><td>27,990.00</td><td>break_bbi</td><td>28,564.96</td></tr><tr><td>45</td><td>2025-10-10</td><td><code>002364</code></td><td class='buy'>买入</td><td>1,000</td><td>26.050</td><td>26,050.00</td><td>next_day_entry</td><td>2,488.91</td></tr><tr><td>46</td><td>2025-10-13</td><td><code>002364</code></td><td class='sell'>卖出</td><td>1,000</td><td>28.050</td><td>28,050.00</td><td>take_profit_5</td><td>30,510.86</td></tr><tr><td>47</td><td>2025-10-13</td><td><code>002436</code></td><td class='buy'>买入</td><td>1,500</td><td>19.460</td><td>29,190.00</td><td>next_day_entry</td><td>1,291.67</td></tr><tr><td>48</td><td>2025-10-14</td><td><code>002436</code></td><td class='sell'>卖出</td><td>1,500</td><td>18.740</td><td>28,110.00</td><td>break_bbi</td><td>29,373.56</td></tr><tr><td>49</td><td>2025-10-14</td><td><code>002245</code></td><td class='buy'>买入</td><td>2,300</td><td>12.600</td><td>28,980.00</td><td>next_day_entry</td><td>364.58</td></tr><tr><td>50</td><td>2025-10-17</td><td><code>002245</code></td><td class='sell'>卖出</td><td>2,300</td><td>11.650</td><td>26,795.00</td><td>stop_loss_5</td><td>27,132.78</td></tr><tr><td>51</td><td>2025-11-04</td><td><code>600172</code></td><td class='buy'>买入</td><td>4,100</td><td>6.460</td><td>26,486.00</td><td>next_day_entry</td><td>620.30</td></tr><tr><td>52</td><td>2025-11-10</td><td><code>600172</code></td><td class='sell'>卖出</td><td>4,100</td><td>6.930</td><td>28,413.00</td><td>take_profit_5</td><td>29,004.88</td></tr><tr><td>53</td><td>2025-11-11</td><td><code>600601</code></td><td class='buy'>买入</td><td>2,400</td><td>11.990</td><td>28,776.00</td><td>next_day_entry</td><td>200.11</td></tr><tr><td>54</td><td>2025-11-12</td><td><code>600601</code></td><td class='sell'>卖出</td><td>2,400</td><td>11.190</td><td>26,856.00</td><td>stop_loss_5</td><td>27,029.25</td></tr><tr><td>55</td><td>2025-11-14</td><td><code>603759</code></td><td class='buy'>买入</td><td>2,300</td><td>11.470</td><td>26,381.00</td><td>next_day_entry</td><td>621.87</td></tr><tr><td>56</td><td>2025-11-17</td><td><code>002210</code></td><td class='buy'>买入</td><td>100</td><td>4.210</td><td>421.00</td><td>next_day_entry</td><td>200.45</td></tr><tr><td>57</td><td>2025-11-20</td><td><code>603759</code></td><td class='sell'>卖出</td><td>2,300</td><td>10.870</td><td>25,001.00</td><td>stop_loss_5</td><td>25,176.45</td></tr><tr><td>58</td><td>2025-11-21</td><td><code>002210</code></td><td class='sell'>卖出</td><td>100</td><td>3.850</td><td>385.00</td><td>stop_loss_5</td><td>25,561.06</td></tr><tr><td>59</td><td>2026-01-06</td><td><code>600865</code></td><td class='buy'>买入</td><td>1,500</td><td>16.260</td><td>24,390.00</td><td>next_day_entry</td><td>1,146.67</td></tr><tr><td>60</td><td>2026-01-07</td><td><code>002491</code></td><td class='buy'>买入</td><td>100</td><td>6.150</td><td>615.00</td><td>next_day_entry</td><td>531.06</td></tr><tr><td>61</td><td>2026-01-08</td><td><code>600865</code></td><td class='sell'>卖出</td><td>1,500</td><td>17.180</td><td>25,770.00</td><td>take_profit_5</td><td>26,275.29</td></tr><tr><td>62</td><td>2026-01-08</td><td><code>600824</code></td><td class='buy'>买入</td><td>5,600</td><td>4.670</td><td>26,152.00</td><td>next_day_entry</td><td>97.14</td></tr><tr><td>63</td><td>2026-01-16</td><td><code>600824</code></td><td class='sell'>卖出</td><td>5,600</td><td>4.580</td><td>25,648.00</td><td>break_bbi</td><td>25,719.49</td></tr><tr><td>64</td><td>2026-01-19</td><td><code>002009</code></td><td class='buy'>买入</td><td>1,100</td><td>21.800</td><td>23,980.00</td><td>next_day_entry</td><td>1,715.51</td></tr><tr><td>65</td><td>2026-01-20</td><td><code>002491</code></td><td class='sell'>卖出</td><td>100</td><td>5.880</td><td>588.00</td><td>break_bbi</td><td>2,302.92</td></tr><tr><td>66</td><td>2026-01-20</td><td><code>002195</code></td><td class='buy'>买入</td><td>200</td><td>9.620</td><td>1,924.00</td><td>next_day_entry</td><td>377.00</td></tr><tr><td>67</td><td>2026-01-21</td><td><code>002009</code></td><td class='sell'>卖出</td><td>1,100</td><td>23.040</td><td>25,344.00</td><td>take_profit_5</td><td>25,695.65</td></tr><tr><td>68</td><td>2026-01-22</td><td><code>002361</code></td><td class='buy'>买入</td><td>2,200</td><td>11.170</td><td>24,574.00</td><td>next_day_entry</td><td>1,097.08</td></tr><tr><td>69</td><td>2026-01-23</td><td><code>002195</code></td><td class='sell'>卖出</td><td>200</td><td>10.510</td><td>2,102.00</td><td>take_profit_5</td><td>3,196.98</td></tr><tr><td>70</td><td>2026-01-23</td><td><code>002361</code></td><td class='sell'>卖出</td><td>2,200</td><td>12.460</td><td>27,412.00</td><td>take_profit_5</td><td>30,581.56</td></tr><tr><td>71</td><td>2026-01-26</td><td><code>002361</code></td><td class='buy'>买入</td><td>2,400</td><td>12.270</td><td>29,448.00</td><td>next_day_entry</td><td>1,104.12</td></tr><tr><td>72</td><td>2026-01-27</td><td><code>002361</code></td><td class='sell'>卖出</td><td>2,400</td><td>11.580</td><td>27,792.00</td><td>stop_loss_5</td><td>28,868.32</td></tr><tr><td>73</td><td>2026-01-27</td><td><code>000981</code></td><td class='buy'>买入</td><td>6,200</td><td>4.650</td><td>28,830.00</td><td>next_day_entry</td><td>9.49</td></tr><tr><td>74</td><td>2026-02-03</td><td><code>000981</code></td><td class='sell'>卖出</td><td>6,200</td><td>4.920</td><td>30,504.00</td><td>take_profit_5</td><td>30,482.99</td></tr><tr><td>75</td><td>2026-03-11</td><td><code>000852</code></td><td class='buy'>买入</td><td>3,700</td><td>8.020</td><td>29,674.00</td><td>next_day_entry</td><td>779.32</td></tr><tr><td>76</td><td>2026-03-16</td><td><code>000852</code></td><td class='sell'>卖出</td><td>3,700</td><td>7.890</td><td>29,193.00</td><td>break_bbi</td><td>29,943.12</td></tr><tr><td>77</td><td>2026-04-29</td><td><code>002364</code></td><td class='buy'>买入</td><td>700</td><td>39.410</td><td>27,587.00</td><td>next_day_entry</td><td>2,328.54</td></tr><tr><td>78</td><td>2026-05-06</td><td><code>002364</code></td><td class='sell'>卖出</td><td>700</td><td>44.870</td><td>31,409.00</td><td>take_profit_5</td><td>33,706.13</td></tr><tr><td>79</td><td>2026-05-06</td><td><code>600590</code></td><td class='buy'>买入</td><td>2,100</td><td>15.940</td><td>33,474.00</td><td>next_day_entry</td><td>198.65</td></tr><tr><td>80</td><td>2026-05-07</td><td><code>600590</code></td><td class='sell'>卖出</td><td>2,100</td><td>17.000</td><td>35,700.00</td><td>take_profit_5</td><td>35,862.95</td></tr><tr><td>81</td><td>2026-05-08</td><td><code>603958</code></td><td class='buy'>买入</td><td>1,500</td><td>23.210</td><td>34,815.00</td><td>next_day_entry</td><td>1,013.14</td></tr><tr><td>82</td><td>2026-05-14</td><td><code>603958</code></td><td class='sell'>卖出</td><td>1,500</td><td>24.420</td><td>36,630.00</td><td>take_profit_5</td><td>37,606.51</td></tr><tr><td>83</td><td>2026-05-15</td><td><code>002361</code></td><td class='buy'>买入</td><td>2,000</td><td>18.350</td><td>36,700.00</td><td>next_day_entry</td><td>869.81</td></tr><tr><td>84</td><td>2026-05-18</td><td><code>002210</code></td><td class='buy'>买入</td><td>200</td><td>3.020</td><td>604.00</td><td>next_day_entry</td><td>265.20</td></tr><tr><td>85</td><td>2026-05-19</td><td><code>002210</code></td><td class='sell'>卖出</td><td>200</td><td>2.950</td><td>590.00</td><td>break_bbi</td><td>854.61</td></tr><tr><td>86</td><td>2026-05-20</td><td><code>603126</code></td><td class='buy'>买入</td><td>100</td><td>8.280</td><td>828.00</td><td>next_day_entry</td><td>25.79</td></tr><tr><td>87</td><td>2026-05-21</td><td><code>002361</code></td><td class='sell'>卖出</td><td>2,000</td><td>17.300</td><td>34,600.00</td><td>stop_loss_5</td><td>34,591.19</td></tr><tr><td>88</td><td>2026-05-21</td><td><code>603126</code></td><td class='sell'>卖出</td><td>100</td><td>8.010</td><td>801.00</td><td>break_bbi</td><td>35,391.38</td></tr></tbody></table></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="shell">
+          <h2>产物与复现入口</h2>
+          <div class="panel">
+            <ul class='artifact-list'><li><span>净值</span><code>b1_small_capital_mainboard_final_20260617_full_nav.csv</code></li><li><span>买卖流水</span><code>b1_small_capital_mainboard_final_20260617_full_trades.csv</code></li><li><span>窗口明细</span><code>b1_small_capital_mainboard_final_20260617_details.csv</code></li><li><span>全窗口汇总</span><code>b1_small_capital_mainboard_final_20260617_summary.csv</code></li><li><span>回测 manifest</span><code>b1_small_capital_mainboard_final_20260617_full_manifest.json</code></li></ul>
+          </div>
+        </div>
+      </section>
+
+      <div class="shell foot">研究边界：本页只用于本地量化研究、复盘和执行方案讨论，不连接券商，不触发真实交易。</div>
+    </main>
+  </div>
+</body>
+</html>

@@ -99,6 +99,24 @@
   - `npm run lint`、`npm run typecheck`、`npm run build`。
   - 依赖包含 `react`、`vite`、`lightweight-charts`、`lucide-react`。
 
+## 独立研究工作区地图
+
+- `my_quant/`
+  - 从 `xquant-beginner` 收拢来的独立研究工作区，依赖和运行方式与主 FastAPI/React 栈分开。
+  - 接手说明看 `my_quant/README.md`，策略研究说明看 `my_quant/strategy_research/README.md`。
+
+- `my_quant/strategy_research/experiment/b1_trend_pullback.py`
+  - B1 A 股趋势回调组合实验核心，包含 Tushare/AkShare 数据读取、候选排序、现实成交约束和组合回测。
+  - `fetch_tushare_index_bars()` 会检查指数缓存最大日期，缓存不覆盖请求结束日时刷新，避免盘前预案读到半旧指数。
+
+- `my_quant/strategy_research/experiment/kronos_forecast_slope.py`
+  - 把 Kronos 预测统计路径转换成研究用 `buy` / `sell` / `hold` 信号。
+  - 只评估预测路径斜率、预测收益和下行分位过滤，不连接券商、不产生真实交易动作。
+
+- `my_quant/strategy_research/run_kronos_hk_forecast.py`
+  - 从 `kronos-预测` 收拢来的港股 Kronos 预测包装入口。
+  - 需要通过 `--kronos-dir` 或 `KRONOS_DIR` 指向外部 Kronos checkout；本仓不内置第三方模型仓库和虚拟环境。
+
 ## AI 科研闭环落点
 
 后续让 AI 自动进化策略时，建议把每轮研究拆成以下可验证单元：
