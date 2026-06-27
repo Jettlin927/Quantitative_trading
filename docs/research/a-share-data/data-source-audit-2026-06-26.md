@@ -6,7 +6,7 @@
 
 - Tushare 数据源当前可用：A 股日线、全市场 daily_basic、单票 fundamentals 烟测均返回 `status=ok`。
 - yfinance 数据源当前可用：美股 sample 观察池快照返回 `status=ok ok=4 stale=0`。
-- 注意：历史记录中 `market:fundamentals` 全市场同步曾为 `partial`，当前财务指标表覆盖 `2023-06-30` 到 `2026-03-31`，不是五年全市场财务完整库。若后续策略使用财务因子，需要另做全量 fundamentals 补齐与失败股票复核。
+- 注意：历史记录中 `market:fundamentals` 全市场同步曾为 `partial`，当前财务指标表覆盖 `2023-06-30` 到 `2026-03-31`，不是五年全市场财务完整库。若后续数据分析依赖财务字段，需要另做全量 fundamentals 补齐与失败股票复核。
 
 ## Tushare 本地库覆盖
 
@@ -80,6 +80,6 @@ status=ok ok=4 stale=0
 
 ## 后续要求
 
-1. 若策略只用价格、成交额、估值和 daily_basic，当前 Tushare 数据源可继续使用。
-2. 若策略使用财务质量因子，必须先补全 `stock_financial_indicators` 全市场覆盖，并复核历史 `market:fundamentals partial` 的失败股票。
-3. yfinance 仅作为美股观察池研究快照来源，不作为券商持仓或真实交易系统。
+1. 若只查询价格、成交额、估值和 daily_basic，当前 Tushare 数据源可继续使用。
+2. 若需要依赖财务质量字段，必须先补全 `stock_financial_indicators` 全市场覆盖，并复核历史 `market:fundamentals partial` 的失败股票。
+3. yfinance 仅作为美股 sample 快照来源，不作为券商持仓或真实交易系统。

@@ -1,63 +1,51 @@
-# 美股操作层研究工作区
+# 美股 sample 数据源
 
-`my_quant/us_research/` 是文件化的美股操作层。它服务于“用 A 股验证规则，再反哺美股持仓和观察池”的闭环，但本目录第一版只使用 sample 数据，不读取真实券商导出，不连接真实账户，不自动下单。
+`my_quant/us_research/` 是美股 sample 数据源目录。它只服务于把 sample 观察池、sample 快照和 sample 持仓结构导入 PostgreSQL。
 
 ## 目录
 
-- `config/watchlist_symbols.csv`：sample 观察池配置，保留 `ticker`、`role`、`notes` 这三个从现有观察池结构迁来的核心列，并补充主题、工具类型、杠杆系数和风险标签。
-- `data/holdings_sample.csv`：sample 持仓结构，数量和成本为虚构示例，不代表真实持仓。
-- `data/snapshots/`：yfinance 快照 JSON/CSV 输出目录。
-- `reports/`：HTML + Markdown 美股操作报告输出目录。
-- `scripts/refresh_us_snapshot.py`：使用 yfinance 拉取历史行情并计算趋势、新鲜度和风险字段。
-- `scripts/build_us_watchlist_backtest.py`：使用 yfinance 历史行情生成 sample 关注池规则回测。
-- `scripts/build_us_operations_report.py`：从快照和 sample 持仓生成研究辅助报告。
-- `tests/`：标准库 `unittest` 测试，不依赖网络。
+- `config/watchlist_symbols.csv`：sample 观察池配置。
+- `data/holdings_sample.csv`：sample 持仓结构，数量和成本为虚构示例。
+- `data/snapshots/us_snapshot_latest.json`：sample 快照 JSON。
+- `data/snapshots/us_snapshot_latest.csv`：sample 快照 CSV。
+- `scripts/refresh_us_snapshot.py`：使用 yfinance 刷新 sample 快照。
 
-## 生成 sample 报告
+## 刷新 sample 快照
 
 在仓库根目录执行：
 
 ```bash
 .venv/bin/python -m my_quant.us_research.scripts.refresh_us_snapshot
-.venv/bin/python -m my_quant.us_research.scripts.build_us_watchlist_backtest --period 2y --interval 1d
-.venv/bin/python -m my_quant.us_research.scripts.build_us_operations_report
 ```
 
 输出：
 
 - `my_quant/us_research/data/snapshots/us_snapshot_latest.json`
 - `my_quant/us_research/data/snapshots/us_snapshot_latest.csv`
-- `my_quant/us_research/reports/latest_us_watchlist_backtest.json`
-- `my_quant/us_research/reports/latest_us_watchlist_backtest.csv`
-- `my_quant/us_research/reports/latest_us_watchlist_backtest.html`
-- `my_quant/us_research/reports/latest_us_operations.html`
-- `my_quant/us_research/reports/latest_us_operations.md`
 
-## 规则回测
+## 入库
 
-当前 sample 回测策略为 `trend_pullback_no_chase`：
+后端预览：
 
-- 使用 2 年 yfinance 日线。
-- 以 MA50/MA200 判断趋势。
-- 使用 `只等回调` 纪律过滤过热追高。
-- 扣除 `0.1%` 单边换手成本。
-- 输出策略收益、买入持有收益、最大回撤、交易数和暴露比例。
+```text
+GET /api/us-research/import-preview
+```
 
-规则证据来自 `docs/research/backtest-reports/no-chase-validation-2026-06-26/`，只能说明“新增仓位等待回调或止跌确认”的研究纪律，不能证明美股单票未来收益。
+写入 sample 数据：
 
-## 数据状态
+```text
+POST /api/us-research/import-sample
+```
 
-快照和报告都会写入：
+DB 概览：
 
-- `source`：当前为 `yfinance`。
-- `fetched_at`：抓取时间。
-- `status`：`ok`、`partial` 或 `stale`。
-- `is_stale` / `stale_reason`：单个 ticker 的数据失败或陈旧原因。
-
-如果 yfinance 失败，报告仍会生成，但会显示 `partial` 或 `stale`，动作标签默认转为 `观察不动`。
+```text
+GET /api/us-research/db-overview
+```
 
 ## 边界
 
-- 不提交真实 `.env`、token、券商导出、真实持仓或真实成交。
-- 不连接 HSBC、券商 API 或任何可触发资金变化的接口。
-- 报告中的 `继续持有`、`只等回调`、`止跌后小加`、`减仓降风险`、`观察不动` 都是研究辅助标签，不是交易指令。
+- 当前数据全部视为 sample。
+- 不提交真实持仓、真实成交或券商导出。
+- 不连接 HSBC、券商 API 或任何真实账户。
+- 不生成操作建议、策略报告或回测报告。

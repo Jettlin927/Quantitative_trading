@@ -1,1 +1,0 @@
-"""Strategy research engineering package."""
