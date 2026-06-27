@@ -1,0 +1,2 @@
+strategy,total_return,annual_return,annual_volatility,max_drawdown,sharpe,calmar,sortino,total_turnover,rebalance_count,estimated_cost,kind,top_n,momentum_window,volatility_window,interval_days,cost_rate
+ram_top2_m180_v20_f10_cost,0.18953980588951191,0.03376854304231114,0.12745934832700237,-0.21423697114752338,0.2649357892186653,0.15762238824342859,0.25680874543906074,50.812008708936446,131.0,0.05081200870893645,ram_topn,2,180,20,10,0.001

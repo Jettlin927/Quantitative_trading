@@ -1,0 +1,21 @@
+{
+  "experiment": "satellite_external_high_volatility_probe",
+  "target_annual_return": 0.5,
+  "max_drawdown_floor": -0.3,
+  "evaluation_start": "2021-01-01",
+  "evaluation_end": "2026-06-15",
+  "latest_price_date": "2026-06-15",
+  "ram_rows": 7776,
+  "fixed_rows": 105,
+  "passing_rows": 0,
+  "return_gate_rows": 1,
+  "best_near_miss": "ext_ram_top1_m10_v10_t200_f5_x1_0_GLD",
+  "best_near_miss_annual_return": 0.2414011624881356,
+  "best_near_miss_max_drawdown": -0.27776562822835427,
+  "artifacts": [
+    "satellite_external_ram_probe.csv",
+    "satellite_external_fixed_probe.csv",
+    "satellite_external_probe_summary.md",
+    "satellite_external_probe_manifest.json"
+  ]
+}
