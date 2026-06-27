@@ -1,48 +1,25 @@
-# Local Quant Research
+# Local Quant Data Workspace
 
-一个本地运行的 A 股量化研究工作台，用来把交易纪律、技术形态、基本面数据和消息面热点放到同一个页面里复盘。它不是自动交易系统，也不会连接券商或真实账户，只用于研究、回测和策略验证。
+一个本地运行的数据工作台：把 A 股 Tushare 数据和美股 sample 数据统一落到 PostgreSQL，再由后端和前端只读展示覆盖度、表状态和样本数据。
 
-## 四区闭环
+它现在不是策略系统，不保留回测引擎，不连接券商，不自动下单，不处理真实资金。
 
-本仓库后续按四个区域收拢，目标是：用 A 股数据验证交易纪律，再把验证过的规则反哺美股持仓和观察池分析。
-
-- `my_quant/us_research/`：美股操作层，保存 sample 持仓、观察池、快照、操作报告和规则证据；真实持仓和成交记录默认只读本地脱敏 CSV，不提交。
-- `backend/`、`docker-compose.yml`、`docs/research/a-share-data/`：A 股数据沙盘，继续使用 Docker PostgreSQL 和 Tushare 做大样本验证。
-- `docs/research/strategy-lab/`：策略思想库，沉淀规则卡片、假设、失败条件和负证据。
-- `docs/research/backtest-reports/`、`my_quant/strategy_research/results/`、`my_quant/strategy_research/web_report/`：回测证据档案，保存 run 索引、HTML、CSV、manifest 和阶段结论。
-
-边界不变：本仓库只做研究、复盘、模拟和人工辅助分析，不连接券商，不自动下单，不处理真实资金。
-
-![选股池与消息面](docs/images/readme-screener.png)
-
-![策略实验与交互 K 线](docs/images/readme-lab.png)
-
-## 现在能做什么
+## 当前能做什么
 
 - 同步 Tushare A 股基础列表、日线行情、`daily_basic` 估值指标和 `fina_indicator` 财务指标。
-- 用 PostgreSQL 持久化本地行情和基本面数据，重复同步按唯一键 upsert。
-- 在选股池中查看技术评分、基本面质量评分、PE/PB、市值、换手率、ROE、毛利率、负债率、净利同比和形态标签。
-- 建立自选标的池，并在全市场或指定标的池范围内批量验证同一套策略。
-- 查看基本面质量榜，把盈利质量、成长性、资产负债、估值和流动性分红拆成可解释评分。
-- 查看财联社、华尔街见闻、雪球热榜等真实消息源，不伪造新闻。
-- 在策略实验页切换 BOLL、MACD、均线、RSI 等预设策略，并用交互式 K 线查看 MA、BOLL、MACD、成交量和买卖点。
-- 在“质量诊断”页用基本面、技术面、情绪面和新闻面四个分析师视角评估指定标的，并输出研究评级。
-- 调用 DeepSeek 生成策略复盘和质量诊断汇总；没有 `DEEPSEEK_TOKEN` 时会降级为本地规则评价。
+- 用 PostgreSQL 持久化本地行情、基本面、财务指标、股票池和同步记录。
+- 查询 A 股数据覆盖度、最新交易日、表行数和同步历史。
+- 读取股票列表、原始日线、最新估值和最新财务指标。
+- 将 `my_quant/us_research/` 下的美股 sample 观察池、sample 快照和 sample 持仓结构 upsert 到 DB。
+- 在前端查看 API/DB 状态、A 股覆盖、美股 sample 入库状态和近期同步记录。
 
 ## 技术栈
 
-- 前端：React + Vite + lightweight-charts
+- 前端：React + Vite
 - 后端：FastAPI + SQLAlchemy 2.0
 - 数据库：PostgreSQL 16
-- 数据源：Tushare Pro、NewsNow 热点源
-- AI 评价：DeepSeek `deepseek-v4-flash`
+- 数据源：Tushare Pro；美股侧当前只使用本仓 sample 文件
 - 运行方式：Docker Compose
-
-## my_quant 研究档案
-
-`my_quant/` 是迁入本仓库的独立策略研究工作区，包含 ETF 组合实验、A 股 B1 趋势回调复刻、Tushare 质量过滤结果、Web 报告和盘前预案自动化脚本。
-
-这部分不走 Docker 后端依赖，单独使用 [my_quant/requirements.txt](my_quant/requirements.txt) 或 [my_quant/pyproject.toml](my_quant/pyproject.toml) 建 Python 3.12 环境。接手入口见 [my_quant/README.md](my_quant/README.md)。
 
 ## 快速启动
 
@@ -57,13 +34,12 @@ notepad .env
 
 ```dotenv
 TUSHARE_TOKEN=你的_tushare_token
-DEEPSEEK_TOKEN=你的_deepseek_token
 ```
 
 然后启动：
 
 ```powershell
-.\启动回测系统.cmd
+.\启动数据工作台.cmd
 ```
 
 访问：
@@ -75,44 +51,72 @@ DEEPSEEK_TOKEN=你的_deepseek_token
 修改依赖、Dockerfile、前端或后端代码后，使用：
 
 ```powershell
-.\重新构建并启动回测系统.cmd
+.\重新构建并启动数据工作台.cmd
 ```
 
 停止服务：
 
 ```powershell
-.\停止回测系统.cmd
+.\停止数据工作台.cmd
 ```
 
 ## 推荐使用流程
 
-1. 打开前端工作台，点“检测 API”确认服务正常。
-2. 点“同步列表”同步 A 股基础信息。
-3. 输入股票代码，例如 `600703.SH`。
-4. 点“同步日线”拉取本地区间行情。
-5. 点“同步基本面”拉取估值和财务指标。
-6. 在“选股池”里筛选候选，查看技术面、基本面和消息面。
-7. 需要固定候选组合时，先建立自选标的池，再对池内标的运行批量验证。
-8. 进入“策略实验”，调整策略参数并运行单票、标的池或全市场回测。
-9. 在“质量诊断”查看指定标的的多 Agent 研究评级。
-10. 在“AI复盘”查看 DeepSeek 或本地规则生成的策略评价。
+1. 打开前端工作台，确认 API 和 DB 状态正常。
+2. 调用 `POST /api/tushare/sync-stock-basic` 同步 A 股基础列表。
+3. 调用 `POST /api/tushare/sync-market-daily` 补齐全市场日线。
+4. 调用 `POST /api/tushare/sync-market-daily-basic` 补齐估值指标。
+5. 调用 `POST /api/tushare/sync-market-fundamentals` 补齐财务指标。
+6. 用 `GET /api/db/overview` 和 `GET /api/tushare/sync-progress` 检查覆盖度。
+7. 如需美股 sample 数据，调用 `POST /api/us-research/import-sample` 入库。
 
-## 质量诊断
+## 主要 API
 
-质量诊断面向单个标的，入口在前端工作台的“质量诊断”页，也可以调用：
+- `GET /api/health`：健康检查和表行数。
+- `GET /api/db/overview`：A 股和美股 sample 的 DB 覆盖概览。
+- `GET /api/stocks`：按代码、名称、行业和市场查询 A 股基础信息。
+- `GET /api/stocks/screen`：返回股票基础信息加最新行情和估值；这里只是数据筛选，不是策略筛选。
+- `GET/POST/DELETE /api/stock-pools...`：自选数据池 CRUD。
+- `POST /api/tushare/sync-stock-basic`：同步 A 股基础列表。
+- `POST /api/tushare/sync-daily`：同步单票日线。
+- `POST /api/tushare/sync-market-daily`：按交易日补齐全市场日线。
+- `POST /api/tushare/sync-fundamentals`：同步单票估值和财务指标。
+- `POST /api/tushare/sync-market-daily-basic`：补齐全市场估值指标。
+- `POST /api/tushare/sync-market-fundamentals`：补齐全市场财务指标。
+- `GET /api/tushare/sync-progress`：查询同步覆盖进度。
+- `GET /api/daily-bars`：读取单票原始日线。
+- `GET /api/stocks/{ts_code}/fundamentals`：读取单票最新估值和财务概览。
+- `GET /api/us-research/overview`：读取美股 sample 文件，只读预览。
+- `GET /api/us-research/import-preview`：预览 sample 文件将写入哪些 DB 表。
+- `POST /api/us-research/import-sample`：将美股 sample 数据 upsert 到 DB。
+- `GET /api/us-research/db-overview`：从 DB 读取美股 sample 入库状态。
 
-```text
-GET /api/stocks/{ts_code}/quality-analysis?start_date=2023-05-30&end_date=2026-05-30&use_ai=true
-```
+## 数据表
 
-它会先基于本地数据库生成四个分析师视角：
+- `stocks`：A 股基础信息。
+- `stock_daily_bars`：A 股日线 OHLCV，按 `ts_code + trade_date` 去重。
+- `stock_daily_basic`：Tushare `daily_basic`，包含 PE、PB、PS、换手率、市值等。
+- `stock_financial_indicators`：Tushare `fina_indicator`，包含 ROE、毛利率、净利率、资产负债率、增长率等。
+- `stock_pools`：自选数据池。
+- `stock_pool_members`：自选数据池成员。
+- `assets`：美股/ETF sample 资产主数据。
+- `asset_daily_prices`：美股 sample 快照行情。
+- `watchlist_items`：美股 sample 观察池。
+- `portfolio_snapshots`：美股 sample 持仓快照，`holdings` 为 JSON。
+- `data_sync_runs`：同步记录。
 
-- 基本面分析师：使用估值和财务指标评估盈利质量、成长性、资产负债、估值和流动性分红。
-- 技术分析师：使用 MA、BOLL、MACD、RSI、KDJ、ATR 等指标评估趋势和交易结构。
-- 情绪分析师：使用已刷新财经新闻标题代理短线情绪；StockTwits 和 Reddit 暂未接入。
-- 新闻分析师：汇总本地消息面标题，识别事件热度和潜在风险。
+## 数据库软件连接
 
-如果配置了 `DEEPSEEK_TOKEN`，后端会把本地证据交给 DeepSeek 生成综合结论；如果没有配置或调用失败，页面会显示本地多 Agent 规则诊断。输出的“买入 / 持有 / 中性 / 卖出”是研究评级，不是交易指令。
+用 TablePlus、DBeaver、DataGrip、pgAdmin 等工具连接本机 PostgreSQL：
+
+- Host：`localhost`
+- Port：`.env` 中的 `POSTGRES_PORT`，默认 `5432`
+- Database：`.env` 中的 `POSTGRES_DB`
+- User：`.env` 中的 `POSTGRES_USER`
+- Password：`.env` 中的 `POSTGRES_PASSWORD`
+- SSL：本地开发通常关闭
+
+容器内服务连接 DB 时使用 `db:5432`，宿主机数据库软件连接时使用 `localhost:<POSTGRES_PORT>`。
 
 ## 环境变量
 
@@ -127,38 +131,13 @@ GET /api/stocks/{ts_code}/quality-analysis?start_date=2023-05-30&end_date=2026-0
 | `API_PORT` | FastAPI 宿主机端口，默认 `18000` |
 | `FRONTEND_PORT` | 前端宿主机端口，默认 `15173` |
 | `TUSHARE_TOKEN` | Tushare Pro token，用于同步行情和财务数据 |
-| `DEEPSEEK_TOKEN` | DeepSeek API token，用于策略 AI 复盘和质量诊断 |
-| `DEEPSEEK_API_KEY` | `DEEPSEEK_TOKEN` 的兼容别名 |
-| `DEEPSEEK_MODEL` | 默认 `deepseek-v4-flash` |
-| `DEEPSEEK_API_BASE` | 默认 `https://api.deepseek.com` |
-| `DEEPSEEK_TIMEOUT_SECONDS` | DeepSeek 请求超时秒数，默认 `25` |
-
-## 数据表
-
-- `stocks`：股票基础信息。
-- `stock_daily_bars`：日线 OHLCV，按 `ts_code + trade_date` 去重。
-- `stock_daily_basic`：Tushare `daily_basic`，包含 PE、PB、PS、换手率、市值等。
-- `stock_financial_indicators`：Tushare `fina_indicator`，包含 ROE、毛利率、净利率、资产负债率、增长率等。
-- `stock_pools`：自选标的池。
-- `stock_pool_members`：自选标的池成员。
-- `data_sync_runs`：同步记录。
-
-## 交易纪律默认值
-
-- 每周最多交易 2 次。
-- 单票仓位上限 20%。
-- 单笔风险上限 1%。
-- 默认止损 5%。
-- 第一止盈 3% 减半，第二止盈 5% 清仓。
-- 退潮或弱势市场禁止开新仓。
-- 盈利卖出当天禁止新买入。
-- A 股默认按 100 股一手取整。
 
 ## 安全边界
 
-- 本项目只做本地研究和复盘，不构成投资建议。
+- 本项目只做本地数据同步、入库和展示。
 - 不接入券商，不自动下单，不处理真实账户资金。
 - 不要提交 `.env`、真实 token、数据库密码或任何凭据。
+- 不要提交真实持仓、真实成交或券商导出。
 - 不要执行 `docker compose down -v`，除非明确接受会删除本地 PostgreSQL volume 数据。
 
 ## 发布前检查
@@ -167,4 +146,4 @@ GET /api/stocks/{ts_code}/quality-analysis?start_date=2023-05-30&end_date=2026-0
 git status --short --ignored
 ```
 
-确认 `.env` 显示为 ignored，而 `.env.example`、README 和 `docs/images/` 正常进入提交。
+确认 `.env` 显示为 ignored，而源码、README 和 docs 正常进入提交。

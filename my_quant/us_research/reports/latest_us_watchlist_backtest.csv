@@ -1,5 +1,0 @@
-ticker,name,strategy,status,evidence_label,bar_count,start_date,end_date,total_return,annual_return,buy_hold_return,max_drawdown,trade_count,exposure_pct,stale_reason
-NVDA,NVIDIA,trend_pullback_no_chase,ok,只等回调,501,2024-06-26,2026-06-25,-0.12744338486905205,-0.06640185062572468,0.5485759741315241,-0.2660744213769499,52,0.214,
-MU,Micron,trend_pullback_no_chase,ok,只等回调,501,2024-06-26,2026-06-25,0.8451456765576335,0.3616937766485677,7.524585932781369,-0.1939770908987718,37,0.172,
-VRT,Vertiv,trend_pullback_no_chase,ok,只等回调,501,2024-06-26,2026-06-25,0.16050198145137928,0.07790758184857638,2.7417538137107256,-0.29156358386746006,44,0.22,
-SOXL,Direxion Daily Semiconductor Bull 3X Shares,trend_pullback_no_chase,ok,只等回调,501,2024-06-26,2026-06-25,1.176123443324105,0.4797641376958648,3.611354622844954,-0.24846305933776147,35,0.122,
