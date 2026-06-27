@@ -6,6 +6,8 @@
 - Candidate: `fixed_513100_518880_50_50_x2_0`
 - Annual return: `28.16%`
 - Max drawdown: `-26.68%`
+- Sharpe: `1.13`
+- Beta vs 513100: `0.84`
 - Calmar: `1.06`
 - Estimated turnover cost drag: `1.10%`
 - Rebalance count: `9`

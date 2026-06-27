@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Research Engine Validation Migration - 2026-06-27</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #20242a;
+      --muted: #68717c;
+      --line: #d9dee5;
+      --panel: #ffffff;
+      --soft: #f5f7fa;
+      --ok: #1f9d55;
+      --warn: #ad6b00;
+    }
+    body {
+      margin: 0;
+      background: #eef1f5;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+    }
+    header {
+      border-top: 5px solid #15181d;
+      background: var(--panel);
+      padding: 24px 28px;
+      box-shadow: 0 1px 0 var(--line);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 28px 0 12px;
+      font-size: 18px;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      margin-top: 14px;
+      padding: 20px 24px;
+    }
+    .status {
+      display: inline-flex;
+      color: var(--ok);
+      font-weight: 700;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .item {
+      background: var(--soft);
+      border: 1px solid var(--line);
+      padding: 14px 16px;
+    }
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    pre {
+      background: #15181d;
+      color: #f4f7fb;
+      overflow: auto;
+      padding: 16px;
+    }
+    .warn {
+      color: var(--warn);
+      font-weight: 700;
+    }
+    @media (max-width: 720px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Research Engine Validation Migration</h1>
+      <div class="status">阶段通过 · 2026-06-27</div>
+      <p>本阶段只迁移 rolling/anchored walk-forward 窗口生成逻辑，未移动、重生成或删除任何历史回测结果。</p>
+    </header>
+
+    <section>
+      <h2>目标</h2>
+      <p>把 <code>my_quant/strategy_research/experiment/validation.py</code> 中可复用、无文件副作用的窗口生成逻辑迁入后端边界，服务后续样本内/样本外验证语义。</p>
+    </section>
+
+    <section>
+      <h2>已迁移内容</h2>
+      <div class="grid">
+        <div class="item">
+          <div class="label">新增后端模块</div>
+          <code>backend/app/research_engine/validation.py</code>
+        </div>
+        <div class="item">
+          <div class="label">新增测试</div>
+          <code>backend/tests/test_research_engine_validation.py</code>
+        </div>
+        <div class="item">
+          <div class="label">兼容入口</div>
+          <code>my_quant/strategy_research/experiment/validation.py</code>
+        </div>
+        <div class="item">
+          <div class="label">迁移函数</div>
+          <code>build_walk_forward_windows</code>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>边界</h2>
+      <ul>
+        <li>未迁移 <code>walk_forward_analysis</code>，因为它依赖旧实验区的 <code>run_config</code> 与 <code>StrategyConfig</code>。</li>
+        <li>未读取行情、未写入 CSV、未生成报告。</li>
+        <li>未改变回测语义、成本假设或历史结果可比口径。</li>
+        <li class="warn">完整 walk-forward 分析迁移需要先设计后端执行契约，不能让后端反向依赖旧实验区。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>验证命令</h2>
+      <pre><code>.venv/bin/python -m unittest backend.tests.test_research_engine_validation -v
+.venv/bin/python -m unittest my_quant.strategy_research.tests.test_experiment_engine.ExperimentEngineTest.test_walk_forward_analysis_returns_rolling_and_anchored_rows -v
+.venv/bin/python -m py_compile backend/app/research_engine/validation.py my_quant/strategy_research/experiment/validation.py</code></pre>
+    </section>
+
+    <section>
+      <h2>验证结果</h2>
+      <ul>
+        <li>后端 validation 测试：2 个测试通过。</li>
+        <li>旧 walk-forward 分析兼容测试：1 个测试通过。</li>
+        <li>Python 编译检查通过。</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

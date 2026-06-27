@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Research Engine Portfolio Migration - 2026-06-27</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #20242a;
+      --muted: #68717c;
+      --line: #d9dee5;
+      --panel: #ffffff;
+      --soft: #f5f7fa;
+      --ok: #1f9d55;
+      --warn: #ad6b00;
+      --accent: #185abc;
+    }
+    body {
+      margin: 0;
+      background: #eef1f5;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+    }
+    header {
+      border-top: 5px solid #15181d;
+      background: var(--panel);
+      padding: 24px 28px;
+      box-shadow: 0 1px 0 var(--line);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 28px 0 12px;
+      font-size: 18px;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      margin-top: 14px;
+      padding: 20px 24px;
+    }
+    .status {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--ok);
+      font-weight: 700;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .item {
+      background: var(--soft);
+      border: 1px solid var(--line);
+      padding: 14px 16px;
+    }
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    pre {
+      background: #15181d;
+      color: #f4f7fb;
+      overflow: auto;
+      padding: 16px;
+    }
+    .warn {
+      color: var(--warn);
+      font-weight: 700;
+    }
+    @media (max-width: 720px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Research Engine Portfolio Migration</h1>
+      <div class="status">阶段通过 · 2026-06-27</div>
+      <p>本阶段只迁移纯组合权重逻辑，未移动 cache、result、HTML report 或策略证据目录。</p>
+    </header>
+
+    <section>
+      <h2>目标</h2>
+      <p>把 <code>my_quant/strategy_research/experiment/strategies.py</code> 中可复用、无文件副作用的组合权重函数迁入后端边界，作为后续 FastAPI 研究聚合和策略评估 API 的共享实现。</p>
+    </section>
+
+    <section>
+      <h2>已迁移内容</h2>
+      <div class="grid">
+        <div class="item">
+          <div class="label">新增后端模块</div>
+          <code>backend/app/research_engine/portfolio.py</code>
+        </div>
+        <div class="item">
+          <div class="label">新增测试</div>
+          <code>backend/tests/test_research_engine_portfolio.py</code>
+        </div>
+        <div class="item">
+          <div class="label">兼容入口</div>
+          <code>my_quant/strategy_research/experiment/strategies.py</code>
+        </div>
+        <div class="item">
+          <div class="label">迁移函数</div>
+          <code>normalize_weights</code>, <code>make_equal_weight</code>, <code>make_risk_parity</code>, <code>make_ram_topn</code>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>边界</h2>
+      <ul>
+        <li>未移动 <code>data_cache/</code>、<code>results/</code>、<code>web_report/</code>。</li>
+        <li>未删除任何历史策略 <code>flow.md</code> 或负证据。</li>
+        <li>未改变回测执行语义、交易成本、持仓规则或三段评估门槛。</li>
+        <li class="warn">涉及数据库 schema、真实数据或历史结果可比口径的迁移仍需单独确认。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>验证命令</h2>
+      <pre><code>.venv/bin/python -m unittest backend.tests.test_research_engine_portfolio -v
+.venv/bin/python -m unittest my_quant.strategy_research.tests.test_experiment_engine -v
+.venv/bin/python -m unittest backend.tests.test_research_engine_portfolio backend.tests.test_research_engine_metrics backend.tests.test_api_contracts backend.tests.test_us_research backend.tests.test_strategy_lifecycle backend.tests.test_strategy_evaluation -v
+.venv/bin/python -m py_compile backend/app/research_engine/portfolio.py backend/app/research_engine/metrics.py backend/app/main.py my_quant/strategy_research/experiment/strategies.py my_quant/strategy_research/experiment/metrics.py</code></pre>
+    </section>
+
+    <section>
+      <h2>验证结果</h2>
+      <ul>
+        <li>新增 portfolio 后端测试：4 个测试通过。</li>
+        <li>旧实验兼容测试：70 个测试通过。</li>
+        <li>后端研究/API 相关测试：15 个测试通过。</li>
+        <li>Python 编译检查通过。</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

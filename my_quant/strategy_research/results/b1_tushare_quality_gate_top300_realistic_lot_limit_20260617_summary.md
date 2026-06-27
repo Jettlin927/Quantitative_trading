@@ -4,6 +4,8 @@
 - Symbols loaded: `299`.
 - Annual return: `48.90%`.
 - Max drawdown: `-22.14%`.
+- Sharpe: `1.16`.
+- Beta: `0.89` vs 沪深 300.
 - Calmar: `2.21`.
 - Trades: `228`.
 - Candidates: `388`.

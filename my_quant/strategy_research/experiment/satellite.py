@@ -16,6 +16,8 @@ from .metrics import calculate_metrics
 from .reports import markdown_table
 from .strategies import normalize_weights
 
+SATELLITE_BETA_BENCHMARK = "513100"
+
 
 @dataclass(frozen=True)
 class SatelliteConfig:
@@ -172,7 +174,7 @@ def run_satellite_config(
 ) -> dict[str, float | str | bool]:
     nav, _weights, run_stats = run_satellite_nav(prices, config, eval_start, eval_end)
     row: dict[str, float | str | bool] = {"strategy": config.name}
-    row.update(calculate_metrics(nav))
+    row.update(calculate_metrics(nav, benchmark_nav=_beta_benchmark(prices, nav.index)))
     row.update(run_stats)
     row.update(
         {
@@ -281,7 +283,7 @@ def run_fixed_blend_config(
             nav.iloc[i + 1] = nav.iloc[i] * (1 + daily_return)
 
     row: dict[str, float | str | bool] = {"strategy": name}
-    row.update(calculate_metrics(nav))
+    row.update(calculate_metrics(nav, benchmark_nav=_beta_benchmark(prices, nav.index)))
     row.update(
         {
             "strategy_family": "fixed_blend",
@@ -377,12 +379,29 @@ def _pct(value: float) -> str:
     return f"{value * 100:.2f}%"
 
 
+def _metric(series: pd.Series, key: str) -> str:
+    value = series.get(key)
+    if pd.isna(value):
+        return "n/a"
+    return f"{float(value):.2f}"
+
+
+def _beta_benchmark(prices: pd.DataFrame, index: pd.Index) -> pd.Series | None:
+    if SATELLITE_BETA_BENCHMARK not in prices.columns:
+        return None
+    return prices[SATELLITE_BETA_BENCHMARK].reindex(index)
+
+
 def build_satellite_final_markdown(
     candidate: pd.Series,
     gate: dict[str, bool | str],
     scan_df: pd.DataFrame,
 ) -> str:
-    top = scan_df.sort_values(["passes_drawdown_gate", "annual_return", "calmar"], ascending=False).head(10)
+    top_source = scan_df.copy()
+    for column in ["sharpe", "beta"]:
+        if column not in top_source.columns:
+            top_source[column] = float("nan")
+    top = top_source.sort_values(["passes_drawdown_gate", "annual_return", "calmar"], ascending=False).head(10)
     lines = [
         "# Satellite 50% DD30 Candidate",
         "",
@@ -392,6 +411,8 @@ def build_satellite_final_markdown(
         f"- Candidate: `{candidate['strategy']}`",
         f"- Annual return: `{_pct(float(candidate['annual_return']))}`",
         f"- Max drawdown: `{_pct(float(candidate['max_drawdown']))}`",
+        f"- Sharpe: `{_metric(candidate, 'sharpe')}`",
+        f"- Beta vs {SATELLITE_BETA_BENCHMARK}: `{_metric(candidate, 'beta')}`",
         f"- Calmar: `{float(candidate['calmar']):.2f}`",
         f"- Estimated turnover cost drag: `{_pct(float(candidate['estimated_cost']))}`",
         f"- Rebalance count: `{int(candidate['rebalance_count'])}`",
@@ -408,6 +429,8 @@ def build_satellite_final_markdown(
                     "strategy",
                     "annual_return",
                     "max_drawdown",
+                    "sharpe",
+                    "beta",
                     "calmar",
                     "passes_return_gate",
                     "passes_drawdown_gate",

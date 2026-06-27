@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>美股 sample 只读 API 接入报告</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #f4f6f8;
+        --paper: #ffffff;
+        --line: #dfe3e8;
+        --ink: #303840;
+        --muted: #65717e;
+        --green: #20a83a;
+        --amber: #b97912;
+        --blue: #5f8fff;
+      }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font-family: Aptos, "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+      }
+      main {
+        width: min(980px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 34px 0 56px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 32px;
+      }
+      h2 {
+        margin: 28px 0 10px;
+        font-size: 18px;
+      }
+      p,
+      li,
+      td {
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      section,
+      .hero {
+        border: 1px solid var(--line);
+        background: var(--paper);
+        padding: 18px 20px;
+      }
+      section {
+        margin-top: 12px;
+      }
+      .badge {
+        display: inline-flex;
+        margin-top: 14px;
+        border: 1px solid #ead4a8;
+        background: #fffaf0;
+        color: var(--amber);
+        padding: 5px 9px;
+        font-weight: 900;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .metric {
+        border: 1px solid var(--line);
+        padding: 12px;
+      }
+      .metric strong {
+        display: block;
+        color: var(--blue);
+        font-size: 24px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 9px 8px;
+        text-align: left;
+      }
+      th {
+        color: #4d5864;
+      }
+      code,
+      pre {
+        background: #f0f3f6;
+        border: 1px solid var(--line);
+      }
+      code {
+        padding: 2px 5px;
+      }
+      pre {
+        padding: 12px;
+        overflow: auto;
+      }
+      @media (max-width: 760px) {
+        .grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="hero">
+        <h1>美股 sample 只读 API 接入报告</h1>
+        <span class="badge">结论标签：观察</span>
+        <p>后端现在可以把 sample 观察池、sample 持仓、yfinance 快照和 sample 回测证据合并为统一只读 API；同时新增 DB import preview。本次不创建 PostgreSQL 表。</p>
+      </div>
+
+      <section>
+        <h2>当前 API</h2>
+        <pre><code>GET /api/us-research/overview
+GET /api/us-research/import-preview</code></pre>
+        <div class="grid">
+          <div class="metric"><strong>4</strong><span>sample 资产</span></div>
+          <div class="metric"><strong>1</strong><span>sample 持仓</span></div>
+          <div class="metric"><strong>false</strong><span>券商连接</span></div>
+          <div class="metric"><strong>pending</strong><span>DB 持久化</span></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>入库预览</h2>
+        <table>
+          <tbody>
+            <tr><th>assets</th><td>4 行，示例唯一键 <code>US:NVDA</code></td></tr>
+            <tr><th>asset_daily_prices</th><td>4 行，示例唯一键 <code>US:NVDA:2026-06-25</code></td></tr>
+            <tr><th>watchlist_items</th><td>4 行，示例唯一键 <code>sample-watchlist:US:NVDA</code></td></tr>
+            <tr><th>portfolio_snapshots</th><td>1 行，示例唯一键 <code>sample-latest</code></td></tr>
+            <tr><th>writesEnabled</th><td>false</td></tr>
+            <tr><th>blocker</th><td>db_schema_confirmation_required</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>输入文件</h2>
+        <ul>
+          <li><code>my_quant/us_research/config/watchlist_symbols.csv</code></li>
+          <li><code>my_quant/us_research/data/holdings_sample.csv</code></li>
+          <li><code>my_quant/us_research/data/snapshots/us_snapshot_latest.json</code></li>
+          <li><code>my_quant/us_research/reports/latest_us_watchlist_backtest.json</code></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>语义边界</h2>
+        <table>
+          <tbody>
+            <tr><th>source</th><td>file-sample</td></tr>
+            <tr><th>isSample</th><td>true</td></tr>
+            <tr><th>brokerConnected</th><td>false</td></tr>
+            <tr><th>realHoldingsImported</th><td>false</td></tr>
+            <tr><th>dbPersistence</th><td>pending_confirmation</td></tr>
+            <tr><th>executionEnabled</th><td>false</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>验证</h2>
+        <pre><code>.venv/bin/python -m unittest backend.tests.test_us_research backend.tests.test_strategy_evaluation backend.tests.test_research_engine_metrics -v
+.venv/bin/python -m py_compile backend/app/main.py backend/app/us_research.py backend/app/strategy_evaluation.py backend/app/research_engine/metrics.py backend/tests/test_us_research.py
+docker compose run --rm frontend npm run lint
+docker compose run --rm frontend npm run build
+curl -fsS http://localhost:18000/api/us-research/overview
+curl -fsS http://localhost:18000/api/us-research/import-preview</code></pre>
+        <p>运行中 API 返回 <code>file-sample True 4 1 pending_confirmation</code>；import preview 返回 <code>assets 4 / prices 4 / watchlist 4 / portfolioSnapshots 1</code>；前端 Chrome 渲染确认右栏出现美股 sample 面板和入库预览，控制台错误为 0。</p>
+      </section>
+    </main>
+  </body>
+</html>

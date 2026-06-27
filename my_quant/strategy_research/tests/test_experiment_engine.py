@@ -75,6 +75,19 @@ class ExperimentEngineTest(unittest.TestCase):
         self.assertTrue(math.isfinite(stats["annual_return"]))
         self.assertTrue(math.isfinite(stats["calmar"]))
 
+    def test_calculate_metrics_reports_sharpe_and_beta_against_benchmark(self):
+        dates = pd.date_range("2024-01-01", periods=4)
+        nav = pd.Series([1.0, 1.1, 1.2, 1.35], index=dates)
+        benchmark_nav = pd.Series([1.0, 1.05, 1.1, 1.2], index=dates)
+
+        stats = calculate_metrics(nav, benchmark_nav=benchmark_nav)
+
+        returns = nav.pct_change().dropna()
+        benchmark_returns = benchmark_nav.pct_change().dropna()
+        expected_beta = returns.cov(benchmark_returns) / benchmark_returns.var()
+        self.assertTrue(math.isfinite(stats["sharpe"]))
+        self.assertAlmostEqual(stats["beta"], expected_beta)
+
     def test_run_weighted_nav_applies_initial_turnover_cost_and_next_day_return(self):
         dates = pd.date_range("2024-01-01", periods=3)
         prices = pd.DataFrame(
@@ -261,6 +274,8 @@ class ExperimentEngineTest(unittest.TestCase):
         self.assertEqual(result["strategy"], "fixed_unit")
         self.assertEqual(result["strategy_family"], "fixed_blend")
         self.assertAlmostEqual(result["gross_exposure"], 1.5)
+        self.assertIn("beta", result)
+        self.assertTrue(math.isfinite(result["beta"]))
         self.assertIn("passes_return_gate", result)
         self.assertIn("passes_drawdown_gate", result)
 
@@ -683,6 +698,36 @@ class ExperimentEngineTest(unittest.TestCase):
         buys = result.trades[result.trades["side"] == "buy"]
         self.assertEqual(buys.iloc[0]["symbol"], "000001")
         self.assertEqual(float(buys.iloc[0]["shares"]), 400.0)
+
+    def test_b1_summary_reports_sharpe_and_beta(self):
+        from my_quant.strategy_research.experiment.b1_trend_pullback import B1BacktestConfig, build_b1_summary_markdown, run_b1_backtest
+
+        dates = pd.date_range("2025-01-01", periods=4)
+        panel = pd.DataFrame(
+            {
+                "open": [100.0, 100.0, 110.0, 121.0],
+                "close": [100.0, 100.0, 110.0, 121.0],
+                "bbi": [80.0, 80.0, 80.0, 80.0],
+                "entry_signal": [True, False, False, False],
+                "b1_score": [10.0, 0.0, 0.0, 0.0],
+            },
+            index=dates,
+        )
+        market = pd.DataFrame({"close": [100.0, 100.0, 105.0, 110.0], "bbi": [80.0, 80.0, 80.0, 80.0]}, index=dates)
+
+        result = run_b1_backtest(
+            {"000001": panel},
+            market,
+            B1BacktestConfig(initial_cash=10_000.0, top_n=1, max_position=1.0, cost_rate=0.0, take_profit_levels=(9.0,), take_profit_fractions=(1.0,)),
+        )
+        markdown = build_b1_summary_markdown(result, "2025-01-01", "2025-01-04", 1)
+
+        self.assertIn("sharpe", result.summary)
+        self.assertIn("beta", result.summary)
+        self.assertTrue(math.isfinite(float(result.summary["sharpe"])))
+        self.assertTrue(math.isfinite(float(result.summary["beta"])))
+        self.assertIn("- Sharpe:", markdown)
+        self.assertIn("- Beta:", markdown)
 
     def test_b1_market_filter_blocks_new_entries_below_bbi(self):
         from my_quant.strategy_research.experiment.b1_trend_pullback import market_allows_entry

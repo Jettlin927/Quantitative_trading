@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>仓库结构与策略评估前端收拢报告</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #050807;
+        --panel: #111916;
+        --ink: #eff7f2;
+        --muted: #9badA5;
+        --line: rgba(230, 241, 235, 0.14);
+        --green: #30dca0;
+        --amber: #f0bf55;
+        --red: #ff685f;
+        --cyan: #7bc7ff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Bahnschrift, "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+        background:
+          linear-gradient(90deg, rgba(230, 241, 235, 0.04) 1px, transparent 1px),
+          linear-gradient(180deg, rgba(230, 241, 235, 0.03) 1px, transparent 1px),
+          var(--bg);
+        background-size: 28px 28px;
+        color: var(--ink);
+      }
+      main {
+        width: min(1180px, calc(100vw - 28px));
+        margin: 0 auto;
+        padding: 28px 0 44px;
+      }
+      header, section {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(17, 25, 22, 0.92);
+        padding: 18px;
+        margin-top: 12px;
+      }
+      h1, h2, p { margin: 0; }
+      h1 { font-size: clamp(30px, 5vw, 56px); line-height: 1; }
+      h2 { margin-bottom: 10px; color: var(--green); }
+      p, li { color: var(--muted); line-height: 1.65; }
+      code, pre {
+        font-family: "SFMono-Regular", Consolas, monospace;
+        color: var(--ink);
+      }
+      pre {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #050807;
+        padding: 12px;
+      }
+      .tagline { margin-top: 12px; color: var(--muted); }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: rgba(5, 8, 7, 0.5);
+      }
+      .card strong { display: block; margin-bottom: 6px; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      th, td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px;
+        text-align: left;
+        color: var(--muted);
+      }
+      th { color: var(--ink); }
+      @media (max-width: 820px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>仓库结构与策略评估前端收拢报告</h1>
+        <p class="tagline">2026-06-27 · 前端已收敛为只读策略评估驾驶舱；后端迁移和美股 DB 进入下一阶段确认。</p>
+      </header>
+
+      <section>
+        <h2>本次已完成</h2>
+        <div class="grid">
+          <div class="card"><strong>前端职责</strong><p>移除同步和运行回测入口，改为读取后端策略证据、指标、阶段和文件路径。</p></div>
+          <div class="card"><strong>评估视图</strong><p>展示年化、回撤、盈亏比、净值/回撤、硬门槛、尾部样本和三段验证闸门。</p></div>
+          <div class="card"><strong>视觉方向</strong><p>工业化风控终端，高信息密度，第一屏直接呈现策略是否达标和为什么。</p></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>结构判断</h2>
+        <p><code>my_quant/strategy_research</code> 不应整包移动进 <code>backend/app</code>。它需要拆成后端引擎、证据产物、缓存和自动化四类，再逐步迁移。</p>
+        <pre>backend/app/research_engine/
+backend/app/research_evidence.py
+docs/research/backtest-reports/
+my_quant/strategy_research/  # 逐步缩成兼容 CLI 和历史产物壳</pre>
+        <p>2026-06-27 进展：已新增 <code>backend/app/research_engine/metrics.py</code>，并把 <code>my_quant/strategy_research/experiment/metrics.py</code> 改成兼容包装器；旧 import 路径保留，核心 NAV 指标计算已由后端边界提供。</p>
+      </section>
+
+      <section>
+        <h2>三段回测闸门</h2>
+        <table>
+          <thead><tr><th>阶段</th><th>窗口</th><th>作用</th><th>负责判定</th></tr></thead>
+          <tbody>
+            <tr><td>第一轮</td><td>2020-01-01 至 2024-12-31</td><td>策略定型与主评估</td><td>是</td></tr>
+            <tr><td>第二轮</td><td>2025-01-01 至当前日期</td><td>样本外复核</td><td>是</td></tr>
+            <tr><td>最终观察</td><td>标志性熊市压力段</td><td>只观察韧性和纪律</td><td>否</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>验证</h2>
+        <pre>docker compose run --rm frontend npm run build
+git diff --check -- frontend/index.html frontend/src/main.jsx frontend/src/styles.css
+curl -fsS http://localhost:15173/
+curl -fsS http://localhost:18000/api/health</pre>
+        <p>浏览器复查：标题、H1、年化收益、三段验证闸门、证据文件均已渲染；控制台错误为 0。</p>
+      </section>
+    </main>
+  </body>
+</html>

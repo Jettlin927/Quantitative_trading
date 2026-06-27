@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>策略生命周期索引接入报告</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #f4f6f8;
+        --paper: #ffffff;
+        --line: #dfe3e8;
+        --ink: #303840;
+        --muted: #65717e;
+        --blue: #5f8fff;
+        --green: #20a83a;
+        --amber: #b97912;
+      }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font-family: Aptos, "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+      }
+      main {
+        width: min(980px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 34px 0 56px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 32px;
+      }
+      h2 {
+        margin: 28px 0 10px;
+        font-size: 18px;
+      }
+      p,
+      li,
+      td {
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      section,
+      .hero {
+        border: 1px solid var(--line);
+        background: var(--paper);
+        padding: 18px 20px;
+      }
+      section {
+        margin-top: 12px;
+      }
+      .badge {
+        display: inline-flex;
+        margin-top: 14px;
+        border: 1px solid #cce7d1;
+        background: #f1faf3;
+        color: var(--green);
+        padding: 5px 9px;
+        font-weight: 900;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .metric {
+        border: 1px solid var(--line);
+        padding: 12px;
+      }
+      .metric strong {
+        display: block;
+        color: var(--blue);
+        font-size: 28px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 9px 8px;
+        text-align: left;
+      }
+      th {
+        color: #4d5864;
+      }
+      code,
+      pre {
+        background: #f0f3f6;
+        border: 1px solid var(--line);
+      }
+      code {
+        padding: 2px 5px;
+      }
+      pre {
+        padding: 12px;
+        overflow: auto;
+      }
+      @media (max-width: 760px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="hero">
+        <h1>策略生命周期索引接入报告</h1>
+        <span class="badge">结论标签：观察</span>
+        <p>“不要物理删除策略证据”已从文档规则推进为机器可读索引、后端 API 和前端可见状态。</p>
+      </div>
+
+      <section>
+        <h2>当前计数</h2>
+        <div class="grid">
+          <div class="metric"><strong>0</strong><span>active</span></div>
+          <div class="metric"><strong>0</strong><span>frozen</span></div>
+          <div class="metric"><strong>14</strong><span>legacy_reset</span></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>API</h2>
+        <pre><code>GET /api/strategy-lifecycle
+GET /api/strategy-evaluations</code></pre>
+        <table>
+          <tbody>
+            <tr><th>主策略</th><td>无</td></tr>
+            <tr><th>生命周期</th><td>legacy_reset</td></tr>
+            <tr><th>主视图展示</th><td>false</td></tr>
+            <tr><th>证据保留</th><td>keep_legacy_evidence</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>证据恢复</h2>
+        <p>旧策略全部退出当前主线，证据继续保留为历史材料和负证据。它们不会进入主策略评估，也不会作为新策略 baseline 展示。</p>
+      </section>
+
+      <section>
+        <h2>验证</h2>
+        <pre><code>.venv/bin/python -m unittest backend.tests.test_strategy_lifecycle backend.tests.test_us_research backend.tests.test_strategy_evaluation backend.tests.test_research_engine_metrics -v
+docker compose run --rm frontend npm run lint
+docker compose run --rm frontend npm run build
+git diff --check</code></pre>
+        <p>测试、前端构建和空白检查均通过；右栏出现策略档案面板，并显示 legacy_reset 计数。</p>
+      </section>
+    </main>
+  </body>
+</html>
