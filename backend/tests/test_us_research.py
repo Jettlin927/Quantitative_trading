@@ -15,7 +15,6 @@ class UsResearchBackendTest(unittest.TestCase):
             us_root = root / "my_quant" / "us_research"
             (us_root / "config").mkdir(parents=True)
             (us_root / "data" / "snapshots").mkdir(parents=True)
-            (us_root / "reports").mkdir(parents=True)
             (us_root / "data").mkdir(exist_ok=True)
 
             (us_root / "config" / "watchlist_symbols.csv").write_text(
@@ -55,24 +54,6 @@ class UsResearchBackendTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (us_root / "reports" / "latest_us_watchlist_backtest.json").write_text(
-                json.dumps(
-                    {
-                        "status": "ok",
-                        "rows": [
-                            {
-                                "ticker": "NVDA",
-                                "strategy": "trend_pullback_no_chase",
-                                "annual_return": 0.18,
-                                "max_drawdown": -0.12,
-                                "trade_count": 4,
-                            }
-                        ],
-                    }
-                ),
-                encoding="utf-8",
-            )
-
             overview = build_us_research_overview(root)
 
         self.assertTrue(overview["isSample"])
@@ -90,7 +71,6 @@ class UsResearchBackendTest(unittest.TestCase):
         self.assertEqual(nvda["latestClose"], 195.74)
         self.assertEqual(nvda["sampleQuantity"], 1.0)
         self.assertEqual(nvda["sampleCostBasis"], 1000.0)
-        self.assertEqual(nvda["backtest"]["strategy"], "trend_pullback_no_chase")
 
         soxl = next(asset for asset in overview["assets"] if asset["ticker"] == "SOXL")
         self.assertEqual(soxl["leverageFactor"], 3.0)
@@ -103,7 +83,6 @@ class UsResearchBackendTest(unittest.TestCase):
             us_root = root / "my_quant" / "us_research"
             (us_root / "config").mkdir(parents=True)
             (us_root / "data" / "snapshots").mkdir(parents=True)
-            (us_root / "reports").mkdir(parents=True)
             (us_root / "data").mkdir(exist_ok=True)
 
             (us_root / "config" / "watchlist_symbols.csv").write_text(
@@ -143,11 +122,6 @@ class UsResearchBackendTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (us_root / "reports" / "latest_us_watchlist_backtest.json").write_text(
-                json.dumps({"status": "ok", "rows": []}),
-                encoding="utf-8",
-            )
-
             preview = build_us_research_import_preview(root)
 
         self.assertEqual(preview["mode"], "preview")

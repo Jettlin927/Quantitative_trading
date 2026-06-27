@@ -1,7 +1,7 @@
 [project]
 name = "xquant-my-quant"
 version = "0.1.0"
-description = "Migrated XQuant strategy research scripts and artifacts."
+description = "Sample market-data helpers for the local quant data workspace."
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "akshare==1.18.64",
