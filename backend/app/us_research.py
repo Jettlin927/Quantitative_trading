@@ -11,17 +11,14 @@ def build_us_research_overview(repo_root: Path) -> dict[str, Any]:
     watchlist_path = us_root / "config" / "watchlist_symbols.csv"
     holdings_path = us_root / "data" / "holdings_sample.csv"
     snapshot_path = us_root / "data" / "snapshots" / "us_snapshot_latest.json"
-    backtest_path = us_root / "reports" / "latest_us_watchlist_backtest.json"
 
     watchlist = [normalize_watchlist_row(row, watchlist_path) for row in read_csv_rows(watchlist_path)]
     holdings = [normalize_holding_row(row, holdings_path) for row in read_csv_rows(holdings_path)]
     snapshot = read_json_dict(snapshot_path, default={"status": "missing", "source": None, "symbols": []})
-    backtest = read_json_dict(backtest_path, default={"status": "missing", "rows": []})
 
     snapshot_by_ticker = {str(row.get("ticker", "")).upper(): row for row in snapshot.get("symbols", []) if row.get("ticker")}
     holding_by_ticker = {row["ticker"]: row for row in holdings}
-    backtest_by_ticker = {str(row.get("ticker", "")).upper(): row for row in backtest.get("rows", []) if row.get("ticker")}
-    assets = [build_asset_contract(row, snapshot_by_ticker, holding_by_ticker, backtest_by_ticker) for row in watchlist]
+    assets = [build_asset_contract(row, snapshot_by_ticker, holding_by_ticker) for row in watchlist]
 
     portfolio_snapshots = [
         {
@@ -58,15 +55,10 @@ def build_us_research_overview(repo_root: Path) -> dict[str, Any]:
             "staleCount": snapshot.get("stale_count"),
             "symbols": snapshot.get("symbols", []),
         },
-        "watchlistBacktest": {
-            "status": backtest.get("status", "missing"),
-            "rows": backtest.get("rows", []),
-        },
         "evidenceFiles": {
             "watchlist": relative_display_path(watchlist_path, repo_root),
             "holdingsSample": relative_display_path(holdings_path, repo_root),
             "snapshot": relative_display_path(snapshot_path, repo_root),
-            "watchlistBacktest": relative_display_path(backtest_path, repo_root),
         },
     }
 
@@ -190,12 +182,10 @@ def build_asset_contract(
     watchlist_row: dict[str, Any],
     snapshot_by_ticker: dict[str, dict[str, Any]],
     holding_by_ticker: dict[str, dict[str, Any]],
-    backtest_by_ticker: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     ticker = watchlist_row["ticker"]
     snapshot = snapshot_by_ticker.get(ticker, {})
     holding = holding_by_ticker.get(ticker, {})
-    backtest = backtest_by_ticker.get(ticker, {})
     return {
         **watchlist_row,
         "latestDate": snapshot.get("latest_date"),
@@ -210,7 +200,6 @@ def build_asset_contract(
         "staleReason": snapshot.get("stale_reason") or "",
         "sampleQuantity": holding.get("sampleQuantity"),
         "sampleCostBasis": holding.get("sampleCostBasis"),
-        "backtest": backtest or None,
     }
 
 
