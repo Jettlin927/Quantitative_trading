@@ -20,7 +20,7 @@
 4. `docs/research/README.md`：策略研究协议和历史 run 结论。
 5. `docs/research/backtest-reports/README.md`：策略目录和回测证据索引。
 6. `my_quant/README.md`：独立研究工作区环境、Python 版本和常用命令。
-7. `my_quant/strategy_research/README.md`：A 股/B1/Kronos 研究脚本入口。
+7. `my_quant/strategy_research/README.md`：B1、小仓卫星、Risk8 和历史证据入口。
 
 ## 当前研究边界
 
@@ -35,7 +35,7 @@
 - `backend/`：FastAPI、SQLAlchemy、Tushare 同步、A 股回测语义和 API 契约。
 - `frontend/`：React + Vite 工作台，只负责参数提交和展示，不维护分叉策略逻辑。
 - `docs/research/`：长期目标、阶段推进、研究 run、策略思想库和回测报告证据。
-- `my_quant/strategy_research/`：独立 A 股/B1/Kronos 研究脚本、测试和报告生成。
+- `my_quant/strategy_research/`：独立 B1、小仓卫星、Risk8 证据、历史实验脚本、测试和报告生成。
 - `my_quant/us_research/`：美股 sample 观察池、yfinance 快照和研究辅助报告；只提交 sample/脱敏结构，不提交真实券商导出。
 
 ## 验证命令

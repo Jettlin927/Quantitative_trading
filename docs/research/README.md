@@ -47,10 +47,10 @@
 - `context.cross-section-strength-liquid-14pct-risk8-quality-plus-ms300.json`、`context.cross-section-strength-liquid-14pct-risk8-ultra-liquid-ms100.json`：更高流动性/市值/换手门槛的小池子实验上下文，市场宽度 `minSamples` 已同步降低。
 - `strategy-status-levels.md`：策略状态分级，从淘汰、观察、候选到纸面交易、实盘前验证、实盘。
 - `long-term-goal.md`：长期目标、阶段目标和每达成一阶段后新建下一阶段目录的规则。
-- `stages/`：长期目标的阶段推进目录；当前活跃阶段是 `stages/001-observation-diagnosis/`。
+- `stages/`：长期目标的阶段推进目录；当前活跃阶段是 `stages/001-research-reset/`。
 - `research-runs.json`：机器可读研究台账，记录当前主线运行、状态、失败原因和下一步动作。
 - `execution-readiness-plan.md`：纸面交易作业单、数据质量报告和运行时风控的落地入口。
-- `executable-strategy-cross-section-risk8.md`、`executable-strategy-cross-section-risk8.json`：当前观察级组合候选规格。文件名沿用历史 API 路径，但当前状态不是“可执行/合格”。
+- `executable-strategy-cross-section-risk8.md`、`executable-strategy-cross-section-risk8.json`：历史 Risk8 规格，仅作旧证据保留；当前主线已归零，不再把它作为观察候选或 baseline。
 - `086-portfolio-cross-section-risk8-pos135-independent-breadth-baseline-capital-audit`：复现 `072` 合格基线，不改变策略规则；新增全量成交标的资本收益、净盈亏、组合权益影响字段，供前端 Tab2 图像和全量表格展示。
 - `next-strategy-brief.md`：上一轮复盘给下一轮策略制定的输入。每轮研究结束后都要更新它。
 - `portfolio-strategy-gate.md`：候选策略推进为组合级共享资金策略前必须满足的硬门槛。
@@ -109,7 +109,7 @@ docker compose exec -T api python scripts/research/run_portfolio_backtest.py --r
 
 `054` 至 `060` 继续验证了三件事：第一，单独压缺口或上影线只会降低收益，不能修复尾部盈亏比样本；第二，进一步提高流动性和市值门槛可以保留部分组合核心指标，但仍不能让后 10 自然产生足够复用；第三，把 `risk8` 同步到逐标的全市场源审计后，单票最高收益只有约 `22.26%`，说明当前策略的收益来自横截面组合轮动，最终落地门槛应以共享资金组合和成交标的尾部审计为主。
 
-`061` 将目标硬门槛和诊断项拆开后，`cross-section-strength-risk8` 成为当前可执行组合策略基线：目标硬门槛全部通过，严格诊断项仍保留为后续优化方向。策略规格见 `executable-strategy-cross-section-risk8.md` 和 `executable-strategy-cross-section-risk8.json`。
+`061` 在历史口径中曾将目标硬门槛和诊断项拆开，并让 `cross-section-strength-risk8` 成为当时的组合策略基线。2026-06-27 用户决定旧策略全部退出当前主线后，这些规格只保留为历史证据，不再作为当前可执行、观察候选或 baseline。
 
 `062` 至 `066` 将风险调整指标和成本敏感性纳入基线。`062` 复跑原始 14% 建仓上限后，三年组合总收益约 `72.68%`，年化约 `19.99%`，年化波动约 `8.26%`，Sharpe 约 `2.42`，Sortino 约 `5.62`，Calmar 约 `5.18`。`063` 使用 2 倍佣金和 2 倍印花税，收益和回撤仍过线，但最大单票暴露漂到约 `15.10%`，集中度门槛失败。`064` 把单票建仓上限降到 `13.5%` 后，2 倍成本压力下目标硬门槛重新全部通过：总收益约 `65.63%`，最大回撤约 `-3.81%`，Sharpe 约 `2.32`。`065` 验证正常成本下 `13.5%` 建仓上限也通过：总收益约 `70.12%`，最大回撤约 `-3.75%`，Sharpe 约 `2.44`。`066` 进一步验证 3 倍成本压力仍通过：总收益约 `62.05%`，最大回撤约 `-3.86%`，Sharpe 约 `2.22`。因此当前可执行基线更新为 `13.5%` 建仓上限；后续默认以 `065` 为正常成本基线，以 `064/066` 为成本压力证据。
 

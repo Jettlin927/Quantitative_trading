@@ -174,6 +174,8 @@ def b1_result_to_response(
         "totalReturn": final_nav - 1.0,
         "annualReturn": float(result.summary["annual_return"]),
         "maxDrawdown": float(result.summary["max_drawdown"]),
+        "sharpe": float(result.summary["sharpe"]),
+        "beta": float(result.summary["beta"]),
         "calmar": float(result.summary["calmar"]),
         "tradeCount": int(float(result.summary["trade_count"])),
         "candidateCount": int(float(result.summary["candidate_count"])),

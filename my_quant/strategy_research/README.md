@@ -1,11 +1,13 @@
 # 策略研究档案
 
-这个目录把 `my_quant/TODO.md` 中的策略完善路线拆成可执行、可对比、可复查的研究档案。这里的目标不是把历史回测调到最高，而是回答一个更严格的问题：有没有策略能在统一口径下稳定超过“中国永久组合”。
+这个目录保留可复查的历史证据和旧实验工具。2026-06-27 之后，旧 Risk8、B1、RAM、Kronos、小仓卫星等策略全部退出当前主线，生命周期统一为 `legacy_reset`；当前主视图不再推进这里的任何旧策略。
+
+历史 ETF/RAM/Kronos/B1/小仓卫星等实验结果仍保留在 `strategies/`、`results/` 与 `docs/research/backtest-reports/` 中，作为负证据和对照证据；它们不再作为当前主策略清单的一部分。策略可见性和保留状态见 `docs/research/strategy-lifecycle.json`。
 
 ## 目录结构
 
 - `evaluation_framework.md`：统一数据、指标、基准和淘汰规则。
-- `final_candidate.md`：当前最优研究候选，以及为什么还不能直接称为最终生产策略。
+- `final_candidate.md`：历史 B1/RAM 候选说明，仅作旧证据保留，不能作为当前主线入口。
 - `goal_and_plan.md`：后续研究 goal 与实施计划。
 - `run_full_experiment.py`：完整实验入口，生成 `results/` 下的对比表、摘要和 manifest。
 - `run_candidate_backtest.py`：兼容旧入口，内部调用完整实验入口。
@@ -14,23 +16,15 @@
   - `data.py`：AkShare 数据拉取与本地缓存。
   - `strategies.py`：等权、风险平价、RAM TopN 权重函数。
   - `backtest.py`：再平衡、换手成本和净值回测。
-  - `metrics.py`：收益、波动、回撤、夏普、卡玛、索提诺。
+  - `metrics.py`：收益、波动、回撤、夏普、贝塔、卡玛、索提诺。
   - `reports.py`：摘要、JSON 和 manifest 生成。
   - `validation.py`：Rolling / Anchored Walk-Forward 验证。
   - `factor_diagnostics.py`：动量、RAM、低波动和趋势强度 IC 诊断。
   - `pipeline.py`：完整实验编排。
 - `tests/`：标准库 `unittest` 测试，不额外引入 pytest。
-- `strategies/00_baseline_china_permanent/`：中国永久组合基准。
-- `strategies/01_universe_diversification/`：资产池扩展与低相关筛选。
-- `strategies/02_risk_parity_permanent/`：风险平价版永久组合。
-- `strategies/03_ram_topn_switch/`：风险调整动量 TopN 进攻/防守切换。
-- `strategies/04_rebalance_cost_control/`：调仓频率与交易成本。
-- `strategies/05_stoploss_trend_filter/`：止损与趋势过滤。
-- `strategies/06_parameter_sensitivity/`：参数敏感性。
-- `strategies/07_oos_walk_forward/`：样本外与 Walk-Forward。
-- `strategies/08_factor_diagnostics/`：因子 IC 诊断。
-- `strategies/09_final_candidate_ram_top2/`：TODO 中优先级最高的候选路线。
-- `strategies/12_kronos_forecast_slope/`：Kronos 预测路径斜率信号，只输出研究用 `buy` / `sell` / `hold`。
+- `strategies/10_satellite_50pct_dd30/`：小仓卫星策略历史证据。
+- `strategies/11_a_share_b1_trend_pullback/`：A 股 B1 趋势回调复刻历史证据。
+- `docs/research/executable-strategy-cross-section-risk8.md`：横截面择强 Risk8 历史规格。
 
 ## 运行方式
 
@@ -86,14 +80,7 @@ Tushare 路径会使用：
 - `index_daily(000300.SH)` 作为大盘长均线过滤。
 - 本地 CSV 缓存，避免重复消耗接口频率。
 
-Kronos 港股预测包装脚本已收拢为可选实验入口。它依赖外部 Kronos checkout，不把第三方模型仓库纳入本仓默认依赖：
-
-```bash
-.venv/bin/python my_quant/strategy_research/run_kronos_hk_forecast.py \
-  --kronos-dir ~/Documents/kronos-预测/Kronos
-```
-
-该入口只生成研究报告和预测路径摘要，不自动下单。
+Kronos、RAM、风险平价和旧 ETF 组合实验脚本仅作为历史证据生成工具保留，不再列入当前策略清单。
 
 ## B1 现实约束复核与 backend 接入
 
@@ -170,7 +157,7 @@ POST /api/strategies/b1-trend-pullback/backtest
 - 全弱势时切到 `511880`。
 - RAM TopN 只选择正分数资产并归一化。
 - 初始换手成本和后续收益复利。
-- 指标中的累计收益和最大回撤。
+- 指标中的累计收益、最大回撤、夏普和贝塔。
 - manifest 记录候选策略和结果产物。
 - shortlist Walk-Forward 输出 rolling / anchored 两类窗口。
 - 因子 IC 输出 momentum / RAM / low volatility / trend strength。

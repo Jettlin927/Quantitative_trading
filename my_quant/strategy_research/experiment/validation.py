@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from backend.app.research_engine.validation import build_walk_forward_windows
+
 from .backtest import run_config
 from .config import StrategyConfig
 
@@ -26,23 +28,7 @@ def _walk_windows(
     step_size: int,
     anchored: bool,
 ) -> list[tuple[pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp]]:
-    windows = []
-    start_pos = 0
-    while start_pos + train_size + test_size <= len(index):
-        train_start_pos = 0 if anchored else start_pos
-        train_end_pos = start_pos + train_size - 1
-        test_start_pos = train_end_pos + 1
-        test_end_pos = test_start_pos + test_size - 1
-        windows.append(
-            (
-                index[train_start_pos],
-                index[train_end_pos],
-                index[test_start_pos],
-                index[test_end_pos],
-            )
-        )
-        start_pos += step_size
-    return windows
+    return build_walk_forward_windows(index, train_size, test_size, step_size, anchored)
 
 
 def walk_forward_analysis(

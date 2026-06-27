@@ -484,10 +484,13 @@ def run_b1_backtest(
     nav = pd.Series(nav_values, index=dates, name="nav")
     trades_df = pd.DataFrame(trades) if trades else _empty_trades()
     candidates_df = pd.DataFrame(candidate_rows)
-    metrics = calculate_metrics(nav)
+    benchmark_nav = market_frame["close"] if "close" in market_frame.columns else None
+    metrics = calculate_metrics(nav, benchmark_nav=benchmark_nav)
     summary: dict[str, float | bool | str] = {
         "annual_return": metrics["annual_return"],
         "max_drawdown": metrics["max_drawdown"],
+        "sharpe": metrics["sharpe"],
+        "beta": metrics["beta"],
         "calmar": metrics["calmar"],
         "passes_return_gate": metrics["annual_return"] >= SATELLITE_TARGET_ANNUAL_RETURN,
         "passes_drawdown_gate": metrics["max_drawdown"] >= SATELLITE_MAX_DRAWDOWN_FLOOR,
@@ -831,6 +834,8 @@ def build_b1_summary_markdown(result: B1BacktestResult, start: str, end: str, sy
         f"- Symbols loaded: `{symbol_count}`.",
         f"- Annual return: `{float(summary['annual_return']) * 100:.2f}%`.",
         f"- Max drawdown: `{float(summary['max_drawdown']) * 100:.2f}%`.",
+        f"- Sharpe: `{float(summary['sharpe']):.2f}`.",
+        f"- Beta: `{float(summary['beta']):.2f}`.",
         f"- Calmar: `{float(summary['calmar']):.2f}`.",
         f"- Trades: `{int(summary['trade_count'])}`.",
         f"- Candidates: `{int(summary['candidate_count'])}`.",
@@ -870,6 +875,8 @@ def write_b1_artifacts(
         "symbol_count": symbol_count,
         "annual_return": result.summary["annual_return"],
         "max_drawdown": result.summary["max_drawdown"],
+        "sharpe": result.summary["sharpe"],
+        "beta": result.summary["beta"],
         "passes_return_gate": result.summary["passes_return_gate"],
         "passes_drawdown_gate": result.summary["passes_drawdown_gate"],
         "artifacts": {

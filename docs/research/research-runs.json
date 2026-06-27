@@ -7,9 +7,9 @@
     "note": "长期北极星目标：年化 >= 100%，最大回撤 < 10%，盈亏比 >= 3:1。按 docs/research/long-term-goal.md 分阶段推进。"
   },
   "activeStage": {
-    "stageId": "001-observation-diagnosis",
-    "stageDir": "docs/research/stages/001-observation-diagnosis",
-    "objective": "解释 105/106/110 失败窗口为什么没有稳定正期望。"
+    "stageId": "001-research-reset",
+    "stageDir": "docs/research/stages/001-research-reset",
+    "objective": "旧策略全量退场，从零开始建立新策略假设、数据口径和评估标准。"
   },
   "target": {
     "annualizedReturn": 0.3,
@@ -18,7 +18,7 @@
     "maxAbsDrawdown": 0.1,
     "note": "2026-05-31 起合格目标改为年化 30%；旧三年总收益 30% 仅作为历史可比口径。"
   },
-  "currentMainline": "105-portfolio-cross-section-risk8-pos135-entry-gap6-netreturn-limitdelay-slip10bp-gap",
+  "currentMainline": null,
   "runs": [
     {
       "runId": "105-portfolio-cross-section-risk8-pos135-entry-gap6-netreturn-limitdelay-slip10bp-gap",

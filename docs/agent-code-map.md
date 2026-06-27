@@ -46,6 +46,10 @@
   - `StockDailyBasic`：Tushare `daily_basic`，估值、换手率、市值等。
   - `StockFinancialIndicator`：Tushare `fina_indicator`，ROE、毛利率、负债率、增长率等。
   - `StockPool` / `StockPoolMember`：自选标的池和成员。
+  - `Asset`：美股/ETF sample 资产主数据，`market + symbol` 与 `natural_key` 唯一。
+  - `AssetDailyPrice`：美股 sample 行情快照，`asset_natural_key + trade_date` 唯一。
+  - `WatchlistItem`：美股 sample 观察池，`watchlist_name + asset_natural_key` 唯一。
+  - `PortfolioSnapshot`：美股 sample 持仓快照，`snapshot_id` 唯一，`holdings` 为 JSON。
   - `DataSyncRun`：同步记录，用于进度与复盘。
 
 - `backend/app/schemas.py`
@@ -69,6 +73,25 @@
   - `analyze_stock_quality_with_deepseek()`：质量诊断总结。
   - 没有 token、调用失败或 JSON 不合格时，应保留本地规则兜底。
 
+- `backend/app/us_research.py`
+  - 美股 sample 数据的文件适配器，读取 `my_quant/us_research/` 下的 sample 观察池、sample 持仓、yfinance 快照和 sample 规则回测。
+  - 文件 preview 仍只返回研究展示合同：`isSample=true`、`brokerConnected=false`、`realHoldingsImported=false`。
+  - 持久化 schema 已确认后，sample 导入通过 `POST /api/us-research/import-sample` 写入 `assets`、`asset_daily_prices`、`watchlist_items`、`portfolio_snapshots`。
+  - 不连接券商、不导入真实持仓；真实持仓导入前必须再次确认。
+
+- `backend/app/strategy_lifecycle.py`
+  - 策略生命周期索引读取器，读取 `docs/research/strategy-lifecycle.json`。
+  - 用 `active`、`frozen`、`archived_negative_evidence` 控制主视图展示与证据保留。
+  - 旧策略可以隐藏出主视图，但不应物理删除证据；删除只能在用户明确确认后做。
+
+- `backend/app/research_engine/`
+  - 从 `my_quant/strategy_research/experiment/` 迁出的可复用研究逻辑。
+  - `metrics.py`：NAV 指标、最大回撤、Sharpe/Sortino/Calmar、beta 等纯计算函数。
+  - `portfolio.py`：权重归一化、等权、风险平价、RAM Top-N 组合权重函数。
+  - `reports.py`：Markdown 表格 fallback、候选选择、summary/manifest payload 纯构造函数；不负责写文件。
+  - `validation.py`：rolling/anchored walk-forward 窗口生成；不负责执行回测。
+  - `my_quant` 下的同名实验入口保留为兼容层，历史脚本和证据路径不应物理删除。
+
 - `backend/app/main.py`
   - FastAPI 应用入口、所有路由、同步流程、全市场后台任务、质量诊断本地 agent。
   - 文件较长，先用函数名定位，不要盲目大改。
@@ -89,6 +112,13 @@
 - `GET /api/stocks/{ts_code}/fundamentals`：读取单票基本面概览。
 - `GET /api/news/trends`：读取财经热点源。
 - `GET /api/stocks/{ts_code}/quality-analysis`：四类分析师质量诊断，可选 DeepSeek 汇总。
+- `GET /api/research/dashboard`：策略评估工作台聚合入口，统一返回健康状态、研究 overview、主策略证据、三段评估、生命周期、美股 sample 数据、入库 preview 和研究 run 列表；前端优先读取这个接口。
+- `GET /api/strategy-evaluations`：当前主策略的三段评估、指标和生命周期字段。
+- `GET /api/strategy-lifecycle`：策略生命周期索引，区分主视图 active、冻结和归档负证据。
+- `GET /api/us-research/overview`：读取美股 sample 观察池、sample 持仓、快照和规则回测，只读展示，不连接券商，不写 DB。
+- `GET /api/us-research/db-overview`：从 DB 读取已持久化的美股 sample 资产、行情、观察池和持仓快照。
+- `GET /api/us-research/import-preview`：把美股 sample 文件转换成 DB upsert 的目标表、行数和自然键；`writesEnabled=false`，只做预览。
+- `POST /api/us-research/import-sample`：将 `my_quant/us_research/` 下 sample 数据 upsert 到 DB；不导入真实持仓，不连接券商。
 - `POST /api/backtests/run`：单票数据库回测，默认可带 AI 复盘。
 - `POST /api/backtests/market`：同步执行全市场或池内回测。
 - `POST /api/backtests/market/jobs` 与 `GET /api/backtests/market/jobs/{job_id}`：后台回测任务和轮询进度。
@@ -96,10 +126,10 @@
 ## 前端地图
 
 - `frontend/src/main.jsx`
-  - 当前是主要应用文件，包含状态、API 调用、页面组件和图表组件。
-  - 顶部常量：`API_BASE`、表单默认值、页签、技术形态选项、策略预设。
-  - 关键状态：`form`、`screenResults`、`stockPools`、`result`、`marketResult`、`qualityAnalysis`、`bars`、`syncProgress`、`marketBacktestJob`。
-  - 关键动作：`syncStockBasic()`、`runScreener()`、`syncDaily()`、`syncMarketDaily()`、`syncFundamentals()`、`syncMarketDailyBasic()`、`runBacktest()`、`runMarketBacktest()`、`runQualityAnalysis()`。
+  - 当前是 QuantConnect 式策略数据呈现页，包含状态、API 调用、页面组件和图表组件。
+  - 顶部常量：`API_BASE`、`EXECUTABLE_STRATEGY_ID`、三段验证兜底窗口。
+  - 关键 API：优先读取 `/api/research/dashboard`；失败时回落到 `/api/health`、`/api/research/overview`、`/api/strategies/executable/{id}`、`/api/strategy-evaluations`、`/api/strategy-lifecycle`、`/api/us-research/overview`、`/api/us-research/import-preview`、`/api/research/runs`。
+  - 第一屏展示策略标题、指标横条、权益曲线、图表网格、概览指标表、滚动统计表和右侧证据栏；不提供回测执行入口。
 
 - `frontend/src/styles.css`
   - 工业化风控终端视觉，维护高信息密度和可扫描性。
@@ -124,13 +154,17 @@
   - B1 A 股趋势回调组合实验核心，包含 Tushare/AkShare 数据读取、候选排序、现实成交约束和组合回测。
   - `fetch_tushare_index_bars()` 会检查指数缓存最大日期，缓存不覆盖请求结束日时刷新，避免盘前预案读到半旧指数。
 
-- `my_quant/strategy_research/experiment/kronos_forecast_slope.py`
-  - 把 Kronos 预测统计路径转换成研究用 `buy` / `sell` / `hold` 信号。
-  - 只评估预测路径斜率、预测收益和下行分位过滤，不连接券商、不产生真实交易动作。
+- `my_quant/strategy_research/experiment/metrics.py` / `strategies.py` / `reports.py`
+  - 兼容入口，实际可复用指标、组合权重、报告 payload 逻辑已迁到 `backend/app/research_engine/`。
+  - 后续新后端 API 应优先 import `backend.app.research_engine`，旧实验脚本可继续使用 `my_quant` 路径。
 
-- `my_quant/strategy_research/run_kronos_hk_forecast.py`
-  - 从 `kronos-预测` 收拢来的港股 Kronos 预测包装入口。
-  - 需要通过 `--kronos-dir` 或 `KRONOS_DIR` 指向外部 Kronos checkout；本仓不内置第三方模型仓库和虚拟环境。
+- `my_quant/strategy_research/experiment/validation.py`
+  - `walk_forward_analysis` 仍留在旧实验区，因为它依赖 experiment-local `run_config` 和策略配置。
+  - 纯窗口生成逻辑已迁到 `backend/app/research_engine/validation.py`，旧路径通过兼容调用继续可用。
+
+- Kronos / RAM / 风险平价等历史实验脚本
+  - 这些脚本保留为负证据和历史报告生成工具，不再列入当前策略清单。
+  - Kronos 包装仍只评估预测路径斜率、预测收益和下行分位过滤，不连接券商、不产生真实交易动作。
 
 ## AI 科研闭环落点
 

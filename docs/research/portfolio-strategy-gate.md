@@ -169,4 +169,4 @@
 - `sourceSingleSymbolTailRiskMet=false`：逐标的源审计未通过，说明收益来自组合轮动，不是单票长期独立达标。
 - `portfolioSymbolTailRiskMet=false` 与 `portfolioSymbolTailRatioEvidenceMet=false`：成交标的后 10 单标的盈亏比样本不足，合格样本为 0/10。
 
-结论：`cross-section-strength-risk8` 可以作为当前可执行组合策略基线。策略规格已固化在 `docs/research/executable-strategy-cross-section-risk8.md` 和 `docs/research/executable-strategy-cross-section-risk8.json`。后续进化不应推翻该基线，而应围绕尾部样本充分性、受控复用、不同窗口滚动验证和交易成本敏感性继续增强。
+历史结论：`cross-section-strength-risk8` 曾在当时口径下作为组合策略基线，策略规格固化在 `docs/research/executable-strategy-cross-section-risk8.md` 和 `docs/research/executable-strategy-cross-section-risk8.json`。2026-06-27 用户决定旧策略全部退出当前主线后，本结论只作为历史证据保留，不再代表现行主线。

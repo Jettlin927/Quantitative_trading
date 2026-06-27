@@ -33,7 +33,19 @@ from .b1_strategy import (
 )
 from .backtest_engine import DEFAULT_CONFIG, enrich_rows, json_safe, run_backtest
 from .database import Base, SessionLocal, engine, get_db
-from .models import DataSyncRun, Stock, StockDailyBar, StockDailyBasic, StockFinancialIndicator, StockPool, StockPoolMember
+from .models import (
+    Asset,
+    AssetDailyPrice,
+    DataSyncRun,
+    PortfolioSnapshot,
+    Stock,
+    StockDailyBar,
+    StockDailyBasic,
+    StockFinancialIndicator,
+    StockPool,
+    StockPoolMember,
+    WatchlistItem,
+)
 from .schemas import (
     B1BacktestRequest,
     BacktestRequest,
@@ -54,7 +66,10 @@ from .schemas import (
     SyncMarketFundamentalsRequest,
     SyncStockBasicRequest,
 )
+from .strategy_evaluation import build_evaluation_windows
+from .strategy_lifecycle import load_strategy_lifecycle, lookup_strategy_lifecycle
 from .tushare_client import decimal_or_none, get_pro_api, parse_tushare_date, tushare_date
+from .us_research import build_us_research_import_preview, build_us_research_overview
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -180,6 +195,10 @@ def health() -> dict[str, str]:
 def get_executable_strategy(strategy_id: str, db: Session = Depends(get_db)) -> dict[str, Any]:
     if strategy_id != EXECUTABLE_STRATEGY_ID:
         raise HTTPException(status_code=404, detail="策略基线不存在")
+    lifecycle = load_strategy_lifecycle(REPO_ROOT)
+    lifecycle_item = lookup_strategy_lifecycle(lifecycle, strategy_id)
+    if not lifecycle_item["showInPrimaryDashboard"]:
+        raise HTTPException(status_code=410, detail="旧策略已从当前主线退场")
 
     spec = read_json_file(EXECUTABLE_STRATEGY_SPEC_PATH)
     run_id = str(spec.get("evidenceRun") or "")
@@ -242,6 +261,135 @@ def get_executable_strategy(strategy_id: str, db: Session = Depends(get_db)) -> 
         "aiAnalysis": build_executable_strategy_ai_analysis(spec, analysis, robustness),
     }
     return json_safe(response)
+
+
+def build_empty_strategy_evaluations_payload(overview: dict[str, Any], lifecycle: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "source": "backend",
+        "updatedAt": date.today().isoformat(),
+        "activeStage": overview.get("stage", {}),
+        "resetStatus": lifecycle.get("resetStatus") or "legacy_strategies_removed_from_primary",
+        "resetReason": "旧策略已全部从主线退场；等待从零开始的新假设和新证据。",
+        "evaluationWindows": build_evaluation_windows({}, {}),
+        "evaluations": [],
+    }
+
+
+def build_strategy_evaluations_payload(strategy: dict[str, Any], overview: dict[str, Any], lifecycle: dict[str, Any]) -> dict[str, Any]:
+    lifecycle_item = lookup_strategy_lifecycle(lifecycle, strategy["id"])
+    return {
+        "source": "backend",
+        "updatedAt": date.today().isoformat(),
+        "activeStage": overview.get("stage", {}),
+        "evaluations": [
+            {
+                "strategyId": strategy["id"],
+                "label": strategy["label"],
+                "runId": strategy.get("runId"),
+                "status": strategy.get("status"),
+                "statusTier": strategy.get("spec", {}).get("statusTier"),
+                "lifecycleStatus": lifecycle_item["lifecycleStatus"],
+                "showInPrimaryDashboard": lifecycle_item["showInPrimaryDashboard"],
+                "evidenceRetention": lifecycle_item["evidenceRetention"],
+                "metrics": strategy.get("metrics", {}),
+                "objectiveGates": strategy.get("objectiveGates", {}),
+                "diagnosticGates": strategy.get("diagnosticGates", {}),
+                "evaluationWindows": build_evaluation_windows(strategy.get("spec", {}), strategy.get("analysis", {})),
+                "resultFiles": strategy.get("resultFiles", {}),
+            }
+        ],
+    }
+
+
+@app.get("/api/strategy-evaluations")
+def list_strategy_evaluations(db: Session = Depends(get_db)) -> dict[str, Any]:
+    overview = build_research_overview()
+    lifecycle = load_strategy_lifecycle(REPO_ROOT)
+    if not lifecycle.get("primaryDashboardStrategies"):
+        return json_safe(build_empty_strategy_evaluations_payload(overview, lifecycle))
+    strategy = get_executable_strategy(EXECUTABLE_STRATEGY_ID, db)
+    return json_safe(build_strategy_evaluations_payload(strategy, overview, lifecycle))
+
+
+@app.get("/api/research/dashboard")
+def get_research_dashboard(run_limit: int = 160, db: Session = Depends(get_db)) -> dict[str, Any]:
+    overview = build_research_overview()
+    lifecycle = load_strategy_lifecycle(REPO_ROOT)
+    if lifecycle.get("primaryDashboardStrategies"):
+        strategy = get_executable_strategy(EXECUTABLE_STRATEGY_ID, db)
+        strategy_evaluation = build_strategy_evaluations_payload(strategy, overview, lifecycle)
+    else:
+        strategy = None
+        strategy_evaluation = build_empty_strategy_evaluations_payload(overview, lifecycle)
+    return json_safe(
+        {
+            "source": "backend",
+            "updatedAt": date.today().isoformat(),
+            "health": health(),
+            "overview": overview,
+            "baseline": strategy,
+            "strategyEvaluation": strategy_evaluation,
+            "strategyLifecycle": lifecycle,
+            "usOverview": build_preferred_us_research_overview(db),
+            "usImportPreview": build_us_research_import_preview(REPO_ROOT),
+            "researchRuns": list_research_runs(limit=run_limit),
+        }
+    )
+
+
+@app.get("/api/strategy-lifecycle")
+def get_strategy_lifecycle() -> dict[str, Any]:
+    return json_safe(load_strategy_lifecycle(REPO_ROOT))
+
+
+@app.get("/api/us-research/overview")
+def get_us_research_overview(db: Session = Depends(get_db)) -> dict[str, Any]:
+    return json_safe(build_preferred_us_research_overview(db))
+
+
+@app.get("/api/us-research/import-preview")
+def get_us_research_import_preview() -> dict[str, Any]:
+    return json_safe(build_us_research_import_preview(REPO_ROOT))
+
+
+@app.get("/api/us-research/db-overview")
+def get_us_research_db_overview(db: Session = Depends(get_db)) -> dict[str, Any]:
+    return json_safe(build_us_research_db_overview(db))
+
+
+@app.post("/api/us-research/import-sample")
+def import_us_research_sample_to_db(db: Session = Depends(get_db)) -> dict[str, Any]:
+    preview = build_us_research_import_preview(REPO_ROOT)
+    records = preview.get("records", {})
+    assets = [asset_import_record_to_db(row) for row in records.get("assets", [])]
+    prices = [price_import_record_to_db(row) for row in records.get("assetDailyPrices", [])]
+    watchlist_items = [watchlist_import_record_to_db(row) for row in records.get("watchlistItems", [])]
+    portfolio_snapshots = [portfolio_snapshot_import_record_to_db(row) for row in records.get("portfolioSnapshots", [])]
+
+    summary = {
+        "assets": upsert_by_key(db, Asset, assets, ["natural_key"]),
+        "assetDailyPrices": upsert_by_key(db, AssetDailyPrice, prices, ["natural_key"]),
+        "watchlistItems": upsert_by_key(db, WatchlistItem, watchlist_items, ["natural_key"]),
+        "portfolioSnapshots": upsert_by_key(db, PortfolioSnapshot, portfolio_snapshots, ["snapshot_id"]),
+    }
+    rows_upserted = sum(summary.values())
+    db.add(DataSyncRun(source="sample", target="us_research_sample", rows_upserted=rows_upserted, status="ok", message="Imported sample US research records."))
+    db.commit()
+    return json_safe(
+        {
+            "status": "ok",
+            "source": "file-sample",
+            "mode": "sample_import",
+            "isSample": True,
+            "brokerConnected": False,
+            "realHoldingsImported": False,
+            "executionEnabled": False,
+            "dbPersistence": "sample_persisted",
+            "rowsUpserted": rows_upserted,
+            "summary": summary,
+            "overview": build_us_research_db_overview(db),
+        }
+    )
 
 
 @app.post("/api/strategies/b1-trend-pullback/backtest")
@@ -1641,6 +1789,237 @@ def upsert_financial_indicator_rows(db: Session, rows: list[dict]) -> int:
 
 def chunk_rows(rows: list[dict]) -> list[list[dict]]:
     return [rows[index : index + UPSERT_CHUNK_SIZE] for index in range(0, len(rows), UPSERT_CHUNK_SIZE)]
+
+
+def build_preferred_us_research_overview(db: Session | None) -> dict[str, Any]:
+    if db is None:
+        return build_us_research_overview(REPO_ROOT)
+    db_overview = build_us_research_db_overview(db)
+    if db_overview["counts"]["assets"]:
+        return db_overview
+    file_overview = build_us_research_overview(REPO_ROOT)
+    file_overview["dataBoundary"]["dbPersistence"] = "schema_ready_no_rows"
+    return file_overview
+
+
+def build_us_research_db_overview(db: Session) -> dict[str, Any]:
+    assets = list(db.scalars(select(Asset).order_by(Asset.symbol)).all())
+    prices = list(db.scalars(select(AssetDailyPrice).order_by(AssetDailyPrice.asset_natural_key, AssetDailyPrice.trade_date)).all())
+    watchlist_items = list(db.scalars(select(WatchlistItem).order_by(WatchlistItem.watchlist_name, WatchlistItem.asset_natural_key)).all())
+    snapshots = list(db.scalars(select(PortfolioSnapshot).order_by(PortfolioSnapshot.created_at.desc(), PortfolioSnapshot.id.desc())).all())
+
+    latest_price_by_asset: dict[str, AssetDailyPrice] = {}
+    for price in prices:
+        current = latest_price_by_asset.get(price.asset_natural_key)
+        if current is None or price.trade_date > current.trade_date:
+            latest_price_by_asset[price.asset_natural_key] = price
+
+    watchlist_by_asset = {item.asset_natural_key: item for item in watchlist_items}
+    latest_snapshot = snapshots[0] if snapshots else None
+    holdings = latest_snapshot.holdings if latest_snapshot and isinstance(latest_snapshot.holdings, list) else []
+    holding_by_asset = {str(item.get("assetNaturalKey")): item for item in holdings if isinstance(item, dict)}
+
+    asset_rows = [
+        asset_to_us_contract(
+            asset,
+            latest_price_by_asset.get(asset.natural_key),
+            watchlist_by_asset.get(asset.natural_key),
+            holding_by_asset.get(asset.natural_key, {}),
+        )
+        for asset in assets
+    ]
+    market_symbols = [price_to_market_symbol(asset, latest_price_by_asset.get(asset.natural_key)) for asset in assets if latest_price_by_asset.get(asset.natural_key)]
+    portfolio_snapshots = [portfolio_snapshot_to_contract(snapshot) for snapshot in snapshots]
+    source = "db-sample" if assets else "db-empty"
+    return {
+        "source": source,
+        "isSample": True,
+        "updatedAt": max((price.updated_at.isoformat() for price in latest_price_by_asset.values() if price.updated_at), default=None),
+        "dataBoundary": {
+            "brokerConnected": False,
+            "realHoldingsImported": False,
+            "dbPersistence": "sample_persisted" if assets else "empty",
+            "executionEnabled": False,
+            "notes": "Only sample US research records are persisted. No broker export or real account data is imported.",
+        },
+        "counts": {
+            "assets": len(assets),
+            "assetDailyPrices": len(prices),
+            "watchlistItems": len(watchlist_items),
+            "portfolioSnapshots": len(snapshots),
+        },
+        "assets": asset_rows,
+        "watchlist": [watchlist_item_to_contract(item) for item in watchlist_items],
+        "portfolioSnapshots": portfolio_snapshots,
+        "marketSnapshot": {
+            "status": "ok" if market_symbols else "empty",
+            "source": "db",
+            "fetchedAt": None,
+            "symbolCount": len(market_symbols),
+            "okCount": len(market_symbols),
+            "staleCount": sum(1 for item in market_symbols if item.get("is_stale")),
+            "symbols": market_symbols,
+        },
+        "watchlistBacktest": {
+            "status": "not_persisted",
+            "rows": [],
+        },
+        "evidenceFiles": {
+            "watchlist": "db:watchlist_items",
+            "holdingsSample": "db:portfolio_snapshots",
+            "snapshot": "db:asset_daily_prices",
+            "watchlistBacktest": "my_quant/us_research/reports/latest_us_watchlist_backtest.json",
+        },
+    }
+
+
+def asset_to_us_contract(asset: Asset, latest_price: AssetDailyPrice | None, watchlist_item: WatchlistItem | None, holding: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "ticker": asset.symbol,
+        "name": asset.name,
+        "role": watchlist_item.role if watchlist_item else None,
+        "theme": watchlist_item.theme if watchlist_item else asset.theme,
+        "subtheme": watchlist_item.subtheme if watchlist_item else None,
+        "instrumentType": asset.instrument_type,
+        "leverageFactor": decimal_to_float(asset.leverage_factor),
+        "riskTag": watchlist_item.risk_tag if watchlist_item else asset.risk_tag,
+        "notes": watchlist_item.notes if watchlist_item else "",
+        "source": asset.source,
+        "sourcePath": "db:assets",
+        "isSample": asset.is_sample,
+        "latestDate": latest_price.trade_date.isoformat() if latest_price else None,
+        "latestClose": decimal_to_float(latest_price.close) if latest_price else None,
+        "ma20": decimal_to_float(latest_price.ma20) if latest_price else None,
+        "ma50": decimal_to_float(latest_price.ma50) if latest_price else None,
+        "ma200": decimal_to_float(latest_price.ma200) if latest_price else None,
+        "return20dPct": decimal_to_float(latest_price.return20d_pct) if latest_price else None,
+        "return60dPct": decimal_to_float(latest_price.return60d_pct) if latest_price else None,
+        "volatility20dPct": decimal_to_float(latest_price.volatility20d_pct) if latest_price else None,
+        "isStale": bool(latest_price.is_stale) if latest_price else False,
+        "staleReason": "",
+        "sampleQuantity": holding.get("sampleQuantity"),
+        "sampleCostBasis": holding.get("sampleCostBasis"),
+        "backtest": None,
+    }
+
+
+def price_to_market_symbol(asset: Asset, price: AssetDailyPrice | None) -> dict[str, Any]:
+    return {
+        "ticker": asset.symbol,
+        "latest_date": price.trade_date.isoformat() if price else None,
+        "close": decimal_to_float(price.close) if price else None,
+        "ma20": decimal_to_float(price.ma20) if price else None,
+        "ma50": decimal_to_float(price.ma50) if price else None,
+        "ma200": decimal_to_float(price.ma200) if price else None,
+        "return_20d_pct": decimal_to_float(price.return20d_pct) if price else None,
+        "return_60d_pct": decimal_to_float(price.return60d_pct) if price else None,
+        "volatility_20d_pct": decimal_to_float(price.volatility20d_pct) if price else None,
+        "is_stale": bool(price.is_stale) if price else False,
+        "source": price.source if price else None,
+    }
+
+
+def watchlist_item_to_contract(item: WatchlistItem) -> dict[str, Any]:
+    ticker = item.asset_natural_key.split(":", 1)[-1]
+    return {
+        "ticker": ticker,
+        "role": item.role,
+        "theme": item.theme,
+        "subtheme": item.subtheme,
+        "riskTag": item.risk_tag,
+        "notes": item.notes,
+        "source": item.source,
+        "sourcePath": "db:watchlist_items",
+        "isSample": item.is_sample,
+    }
+
+
+def portfolio_snapshot_to_contract(snapshot: PortfolioSnapshot) -> dict[str, Any]:
+    holdings = snapshot.holdings if isinstance(snapshot.holdings, list) else []
+    return {
+        "snapshotId": snapshot.snapshot_id,
+        "source": snapshot.source,
+        "sourcePath": "db:portfolio_snapshots",
+        "isSample": snapshot.is_sample,
+        "holdingCount": snapshot.holding_count,
+        "totalSampleCostBasis": decimal_to_float(snapshot.total_sample_cost_basis) or 0.0,
+        "holdings": holdings,
+    }
+
+
+def asset_import_record_to_db(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "natural_key": row["naturalKey"],
+        "market": row["market"],
+        "symbol": row["symbol"],
+        "name": row.get("name"),
+        "instrument_type": row.get("instrumentType"),
+        "leverage_factor": decimal_or_none(row.get("leverageFactor")),
+        "risk_tag": row.get("riskTag"),
+        "theme": row.get("theme"),
+        "is_sample": bool(row.get("isSample", True)),
+        "source": row.get("source"),
+    }
+
+
+def price_import_record_to_db(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "natural_key": row["naturalKey"],
+        "asset_natural_key": row["assetNaturalKey"],
+        "trade_date": date.fromisoformat(row["tradeDate"]),
+        "close": decimal_or_none(row.get("close")),
+        "ma20": decimal_or_none(row.get("ma20")),
+        "ma50": decimal_or_none(row.get("ma50")),
+        "ma200": decimal_or_none(row.get("ma200")),
+        "return20d_pct": decimal_or_none(row.get("return20dPct")),
+        "return60d_pct": decimal_or_none(row.get("return60dPct")),
+        "volatility20d_pct": decimal_or_none(row.get("volatility20dPct")),
+        "is_sample": bool(row.get("isSample", True)),
+        "source": row.get("source"),
+        "is_stale": bool(row.get("isStale", False)),
+    }
+
+
+def watchlist_import_record_to_db(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "natural_key": row["naturalKey"],
+        "watchlist_name": row["watchlistName"],
+        "asset_natural_key": row["assetNaturalKey"],
+        "role": row.get("role"),
+        "theme": row.get("theme"),
+        "subtheme": row.get("subtheme"),
+        "risk_tag": row.get("riskTag"),
+        "notes": row.get("notes"),
+        "is_sample": bool(row.get("isSample", True)),
+        "source": row.get("source"),
+    }
+
+
+def portfolio_snapshot_import_record_to_db(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "snapshot_id": row["snapshotId"],
+        "source": row.get("source"),
+        "is_sample": bool(row.get("isSample", True)),
+        "holding_count": int(row.get("holdingCount") or 0),
+        "total_sample_cost_basis": decimal_or_none(row.get("totalSampleCostBasis")),
+        "holdings": row.get("holdings", []),
+    }
+
+
+def upsert_by_key(db: Session, model: Any, rows: list[dict[str, Any]], key_columns: list[str]) -> int:
+    for row in rows:
+        filters = [getattr(model, column) == row[column] for column in key_columns]
+        existing = db.scalars(select(model).where(*filters).limit(1)).first()
+        if existing:
+            for key, value in row.items():
+                setattr(existing, key, value)
+        else:
+            db.add(model(**row))
+    return len(rows)
+
+
+def decimal_to_float(value: Any) -> float | None:
+    return float(value) if value is not None else None
 
 
 def finish_market_sync_run(

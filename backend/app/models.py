@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -128,6 +128,89 @@ class StockPoolMember(Base):
     pool_id: Mapped[int] = mapped_column(ForeignKey("stock_pools.id", ondelete="CASCADE"), index=True)
     ts_code: Mapped[str] = mapped_column(ForeignKey("stocks.ts_code", ondelete="CASCADE"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Asset(Base):
+    __tablename__ = "assets"
+    __table_args__ = (
+        UniqueConstraint("market", "symbol", name="uq_asset_market_symbol"),
+        Index("ix_assets_market_symbol", "market", "symbol"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    natural_key: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    market: Mapped[str] = mapped_column(String(16), index=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    name: Mapped[str | None] = mapped_column(String(120))
+    instrument_type: Mapped[str | None] = mapped_column(String(40))
+    leverage_factor: Mapped[Decimal | None] = mapped_column(Numeric(10, 4))
+    risk_tag: Mapped[str | None] = mapped_column(String(80))
+    theme: Mapped[str | None] = mapped_column(String(120))
+    is_sample: Mapped[bool] = mapped_column(Boolean, default=True)
+    source: Mapped[str | None] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class AssetDailyPrice(Base):
+    __tablename__ = "asset_daily_prices"
+    __table_args__ = (
+        UniqueConstraint("asset_natural_key", "trade_date", name="uq_asset_daily_price_key_date"),
+        Index("ix_asset_daily_prices_key_date", "asset_natural_key", "trade_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    natural_key: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    asset_natural_key: Mapped[str] = mapped_column(ForeignKey("assets.natural_key", ondelete="CASCADE"), index=True)
+    trade_date: Mapped[date] = mapped_column(Date, index=True)
+    close: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    ma20: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    ma50: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    ma200: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    return20d_pct: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    return60d_pct: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    volatility20d_pct: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    is_sample: Mapped[bool] = mapped_column(Boolean, default=True)
+    source: Mapped[str | None] = mapped_column(String(120))
+    is_stale: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class WatchlistItem(Base):
+    __tablename__ = "watchlist_items"
+    __table_args__ = (
+        UniqueConstraint("watchlist_name", "asset_natural_key", name="uq_watchlist_item_name_asset"),
+        Index("ix_watchlist_items_name_asset", "watchlist_name", "asset_natural_key"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    natural_key: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    watchlist_name: Mapped[str] = mapped_column(String(80), index=True)
+    asset_natural_key: Mapped[str] = mapped_column(ForeignKey("assets.natural_key", ondelete="CASCADE"), index=True)
+    role: Mapped[str | None] = mapped_column(String(40))
+    theme: Mapped[str | None] = mapped_column(String(120))
+    subtheme: Mapped[str | None] = mapped_column(String(160))
+    risk_tag: Mapped[str | None] = mapped_column(String(80))
+    notes: Mapped[str | None] = mapped_column(String(1000))
+    is_sample: Mapped[bool] = mapped_column(Boolean, default=True)
+    source: Mapped[str | None] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class PortfolioSnapshot(Base):
+    __tablename__ = "portfolio_snapshots"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    snapshot_id: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    source: Mapped[str | None] = mapped_column(String(120))
+    is_sample: Mapped[bool] = mapped_column(Boolean, default=True)
+    holding_count: Mapped[int] = mapped_column(default=0)
+    total_sample_cost_basis: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    holdings: Mapped[list[dict] | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class DataSyncRun(Base):

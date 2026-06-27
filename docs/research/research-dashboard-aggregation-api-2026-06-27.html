@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Research Dashboard Aggregation API - 2026-06-27</title>
+  <style>
+    :root {
+      --ink: #1f252b;
+      --muted: #69737f;
+      --line: #d9dee5;
+      --panel: #fff;
+      --soft: #f5f7fa;
+      --black: #15181d;
+      --ok: #1f9d55;
+      --warn: #ad6b00;
+    }
+    body {
+      margin: 0;
+      background: #eef1f5;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+    }
+    header, section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 22px 26px;
+      margin-bottom: 14px;
+    }
+    header {
+      border-top: 5px solid var(--black);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    pre {
+      overflow: auto;
+      background: var(--black);
+      color: #f6f8fb;
+      padding: 16px;
+    }
+    ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+    .status {
+      color: var(--ok);
+      font-weight: 700;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .cell {
+      background: var(--soft);
+      border: 1px solid var(--line);
+      padding: 14px 16px;
+    }
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .warn {
+      color: var(--warn);
+      font-weight: 700;
+    }
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Research Dashboard Aggregation API</h1>
+      <div class="status">阶段通过 · 2026-06-27</div>
+      <p>前端策略评估页已优先读取后端统一聚合 API，旧的多接口读取路径保留为降级兜底。</p>
+    </header>
+
+    <section>
+      <h2>新增接口</h2>
+      <p><code>GET /api/research/dashboard?run_limit=160</code></p>
+      <div class="grid">
+        <div class="cell"><div class="label">策略证据</div><code>baseline</code> + <code>strategyEvaluation</code></div>
+        <div class="cell"><div class="label">生命周期</div><code>strategyLifecycle</code></div>
+        <div class="cell"><div class="label">美股 sample</div><code>usOverview</code> + <code>usImportPreview</code></div>
+        <div class="cell"><div class="label">研究索引</div><code>overview</code> + <code>researchRuns</code></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>边界</h2>
+      <ul>
+        <li>三段评估仍由后端生成。</li>
+        <li><code>train-2020-2024</code> 和 <code>oos-2025-now</code> 当前仍为 <code>missing</code>。</li>
+        <li>美股入库仍是 preview，<code>writesEnabled=false</code>。</li>
+        <li class="warn">不创建 PostgreSQL 新表，不导入真实持仓，不连接券商。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>前端使用</h2>
+      <p><code>frontend/src/main.jsx</code> 的 <code>refreshAll()</code> 现在优先读取 dashboard 聚合 payload；若失败，再回落到旧的多接口读取路径。</p>
+    </section>
+
+    <section>
+      <h2>验证命令</h2>
+      <pre><code>.venv/bin/python -m unittest backend.tests.test_api_contracts backend.tests.test_strategy_evaluation backend.tests.test_strategy_lifecycle backend.tests.test_us_research backend.tests.test_research_engine_metrics backend.tests.test_research_engine_portfolio -v
+.venv/bin/python -m py_compile backend/app/main.py backend/app/strategy_evaluation.py backend/app/strategy_lifecycle.py backend/app/us_research.py backend/app/research_engine/metrics.py backend/app/research_engine/portfolio.py
+docker compose run --rm frontend npm run lint
+docker compose run --rm frontend npm run build
+curl -fsS 'http://localhost:18000/api/research/dashboard?run_limit=5'</code></pre>
+    </section>
+
+    <section>
+      <h2>验证结果</h2>
+      <ul>
+        <li>后端合同/研究相关测试：23 个测试通过。</li>
+        <li>Python 编译检查通过。</li>
+        <li>前端 lint/build 通过。</li>
+        <li>运行中 API 返回 <code>200</code>：<code>source=backend</code>、<code>baseline=null</code>、<code>resetStatus=legacy_strategies_removed_from_primary</code>、<code>window0=missing</code>、<code>writes=false</code>、<code>runs=5</code>。</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

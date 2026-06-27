@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>前端 QuantConnect 式数据呈现重构报告</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #303840;
+        --muted: #65717e;
+        --line: #dfe3e8;
+        --paper: #ffffff;
+        --page: #f4f6f8;
+        --green: #20a83a;
+        --blue: #5f8fff;
+        --amber: #b97912;
+      }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font-family: Aptos, "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+      }
+      main {
+        width: min(980px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 34px 0 56px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 32px;
+        letter-spacing: 0;
+      }
+      h2 {
+        margin: 28px 0 10px;
+        font-size: 18px;
+      }
+      p,
+      li {
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      .hero,
+      section {
+        border: 1px solid var(--line);
+        background: var(--paper);
+        padding: 18px 20px;
+      }
+      section {
+        margin-top: 12px;
+      }
+      .badge {
+        display: inline-flex;
+        margin-top: 14px;
+        border: 1px solid #cce7d1;
+        background: #f1faf3;
+        color: var(--green);
+        padding: 5px 9px;
+        font-weight: 900;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 9px 8px;
+        text-align: left;
+      }
+      th {
+        color: #4d5864;
+      }
+      code,
+      pre {
+        background: #f0f3f6;
+        border: 1px solid var(--line);
+      }
+      code {
+        padding: 2px 5px;
+      }
+      pre {
+        padding: 12px;
+        overflow: auto;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .metric {
+        border: 1px solid var(--line);
+        padding: 12px;
+      }
+      .metric strong {
+        display: block;
+        color: var(--blue);
+        font-size: 24px;
+      }
+      @media (max-width: 760px) {
+        .grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="hero">
+        <h1>前端 QuantConnect 式数据呈现重构报告</h1>
+        <span class="badge">结论标签：观察</span>
+        <p>本次前端已从深色卡片式驾驶舱改为更接近 QuantConnect 策略页的信息结构；只调整展示，不改变后端策略评估语义。</p>
+      </div>
+
+      <section>
+        <h2>参考方向</h2>
+        <p>参考页的核心是研究终端式的数据密度：标题、作者、版本、关键指标、权益/回撤/基准/容量图表、概览表和滚动统计表。</p>
+      </section>
+
+      <section>
+        <h2>当前实现</h2>
+        <div class="grid">
+          <div class="metric"><strong>6</strong><span>首屏指标</span></div>
+          <div class="metric"><strong>5</strong><span>图表面板</span></div>
+          <div class="metric"><strong>14</strong><span>概览表行</span></div>
+          <div class="metric"><strong>12</strong><span>滚动统计行</span></div>
+        </div>
+        <ul>
+          <li>左侧导航和顶部黑色工具栏模拟研究平台信息架构。</li>
+          <li>指标横条展示累计收益、Sharpe、盈亏比、最大回撤、年化收益和闭环交易。</li>
+          <li>图表网格展示策略权益、资产销售量、回撤、基准和容量。</li>
+          <li>右栏展示作者、三段验证闸门、硬门槛、研究 run 和证据文件。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>语义边界</h2>
+        <ul>
+          <li>仍读取后端统一评估接口，不在前端手填策略结论。</li>
+          <li>不新增回测按钮，不提交回测参数。</li>
+          <li>三段窗口仍由后端判定；旧策略全部 <code>legacy_reset</code> 后，页面展示 <code>新策略研究台</code>，正式两段等待新策略证据。</li>
+          <li>Sharpe、Sortino、盈亏比按普通数值展示，不格式化成百分比。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>验证</h2>
+        <pre><code>docker compose run --rm frontend npm run lint
+docker compose run --rm frontend npm run build
+git diff --check -- frontend/src/main.jsx frontend/src/styles.css</code></pre>
+        <table>
+          <tbody>
+            <tr><th>页面标题</th><td>策略评估驾驶舱</td></tr>
+            <tr><th>H1</th><td>新策略研究台</td></tr>
+            <tr><th>控制台错误</th><td>0</td></tr>
+            <tr><th>Sharpe 百分比误格式化</th><td>false</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>
