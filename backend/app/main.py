@@ -20,10 +20,22 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from .ai_client import analyze_stock_quality_with_deepseek
+from .b1_strategy import (
+    B1_STRATEGY_ID,
+    B1_STRATEGY_LABEL,
+    apply_mainboard_style_gate,
+    build_b1_config,
+    build_b1_market_frame_from_rows,
+    build_b1_panels_from_rows,
+    build_permissive_market_frame,
+    filter_mainboard_stock_codes,
+    run_backend_b1_backtest,
+)
 from .backtest_engine import DEFAULT_CONFIG, enrich_rows, json_safe, run_backtest
 from .database import Base, SessionLocal, engine, get_db
 from .models import DataSyncRun, Stock, StockDailyBar, StockDailyBasic, StockFinancialIndicator, StockPool, StockPoolMember
 from .schemas import (
+    B1BacktestRequest,
     BacktestRequest,
     DailyBarOut,
     MarketBacktestRequest,
@@ -39,6 +51,7 @@ from .schemas import (
     SyncDailyRequest,
     SyncFundamentalsRequest,
     SyncMarketDataRequest,
+    SyncMarketFundamentalsRequest,
     SyncStockBasicRequest,
 )
 from .tushare_client import decimal_or_none, get_pro_api, parse_tushare_date, tushare_date
@@ -146,7 +159,12 @@ MARKET_BACKTEST_JOBS: dict[str, dict[str, Any]] = {}
 MARKET_BACKTEST_LOCK = Lock()
 TRADE_CALENDAR_CACHE_TTL_SECONDS = 3600
 TRADE_CALENDAR_CACHE: dict[tuple[date, date], tuple[float, list[date]]] = {}
+RESEARCH_RUN_SUMMARY_READ_CHARS = int(os.getenv("RESEARCH_RUN_SUMMARY_READ_CHARS", "300000"))
+RESEARCH_RUN_SUMMARY_CACHE: dict[str, tuple[int, int, dict[str, Any]]] = {}
 REPO_ROOT = Path(__file__).resolve().parents[2]
+RESEARCH_ROOT = REPO_ROOT / "docs" / "research"
+RESEARCH_INDEX_PATH = RESEARCH_ROOT / "research-runs.json"
+RESEARCH_STAGES_DIR = RESEARCH_ROOT / "stages"
 RESEARCH_RUNS_DIR = REPO_ROOT / "docs" / "research" / "runs"
 RESEARCH_RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+$")
 EXECUTABLE_STRATEGY_ID = "cross-section-strength-risk8"
@@ -226,28 +244,188 @@ def get_executable_strategy(strategy_id: str, db: Session = Depends(get_db)) -> 
     return json_safe(response)
 
 
+@app.post("/api/strategies/b1-trend-pullback/backtest")
+def run_b1_research_backtest(payload: B1BacktestRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    if payload.end_date < payload.start_date:
+        raise HTTPException(status_code=400, detail="end_date 不能早于 start_date。")
+
+    history_start = payload.history_start_date or (payload.start_date - timedelta(days=260))
+    if history_start > payload.start_date:
+        raise HTTPException(status_code=400, detail="history_start_date 不能晚于 start_date。")
+
+    try:
+        config = build_b1_config(payload.config)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=compact_error(exc)) from exc
+
+    stock_payload = MarketBacktestRequest(
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        config={},
+        pool_id=payload.pool_id,
+        q=payload.q,
+        industry=payload.industry,
+        market=payload.market,
+        min_bars=payload.min_bars,
+        max_stocks=payload.max_stocks,
+        exclude_st=payload.exclude_st,
+        exclude_bj=payload.exclude_bj,
+        min_list_days=payload.min_list_days,
+        min_avg_amount=payload.min_avg_amount,
+        min_avg_circ_mv=payload.min_avg_circ_mv,
+        min_avg_turnover_rate_f=payload.min_avg_turnover_rate_f,
+    )
+    pool = get_stock_pool_or_404(db, payload.pool_id) if payload.pool_id else None
+    stocks = query_backtest_stocks(db, stock_payload)
+    if payload.exclude_permission_boards:
+        mainboard_codes = set(filter_mainboard_stock_codes(stock.ts_code for stock in stocks))
+        stocks = [stock for stock in stocks if stock.ts_code in mainboard_codes]
+    if not stocks:
+        raise HTTPException(status_code=404, detail="没有符合 B1 回测条件的候选标的。")
+
+    stock_codes = [stock.ts_code for stock in stocks]
+    rows_by_code = query_backtest_rows_by_code(db, stock_codes, history_start, payload.end_date)
+    panels, skipped_by_bars = build_b1_panels_from_rows(rows_by_code, config, payload.min_bars, volume_unit=payload.volume_unit)
+    skipped_by_bars = {**{code: 0 for code in stock_codes if code not in rows_by_code}, **skipped_by_bars}
+    if not panels:
+        raise HTTPException(status_code=404, detail="候选标的日线不足，无法构建 B1 指标。")
+
+    if payload.require_market_gate:
+        market_code = resolve_ts_code(db, payload.market_ts_code or "")
+        market_rows = query_backtest_rows_by_code(db, [market_code], history_start, payload.end_date).get(market_code, [])
+        if not market_rows:
+            raise HTTPException(
+                status_code=404,
+                detail=f"没有找到市场门控标的 {market_code} 的日线；可同步指数/ETF数据，或设置 require_market_gate=false 做无门控研究。",
+            )
+        market_frame = build_b1_market_frame_from_rows(
+            market_rows,
+            config,
+            payload.start_date,
+            payload.end_date,
+            require_ma20_gt_ma60=payload.market_ma20_gt_ma60,
+            volume_unit=payload.volume_unit,
+        )
+        market_gate = {
+            "enabled": True,
+            "marketTsCode": market_code,
+            "requireMa20GtMa60": payload.market_ma20_gt_ma60,
+        }
+    else:
+        market_frame = build_permissive_market_frame(panels, payload.start_date, payload.end_date)
+        market_gate = {
+            "enabled": False,
+            "marketTsCode": None,
+            "requireMa20GtMa60": False,
+        }
+    if market_frame.empty:
+        raise HTTPException(status_code=404, detail="市场门控日期为空，无法运行 B1 回测。")
+    if payload.use_mainboard_style_gate:
+        market_frame = apply_mainboard_style_gate(
+            market_frame,
+            panels,
+            min_above_bbi_pct=payload.style_gate_min_above_bbi_pct,
+            min_median_mom20=payload.style_gate_min_median_mom20,
+            min_sample_size=payload.style_gate_min_sample_size,
+        )
+
+    try:
+        result = run_backend_b1_backtest(panels, market_frame, config)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=compact_error(exc)) from exc
+
+    return json_safe(
+        {
+            "status": "ok",
+            "scope": {
+                "strategyId": B1_STRATEGY_ID,
+                "strategyLabel": B1_STRATEGY_LABEL,
+                "startDate": payload.start_date.isoformat(),
+                "endDate": payload.end_date.isoformat(),
+                "historyStartDate": history_start.isoformat(),
+                "candidateStocks": len(stocks),
+                "testedStocks": len(panels),
+                "skippedStocks": len(skipped_by_bars),
+                "poolId": payload.pool_id,
+                "poolName": pool.name if pool else None,
+                "q": payload.q,
+                "industry": payload.industry,
+                "market": payload.market,
+                "minBars": payload.min_bars,
+                "maxStocks": payload.max_stocks,
+                "excludeSt": payload.exclude_st,
+                "excludeBj": payload.exclude_bj,
+                "excludePermissionBoards": payload.exclude_permission_boards,
+                "minListDays": payload.min_list_days,
+                "minAvgAmount": payload.min_avg_amount,
+                "minAvgCircMv": payload.min_avg_circ_mv,
+                "minAvgTurnoverRateF": payload.min_avg_turnover_rate_f,
+                "volumeUnit": payload.volume_unit,
+                "marketGate": market_gate,
+                "mainboardStyleGate": {
+                    "enabled": payload.use_mainboard_style_gate,
+                    "minAboveBbiPct": payload.style_gate_min_above_bbi_pct,
+                    "minMedianMom20": payload.style_gate_min_median_mom20,
+                    "minSampleSize": payload.style_gate_min_sample_size,
+                },
+            },
+            "diagnostics": {
+                "skippedByBars": skipped_by_bars,
+                "note": "B1 backend 接入为研究回测接口，不连接真实券商，也不产生真实交易动作。",
+            },
+            **result,
+        }
+    )
+
+
 @app.get("/api/research/runs")
-def list_research_runs(limit: int = 120) -> dict[str, Any]:
+def list_research_runs(limit: int = 120, include_unmerged: bool = False) -> dict[str, Any]:
     safe_limit = max(1, min(int(limit or 120), 300))
     runs = []
     errors = []
     if not RESEARCH_RUNS_DIR.exists():
         return {"sourceDir": "docs/research/runs", "count": 0, "runs": [], "errors": []}
 
-    for run_dir in sorted((item for item in RESEARCH_RUNS_DIR.iterdir() if item.is_dir()), key=lambda item: item.name, reverse=True):
+    run_dirs = sorted((item for item in RESEARCH_RUNS_DIR.iterdir() if item.is_dir()), key=lambda item: item.name, reverse=True)
+    available_run_ids = {item.name for item in run_dirs}
+    registry = read_research_registry()
+    registry_summaries = {
+        str(item.get("runId")): build_research_registry_run_summary(item, available_run_ids)
+        for item in registry.get("runs", [])
+        if isinstance(item, dict) and item.get("runId")
+    }
+    for run_dir in run_dirs:
         if len(runs) >= safe_limit:
             break
         results_path = run_dir / "results.json"
         if not results_path.exists():
             continue
+        if run_dir.name in registry_summaries:
+            runs.append(registry_summaries[run_dir.name])
+            continue
+        if not include_unmerged:
+            continue
         try:
-            run = read_research_run_file(run_dir)
+            summary = read_research_run_summary_cached(run_dir)
         except HTTPException as exc:
             errors.append({"runId": run_dir.name, "detail": exc.detail})
             continue
-        runs.append(build_research_run_summary(run_dir, run))
+        runs.append(summary)
 
     return json_safe({"sourceDir": "docs/research/runs", "count": len(runs), "runs": runs, "errors": errors})
+
+
+@app.get("/api/research/overview")
+def get_research_overview() -> dict[str, Any]:
+    return json_safe(build_research_overview())
+
+
+@app.get("/api/research/sessions/{session_id}")
+def get_research_session(session_id: str) -> dict[str, Any]:
+    registry = read_research_registry()
+    active_stage = registry.get("activeStage", {})
+    session_dir = resolve_research_session_dir(str(active_stage.get("stageDir") or ""), session_id)
+    return json_safe(build_research_session_summary(session_dir, include_text=True))
 
 
 @app.get("/api/research/runs/{run_id}")
@@ -298,7 +476,18 @@ def screen_stocks(
         stmt = stmt.where(Stock.market.ilike(f"%{market}%"))
 
     stocks = db.scalars(stmt.order_by(Stock.ts_code).limit(scan_limit)).all()
-    screened = [build_screen_row(db, stock, start, end, technical) for stock in stocks]
+    ts_codes = [stock.ts_code for stock in stocks]
+    bars_by_code = query_screen_bars_by_code(db, ts_codes, start, end)
+    fundamentals_by_code = query_latest_fundamentals_by_code(db, ts_codes, start, end)
+    screened = [
+        build_screen_row(
+            stock,
+            bars_by_code.get(stock.ts_code, []),
+            *fundamentals_by_code.get(stock.ts_code, (None, None)),
+            technical,
+        )
+        for stock in stocks
+    ]
     if technical != "all":
         screened = [row for row in screened if row.technical_score > 0 and "无本地日线" not in row.technical_tags]
     return sort_screened_stocks(screened, rank_by)[:requested_limit]
@@ -558,6 +747,65 @@ def sync_market_daily_basic(payload: SyncMarketDataRequest, db: Session = Depend
         failed_dates=failed_dates,
         skipped_trade_dates=skipped_trade_dates,
     )
+
+
+@app.post("/api/tushare/sync-market-fundamentals")
+def sync_market_fundamentals(payload: SyncMarketFundamentalsRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    if payload.end_date < payload.start_date:
+        raise HTTPException(status_code=400, detail="end_date 不能早于 start_date。")
+
+    stocks = list(db.scalars(select(Stock).order_by(Stock.ts_code)).all())
+    if payload.max_stocks:
+        stocks = stocks[: payload.max_stocks]
+    if not stocks:
+        raise HTTPException(status_code=400, detail="请先同步 A 股基础列表。")
+
+    pro = get_pro_api(payload.token)
+    rows_upserted = 0
+    skipped_stocks = 0
+    failed_stocks: list[dict[str, str]] = []
+    for stock in stocks:
+        if payload.skip_existing and has_financial_rows(db, stock.ts_code, payload.start_date, payload.end_date):
+            skipped_stocks += 1
+            continue
+        try:
+            df = pro.fina_indicator(
+                ts_code=stock.ts_code,
+                start_date=tushare_date(payload.start_date),
+                end_date=tushare_date(payload.end_date),
+                fields=FINA_INDICATOR_FIELDS,
+            )
+            rows = dedupe_rows(
+                [row for item in df.to_dict("records") if (row := financial_indicator_record_to_row(item))],
+                ("ts_code", "end_date", "ann_date"),
+            )
+            rows_upserted += upsert_financial_indicator_rows(db, rows)
+            db.commit()
+        except Exception as error:
+            db.rollback()
+            failed_stocks.append({"ts_code": stock.ts_code, "error": compact_error(error)})
+
+    status = "partial" if failed_stocks else "ok"
+    if failed_stocks and not rows_upserted and not skipped_stocks:
+        status = "failed"
+    db.add(
+        DataSyncRun(
+            target="market:fundamentals",
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+            rows_upserted=rows_upserted,
+            status=status,
+            message=f"stocks={len(stocks)}, skipped_stocks={skipped_stocks}, failed_stocks={len(failed_stocks)}",
+        )
+    )
+    db.commit()
+    return {
+        "status": status,
+        "stocks": len(stocks),
+        "skipped_stocks": skipped_stocks,
+        "financial_rows": rows_upserted,
+        "failed_stocks": failed_stocks,
+    }
 
 
 @app.get("/api/tushare/sync-progress")
@@ -1218,6 +1466,102 @@ def query_daily_bars(db: Session, ts_code: str, start_date: date, end_date: date
     return list(db.scalars(stmt).all())
 
 
+def query_screen_bars_by_code(db: Session, ts_codes: list[str], start_date: date, end_date: date) -> dict[str, list[tuple[date, float, float, float, float, float | None, float]]]:
+    if not ts_codes:
+        return {}
+    stmt = (
+        select(
+            StockDailyBar.ts_code,
+            StockDailyBar.trade_date,
+            StockDailyBar.open,
+            StockDailyBar.high,
+            StockDailyBar.low,
+            StockDailyBar.close,
+            StockDailyBar.pct_chg,
+            StockDailyBar.vol,
+        )
+        .where(
+            StockDailyBar.ts_code.in_(ts_codes),
+            StockDailyBar.trade_date >= start_date,
+            StockDailyBar.trade_date <= end_date,
+        )
+        .order_by(StockDailyBar.ts_code, StockDailyBar.trade_date)
+    )
+    grouped: dict[str, list[tuple[date, float, float, float, float, float | None, float]]] = {ts_code: [] for ts_code in ts_codes}
+    for row in db.execute(stmt):
+        grouped.setdefault(row.ts_code, []).append(
+            (
+                row.trade_date,
+                float(row.open),
+                float(row.high),
+                float(row.low),
+                float(row.close),
+                float(row.pct_chg) if row.pct_chg is not None else None,
+                float(row.vol) if row.vol is not None else 0,
+            )
+        )
+    return grouped
+
+
+def query_latest_fundamentals_by_code(
+    db: Session,
+    ts_codes: list[str],
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> dict[str, tuple[StockDailyBasic | None, StockFinancialIndicator | None]]:
+    if not ts_codes:
+        return {}
+
+    result: dict[str, tuple[StockDailyBasic | None, StockFinancialIndicator | None]] = {ts_code: (None, None) for ts_code in ts_codes}
+    valuation_filters = [StockDailyBasic.ts_code.in_(ts_codes)]
+    financial_filters = [StockFinancialIndicator.ts_code.in_(ts_codes)]
+    if start_date:
+        valuation_filters.append(StockDailyBasic.trade_date >= start_date)
+        financial_filters.append(StockFinancialIndicator.end_date >= start_date)
+    if end_date:
+        valuation_filters.append(StockDailyBasic.trade_date <= end_date)
+        financial_filters.append(StockFinancialIndicator.end_date <= end_date)
+
+    valuation_ranked = (
+        select(
+            StockDailyBasic.id.label("id"),
+            func.row_number()
+            .over(partition_by=StockDailyBasic.ts_code, order_by=StockDailyBasic.trade_date.desc())
+            .label("row_number"),
+        )
+        .where(*valuation_filters)
+        .subquery()
+    )
+    valuation_stmt = select(StockDailyBasic).join(valuation_ranked, StockDailyBasic.id == valuation_ranked.c.id).where(valuation_ranked.c.row_number == 1)
+    for valuation in db.scalars(valuation_stmt):
+        _, financial = result.get(valuation.ts_code, (None, None))
+        result[valuation.ts_code] = (valuation, financial)
+
+    financial_ranked = (
+        select(
+            StockFinancialIndicator.id.label("id"),
+            func.row_number()
+            .over(
+                partition_by=StockFinancialIndicator.ts_code,
+                order_by=(StockFinancialIndicator.end_date.desc(), StockFinancialIndicator.ann_date.desc()),
+            )
+            .label("row_number"),
+        )
+        .where(*financial_filters)
+        .subquery()
+    )
+    financial_stmt = (
+        select(StockFinancialIndicator)
+        .join(financial_ranked, StockFinancialIndicator.id == financial_ranked.c.id)
+        .where(financial_ranked.c.row_number == 1)
+    )
+    for financial in db.scalars(financial_stmt):
+        valuation, _ = result.get(financial.ts_code, (None, None))
+        result[financial.ts_code] = (valuation, financial)
+
+    return result
+
+
 def daily_record_to_row(item: dict) -> dict:
     return {
         "ts_code": item["ts_code"],
@@ -1349,6 +1693,345 @@ def read_json_file(path: Path) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"JSON 文件解析失败：{path.name}") from exc
 
 
+def read_research_run_summary_cached(run_dir: Path) -> dict[str, Any]:
+    results_path = run_dir / "results.json"
+    if not results_path.exists():
+        raise HTTPException(status_code=404, detail=f"文件不存在：{results_path.name}")
+
+    stat = results_path.stat()
+    cache_key = str(results_path)
+    cached = RESEARCH_RUN_SUMMARY_CACHE.get(cache_key)
+    if cached and cached[0] == stat.st_mtime_ns and cached[1] == stat.st_size:
+        return dict(cached[2])
+
+    summary = read_research_run_summary_fast(run_dir, results_path)
+    if summary is None:
+        summary = build_research_run_summary(run_dir, read_research_run_file(run_dir))
+    RESEARCH_RUN_SUMMARY_CACHE[cache_key] = (stat.st_mtime_ns, stat.st_size, summary)
+    return dict(summary)
+
+
+def read_research_run_summary_fast(run_dir: Path, results_path: Path) -> dict[str, Any] | None:
+    try:
+        with results_path.open("r", encoding="utf-8") as file:
+            text = file.read(RESEARCH_RUN_SUMMARY_READ_CHARS)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"研究运行结果读取失败：{run_dir.name}") from exc
+
+    run_id = extract_json_key_value(text, "runId")
+    strategy = extract_json_key_value(text, "strategy") or {}
+    analysis = extract_json_key_value(text, "analysis") or {}
+    result_pos = text.find('"result"')
+    result_status = extract_json_key_value(text, "status", result_pos if result_pos >= 0 else 0)
+    result_summary = extract_json_key_value(text, "summary", result_pos if result_pos >= 0 else 0) or {}
+    if not run_id and not strategy and not analysis and not result_summary:
+        return None
+
+    run = {
+        "runId": run_id or run_dir.name,
+        "startedAt": extract_json_key_value(text, "startedAt"),
+        "finishedAt": extract_json_key_value(text, "finishedAt"),
+        "sourceRun": extract_json_key_value(text, "sourceRun"),
+        "strategy": strategy if isinstance(strategy, dict) else {},
+        "analysis": analysis if isinstance(analysis, dict) else {},
+        "result": {
+            "status": result_status,
+            "summary": result_summary if isinstance(result_summary, dict) else {},
+            "equity": [],
+            "trades": [],
+            "completedTrades": [],
+            "finalPositions": [],
+        },
+    }
+    return build_research_run_summary(run_dir, run)
+
+
+def extract_json_key_value(text: str, key: str, start: int = 0) -> Any:
+    key_pos = text.find(f'"{key}"', max(start, 0))
+    if key_pos < 0:
+        return None
+    colon_pos = text.find(":", key_pos)
+    if colon_pos < 0:
+        return None
+    value_text = text[colon_pos + 1 :].lstrip()
+    try:
+        value, _ = json.JSONDecoder().raw_decode(value_text)
+    except json.JSONDecodeError:
+        return None
+    return value
+
+
+def read_research_registry() -> dict[str, Any]:
+    if not RESEARCH_INDEX_PATH.exists():
+        return {"runs": [], "activeStage": {}, "target": {}, "warnings": ["research-runs.json 不存在"]}
+    registry = read_json_file(RESEARCH_INDEX_PATH)
+    if not isinstance(registry.get("runs"), list):
+        registry["runs"] = []
+    return registry
+
+
+def build_research_overview() -> dict[str, Any]:
+    registry = read_research_registry()
+    active_stage = registry.get("activeStage", {}) if isinstance(registry.get("activeStage"), dict) else {}
+    stage = build_research_stage_summary(active_stage)
+    available_run_ids = set(query_research_run_ids())
+    integrated_runs = [build_research_registry_run_summary(item, available_run_ids) for item in registry.get("runs", []) if isinstance(item, dict)]
+    sessions = build_research_session_summaries(str(active_stage.get("stageDir") or ""))
+    unmerged_runs = build_unmerged_research_runs(registry)
+    session_evidence = [item for item in sessions if item.get("hasEvidence")]
+    warnings = []
+    if unmerged_runs:
+        warnings.append(f"发现 {len(unmerged_runs)} 个当前阶段未整合 run；只能作为待复核证据。")
+    if session_evidence:
+        warnings.append(f"发现 {len(session_evidence)} 个 session 证据文件；等待整合 session 复核。")
+    if not sessions and not (stage.get("sessionsDirExists")):
+        warnings.append("当前阶段尚未创建 sessions/ 目录；并行研究启动后会自动出现在这里。")
+
+    return {
+        "sourceDir": "docs/research",
+        "registryPath": RESEARCH_INDEX_PATH.relative_to(REPO_ROOT).as_posix(),
+        "activeStage": active_stage,
+        "stage": stage,
+        "target": registry.get("target", {}),
+        "ultimateTarget": registry.get("ultimateTarget", {}),
+        "currentMainline": registry.get("currentMainline"),
+        "officialConclusionSource": "research-runs.json 与整合 session 更新后的阶段证据",
+        "integratedRunCount": len(integrated_runs),
+        "integratedRuns": integrated_runs,
+        "sessionCount": len(sessions),
+        "activeSessions": sessions,
+        "evidenceInbox": {
+            "unmergedRuns": unmerged_runs,
+            "sessionEvidence": session_evidence,
+            "count": len(unmerged_runs) + len(session_evidence),
+        },
+        "integrationWarnings": warnings,
+    }
+
+
+def build_research_stage_summary(active_stage: dict[str, Any]) -> dict[str, Any]:
+    stage_dir_value = str(active_stage.get("stageDir") or "")
+    stage_dir = (REPO_ROOT / stage_dir_value).resolve() if stage_dir_value else None
+    readme_path = stage_dir / "README.md" if stage_dir else None
+    text = read_text_file(readme_path) if readme_path else ""
+    return {
+        "stageId": str(active_stage.get("stageId") or first_markdown_heading(text, "未声明阶段")),
+        "stageDir": stage_dir_value,
+        "sourceFile": safe_relative_path(readme_path) if readme_path and readme_path.exists() else "",
+        "sessionsDir": safe_relative_path(stage_dir / "sessions") if stage_dir else "",
+        "sessionsDirExists": bool(stage_dir and (stage_dir / "sessions").exists()),
+        "status": strip_markdown(extract_markdown_section(text, "阶段状态")).strip() or "unknown",
+        "objective": compact_markdown(extract_markdown_section(text, "阶段目标") or str(active_stage.get("objective") or "")),
+        "gates": extract_markdown_items(text, "硬门槛"),
+        "priorityHypotheses": extract_markdown_items(text, "优先验证假设"),
+        "forbiddenAttempts": extract_markdown_items(text, "禁止重复尝试"),
+        "requiredOutputs": extract_markdown_items(text, "必须产物"),
+        "startEvidence": extract_markdown_items(text, "起点证据"),
+    }
+
+
+def query_research_run_ids() -> list[str]:
+    if not RESEARCH_RUNS_DIR.exists():
+        return []
+    return [item.name for item in RESEARCH_RUNS_DIR.iterdir() if item.is_dir()]
+
+
+def build_research_registry_run_summary(item: dict[str, Any], available_run_ids: set[str] | None = None) -> dict[str, Any]:
+    run_id = str(item.get("runId") or "")
+    run_dir = RESEARCH_RUNS_DIR / run_id if run_id else None
+    return {
+        "runId": run_id,
+        "label": item.get("strategyName") or run_id,
+        "strategyName": item.get("strategyName"),
+        "parameterSummary": item.get("parameterSummary"),
+        "sample": item.get("sample"),
+        "statusTier": item.get("statusTier") or item.get("status"),
+        "evidenceRole": item.get("evidenceRole"),
+        "fullWindowPass": item.get("fullWindowPass"),
+        "rollingWindowPass": item.get("rollingWindowPass"),
+        "passedWindows": item.get("passedWindows"),
+        "failedWindows": item.get("failedWindows"),
+        "failedWindowLabels": item.get("failedWindowLabels", []),
+        "failureReason": item.get("failureReason"),
+        "nextAction": item.get("nextAction"),
+        "metrics": {
+            "annualizedReturn": item.get("annualizedReturn"),
+            "totalReturn": item.get("totalReturn"),
+            "maxDrawdown": item.get("maxDrawdown") or item.get("worstDrawdown"),
+            "profitLossRatio": item.get("profitLossRatio"),
+            "tailWorstReturn": item.get("tailWorstReturn"),
+            "minAnnualizedReturn": item.get("minAnnualizedReturn"),
+            "minSharpeRatio": item.get("minSharpeRatio"),
+        },
+        "resultFiles": build_known_research_run_files(run_id) if available_run_ids is not None and run_id in available_run_ids else (build_research_run_files(run_dir) if run_dir and run_dir.is_dir() else {}),
+        "integrationStatus": "integrated",
+    }
+
+
+def build_unmerged_research_runs(registry: dict[str, Any]) -> list[dict[str, Any]]:
+    integrated_ids = {str(item.get("runId")) for item in registry.get("runs", []) if isinstance(item, dict) and item.get("runId")}
+    active_stage = registry.get("activeStage", {}) if isinstance(registry.get("activeStage"), dict) else {}
+    stage_id = str(active_stage.get("stageId") or "")
+    current_mainline = str(registry.get("currentMainline") or "")
+    if not RESEARCH_RUNS_DIR.exists():
+        return []
+
+    rows = []
+    for run_dir in sorted((item for item in RESEARCH_RUNS_DIR.iterdir() if item.is_dir()), key=lambda item: item.name, reverse=True):
+        if run_dir.name in integrated_ids or not (run_dir / "results.json").exists():
+            continue
+        if stage_id and not run_dir.name.startswith(f"{stage_id.split('-', 1)[0]}-"):
+            continue
+        try:
+            summary = read_research_run_summary_cached(run_dir)
+        except HTTPException:
+            continue
+        if not is_current_stage_run_candidate(run_dir.name, summary, stage_id, current_mainline):
+            continue
+        summary["integrationStatus"] = "unmerged"
+        summary["warning"] = "未写入 research-runs.json；只能作为待复核证据，不参与阶段通过结论。"
+        rows.append(summary)
+    return rows
+
+
+def is_current_stage_run_candidate(run_id: str, run: dict[str, Any], stage_id: str, current_mainline: str) -> bool:
+    stage_prefix = stage_id.split("-", 1)[0]
+    if stage_prefix and not run_id.startswith(f"{stage_prefix}-"):
+        return False
+    if "-repair-" in run_id:
+        return True
+    source_run = str(run.get("sourceRun") or run.get("source_run") or "")
+    return bool(current_mainline and source_run == current_mainline)
+
+
+def build_research_session_summaries(stage_dir_value: str) -> list[dict[str, Any]]:
+    stage_dir = (REPO_ROOT / stage_dir_value).resolve() if stage_dir_value else None
+    sessions_dir = stage_dir / "sessions" if stage_dir else None
+    if not sessions_dir or not sessions_dir.exists():
+        return []
+    return [build_research_session_summary(item) for item in sorted(sessions_dir.iterdir(), key=lambda path: path.name) if item.is_dir()]
+
+
+def resolve_research_session_dir(stage_dir_value: str, session_id: str) -> Path:
+    if not RESEARCH_RUN_ID_PATTERN.fullmatch(session_id):
+        raise HTTPException(status_code=400, detail="研究 session ID 不合法")
+    stage_dir = (REPO_ROOT / stage_dir_value).resolve() if stage_dir_value else None
+    sessions_dir = (stage_dir / "sessions").resolve() if stage_dir else None
+    session_dir = (sessions_dir / session_id).resolve() if sessions_dir else None
+    if not session_dir or session_dir.parent != sessions_dir or not session_dir.is_dir():
+        raise HTTPException(status_code=404, detail="研究 session 不存在")
+    return session_dir
+
+
+def build_research_session_summary(session_dir: Path, include_text: bool = False) -> dict[str, Any]:
+    session_path = session_dir / "session.md"
+    log_path = session_dir / "session-log.md"
+    evidence_path = session_dir / "evidence.md"
+    session_text = read_text_file(session_path)
+    evidence_text = read_text_file(evidence_path)
+    status = extract_label_value(session_text, ["状态", "status"]) or ("待整合" if evidence_text else "进行中")
+    files = {
+        name: safe_relative_path(path)
+        for name, path in {
+            "session": session_path,
+            "log": log_path,
+            "evidence": evidence_path,
+        }.items()
+        if path.exists()
+    }
+    summary = {
+        "sessionId": session_dir.name,
+        "topic": first_markdown_heading(session_text, session_dir.name),
+        "status": status,
+        "question": extract_label_value(session_text, ["研究问题", "问题", "research question"]),
+        "hypothesis": extract_label_value(session_text, ["假设", "hypothesis"]),
+        "runIdPrefix": extract_label_value(session_text, ["run id 前缀", "runIdPrefix", "run prefix"]),
+        "hasEvidence": bool(evidence_text.strip()),
+        "hasLog": log_path.exists(),
+        "files": files,
+        "evidenceSummary": compact_markdown(evidence_text)[:360],
+        "integrationStatus": "session_evidence_waiting" if evidence_text else "active",
+    }
+    if include_text:
+        summary["texts"] = {
+            "session": session_text,
+            "log": read_text_file(log_path),
+            "evidence": evidence_text,
+        }
+    return summary
+
+
+def read_text_file(path: Path | None) -> str:
+    if not path or not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8")
+
+
+def safe_relative_path(path: Path | None) -> str:
+    if not path:
+        return ""
+    try:
+        return path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def first_markdown_heading(text: str, fallback: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            return strip_markdown(stripped.lstrip("#").strip()) or fallback
+    return fallback
+
+
+def extract_markdown_section(text: str, heading: str) -> str:
+    lines = text.splitlines()
+    start = None
+    for index, line in enumerate(lines):
+        if line.strip() == f"## {heading}":
+            start = index + 1
+            break
+    if start is None:
+        return ""
+    end = len(lines)
+    for index in range(start, len(lines)):
+        if lines[index].startswith("## "):
+            end = index
+            break
+    return "\n".join(lines[start:end]).strip()
+
+
+def extract_markdown_items(text: str, heading: str) -> list[str]:
+    section = extract_markdown_section(text, heading)
+    items = []
+    for line in section.splitlines():
+        stripped = line.strip()
+        match = re.match(r"(?:[-*]|\d+\.)\s+(.*)", stripped)
+        if match:
+            items.append(strip_markdown(match.group(1).strip()))
+    return items
+
+
+def extract_label_value(text: str, labels: list[str]) -> str:
+    normalized_labels = {label.strip().lower() for label in labels}
+    for line in text.splitlines():
+        stripped = line.strip().lstrip("-*").strip()
+        match = re.match(r"([^:：]+)[:：]\s*(.+)", stripped)
+        if match and match.group(1).strip().lower() in normalized_labels:
+            return strip_markdown(match.group(2).strip())
+    return ""
+
+
+def strip_markdown(value: str) -> str:
+    return value.replace("`", "").replace("**", "").strip()
+
+
+def compact_markdown(value: str) -> str:
+    text = re.sub(r"[#>*_`]", "", value or "")
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
 def apply_strategy_spec_analysis_override(spec: dict[str, Any], analysis: dict[str, Any]) -> dict[str, Any]:
     objective_evidence = spec.get("objectiveEvidence")
     if not isinstance(objective_evidence, dict):
@@ -1472,6 +2155,13 @@ def build_research_run_files(run_dir: Path) -> dict[str, str]:
         if path.exists():
             files[name.removesuffix(".json").removesuffix(".md").replace("-", "_")] = path.relative_to(REPO_ROOT).as_posix()
     return files
+
+
+def build_known_research_run_files(run_id: str) -> dict[str, str]:
+    if not run_id:
+        return {}
+    base = f"docs/research/runs/{run_id}"
+    return {"results": f"{base}/results.json"}
 
 
 def infer_research_run_spec(run_dir: Path, run: dict[str, Any], analysis: dict[str, Any]) -> dict[str, Any]:
@@ -2019,9 +2709,13 @@ def get_stock_pool_or_404(db: Session, pool_id: int | None) -> StockPool:
     return pool
 
 
-def build_screen_row(db: Session, stock: Stock, start_date: date, end_date: date, technical: str) -> StockScreenOut:
-    bars = query_daily_bars(db, stock.ts_code, start_date, end_date)
-    valuation, financial = query_latest_fundamentals(db, stock.ts_code, start_date, end_date)
+def build_screen_row(
+    stock: Stock,
+    bars: list[tuple[date, float, float, float, float, float | None, float]],
+    valuation: StockDailyBasic | None,
+    financial: StockFinancialIndicator | None,
+    technical: str,
+) -> StockScreenOut:
     fundamental_profile = build_fundamental_profile(valuation, financial)
     fundamentals = {
         "地区": stock.area,
@@ -2051,7 +2745,7 @@ def build_screen_row(db: Session, stock: Stock, start_date: date, end_date: date
             fundamentals=fundamentals,
         )
 
-    rows = [bar_to_backtest_row(bar) for bar in bars]
+    rows = [screen_bar_to_backtest_row(stock.ts_code, bar) for bar in bars]
     enriched = enrich_rows(rows, DEFAULT_CONFIG)
     latest = enriched[-1]
     previous = enriched[-2] if len(enriched) > 1 else None
@@ -2059,9 +2753,9 @@ def build_screen_row(db: Session, stock: Stock, start_date: date, end_date: date
     latest_bar = bars[-1]
     return StockScreenOut(
         **stock_to_schema(stock).model_dump(),
-        latest_date=latest_bar.trade_date,
-        close=float(latest_bar.close),
-        pct_chg=float(latest_bar.pct_chg) if latest_bar.pct_chg is not None else None,
+        latest_date=latest_bar[0],
+        close=latest_bar[4],
+        pct_chg=latest_bar[5],
         data_bars=len(bars),
         technical_score=profile["score"],
         technical_tags=profile["tags"],
@@ -2093,6 +2787,19 @@ def query_latest_fundamentals(
     valuation = db.scalars(valuation_stmt.order_by(StockDailyBasic.trade_date.desc()).limit(1)).first()
     financial = db.scalars(financial_stmt.order_by(StockFinancialIndicator.end_date.desc(), StockFinancialIndicator.ann_date.desc()).limit(1)).first()
     return valuation, financial
+
+
+def has_financial_rows(db: Session, ts_code: str, start_date: date, end_date: date) -> bool:
+    stmt = (
+        select(func.count())
+        .select_from(StockFinancialIndicator)
+        .where(
+            StockFinancialIndicator.ts_code == ts_code,
+            StockFinancialIndicator.ann_date >= start_date,
+            StockFinancialIndicator.ann_date <= end_date,
+        )
+    )
+    return bool(db.scalar(stmt))
 
 
 def daily_basic_to_dict(row: StockDailyBasic | None) -> dict[str, Any]:
@@ -2654,4 +3361,16 @@ def bar_to_backtest_row(bar: StockDailyBar) -> dict:
         "low": float(bar.low),
         "close": float(bar.close),
         "volume": float(bar.vol) if bar.vol is not None else 0,
+    }
+
+
+def screen_bar_to_backtest_row(ts_code: str, bar: tuple[date, float, float, float, float, float | None, float]) -> dict:
+    return {
+        "ts_code": ts_code,
+        "date": bar[0].isoformat(),
+        "open": bar[1],
+        "high": bar[2],
+        "low": bar[3],
+        "close": bar[4],
+        "volume": bar[6],
     }

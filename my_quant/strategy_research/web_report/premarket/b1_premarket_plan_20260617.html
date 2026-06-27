@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>B1 次日盘前预案</title>
+  <style>
+    :root { --ink:#16202a; --muted:#617080; --line:#dce3ea; --paper:#f6f8fb; --surface:#fff; --red:#c0392b; --green:#13795b; --blue:#2764a2; --amber:#a56714; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",Arial,sans-serif; color:var(--ink); background:var(--paper); line-height:1.58; }
+    .shell { width:min(1220px, calc(100% - 36px)); margin:0 auto; }
+    header { background:#fff; border-bottom:1px solid var(--line); padding:28px 0; }
+    h1 { margin:0 0 10px; font-size:clamp(30px,4vw,46px); letter-spacing:0; line-height:1.1; }
+    h2 { font-size:25px; margin:0 0 14px; }
+    h3 { font-size:17px; margin:0 0 8px; }
+    section { padding:28px 0; }
+    .lead { color:var(--muted); margin:0; max-width:960px; }
+    .meta { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+    .pill { border:1px solid var(--line); border-radius:999px; padding:6px 10px; background:#fff; color:var(--muted); font-size:13px; }
+    .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .metric,.panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:15px; }
+    .metric span { display:block; color:var(--muted); font-size:12px; }
+    .metric strong { display:block; font-size:22px; margin-top:4px; overflow-wrap:anywhere; }
+    .panel-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; background:#fff; }
+    th,td { padding:10px 11px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; white-space:nowrap; }
+    th { color:var(--muted); background:#f7f9fb; position:sticky; top:0; }
+    .table-wrap { border:1px solid var(--line); border-radius:8px; overflow:auto; max-height:430px; background:#fff; }
+    .empty { color:var(--muted); background:#fff; border:1px dashed var(--line); border-radius:8px; padding:16px; }
+    .note { border-left:5px solid var(--amber); background:#fff9eb; color:#47320d; padding:14px 16px; border-radius:8px; }
+    code { background:#edf2f7; border-radius:4px; padding:2px 5px; }
+    @media (max-width:900px) { .grid,.panel-row { grid-template-columns:1fr; } .shell { width:min(100% - 26px,1220px); } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell">
+      <h1>B1 次日盘前预案</h1>
+      <p class="lead">基于 2026-06-16 收盘后的 B1 趋势回调信号，生成 2026-06-17 盘前执行预案。它不是回测收益展示，也不会自动下单。</p>
+      <div class="meta">
+        <span class="pill">结论：没有新的买入动作</span>
+        <span class="pill">信号日：2026-06-16</span>
+        <span class="pill">预案日：2026-06-17</span>
+        <span class="pill">数据源：Tushare/本地缓存</span>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section>
+      <div class="shell grid">
+        <div class="metric"><span>市场门</span><strong>打开</strong></div>
+        <div class="metric"><span>候选买入</span><strong>0 只</strong></div>
+        <div class="metric"><span>优先卖出</span><strong>0 只</strong></div>
+        <div class="metric"><span>继续观察</span><strong>3 只</strong></div>
+      </div>
+    </section>
+    <section>
+      <div class="shell panel-row">
+        <div class="panel">
+          <h3>市场状态</h3>
+          <p>沪深300 close=4884.23，BBI=4796.44，MA20=4851.09，MA60=4745.72。</p>
+        </div>
+        <div class="panel">
+          <h3>执行顺序</h3>
+          <p>先看卖出/风控，再看候选买入；若市场门关闭，不新增仓。候选只用于小仓卫星策略，不做全仓组合。</p>
+        </div>
+      </div>
+    </section>
+    <section>
+      <div class="shell">
+        <h2>1. 明日优先卖出/风控</h2>
+        <p class='empty'>没有持仓触发跌破 BBI 或 8% 止盈。</p>
+      </div>
+    </section>
+    <section>
+      <div class="shell">
+        <h2>2. 明日候选买入</h2>
+        <p class='empty'>没有新的候选买入；空仓优先等待，不为了交易而交易。</p>
+      </div>
+    </section>
+    <section>
+      <div class="shell">
+        <h2>3. 继续观察持仓</h2>
+        <div class='table-wrap'><table><thead><tr><th>代码</th><th>名称</th><th>买入日</th><th>买入价</th><th>信号收盘</th><th>BBI</th><th>浮盈亏</th><th>执行约束</th></tr></thead><tbody><tr><td>002902</td><td>铭普光磁</td><td>2026-05-26</td><td>34.730</td><td>36.380</td><td>31.819</td><td>4.75%</td><td>未触发止盈/跌破BBI，明日不主动加仓；等待新信号。</td></tr><tr><td>300959</td><td>线上线下</td><td>2026-06-10</td><td>168.860</td><td>170.450</td><td>151.294</td><td>0.94%</td><td>未触发止盈/跌破BBI，明日不主动加仓；等待新信号。</td></tr><tr><td>600172</td><td>黄河旋风</td><td>2026-06-10</td><td>12.120</td><td>12.900</td><td>11.162</td><td>6.44%</td><td>未触发止盈/跌破BBI，明日不主动加仓；等待新信号。</td></tr></tbody></table></div>
+      </div>
+    </section>
+    <section>
+      <div class="shell">
+        <p class="note">纪律提醒：低位不是入场信号，止跌才是入场信号。盘前预案只给条件和顺序，不保证收益，也不替代你自己的下单确认。</p>
+      </div>
+    </section>
+  </main>
+  <footer class="shell" style="padding:24px 0 40px;color:var(--muted);font-size:13px;">生成时间：2026-06-17 01:47:33</footer>
+</body>
+</html>

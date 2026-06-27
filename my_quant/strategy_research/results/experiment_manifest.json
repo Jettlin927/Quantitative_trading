@@ -1,0 +1,23 @@
+{
+  "experiment": "permanent_portfolio_alpha_research",
+  "evaluation_start": "2021-01-04",
+  "evaluation_end": "2026-06-15",
+  "train_start": "2017-09-01",
+  "train_end": "2020-12-31",
+  "latest_price_date": "2026-06-15",
+  "best_research_candidate": "ram_top2_m20_v120_f21_cost",
+  "base_strategy_rows": 8,
+  "ram_scan_rows": 144,
+  "train_scan_rows": 144,
+  "artifacts": [
+    "base_strategy_comparison.csv",
+    "ram_parameter_scan.csv",
+    "train_parameter_scan.csv",
+    "train_best_oos_result.csv",
+    "walk_forward_shortlist_summary.csv",
+    "factor_ic_summary.csv",
+    "latest_summary.md",
+    "latest_summary.json",
+    "experiment_manifest.json"
+  ]
+}

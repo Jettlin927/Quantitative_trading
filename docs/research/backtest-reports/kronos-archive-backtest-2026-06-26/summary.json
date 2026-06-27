@@ -1,0 +1,13 @@
+{
+  "prediction_count": 29,
+  "buy_count": 1,
+  "sell_count": 0,
+  "hold_count": 28,
+  "direction_hit_rate": 0.9310344827586207,
+  "long_only_total_return": -0.0038595036891557744,
+  "mean_actual_horizon_return": -0.00011086151436309467,
+  "archive_count": 29,
+  "error_count": 0,
+  "prediction_dir": "/Users/jettlin/Documents/kronos-预测/Kronos/webui/prediction_results",
+  "scope_note": "external Kronos webui crypto futures 5m archive; not HK equity validation"
+}

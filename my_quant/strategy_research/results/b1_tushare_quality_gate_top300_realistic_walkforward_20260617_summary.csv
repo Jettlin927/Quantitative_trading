@@ -1,0 +1,4 @@
+strategy,windows,return_pass_windows,drawdown_pass_windows,mean_annual_return,min_annual_return,worst_drawdown,mean_calmar,return_fail_windows,drawdown_fail_windows,passes_all_windows
+old_close_fractional,6,6,6,1.0201681200294288,0.5259103787137838,-0.2078616903088184,6.633967127249803,0,0,True
+realistic_lot_limit,6,2,6,0.4701364372893851,0.16924537360954717,-0.24442504126108477,2.335016890866979,4,0,False
+capacity_stress_5pct_vol,6,1,6,0.3931096906616398,0.09074681689847419,-0.2546067090257187,2.123482884444518,5,0,False

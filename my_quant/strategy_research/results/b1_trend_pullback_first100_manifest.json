@@ -1,0 +1,16 @@
+{
+  "strategy": "b1_trend_pullback_replica",
+  "start": "2025-01-01",
+  "end": "2026-05-15",
+  "symbol_count": 100,
+  "annual_return": 0.36862275911248865,
+  "max_drawdown": -0.2054659300138334,
+  "passes_return_gate": false,
+  "passes_drawdown_gate": true,
+  "artifacts": {
+    "nav": "b1_trend_pullback_first100_nav.csv",
+    "trades": "b1_trend_pullback_first100_trades.csv",
+    "candidates": "b1_trend_pullback_first100_candidates.csv",
+    "summary": "b1_trend_pullback_first100_summary.md"
+  }
+}

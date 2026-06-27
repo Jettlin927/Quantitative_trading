@@ -1,0 +1,2 @@
+ticker,instrument_type,quantity,cost_basis,theme,leverage_factor,risk_tag,notes
+NVDA,equity,1,1000,AI infrastructure,1,core,sample holding only

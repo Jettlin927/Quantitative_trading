@@ -26,5 +26,9 @@
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
     "globals": "latest"
+  },
+  "optionalDependencies": {
+    "@rolldown/binding-linux-arm64-musl": "^1.0.2",
+    "lightningcss-linux-arm64-musl": "^1.32.0"
   }
 }

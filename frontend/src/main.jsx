@@ -10,15 +10,20 @@ import {
 } from "lightweight-charts";
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Bot,
   Building2,
   CheckCircle2,
+  ClipboardCheck,
   Database,
   Download,
+  FileSearch,
   Filter,
   FolderPlus,
   Gauge,
+  GitBranch,
+  Inbox,
   Layers3,
   LineChart,
   Play,
@@ -98,11 +103,9 @@ const DEFAULT_SCREEN_FILTERS = {
 
 const TABS = [
   ["screen", "选股池", Filter],
-  ["quant", "量化全景", BarChart3],
-  ["lab", "策略实验", SlidersHorizontal],
-  ["baseline", "组合基线", ShieldCheck],
-  ["analysis", "质量诊断", Gauge],
-  ["review", "AI复盘", Bot],
+  ["single", "单票验证", LineChart],
+  ["market", "全市场验证", BarChart3],
+  ["diagnostic", "复盘诊断", Gauge],
 ];
 
 const TECHNICAL_OPTIONS = [
@@ -123,51 +126,6 @@ const RANK_OPTIONS = [
   ["composite", "综合榜"],
   ["technical", "技术榜"],
   ["valuation", "估值榜"],
-];
-
-const ENTRY_PRESETS = [
-  {
-    value: "boll-rebound",
-    label: "BOLL下轨反弹",
-    bias: "回撤试错",
-    config: { entryMode: "boll-rebound", useTrendFilter: true, useMacdFilter: false, useRsiFilter: false },
-  },
-  {
-    value: "macd-cross",
-    label: "MACD金叉",
-    bias: "趋势动量",
-    config: { entryMode: "macd-cross", useTrendFilter: true, useMacdFilter: false, useRsiFilter: true, rsiLowerBound: "35", rsiUpperBound: "82" },
-  },
-  {
-    value: "boll-squeeze",
-    label: "BOLL收口突破",
-    bias: "波动扩张",
-    config: { entryMode: "boll-squeeze", useTrendFilter: true, useMacdFilter: true, useRsiFilter: false, bollBandwidthMaxPct: "8" },
-  },
-  {
-    value: "boll-breakout",
-    label: "BOLL上轨突破",
-    bias: "强势突破",
-    config: { entryMode: "boll-breakout", useTrendFilter: true, useMacdFilter: true, useRsiFilter: false, volumeBreakoutMultiplier: "1.15" },
-  },
-  {
-    value: "ma-cross",
-    label: "均线金叉",
-    bias: "趋势切换",
-    config: { entryMode: "ma-cross", useTrendFilter: false, useMacdFilter: false, useRsiFilter: true, rsiLowerBound: "40", rsiUpperBound: "80" },
-  },
-  {
-    value: "rsi-reversal",
-    label: "RSI超卖反转",
-    bias: "反转确认",
-    config: { entryMode: "rsi-reversal", useTrendFilter: false, useMacdFilter: false, useRsiFilter: false, rsiLowerBound: "32", rsiUpperBound: "70" },
-  },
-  {
-    value: "trend-follow",
-    label: "MA趋势跟随",
-    bias: "顺势持有",
-    config: { entryMode: "trend-follow", useTrendFilter: true, useMacdFilter: true, useRsiFilter: false },
-  },
 ];
 
 function App() {
@@ -198,6 +156,10 @@ function App() {
   const [selectedResearchRunId, setSelectedResearchRunId] = useState("");
   const [researchRun, setResearchRun] = useState(null);
   const [researchRunError, setResearchRunError] = useState("");
+  const [researchOverview, setResearchOverview] = useState(null);
+  const [researchOverviewError, setResearchOverviewError] = useState("");
+  const [selectedDocsStrategy, setSelectedDocsStrategy] = useState(null);
+  const [docsStrategyConfig, setDocsStrategyConfig] = useState(null);
   const initialFormRef = useRef(form);
 
   const rows = result?.rows?.length ? result.rows : bars;
@@ -263,6 +225,20 @@ function App() {
     [loadResearchRun],
   );
 
+  const refreshResearchOverview = useCallback(async (showStatus = false) => {
+    try {
+      const data = await apiFetch("/api/research/overview");
+      setResearchOverview(data);
+      setResearchOverviewError("");
+      if (showStatus) setStatus({ text: `研究阶段已刷新：${data.stage?.stageId || "未声明阶段"}`, tone: "good" });
+      return data;
+    } catch (error) {
+      setResearchOverviewError(error.message);
+      if (showStatus) setStatus({ text: `研究阶段读取失败：${error.message}`, tone: "bad" });
+      return null;
+    }
+  }, []);
+
   const fetchSyncProgress = useCallback(
     async (target) => {
       const params = new URLSearchParams({
@@ -277,27 +253,14 @@ function App() {
   );
 
   useEffect(() => {
-    let ignore = false;
-    async function loadBaseline() {
-      try {
-        const data = await apiFetch("/api/strategies/executable/cross-section-strength-risk8");
-        if (!ignore) {
-          setBaselineStrategy(data);
-          setBaselineError("");
-        }
-      } catch (error) {
-        if (!ignore) setBaselineError(error.message);
-      }
-    }
-    loadBaseline();
-    return () => {
-      ignore = true;
-    };
-  }, []);
+    if (view !== "single" || researchRuns.length || researchRunError) return;
+    void refreshResearchRuns("", false);
+  }, [refreshResearchRuns, researchRunError, researchRuns.length, view]);
 
   useEffect(() => {
-    void refreshResearchRuns("", false);
-  }, [refreshResearchRuns]);
+    if (!["single", "market"].includes(view) || researchOverview || researchOverviewError) return;
+    void refreshResearchOverview(false);
+  }, [refreshResearchOverview, researchOverview, researchOverviewError, view]);
 
   useEffect(() => {
     let ignore = false;
@@ -416,7 +379,7 @@ function App() {
           setResult(null);
           setSourceLabel(`${data.result.scope?.poolId ? "POOL" : "MARKET"}:${data.result.summary.tested}/${data.result.summary.candidates}`);
           setStatus({ text: `${scopeName}验证完成：测试 ${data.result.summary.tested} 只，正收益 ${data.result.summary.winners} 只`, tone: "good" });
-          setView((current) => (current === "quant" ? "quant" : "lab"));
+          setView("market");
         } else if (data.status === "failed") {
           localStorage.removeItem(MARKET_BACKTEST_JOB_KEY);
           setStatus({ text: data.error || data.message || "全市场验证失败", tone: "bad" });
@@ -570,6 +533,56 @@ function App() {
     });
   }
 
+  async function syncMarketFundamentals() {
+    await withBusy(async () => {
+      if (new Date(form.endDate) < new Date(form.startDate)) throw new Error("结束日期不能早于开始日期。");
+      if (!confirmMarketSync("全A基本面")) return;
+      const progressTarget = "daily_basic";
+      activateSyncProgress(progressTarget);
+      setSyncProgressPolling(true);
+      void refreshSyncProgress(progressTarget).catch(() => null);
+      setResult(null);
+      setMarketResult(null);
+      try {
+        setStatus({ text: "正在同步 A 股公司列表...", tone: "muted" });
+        const stockBasic = await apiFetch("/api/tushare/sync-stock-basic", { method: "POST", body: JSON.stringify({}) });
+
+        setStatus({ text: "正在补齐全市场估值数据...", tone: "muted" });
+        const dailyBasic = await apiFetch("/api/tushare/sync-market-daily-basic", {
+          method: "POST",
+          body: JSON.stringify({
+            start_date: form.startDate,
+            end_date: form.endDate,
+            max_trade_dates: 0,
+            skip_existing: true,
+            min_existing_rows: MARKET_SYNC_MIN_ROWS,
+          }),
+        });
+
+        setStatus({ text: "正在补齐全市场财务指标...", tone: "muted" });
+        const financial = await apiFetch("/api/tushare/sync-market-fundamentals", {
+          method: "POST",
+          body: JSON.stringify({
+            start_date: form.startDate,
+            end_date: form.endDate,
+            max_stocks: 0,
+            skip_existing: true,
+          }),
+        });
+
+        const failedCount = (dailyBasic.failed_dates?.length || 0) + (financial.failed_stocks?.length || 0);
+        setStatus({
+          text: `全A基本面载入完成：公司 ${stockBasic.rows_upserted}，估值 ${dailyBasic.rows_upserted}，财务 ${financial.financial_rows}，跳过 ${financial.skipped_stocks}`,
+          tone: failedCount ? "bad" : "good",
+        });
+        await runScreener(false);
+      } finally {
+        setSyncProgressPolling(false);
+        void refreshSyncProgress(progressTarget).catch(() => null);
+      }
+    });
+  }
+
   async function loadBars(showLoadedStatus = true, overrideCode = null) {
     const req = getDataRequest({ ...form, tsCode: overrideCode || form.tsCode });
     const params = new URLSearchParams(req);
@@ -629,7 +642,7 @@ function App() {
       const data = await apiFetch(`/api/stocks/${encodeURIComponent(req.ts_code)}/quality-analysis?${params.toString()}`);
       setQualityAnalysis(data);
       setStatus({ text: `${data.name || data.symbol} 质量诊断完成：${data.rating} / ${data.score}分`, tone: data.score >= 58 ? "good" : "muted" });
-      setView("analysis");
+      setView("diagnostic");
     });
   }
 
@@ -700,35 +713,37 @@ function App() {
       setStatus({ text: `正在回测 ${req.ts_code}...`, tone: "muted" });
       const data = await apiFetch("/api/backtests/run", {
         method: "POST",
-        body: JSON.stringify({ ...req, config: buildBacktestConfig(form) }),
+        body: JSON.stringify({ ...req, config: buildBacktestConfig(form, docsStrategyConfig) }),
       });
       setResult(data);
       setMarketResult(null);
       setBars(data.rows || []);
       setSourceLabel(`BT:${req.ts_code}`);
       setStatus({ text: `${req.ts_code} 回测完成：${data.trades.length} 笔流水`, tone: "good" });
-      setView("review");
+      setView("diagnostic");
     });
   }
 
   async function runMarketBacktest(options = {}) {
     if (marketBacktestActive) {
-      setView(options?.targetView || "lab");
+      setView(options?.targetView || "market");
       return;
     }
     const poolId = Number(options?.poolId || 0);
     const poolName = options?.poolName || (poolId === activePool?.id ? activePool?.name : "");
     const scopeLabel = poolId ? `标的池「${poolName || poolId}」` : "全市场";
-    const targetView = options?.targetView || "lab";
+    const targetView = options?.targetView || "market";
+    const startDate = options?.startDate || form.startDate;
+    const endDate = options?.endDate || form.endDate;
     await withBusy(async () => {
-      if (new Date(form.endDate) < new Date(form.startDate)) throw new Error("结束日期不能早于开始日期。");
+      if (new Date(endDate) < new Date(startDate)) throw new Error("结束日期不能早于开始日期。");
       setStatus({ text: `正在创建${scopeLabel}后台验证任务...`, tone: "muted" });
       const data = await apiFetch("/api/backtests/market/jobs", {
         method: "POST",
         body: JSON.stringify({
-          start_date: form.startDate,
-          end_date: form.endDate,
-          config: buildBacktestConfig(form),
+          start_date: startDate,
+          end_date: endDate,
+          config: buildBacktestConfig(form, docsStrategyConfig),
           pool_id: poolId || null,
           min_bars: 120,
           max_stocks: 0,
@@ -739,7 +754,7 @@ function App() {
       setResult(null);
       setMarketResult(null);
       setSourceLabel(`JOB:${data.jobId.slice(0, 8)}`);
-      setStatus({ text: `${scopeLabel}验证已进入后台：分批读取数据库，并发验证中...`, tone: "muted" });
+      setStatus({ text: `${scopeLabel}验证已进入后台：${startDate} 至 ${endDate}`, tone: "muted" });
       setView(targetView);
     });
   }
@@ -783,15 +798,35 @@ function App() {
     setScreenFilters((current) => ({ ...current, [name]: value }));
   }
 
-  function applyPreset(preset) {
-    setResult(null);
-    setMarketResult(null);
-    setForm((current) => ({ ...current, ...preset.config }));
-    setStatus({ text: `策略预设已切换：${preset.label}`, tone: "good" });
+  async function applyDocsStrategy(runId) {
+    await withBusy(async () => {
+      const data = await loadResearchRun(runId, false);
+      if (!data) throw new Error("docs 策略读取失败。");
+      const config = getResearchRunConfig(data);
+      if (!Object.keys(config).length) throw new Error("这个 docs 策略没有可应用的 config。");
+      setDocsStrategyConfig(config);
+      setSelectedDocsStrategy({
+        runId: data.runId,
+        label: data.strategy?.label || data.label || data.runId,
+        status: data.status,
+        metrics: data.metrics || {},
+        source: data.resultFiles?.strategies || data.resultFiles?.results || "docs/research/runs",
+      });
+      setResult(null);
+      setMarketResult(null);
+      setQualityAnalysis(null);
+      setForm((current) => ({ ...current, ...mapDocsConfigToForm(config) }));
+      setStatus({ text: `已套用 docs 策略：${data.strategy?.label || data.label || data.runId}`, tone: "good" });
+    });
   }
 
   async function changeResearchRun(runId) {
     await loadResearchRun(runId, true);
+  }
+
+  async function openResearchRun(runId) {
+    const data = await loadResearchRun(runId, true);
+    if (data) setView("market");
   }
 
   async function selectCandidate(stock, load = false) {
@@ -803,7 +838,7 @@ function App() {
     setSourceLabel(`标的:${stock.ts_code}`);
     setStatus({ text: `已选择 ${stock.name}（${stock.ts_code}）`, tone: "good" });
     if (load) {
-      setView("lab");
+      setView("single");
       await withBusy(() => loadBars(true, stock.ts_code));
     }
   }
@@ -817,7 +852,7 @@ function App() {
           </span>
           <div>
             <p className="eyebrow">Local Quant Research</p>
-            <h1>选股与策略研究台</h1>
+            <h1>四步策略验证台</h1>
             <div className="desk-header-meta">
               <span>{activeTab?.[1] || "工作区"}</span>
               <span>{rows.length ? `${rows.length} 根日线` : "等待行情"}</span>
@@ -852,11 +887,10 @@ function App() {
           <ActionCluster label="连接">
             <ActionButton icon={<Activity size={15} />} label="检测API" onClick={checkApi} disabled={busy} compact />
             <ActionButton icon={<RefreshCw size={15} />} label="同步列表" onClick={syncStockBasic} disabled={busy} compact />
-            <ActionButton icon={<ShieldCheck size={15} />} label="组合基线" onClick={() => loadExecutableStrategy(true)} disabled={busy} compact />
           </ActionCluster>
           <ActionCluster label="全市场预热">
             <ActionButton icon={<UploadCloud size={15} />} label="补齐日线" onClick={syncMarketDaily} disabled={busy} compact />
-            <ActionButton icon={<Database size={15} />} label="补齐估值" onClick={syncMarketDailyBasic} disabled={busy} compact />
+            <ActionButton icon={<Database size={15} />} label="全A基本面" onClick={syncMarketFundamentals} disabled={busy} compact />
           </ActionCluster>
           <ActionCluster label="当前标的">
             <ActionButton icon={<UploadCloud size={15} />} label="单票日线" onClick={syncDaily} disabled={busy} compact />
@@ -869,10 +903,10 @@ function App() {
         <MarketBacktestProgressStrip job={marketBacktestJob} />
       </section>
 
-      <section className={`research-grid ${view === "quant" || view === "baseline" ? "wide-workspace" : ""}`}>
+      <section className={`research-grid ${view === "market" ? "wide-workspace" : ""}`}>
         <aside className="context-rail">
           <FundamentalsPanel profile={profile} latestBar={latestBar} dataBars={rows.length} sourceLabel={sourceLabel} onSync={syncFundamentals} busy={busy} />
-          {view === "quant" ? <ResearchRunBrief run={researchRun} runs={researchRuns} /> : <StrategyBrief form={form} result={result} />}
+          <StrategyBrief form={form} result={result} selectedDocsStrategy={selectedDocsStrategy} />
           <section className="rail-panel">
             <PanelTitle icon={<Gauge size={17} />} title="指标快照" right={latestBar?.date || "无数据"} />
             <IndicatorTape bar={latestBar} />
@@ -899,6 +933,7 @@ function App() {
               onAddToPool={addStocksToActivePool}
               onAddResultsToPool={() => addStocksToActivePool(screenResults.map((stock) => stock.ts_code))}
               onRemoveFromPool={removeStockFromActivePool}
+              onSyncMarketFundamentals={syncMarketFundamentals}
               onRunPoolBacktest={() => {
                 if (!activePool?.member_count) {
                   setStatus({ text: "标的池里还没有股票。", tone: "bad" });
@@ -912,43 +947,39 @@ function App() {
             />
           ) : null}
 
-          {view === "lab" ? (
+          {view === "single" ? (
             <StrategyPanel
               form={form}
               metrics={metrics}
               rows={rows}
               trades={result?.trades || []}
               result={result}
-              marketResult={marketResult}
+              researchRuns={researchRuns}
+              selectedDocsStrategy={selectedDocsStrategy}
               onChange={updateForm}
-              onPreset={applyPreset}
-              onRun={runMarketBacktest}
+              onApplyDocsStrategy={applyDocsStrategy}
+              onRefreshResearchRuns={() => refreshResearchRuns(selectedResearchRunId, true)}
               onSingleRun={runBacktest}
+              onOpenMarket={() => setView("market")}
+              busy={busy}
+            />
+          ) : null}
+
+          {view === "market" ? (
+            <MarketValidationPanel
+              form={form}
+              metrics={metrics}
+              marketResult={marketResult}
+              marketJob={marketBacktestJob}
+              activePool={activePool}
+              selectedDocsStrategy={selectedDocsStrategy}
               busy={busy}
               marketBusy={marketBacktestActive}
-              marketJob={marketBacktestJob}
+              onRun={runMarketBacktest}
             />
           ) : null}
 
-          {view === "quant" ? (
-            <QuantCommandCenter
-              researchRuns={researchRuns}
-              selectedResearchRunId={selectedResearchRunId}
-              researchRun={researchRun}
-              researchRunError={researchRunError}
-              baselineRunId={baselineStrategy?.runId || ""}
-              onResearchRunChange={changeResearchRun}
-              onRefreshResearchRuns={() => refreshResearchRuns(selectedResearchRunId, true)}
-              onLoadBaseline={() => loadResearchRun(baselineStrategy?.runId || "", true)}
-              busy={busy}
-            />
-          ) : null}
-
-          {view === "baseline" ? <BaselineStrategyPanel data={baselineStrategy} error={baselineError} onReload={() => loadExecutableStrategy(false)} busy={busy} /> : null}
-
-          {view === "analysis" ? <QualityAnalysisPanel analysis={qualityAnalysis} onRun={runQualityAnalysis} busy={busy} /> : null}
-
-          {view === "review" ? <ReviewPanel result={result} rows={rows} symbolTitle={symbolTitle} /> : null}
+          {view === "diagnostic" ? <DiagnosticPanel analysis={qualityAnalysis} result={result} rows={rows} symbolTitle={symbolTitle} onRunQuality={runQualityAnalysis} busy={busy} /> : null}
         </section>
       </section>
     </main>
@@ -1015,6 +1046,7 @@ function ScreenerPanel({
   onAddToPool,
   onAddResultsToPool,
   onRemoveFromPool,
+  onSyncMarketFundamentals,
   onRunPoolBacktest,
   newsItems,
   newsMessage,
@@ -1052,6 +1084,12 @@ function ScreenerPanel({
           <SummaryCell label="候选" value={results.length} />
           <SummaryCell label="已同步基本面" value={syncedCount} />
           <SummaryCell label="综合较强" value={strongCount} />
+        </div>
+        <div className="screen-action-row">
+          <button className="primary-button" type="button" onClick={onSyncMarketFundamentals} disabled={busy}>
+            <Database size={17} /> 载入全A基本面
+          </button>
+          <span>同步公司列表、每日估值和财务指标后重新评分排名</span>
         </div>
         <QualityLeaderboard results={results} onSelect={onSelect} />
         <ResearchPoolConsole
@@ -1258,7 +1296,7 @@ function CandidateCards({ results, activePool, activePoolMemberCodes, onSelect, 
                   {activePoolMemberCodes.has(stock.ts_code) ? "已入池" : "入池"}
                 </button>
                 <button className="row-button" type="button" onClick={() => onSelect(stock, true)}>
-                  载入策略
+                  单票验证
                 </button>
               </div>
             </div>
@@ -1339,20 +1377,65 @@ function FactorMini({ label, value }) {
   );
 }
 
-function StrategyPanel({ form, metrics, rows, trades, result, marketResult, marketJob, onChange, onPreset, onRun, onSingleRun, busy, marketBusy = false }) {
+function DocsStrategyChooser({ runs, selected, onApply, onRefresh, busy }) {
+  const cards = useMemo(() => buildDocsStrategyCards(runs), [runs]);
+  return (
+    <section className="workspace-panel docs-strategy-panel">
+      <div className="docs-strategy-head">
+        <PanelTitle icon={<FileSearch size={17} />} title="docs 策略" right={cards.length ? `${cards.length} 个研究运行` : "等待 docs"} />
+        <button className="ghost-button" type="button" onClick={onRefresh} disabled={busy}>
+          <RefreshCw size={16} /> 刷新 docs
+        </button>
+      </div>
+      {cards.length ? (
+        <div className="docs-strategy-grid">
+          {cards.map((run) => {
+            const active = selected?.runId === run.runId;
+            return (
+              <button key={run.runId} type="button" className={`docs-strategy-card ${active ? "active" : ""}`} onClick={() => onApply(run.runId)} disabled={busy}>
+                <span className={`docs-strategy-status ${strategyStatusClass(run.status)}`}>{strategyStatusText(run.status)}</span>
+                <strong>{run.label || run.strategyName || run.runId}</strong>
+                <em>{run.runId}</em>
+                <div className="docs-strategy-meta">
+                  <span>年化 {formatPercent(run.metrics?.annualizedReturn, 2)}</span>
+                  <span>回撤 {formatPercent(run.metrics?.maxDrawdown, 2)}</span>
+                  <span>盈亏比 {formatProfitLossRatio(run.metrics?.profitLossRatio)}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="empty-state docs-strategy-empty">未读取到 docs/research/runs 策略</div>
+      )}
+    </section>
+  );
+}
+
+function StrategyPanel({
+  form,
+  metrics,
+  rows,
+  trades,
+  result,
+  researchRuns,
+  selectedDocsStrategy,
+  onChange,
+  onApplyDocsStrategy,
+  onRefreshResearchRuns,
+  onSingleRun,
+  onOpenMarket,
+  busy,
+}) {
   return (
     <section className="strategy-layout">
-      <section className="workspace-panel">
-        <PanelTitle icon={<TrendingUp size={17} />} title="策略预设" right={ENTRY_PRESETS.find((item) => item.value === form.entryMode)?.bias || "自定义"} />
-        <div className="preset-grid">
-          {ENTRY_PRESETS.map((preset) => (
-            <button key={preset.value} type="button" className={form.entryMode === preset.value ? "active" : ""} onClick={() => onPreset(preset)}>
-              <strong>{preset.label}</strong>
-              <span>{preset.bias}</span>
-            </button>
-          ))}
-        </div>
-      </section>
+      <DocsStrategyChooser
+        runs={researchRuns}
+        selected={selectedDocsStrategy}
+        onApply={onApplyDocsStrategy}
+        onRefresh={onRefreshResearchRuns}
+        busy={busy}
+      />
 
       <section className="metric-grid">
         {metrics.map((item) => (
@@ -1415,22 +1498,372 @@ function StrategyPanel({ form, metrics, rows, trades, result, marketResult, mark
             <ToggleField label="RSI过滤" checked={form.useRsiFilter} onChange={(value) => onChange("useRsiFilter", value)} />
           </div>
           <div className="action-pair">
-            <button className="primary-button wide-action" type="button" onClick={onRun} disabled={busy || marketBusy}>
-              <Play size={17} /> {marketBusy ? "验证中..." : "全市场验证"}
+            <button className="primary-button wide-action" type="button" onClick={onSingleRun} disabled={busy}>
+              <Play size={17} /> 运行单票验证
             </button>
-            <button className="ghost-button wide-action" type="button" onClick={onSingleRun} disabled={busy}>
-              <Bot size={16} /> 单票AI复盘
+            <button className="ghost-button wide-action" type="button" onClick={onOpenMarket} disabled={busy}>
+              <Database size={16} /> 转到全市场验证
             </button>
           </div>
         </section>
       </section>
 
-      <MarketBacktestPanel result={marketResult} job={marketJob} />
-
       <section className="workspace-panel">
         <PanelTitle icon={<Activity size={17} />} title="交易流水" right={result ? `${result.trades.length} 笔` : "0 笔"} />
         <TradeTable trades={result?.trades || []} />
       </section>
+    </section>
+  );
+}
+
+function MarketValidationPanel({ form, metrics, marketResult, marketJob, activePool, selectedDocsStrategy, busy, marketBusy, onRun }) {
+  const endDate = form.endDate || dateToday();
+  const year = Number(String(endDate).slice(0, 4)) || new Date().getFullYear();
+  const yearStart = `${year}-01-01`;
+  const threeYearStart = dateYearsBefore(endDate, 3);
+  const runDisabled = busy || marketBusy;
+  const routeCards = [
+    ["单票", form.tsCode || "--", "先在单票验证页确认策略信号、K线层和交易流水"],
+    ["年度全市场", `${yearStart} / ${endDate}`, "同一策略参数应用到当前年份全A样本"],
+    ["三年全市场", `${threeYearStart} / ${endDate}`, "拉长窗口后检查收益、回撤和尾部样本"],
+  ];
+
+  return (
+    <section className="market-validation-layout">
+      <section className="workspace-panel market-validation-hero">
+        <div>
+          <p className="eyebrow">Scale Out Validation</p>
+          <h2>从单票到全市场</h2>
+          <strong>{selectedDocsStrategy?.label || "待选择 docs 策略"}</strong>
+          <span>
+            当前参数会原样应用到批量验证；这里只生成研究证据，不构成交易指令。
+          </span>
+        </div>
+        <div className="market-validation-actions">
+          <button className="primary-button" type="button" onClick={() => onRun({ targetView: "market" })} disabled={runDisabled}>
+            <Play size={16} /> 当前区间全市场
+          </button>
+          <button className="ghost-button" type="button" onClick={() => onRun({ targetView: "market", startDate: yearStart, endDate })} disabled={runDisabled}>
+            <BarChart3 size={16} /> 当前年份
+          </button>
+          <button className="ghost-button" type="button" onClick={() => onRun({ targetView: "market", startDate: threeYearStart, endDate })} disabled={runDisabled}>
+            <Database size={16} /> 三年全市场
+          </button>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => onRun({ targetView: "market", poolId: activePool?.id, poolName: activePool?.name })}
+            disabled={runDisabled || !activePool?.member_count}
+          >
+            <Layers3 size={16} /> 验证当前池
+          </button>
+        </div>
+      </section>
+
+      <section className="metric-grid">
+        {metrics.map((item) => (
+          <MetricTile key={item.label} {...item} />
+        ))}
+      </section>
+
+      <section className="workspace-panel">
+        <PanelTitle icon={<GitBranch size={17} />} title="手动验证路径" right={marketBusy ? "后台运行中" : "点到面"} />
+        <div className="market-route-grid">
+          {routeCards.map(([label, value, detail]) => (
+            <article key={label} className="market-route-card">
+              <span>{label}</span>
+              <strong>{value}</strong>
+              <em>{detail}</em>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <MarketBacktestPanel result={marketResult} job={marketJob} />
+    </section>
+  );
+}
+
+function ResearchStagePanel({ overview, error, onRefresh, onOpenRun, busy }) {
+  const stage = overview?.stage || {};
+  const target = overview?.target || {};
+  const integratedRuns = overview?.integratedRuns || [];
+  const sessions = overview?.activeSessions || [];
+  const inbox = overview?.evidenceInbox || {};
+  const unmergedRuns = inbox.unmergedRuns || [];
+  const sessionEvidence = inbox.sessionEvidence || [];
+  const warnings = overview?.integrationWarnings || [];
+  const stageTitle = stage.stageId || overview?.activeStage?.stageId || "研究阶段未载入";
+  const gateItems = [
+    ["年化收益", `>= ${formatPercent(target.annualizedReturn, 0)}`, "当前阶段硬门槛"],
+    ["最大回撤", `< ${formatPercent(target.maxAbsDrawdown, 0)}`, "按绝对值审计"],
+    ["盈亏比", `>= ${formatNumber(target.profitLossRatio)}:1`, "已完成交易口径"],
+    ["滚动窗口", ">= 5/7", "仅整合证据可判定"],
+  ];
+
+  return (
+    <section className="research-stage-layout">
+      <section className="workspace-panel research-stage-hero">
+        <div>
+          <p className="eyebrow">Parallel Research Control</p>
+          <h2>{stageTitle}</h2>
+          <strong>{stage.status || "unknown"} · {overview?.currentMainline || "未声明主线 run"}</strong>
+          <span>{stage.objective || overview?.activeStage?.objective || "等待阶段目标"}</span>
+        </div>
+        <div className="research-stage-actions">
+          <button className="ghost-button" type="button" onClick={onRefresh} disabled={busy}>
+            <RefreshCw size={16} /> 刷新阶段证据
+          </button>
+          {error ? <span className="stage-error">{error}</span> : <span>{overview?.officialConclusionSource || "正式结论只来自整合证据"}</span>}
+        </div>
+      </section>
+
+      <section className="metric-grid stage-metrics">
+        <MetricTile label="正式 run" value={formatInteger(overview?.integratedRunCount)} tone="neutral" sub="已写入 research-runs.json" />
+        <MetricTile label="并行 session" value={formatInteger(overview?.sessionCount)} tone={sessions.length ? "good" : "neutral"} sub={stage.sessionsDirExists ? "sessions/ 已存在" : "等待 session 认领"} />
+        <MetricTile label="待整合证据" value={formatInteger(inbox.count)} tone={inbox.count ? "bad" : "good"} sub="不参与阶段结论" />
+        <MetricTile label="长期目标" value={formatPercent(overview?.ultimateTarget?.annualizedReturn, 0)} tone="neutral" sub={`终极盈亏比 ${formatNumber(overview?.ultimateTarget?.profitLossRatio)}:1`} />
+      </section>
+
+      <div className="research-stage-grid">
+        <section className="workspace-panel stage-gate-panel">
+          <PanelTitle icon={<ClipboardCheck size={17} />} title="阶段闸门" right="只读目标" />
+          <div className="stage-gate-grid">
+            {gateItems.map(([label, value, detail]) => (
+              <span key={label}>
+                <em>{label}</em>
+                <strong>{value}</strong>
+                <b>{detail}</b>
+              </span>
+            ))}
+          </div>
+          <StageList title="优先验证假设" items={stage.priorityHypotheses} />
+          <StageList title="禁止重复尝试" items={stage.forbiddenAttempts} danger />
+        </section>
+
+        <section className="workspace-panel stage-session-panel">
+          <PanelTitle icon={<GitBranch size={17} />} title="并行 Session" right={sessions.length ? `${sessions.length} 条线` : "未认领"} />
+          <div className="stage-session-stack">
+            {sessions.length ? (
+              sessions.map((session) => (
+                <Fragment key={session.sessionId}>
+                  <ResearchSessionCard session={session} />
+                </Fragment>
+              ))
+            ) : (
+              <div className="stage-empty">
+                <strong>当前阶段还没有 session 目录</strong>
+                <span>{stage.sessionsDir || "docs/research/stages/<stage>/sessions"} 出现后会自动归入这里。</span>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <section className="workspace-panel">
+        <PanelTitle icon={<Inbox size={17} />} title="证据收件箱" right={inbox.count ? `${inbox.count} 项待复核` : "清洁"} />
+        {warnings.length ? (
+          <div className="stage-warning-strip">
+            {warnings.map((item) => (
+              <span key={item}>
+                <AlertTriangle size={14} /> {item}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        <ResearchInbox runs={unmergedRuns} sessionEvidence={sessionEvidence} onOpenRun={onOpenRun} busy={busy} />
+      </section>
+
+      <section className="workspace-panel">
+        <PanelTitle icon={<FileSearch size={17} />} title="正式 Run 对比账本" right={`${integratedRuns.length} 条`} />
+        <ResearchRunLedger runs={integratedRuns} onOpenRun={onOpenRun} busy={busy} />
+      </section>
+    </section>
+  );
+}
+
+function StageList({ title, items = [], danger = false }) {
+  return (
+    <div className={`stage-list${danger ? " danger" : ""}`}>
+      <strong>{title}</strong>
+      {items.length ? (
+        <ul>
+          {items.slice(0, 5).map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : (
+        <span>暂无结构化条目</span>
+      )}
+    </div>
+  );
+}
+
+function ResearchSessionCard({ session }) {
+  return (
+    <article className={`stage-session-card ${session.hasEvidence ? "has-evidence" : ""}`}>
+      <div>
+        <strong>{session.topic || session.sessionId}</strong>
+        <span>{session.sessionId}</span>
+      </div>
+      <b>{session.status || "进行中"}</b>
+      <p>{session.question || session.hypothesis || "session.md 暂未写入研究问题。"}</p>
+      <em>{session.hasEvidence ? "已有 evidence.md，等待整合复核" : "暂无证据文件"}</em>
+    </article>
+  );
+}
+
+function ResearchInbox({ runs, sessionEvidence, onOpenRun, busy }) {
+  if (!runs.length && !sessionEvidence.length) {
+    return (
+      <div className="stage-empty inline">
+        <strong>暂无待整合证据</strong>
+        <span>正式结论目前只来自 research-runs.json。</span>
+      </div>
+    );
+  }
+  return (
+    <div className="stage-inbox-grid">
+      <div className="table-wrap stage-run-table">
+        <table>
+          <thead>
+            <tr>
+              <th>待整合 run</th>
+              <th>状态</th>
+              <th>年化</th>
+              <th>回撤</th>
+              <th>盈亏比</th>
+              <th>证据边界</th>
+              <th>动作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {runs.length ? (
+              runs.map((run) => (
+                <Fragment key={run.runId}>
+                  <ResearchRunRow run={run} onOpenRun={onOpenRun} busy={busy} />
+                </Fragment>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="7" className="empty-state">没有发现当前阶段未整合 run</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="stage-session-evidence">
+        {sessionEvidence.length ? (
+          sessionEvidence.map((session) => (
+            <span key={session.sessionId}>
+              <strong>{session.sessionId}</strong>
+              <em>{session.evidenceSummary || "evidence.md 已存在，等待整合。"}</em>
+            </span>
+          ))
+        ) : (
+          <span>
+            <strong>session evidence</strong>
+            <em>暂无 session 级 evidence.md</em>
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResearchRunLedger({ runs, onOpenRun, busy }) {
+  return (
+    <div className="table-wrap stage-run-table">
+      <table>
+        <thead>
+          <tr>
+            <th>正式 run</th>
+            <th>结论</th>
+            <th>窗口</th>
+            <th>年化</th>
+            <th>总收益</th>
+            <th>最大回撤</th>
+            <th>盈亏比</th>
+            <th>下一步</th>
+            <th>动作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {runs.length ? (
+            runs.map((run) => (
+              <Fragment key={run.runId}>
+                <ResearchRunRow run={run} onOpenRun={onOpenRun} busy={busy} integrated />
+              </Fragment>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="9" className="empty-state">research-runs.json 暂无正式 run</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ResearchRunRow({ run, onOpenRun, busy, integrated = false }) {
+  const metrics = run.metrics || {};
+  const canOpen = Boolean(run.resultFiles?.results);
+  return (
+    <tr>
+      <td>
+        <strong>{run.runId}</strong>
+        <em>{run.parameterSummary || run.label || "--"}</em>
+      </td>
+      <td>{run.statusTier || run.status || (integrated ? "正式" : "待整合")}</td>
+      {integrated ? <td>{formatWindowPass(run)}</td> : null}
+      <td>{formatPercent(metrics.annualizedReturn, 2)}</td>
+      {integrated ? <td>{formatPercent(metrics.totalReturn, 2)}</td> : null}
+      <td>{formatPercent(metrics.maxDrawdown, 2)}</td>
+      <td>{metrics.profitLossRatio == null ? "n/a" : `${formatNumber(metrics.profitLossRatio)}:1`}</td>
+      <td>{integrated ? run.nextAction || run.failureReason || "--" : run.warning || "待整合"}</td>
+      <td>
+        <button className="row-button" type="button" onClick={() => onOpenRun(run.runId)} disabled={busy || !canOpen}>
+          载入
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function formatWindowPass(run) {
+  if (run.passedWindows != null || run.failedWindows != null) {
+    return `${formatInteger(run.passedWindows || 0)}/${formatInteger((run.passedWindows || 0) + (run.failedWindows || 0))}`;
+  }
+  if (run.rollingWindowPass === true) return "通过";
+  if (run.rollingWindowPass === false) return "未过";
+  return "--";
+}
+
+function ResearchStageBrief({ overview, error }) {
+  const inboxCount = overview?.evidenceInbox?.count || 0;
+  const stage = overview?.stage || {};
+  return (
+    <section className="rail-panel">
+      <PanelTitle icon={<GitBranch size={17} />} title="阶段证据边界" right={stage.status || "unknown"} />
+      <ul className="audit-list">
+        <li>
+          <i className={`audit-dot ${error ? "warn" : "ok"}`} />
+          <span>{error || stage.stageId || "等待阶段信息"}</span>
+        </li>
+        <li>
+          <i className="audit-dot ok" />
+          <span>正式 run：{formatInteger(overview?.integratedRunCount)}，只读自 research-runs.json</span>
+        </li>
+        <li>
+          <i className={`audit-dot ${inboxCount ? "warn" : "ok"}`} />
+          <span>待整合证据：{formatInteger(inboxCount)}，不参与阶段结论</span>
+        </li>
+        <li>
+          <i className="audit-dot warn" />
+          <span>并行 session：{formatInteger(overview?.sessionCount)}，只展示进度与证据</span>
+        </li>
+      </ul>
     </section>
   );
 }
@@ -2443,6 +2876,15 @@ function QualityAnalysisPanel({ analysis, onRun, busy }) {
   );
 }
 
+function DiagnosticPanel({ analysis, result, rows, symbolTitle, onRunQuality, busy }) {
+  return (
+    <section className="diagnostic-layout">
+      <QualityAnalysisPanel analysis={analysis} onRun={onRunQuality} busy={busy} />
+      <ReviewPanel result={result} rows={rows} symbolTitle={symbolTitle} />
+    </section>
+  );
+}
+
 function MiniList({ title, items }) {
   return (
     <div className="mini-list">
@@ -2539,14 +2981,13 @@ function FundamentalsPanel({ profile, latestBar, dataBars, sourceLabel, onSync, 
   );
 }
 
-function StrategyBrief({ form, result }) {
-  const preset = ENTRY_PRESETS.find((item) => item.value === form.entryMode);
+function StrategyBrief({ form, result, selectedDocsStrategy }) {
   return (
     <section className="rail-panel">
-      <PanelTitle icon={<ShieldCheck size={17} />} title="当前策略" right={preset?.bias || "自定义"} />
+      <PanelTitle icon={<ShieldCheck size={17} />} title="当前策略" right={selectedDocsStrategy?.runId || "docs 待选择"} />
       <div className="strategy-stamp">
-        <strong>{preset?.label || form.entryMode}</strong>
-        <span>周交易≤{form.weeklyTradeLimit} · 仓位≤{form.positionCapPct}% · 风险≤{form.riskPct}%</span>
+        <strong>{selectedDocsStrategy?.label || "请选择 docs 策略"}</strong>
+        <span>{selectedDocsStrategy?.source || "来源：docs/research/runs"}</span>
       </div>
       <ul className="audit-list">
         <li>
@@ -3122,8 +3563,8 @@ function parseStockCodes(text) {
     .filter(Boolean);
 }
 
-function buildBacktestConfig(form) {
-  return {
+function buildBacktestConfig(form, baseConfig = null) {
+  const visibleConfig = {
     symbolName: form.stockName ? `${form.stockName} ${form.tsCode.trim().toUpperCase()}` : "",
     marketState: form.marketState,
     entryMode: form.entryMode,
@@ -3165,6 +3606,100 @@ function buildBacktestConfig(form) {
     forceStopOverridesLimit: form.forceStopOverridesLimit,
     blockSameDayReentry: form.blockSameDayReentry,
   };
+  return { ...(baseConfig || {}), ...visibleConfig };
+}
+
+function getResearchRunConfig(run) {
+  return run?.strategy?.config || run?.payload?.config || {};
+}
+
+function mapDocsConfigToForm(config) {
+  const mapped = {};
+  assignFormValue(mapped, "marketState", config.marketState);
+  assignFormValue(mapped, "entryMode", config.entryMode);
+  assignFormNumber(mapped, "initialCash", config.initialCash);
+  assignFormNumber(mapped, "weeklyTradeLimit", config.weeklyTradeLimit);
+  assignFormPercent(mapped, "positionCapPct", config.positionCapPct ?? config.maxSinglePositionPct);
+  assignFormPercent(mapped, "riskPct", config.riskPct);
+  assignFormPercent(mapped, "stopLossPct", config.stopLossPct);
+  assignFormPercent(mapped, "takeProfit1Pct", config.takeProfit1Pct);
+  assignFormPercent(mapped, "takeProfit2Pct", config.takeProfit2Pct);
+  assignFormPercent(mapped, "commissionPct", config.commissionPct);
+  assignFormPercent(mapped, "stampDutyPct", config.stampDutyPct);
+  assignFormNumber(mapped, "lotSize", config.lotSize);
+  assignFormNumber(mapped, "bollPeriod", config.bollPeriod);
+  assignFormNumber(mapped, "bollDev", config.bollDev);
+  assignFormPercent(mapped, "bollTolerancePct", config.bollTolerancePct);
+  assignFormPercent(mapped, "bollBandwidthMaxPct", config.bollBandwidthMaxPct);
+  assignFormPercent(mapped, "midlineTolerancePct", config.midlineTolerancePct);
+  assignFormNumber(mapped, "trendFastPeriod", config.trendFastPeriod);
+  assignFormNumber(mapped, "trendSlowPeriod", config.trendSlowPeriod);
+  assignFormNumber(mapped, "trendLongPeriod", config.trendLongPeriod);
+  assignFormNumber(mapped, "volumeMaPeriod", config.volumeMaPeriod);
+  assignFormNumber(mapped, "volumeBreakoutMultiplier", config.volumeBreakoutMultiplier);
+  assignFormValue(mapped, "useTrendFilter", config.useTrendFilter);
+  assignFormValue(mapped, "useMacdFilter", config.useMacdFilter);
+  assignFormNumber(mapped, "macdFastPeriod", config.macdFastPeriod);
+  assignFormNumber(mapped, "macdSlowPeriod", config.macdSlowPeriod);
+  assignFormNumber(mapped, "macdSignalPeriod", config.macdSignalPeriod);
+  assignFormValue(mapped, "macdRequireZeroAxis", config.macdRequireZeroAxis);
+  assignFormValue(mapped, "useRsiFilter", config.useRsiFilter);
+  assignFormNumber(mapped, "rsiPeriod", config.rsiPeriod);
+  assignFormNumber(mapped, "rsiLowerBound", config.rsiLowerBound);
+  assignFormNumber(mapped, "rsiUpperBound", config.rsiUpperBound);
+  assignFormNumber(mapped, "kdjPeriod", config.kdjPeriod);
+  assignFormNumber(mapped, "atrPeriod", config.atrPeriod);
+  assignFormValue(mapped, "useAtrStop", config.useAtrStop);
+  assignFormNumber(mapped, "atrStopMultiplier", config.atrStopMultiplier);
+  assignFormValue(mapped, "blockWeakMarket", config.blockWeakMarket);
+  assignFormValue(mapped, "forceStopOverridesLimit", config.forceStopOverridesLimit);
+  assignFormValue(mapped, "blockSameDayReentry", config.blockSameDayReentry);
+  return mapped;
+}
+
+function assignFormValue(target, key, value) {
+  if (value !== undefined && value !== null && value !== "") target[key] = value;
+}
+
+function assignFormNumber(target, key, value) {
+  if (value === undefined || value === null || value === "") return;
+  const numberValue = Number(value);
+  if (Number.isFinite(numberValue)) target[key] = compactNumberString(numberValue);
+}
+
+function assignFormPercent(target, key, value) {
+  if (value === undefined || value === null || value === "") return;
+  const numberValue = Number(value);
+  if (Number.isFinite(numberValue)) target[key] = compactNumberString(numberValue * 100);
+}
+
+function compactNumberString(value) {
+  return Number(value).toFixed(6).replace(/\.?0+$/, "");
+}
+
+function buildDocsStrategyCards(runs) {
+  return (runs || [])
+    .filter((run) => run?.runId && (run.strategyName || run.label || run.resultFiles?.strategies))
+    .slice(0, 12);
+}
+
+function strategyStatusText(status) {
+  if (status === "target_pass") return "阶段通过";
+  if (status === "completed" || status === "ok") return "观察";
+  if (status === "review") return "复核";
+  if (status === "failed") return "失败";
+  return status || "docs";
+}
+
+function strategyStatusClass(status) {
+  if (status === "target_pass") return "pass";
+  if (status === "failed") return "fail";
+  if (status === "review") return "review";
+  return "observe";
+}
+
+function formatProfitLossRatio(value) {
+  return isFiniteNumber(value) ? `${formatNumber(value)}:1` : "--";
 }
 
 async function apiFetch(path, options = {}) {
@@ -3369,6 +3904,13 @@ function dateToday() {
 
 function dateYearsAgo(years) {
   const date = new Date();
+  date.setFullYear(date.getFullYear() - years);
+  return formatDate(date);
+}
+
+function dateYearsBefore(value, years) {
+  const [year, month, day] = String(value || dateToday()).split("-").map(Number);
+  const date = new Date(year, (month || 1) - 1, day || 1);
   date.setFullYear(date.getFullYear() - years);
   return formatDate(date);
 }

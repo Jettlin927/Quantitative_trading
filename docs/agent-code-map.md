@@ -2,9 +2,18 @@
 
 这份文档给后续 AI Agent 快速定位代码用。它不是产品说明，而是“从目标到代码位置”的导航图。项目主管规则仍以根目录 `AGENTS.md` 为准。
 
+如果是接手当前分支、PR 或阶段性验收，先看 `docs/agent-handoff.md`；这里主要负责代码和文档位置导航。
+
 ## 一句话架构
 
 本仓库是本地量化研究工作台：React/Vite 前端负责人机交互，FastAPI 后端负责数据同步、指标计算、策略回测、AI/本地复盘，PostgreSQL 负责持久化 Tushare 行情、基本面、同步记录和自选标的池。
+
+## 四区导航
+
+- 美股操作层：`my_quant/us_research/`，已包含 sample 持仓、观察池、yfinance 快照脚本、HTML/Markdown 操作报告和规则证据引用入口。
+- A 股数据沙盘：`backend/app/`、`docker-compose.yml`、PostgreSQL volume 和 `docs/research/a-share-data/`，继续服务 Tushare 同步、A 股研究池和大样本验证。
+- 策略思想库：`docs/research/strategy-lab/`，已放“不追高”“止跌后加仓”“同因子杠杆预算”等规则卡片和负证据入口。
+- 回测证据档案：`docs/research/backtest-reports/`、`docs/research/runs/`、`my_quant/strategy_research/results/`、`my_quant/strategy_research/web_report/`。
 
 ```text
 人类/AI Agent
@@ -23,6 +32,7 @@
 - `停止回测系统.cmd`：停止服务。
 - `README.md`：面向人类的使用说明和截图。
 - `AGENTS.md`：面向 AI Agent 的项目主管规则。
+- `docs/agent-handoff.md`：面向后续 Agent 的当前 PR、活跃阶段、验证命令和本机坑点交接。
 
 ## 后端地图
 
@@ -98,6 +108,29 @@
 - `frontend/package.json`
   - `npm run lint`、`npm run typecheck`、`npm run build`。
   - 依赖包含 `react`、`vite`、`lightweight-charts`、`lucide-react`。
+
+## 独立研究工作区地图
+
+- `my_quant/`
+  - 从 `xquant-beginner` 收拢来的独立研究工作区，依赖和运行方式与主 FastAPI/React 栈分开。
+  - 接手说明看 `my_quant/README.md`，策略研究说明看 `my_quant/strategy_research/README.md`。
+
+- `my_quant/us_research/`
+  - 文件化美股操作层，只使用 sample 持仓和 sample 观察池，不读取真实券商导出。
+  - `scripts/refresh_us_snapshot.py` 使用 yfinance 生成 `data/snapshots/us_snapshot_latest.{json,csv}`，字段包含 `fetched_at`、`source`、`is_stale` 和趋势指标。
+  - `scripts/build_us_operations_report.py` 从快照生成 `reports/latest_us_operations.html` 和 `reports/latest_us_operations.md`，报告中的动作标签只作研究辅助。
+
+- `my_quant/strategy_research/experiment/b1_trend_pullback.py`
+  - B1 A 股趋势回调组合实验核心，包含 Tushare/AkShare 数据读取、候选排序、现实成交约束和组合回测。
+  - `fetch_tushare_index_bars()` 会检查指数缓存最大日期，缓存不覆盖请求结束日时刷新，避免盘前预案读到半旧指数。
+
+- `my_quant/strategy_research/experiment/kronos_forecast_slope.py`
+  - 把 Kronos 预测统计路径转换成研究用 `buy` / `sell` / `hold` 信号。
+  - 只评估预测路径斜率、预测收益和下行分位过滤，不连接券商、不产生真实交易动作。
+
+- `my_quant/strategy_research/run_kronos_hk_forecast.py`
+  - 从 `kronos-预测` 收拢来的港股 Kronos 预测包装入口。
+  - 需要通过 `--kronos-dir` 或 `KRONOS_DIR` 指向外部 Kronos checkout；本仓不内置第三方模型仓库和虚拟环境。
 
 ## AI 科研闭环落点
 

@@ -1,0 +1,14 @@
+{
+  "strategy": "b1_tushare_quality_gate_top300",
+  "html": "/Users/jettlin/Documents/xquant-beginner/my_quant/strategy_research/web_report/b1_quality_strategy.html",
+  "display_capital": 1000000.0,
+  "artifacts": {
+    "nav": "b1_tushare_quality_gate_top300_nav.csv",
+    "trades": "b1_tushare_quality_gate_top300_trades.csv",
+    "candidates": "b1_tushare_quality_gate_top300_candidates.csv",
+    "summary": "b1_tushare_quality_gate_top300_summary.md",
+    "manifest": "b1_tushare_quality_gate_top300_manifest.json",
+    "round_trips": "b1_tushare_quality_gate_top300_round_trips.csv",
+    "nav_with_drawdown": "b1_tushare_quality_gate_top300_nav_with_drawdown.csv"
+  }
+}
