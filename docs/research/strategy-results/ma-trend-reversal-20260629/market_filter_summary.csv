@@ -1,0 +1,7 @@
+rule,market_regime,raw_signals,passed_signals,filtered_out
+ma5_cross_up_ma20_above_ma60,bear_or_warmup,11797,0,11797
+ma5_cross_up_ma20_above_ma60,risk_on,46605,46605,0
+ma5_cross_up_ma20_above_ma60,transition,3895,0,3895
+ma5_gt_ma20_5pct_3d,bear_or_warmup,22259,0,22259
+ma5_gt_ma20_5pct_3d,risk_on,51319,51319,0
+ma5_gt_ma20_5pct_3d,transition,11744,0,11744

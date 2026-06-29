@@ -43,6 +43,7 @@ from .schemas import (
 )
 from .tushare_client import decimal_or_none, get_pro_api, parse_tushare_date, tushare_date
 from .us_research import build_us_research_import_preview, build_us_research_overview
+from .strategy_results import build_strategy_results_overview
 
 
 Base.metadata.create_all(bind=engine)
@@ -427,6 +428,11 @@ def import_us_research_sample_to_db(db: Session = Depends(get_db)) -> dict[str, 
 @app.get("/api/us-research/db-overview")
 def get_us_research_db_overview(db: Session = Depends(get_db)) -> dict[str, Any]:
     return build_us_research_db_overview(db)
+
+
+@app.get("/api/strategy-results/overview")
+def get_strategy_results_overview() -> dict[str, Any]:
+    return build_strategy_results_overview(REPO_ROOT)
 
 
 def get_table_counts(db: Session) -> dict[str, int]:

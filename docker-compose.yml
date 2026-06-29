@@ -21,6 +21,9 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
     container_name: quant_trading_api
     restart: unless-stopped
     depends_on:
@@ -41,6 +44,8 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-}
     container_name: quant_trading_frontend
     restart: unless-stopped
     depends_on:

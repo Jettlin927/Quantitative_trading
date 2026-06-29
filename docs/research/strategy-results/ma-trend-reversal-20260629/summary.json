@@ -1,0 +1,436 @@
+{
+  "status": "ok",
+  "generated_at": "2026-06-29T16:56:59",
+  "strategy": "MA5/MA20/MA60 趋势跟踪 + 趋势反转",
+  "data_coverage": {
+    "min_date": "2021-06-28",
+    "max_date": "2026-06-01",
+    "rows": 6155285,
+    "symbols": 5713,
+    "trade_dates": 1193
+  },
+  "assumptions": {
+    "signal_timing": "收盘后确认信号，下一交易日开盘买入。",
+    "market_filter": "从 stock_daily_bars 构造全市场等权市场代理，market_nav > MA60 且 MA20 > MA60 时允许开仓。",
+    "trend_following": "MA5 / MA20 - 1 >= 5% 连续 3 个交易日，且只记录首次确认日。",
+    "trend_reversal": "MA5 当日上穿 MA20，MA5 较前日抬升，且 MA5 与 MA20 均在 MA60 上方。",
+    "filtered_trend_entry": "大盘 risk_on，MA5 > MA20 连续 3 天，MA20 5日斜率为正，MA20 > MA60 或 MA60 10日斜率为正，收盘价位于 MA20 上方且距离不超过 8%，20日平均成交额不低于 5000 万元等价的 Tushare amount=50000，并对同一标的设置 20 个交易日冷却。",
+    "filtered_trend_entry_top10": "在过滤版信号上按强度评分排序，每个交易日最多保留 10 个信号。",
+    "costs": {
+      "buy_cost_rate": 0.00035,
+      "sell_cost_rate": 0.00085,
+      "slippage_rate": 0.001
+    },
+    "portfolio": {
+      "initial_cash": 1000000,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "lot_size": 100,
+      "volume_capacity_pct": 0.05
+    }
+  },
+  "counts": {
+    "signals": 181824,
+    "events": 180553
+  },
+  "event_summary": [
+    {
+      "rule": "ma5_cross_up_ma20_above_ma60",
+      "horizon": 5,
+      "event_count": 45721,
+      "mean_return": -0.006043739588406032,
+      "median_return": -0.010973092696770936,
+      "win_rate": 0.4055904289057545,
+      "best_return": 0.9745005584314212,
+      "worst_return": -0.5496452451061571
+    },
+    {
+      "rule": "ma5_cross_up_ma20_above_ma60",
+      "horizon": 10,
+      "event_count": 45669,
+      "mean_return": -0.009604573394323614,
+      "median_return": -0.01807336215512023,
+      "win_rate": 0.40138825023538943,
+      "best_return": 2.4813614282732277,
+      "worst_return": -0.5794832827034855
+    },
+    {
+      "rule": "ma5_cross_up_ma20_above_ma60",
+      "horizon": 20,
+      "event_count": 45193,
+      "mean_return": -0.019404705951063802,
+      "median_return": -0.03425757663415019,
+      "win_rate": 0.3815413891531874,
+      "best_return": 4.041256777943274,
+      "worst_return": -0.6907212560340837
+    },
+    {
+      "rule": "ma5_cross_up_ma20_above_ma60",
+      "horizon": 60,
+      "event_count": 44535,
+      "mean_return": -0.0037293031182513646,
+      "median_return": -0.042751412577147874,
+      "win_rate": 0.3889974177613113,
+      "best_return": 5.081950960406351,
+      "worst_return": -0.883867458542618
+    },
+    {
+      "rule": "ma5_gt_ma20_3d_filtered",
+      "horizon": 5,
+      "event_count": 76449,
+      "mean_return": -0.0017643703065998203,
+      "median_return": -0.008713052876771266,
+      "win_rate": 0.429449698491805,
+      "best_return": 0.9718737974411236,
+      "worst_return": -0.5395237833247382
+    },
+    {
+      "rule": "ma5_gt_ma20_3d_filtered",
+      "horizon": 10,
+      "event_count": 75725,
+      "mean_return": -0.0023074323699597554,
+      "median_return": -0.011443836753572967,
+      "win_rate": 0.43672499174645096,
+      "best_return": 1.558761074335362,
+      "worst_return": -0.5900641914045885
+    },
+    {
+      "rule": "ma5_gt_ma20_3d_filtered",
+      "horizon": 20,
+      "event_count": 74411,
+      "mean_return": -0.004392128697823247,
+      "median_return": -0.02195275625217774,
+      "win_rate": 0.41867465831664674,
+      "best_return": 2.485999268219542,
+      "worst_return": -0.8414720849744411
+    },
+    {
+      "rule": "ma5_gt_ma20_3d_filtered",
+      "horizon": 60,
+      "event_count": 73192,
+      "mean_return": -0.007314594462051227,
+      "median_return": -0.04353634394866812,
+      "win_rate": 0.38767898130943274,
+      "best_return": 8.194280676887306,
+      "worst_return": -0.7983343873054614
+    },
+    {
+      "rule": "ma5_gt_ma20_3d_filtered_top10",
+      "horizon": 5,
+      "event_count": 6372,
+      "mean_return": -0.006496705424417455,
+      "median_return": -0.01908758250228304,
+      "win_rate": 0.39987445072190836,
+      "best_return": 0.9718737974411236,
+      "worst_return": -0.493772881137859
+    },
+    {
+      "rule": "ma5_gt_ma20_3d_filtered_top10",
+      "horizon": 10,
+      "event_count": 6351,
+      "mean_return": -0.011463118678245236,
+      "median_return": -0.03201982228822697,
+      "win_rate": 0.38072744449692963,
+      "best_return": 1.0700552750028063,
+      "worst_return": -0.5572345152819966
+    },
+    {
+      "rule": "ma5_gt_ma20_3d_filtered_top10",
+      "horizon": 20,
+      "event_count": 6307,
+      "mean_return": -0.020555792962621087,
+      "median_return": -0.051162896176321526,
+      "win_rate": 0.3575392421119391,
+      "best_return": 2.4762847221412723,
+      "worst_return": -0.8414720849744411
+    },
+    {
+      "rule": "ma5_gt_ma20_3d_filtered_top10",
+      "horizon": 60,
+      "event_count": 6203,
+      "mean_return": -0.028618286103130375,
+      "median_return": -0.08192313474300428,
+      "win_rate": 0.34225374818636145,
+      "best_return": 3.717363145169834,
+      "worst_return": -0.7983343873054614
+    },
+    {
+      "rule": "ma5_gt_ma20_5pct_3d",
+      "horizon": 5,
+      "event_count": 49831,
+      "mean_return": -0.009301340734036049,
+      "median_return": -0.018911069155738924,
+      "win_rate": 0.3767734944111096,
+      "best_return": 5.049356181654766,
+      "worst_return": -0.7990313882709954
+    },
+    {
+      "rule": "ma5_gt_ma20_5pct_3d",
+      "horizon": 10,
+      "event_count": 49653,
+      "mean_return": -0.008027083396735553,
+      "median_return": -0.020283759781437816,
+      "win_rate": 0.4004793265260911,
+      "best_return": 4.908261586322068,
+      "worst_return": -0.823147621678476
+    },
+    {
+      "rule": "ma5_gt_ma20_5pct_3d",
+      "horizon": 20,
+      "event_count": 48701,
+      "mean_return": -0.007585096509980382,
+      "median_return": -0.02964614146944078,
+      "win_rate": 0.40208619946202334,
+      "best_return": 4.432774470939328,
+      "worst_return": -0.9038795839901846
+    },
+    {
+      "rule": "ma5_gt_ma20_5pct_3d",
+      "horizon": 60,
+      "event_count": 47935,
+      "mean_return": -0.014162797524901169,
+      "median_return": -0.060116266438636545,
+      "win_rate": 0.3627620736413894,
+      "best_return": 5.218286823898848,
+      "worst_return": -0.9410407542877053
+    }
+  ],
+  "market_filter_summary": [
+    {
+      "rule": "ma5_cross_up_ma20_above_ma60",
+      "market_regime": "bear_or_warmup",
+      "raw_signals": 11797,
+      "passed_signals": 0,
+      "filtered_out": 11797
+    },
+    {
+      "rule": "ma5_cross_up_ma20_above_ma60",
+      "market_regime": "risk_on",
+      "raw_signals": 46605,
+      "passed_signals": 46605,
+      "filtered_out": 0
+    },
+    {
+      "rule": "ma5_cross_up_ma20_above_ma60",
+      "market_regime": "transition",
+      "raw_signals": 3895,
+      "passed_signals": 0,
+      "filtered_out": 3895
+    },
+    {
+      "rule": "ma5_gt_ma20_5pct_3d",
+      "market_regime": "bear_or_warmup",
+      "raw_signals": 22259,
+      "passed_signals": 0,
+      "filtered_out": 22259
+    },
+    {
+      "rule": "ma5_gt_ma20_5pct_3d",
+      "market_regime": "risk_on",
+      "raw_signals": 51319,
+      "passed_signals": 51319,
+      "filtered_out": 0
+    },
+    {
+      "rule": "ma5_gt_ma20_5pct_3d",
+      "market_regime": "transition",
+      "raw_signals": 11744,
+      "passed_signals": 0,
+      "filtered_out": 11744
+    }
+  ],
+  "portfolio_summary": [
+    {
+      "horizon": 5,
+      "initial_cash": 1000000.0,
+      "ending_equity": 298368.3783000018,
+      "total_return": -0.7016316216999983,
+      "trade_count": 3350,
+      "skipped_count": 42678,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_cross_up_ma20_above_ma60"
+    },
+    {
+      "horizon": 10,
+      "initial_cash": 1000000.0,
+      "ending_equity": 624628.3390000004,
+      "total_return": -0.37537166099999963,
+      "trade_count": 1618,
+      "skipped_count": 44332,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_cross_up_ma20_above_ma60"
+    },
+    {
+      "horizon": 20,
+      "initial_cash": 1000000.0,
+      "ending_equity": 385786.9190500009,
+      "total_return": -0.614213080949999,
+      "trade_count": 776,
+      "skipped_count": 44912,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_cross_up_ma20_above_ma60"
+    },
+    {
+      "horizon": 60,
+      "initial_cash": 1000000.0,
+      "ending_equity": 862409.640600001,
+      "total_return": -0.13759035939999897,
+      "trade_count": 320,
+      "skipped_count": 44416,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_cross_up_ma20_above_ma60"
+    },
+    {
+      "horizon": 5,
+      "initial_cash": 1000000.0,
+      "ending_equity": 466243.82045000244,
+      "total_return": -0.5337561795499975,
+      "trade_count": 3381,
+      "skipped_count": 73621,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_gt_ma20_3d_filtered"
+    },
+    {
+      "horizon": 10,
+      "initial_cash": 1000000.0,
+      "ending_equity": 685545.0319500004,
+      "total_return": -0.3144549680499995,
+      "trade_count": 1620,
+      "skipped_count": 74838,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_gt_ma20_3d_filtered"
+    },
+    {
+      "horizon": 20,
+      "initial_cash": 1000000.0,
+      "ending_equity": 601190.978100001,
+      "total_return": -0.398809021899999,
+      "trade_count": 780,
+      "skipped_count": 74097,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_gt_ma20_3d_filtered"
+    },
+    {
+      "horizon": 60,
+      "initial_cash": 1000000.0,
+      "ending_equity": 679508.626050001,
+      "total_return": -0.32049137394999894,
+      "trade_count": 316,
+      "skipped_count": 73239,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_gt_ma20_3d_filtered"
+    },
+    {
+      "horizon": 5,
+      "initial_cash": 1000000.0,
+      "ending_equity": 174860.116100002,
+      "total_return": -0.825139883899998,
+      "trade_count": 3338,
+      "skipped_count": 3166,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_gt_ma20_3d_filtered_top10"
+    },
+    {
+      "horizon": 10,
+      "initial_cash": 1000000.0,
+      "ending_equity": 338600.244100001,
+      "total_return": -0.661399755899999,
+      "trade_count": 1593,
+      "skipped_count": 4861,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_gt_ma20_3d_filtered_top10"
+    },
+    {
+      "horizon": 20,
+      "initial_cash": 1000000.0,
+      "ending_equity": 375015.1158500001,
+      "total_return": -0.6249848841499999,
+      "trade_count": 780,
+      "skipped_count": 5604,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_gt_ma20_3d_filtered_top10"
+    },
+    {
+      "horizon": 60,
+      "initial_cash": 1000000.0,
+      "ending_equity": 377159.1105499999,
+      "total_return": -0.6228408894500002,
+      "trade_count": 317,
+      "skipped_count": 5943,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_gt_ma20_3d_filtered_top10"
+    },
+    {
+      "horizon": 5,
+      "initial_cash": 1000000.0,
+      "ending_equity": 241024.0352500017,
+      "total_return": -0.7589759647499983,
+      "trade_count": 3377,
+      "skipped_count": 47041,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_gt_ma20_5pct_3d"
+    },
+    {
+      "horizon": 10,
+      "initial_cash": 1000000.0,
+      "ending_equity": 323340.179700001,
+      "total_return": -0.6766598202999989,
+      "trade_count": 1616,
+      "skipped_count": 48556,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_gt_ma20_5pct_3d"
+    },
+    {
+      "horizon": 20,
+      "initial_cash": 1000000.0,
+      "ending_equity": 604515.2188500008,
+      "total_return": -0.3954847811499992,
+      "trade_count": 780,
+      "skipped_count": 48327,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_gt_ma20_5pct_3d"
+    },
+    {
+      "horizon": 60,
+      "initial_cash": 1000000.0,
+      "ending_equity": 445065.46710000024,
+      "total_return": -0.5549345328999997,
+      "trade_count": 318,
+      "skipped_count": 47909,
+      "max_positions": 20,
+      "target_position_pct": 0.05,
+      "volume_capacity_pct": 0.05,
+      "rule": "ma5_gt_ma20_5pct_3d"
+    }
+  ]
+}

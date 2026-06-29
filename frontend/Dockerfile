@@ -2,8 +2,12 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+ARG NPM_CONFIG_REGISTRY=
+
 COPY frontend/package*.json ./
-RUN npm install
+RUN if [ -n "$NPM_CONFIG_REGISTRY" ]; then \
+      npm config set registry "$NPM_CONFIG_REGISTRY"; \
+    fi && npm install
 
 COPY frontend/ ./
 
