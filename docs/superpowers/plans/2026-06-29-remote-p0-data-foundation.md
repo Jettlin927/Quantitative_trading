@@ -79,7 +79,7 @@
 - Consumes: pushed branch `codex/todo-p0-data-foundation`
 - Produces: isolated remote app at `http://127.0.0.1:15175` and isolated API at `http://127.0.0.1:18002`
 
-- [ ] **Step 1: Capture original remote service state**
+- [x] **Step 1: Capture original remote service state**
 
 Run on the local machine:
 
@@ -89,7 +89,7 @@ ssh quant-trading-server 'docker ps --filter name=quant_trading --format "{{.Nam
 
 Expected: output lists the original `quant_trading_*` containers and existing quant volumes. Save the output in the implementation notes, not in source files.
 
-- [ ] **Step 2: Create isolated remote directory and clone branch**
+- [x] **Step 2: Create isolated remote directory and clone branch**
 
 Run on the local machine after pushing `codex/todo-p0-data-foundation`:
 
@@ -111,7 +111,7 @@ cp /opt/quantitative-trading/.env /opt/quantitative-trading-todo-p0-20260629/.en
 
 Expected: the isolated directory contains the feature branch and a remote-only `.env` copied from the original server directory.
 
-- [ ] **Step 3: Add remote-only standalone Compose file**
+- [x] **Step 3: Add remote-only standalone Compose file**
 
 Run on the local machine:
 
@@ -185,7 +185,7 @@ EOF'
 
 Expected: this file exists only in the remote sandbox directory and is not committed. Do not combine it with `docker-compose.yml`; it is intentionally standalone to avoid Compose list-merge port collisions with the original service.
 
-- [ ] **Step 4: Verify isolated Compose config**
+- [x] **Step 4: Verify isolated Compose config**
 
 Run on the local machine:
 
@@ -210,7 +210,7 @@ Expected: output includes only sandbox container names, sandbox ports and sandbo
 - Produces SQLAlchemy models: `TradeCalendar`, `StockAdjustFactor`, `Index`, `IndexDailyBar`, `Fund`, `FundDailyBar`, `IndustryClassification`, `IndustryMember`
 - Produces helper functions: `trade_calendar_record_to_row`, `adjust_factor_record_to_row`, `index_basic_record_to_row`, `index_daily_record_to_row`, `fund_basic_record_to_row`, `fund_daily_record_to_row`, `industry_classification_record_to_row`, `industry_member_record_to_row`
 
-- [ ] **Step 1: Write failing tests for P0 model uniqueness and row mappers**
+- [x] **Step 1: Write failing tests for P0 model uniqueness and row mappers**
 
 Add tests in `backend/tests/test_data_api_contracts.py` that create an in-memory SQLite DB, call `Base.metadata.create_all`, and assert:
 
@@ -235,7 +235,7 @@ self.assertEqual(main.fund_basic_record_to_row({"ts_code": "512480.SH", "name": 
 self.assertEqual(main.industry_classification_record_to_row({"index_code": "801081.SI", "industry_name": "半导体", "level": "L2", "src": "SW2021"})["index_code"], "801081.SI")
 ```
 
-- [ ] **Step 2: Run tests remotely and verify failure**
+- [x] **Step 2: Run tests remotely and verify failure**
 
 ```bash
 ssh quant-trading-server '
@@ -246,11 +246,11 @@ POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_t
 
 Expected: FAIL because P0 models and mapper functions do not exist yet.
 
-- [ ] **Step 3: Add minimal schema and mappers**
+- [x] **Step 3: Add minimal schema and mappers**
 
 In `backend/app/models.py`, add only the P0 models listed above. In `backend/app/main.py`, add only mapper helpers needed by the tests and later sync routes. Reuse `parse_tushare_date`, `decimal_or_none`, `upsert_rows`, `record_sync_run`, `query_date_coverage` and existing style.
 
-- [ ] **Step 4: Run tests remotely and verify pass**
+- [x] **Step 4: Run tests remotely and verify pass**
 
 ```bash
 ssh quant-trading-server '
@@ -279,11 +279,11 @@ Expected: PASS.
   - `POST /api/tushare/sync-fund-daily`
   - `POST /api/tushare/sync-industry-classifications`
 
-- [ ] **Step 1: Write failing route and fake Tushare tests**
+- [x] **Step 1: Write failing route and fake Tushare tests**
 
 Use FastAPI route inspection and fake Tushare objects. Tests should not call the network. Assert all seven routes exist and each route calls `upsert_rows` with the expected conflict columns.
 
-- [ ] **Step 2: Run remote failure**
+- [x] **Step 2: Run remote failure**
 
 ```bash
 ssh quant-trading-server '
@@ -294,7 +294,7 @@ POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_t
 
 Expected: FAIL because sync schemas and routes do not exist yet.
 
-- [ ] **Step 3: Implement minimal sync routes**
+- [x] **Step 3: Implement minimal sync routes**
 
 Use the existing pattern from `sync_stock_basic`, `sync_daily`, `sync_market_daily` and `sync_fundamentals`. Keep each route narrow:
 
@@ -306,7 +306,7 @@ Use the existing pattern from `sync_stock_basic`, `sync_daily`, `sync_market_dai
 - `sync-fund-daily`: call `pro.fund_daily(ts_code=code, start_date=..., end_date=..., fields="ts_code,trade_date,open,high,low,close,pre_close,change,pct_chg,vol,amount")` only for requested `ts_codes`.
 - `sync-industry-classifications`: call `pro.index_classify(src="SW2021")`, filter to requested `index_codes`, and call `pro.index_member_all(index_code=...)` only for those sample industry codes.
 
-- [ ] **Step 4: Run remote pass**
+- [x] **Step 4: Run remote pass**
 
 ```bash
 ssh quant-trading-server '
@@ -337,11 +337,11 @@ Expected: PASS.
   - `GET /api/industries/{index_code}/members`
 - Extends `GET /api/db/overview` with `aShare.tradeCalendar`, `aShare.adjustFactors`, `aShare.indices`, `aShare.indexDailyBars`, `aShare.funds`, `aShare.fundDailyBars`, `aShare.industries`
 
-- [ ] **Step 1: Write failing overview and route tests**
+- [x] **Step 1: Write failing overview and route tests**
 
 Seed SQLite with one row per P0 table. Assert `get_db_overview(db)` includes non-zero counts and expected latest dates. Assert all query route paths exist.
 
-- [ ] **Step 2: Run remote failure**
+- [x] **Step 2: Run remote failure**
 
 ```bash
 ssh quant-trading-server '
@@ -352,11 +352,11 @@ POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_t
 
 Expected: FAIL because overview/query APIs are not wired.
 
-- [ ] **Step 3: Implement minimal read-only APIs**
+- [x] **Step 3: Implement minimal read-only APIs**
 
 Return JSON-safe values only. Convert `Decimal`, `date`, `datetime`, NaN and Infinity the same way existing endpoints do. Do not add trading recommendations or ranking language.
 
-- [ ] **Step 4: Run remote pass**
+- [x] **Step 4: Run remote pass**
 
 ```bash
 ssh quant-trading-server '
@@ -378,7 +378,7 @@ Expected: PASS.
 - Consumes: `GET /api/db/overview` P0 fields from Task 3
 - Produces: read-only coverage rows for calendar, factors, indices, index bars, funds, fund bars and industries
 
-- [ ] **Step 1: Read frontend design rules**
+- [x] **Step 1: Read frontend design rules**
 
 ```bash
 sed -n '1,260p' .codex/skills/frontend-design/SKILL.md
@@ -386,11 +386,11 @@ sed -n '1,260p' .codex/skills/frontend-design/SKILL.md
 
 Expected: confirms industrial data terminal direction and no marketing/strategy UI.
 
-- [ ] **Step 2: Add only coverage display**
+- [x] **Step 2: Add only coverage display**
 
 Update the existing data workbench overview area. Keep it read-only and concise. Do not add strategy, signal, ranking, recommendation, backtest execution or real account language.
 
-- [ ] **Step 3: Build remotely**
+- [x] **Step 3: Build remotely**
 
 ```bash
 ssh quant-trading-server '
@@ -410,7 +410,7 @@ Expected: PASS.
 - Consumes: all tasks above
 - Produces: remote verification evidence and final task log
 
-- [ ] **Step 1: Run backend compile remotely**
+- [x] **Step 1: Run backend compile remotely**
 
 ```bash
 ssh quant-trading-server '
@@ -421,7 +421,7 @@ POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_t
 
 Expected: exit code `0`.
 
-- [ ] **Step 2: Run backend tests remotely**
+- [x] **Step 2: Run backend tests remotely**
 
 ```bash
 ssh quant-trading-server '
@@ -432,7 +432,7 @@ POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_t
 
 Expected: `OK`.
 
-- [ ] **Step 3: Run Compose and frontend checks remotely**
+- [x] **Step 3: Run Compose and frontend checks remotely**
 
 ```bash
 ssh quant-trading-server '
@@ -444,7 +444,7 @@ POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_t
 
 Expected: both commands exit `0`.
 
-- [ ] **Step 4: Start isolated stack remotely**
+- [x] **Step 4: Start isolated stack remotely**
 
 ```bash
 ssh quant-trading-server '
@@ -456,7 +456,7 @@ POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_t
 
 Expected: only `quant_trading_todo_p0_*` containers are created or rebuilt.
 
-- [ ] **Step 5: Run small-sample live Tushare sync remotely**
+- [x] **Step 5: Run small-sample live Tushare sync remotely**
 
 This step is the live-data gate for Tushare permission-sensitive interfaces. Do not expand it to full-market or full-catalog sync during P0 acceptance. The required sample is:
 
@@ -481,7 +481,7 @@ curl -fsS -X POST http://127.0.0.1:18002/api/tushare/sync-industry-classificatio
 
 Expected: every call returns JSON with `status` equal to `ok` or `partial`. Any `partial` response must include `failed_items` or an equivalent concrete reason that names the interface and sample code that failed. P0 acceptance is blocked by missing route/schema/upsert/query behavior, but not blocked by a documented Tushare permission failure for a sample code.
 
-- [ ] **Step 6: Verify live query and idempotency remotely**
+- [x] **Step 6: Verify live query and idempotency remotely**
 
 Run the same small-sample sync commands from Step 5 a second time, then run:
 
@@ -510,7 +510,7 @@ SQL
 
 Expected: duplicate counts are all `0`; overview contains P0 coverage fields.
 
-- [ ] **Step 7: Verify original remote service was not touched**
+- [x] **Step 7: Verify original remote service was not touched**
 
 ```bash
 ssh quant-trading-server 'docker ps --filter name=quant_trading --format "{{.Names}} {{.ID}} {{.Ports}} {{.Status}}" | sort && docker volume ls --format "{{.Name}}" | grep "quant" | sort'
@@ -518,7 +518,7 @@ ssh quant-trading-server 'docker ps --filter name=quant_trading --format "{{.Nam
 
 Expected: original `quant_trading_db`, `quant_trading_api`, `quant_trading_frontend` container IDs and original volume names match Step 1. Additional sandbox containers/volumes may exist with `todo_p0` or `quant_todo_p0` in their names.
 
-- [ ] **Step 8: Append implementation log**
+- [x] **Step 8: Append implementation log**
 
 Append to `操作日志.md` with:
 
