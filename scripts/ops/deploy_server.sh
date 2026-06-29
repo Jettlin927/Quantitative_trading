@@ -53,19 +53,34 @@ git_ssh_command() {
 
 sync_code() {
   local backup_dir
+  local uid
+  local gid
+  local project_parent
 
   if [[ "$SKIP_GIT_PULL" == "1" ]]; then
     cd "$PROJECT_DIR"
     return
   fi
 
-  mkdir -p "$(dirname "$PROJECT_DIR")"
+  uid="$(id -u)"
+  gid="$(id -g)"
+  project_parent="$(dirname "$PROJECT_DIR")"
+
+  mkdir -p "$project_parent"
 
   if [[ ! -d "$PROJECT_DIR/.git" ]]; then
     if [[ -d "$PROJECT_DIR" ]] && [[ -n "$(find "$PROJECT_DIR" -mindepth 1 -maxdepth 1 2>/dev/null)" ]]; then
       backup_dir="${PROJECT_DIR}.pre-git.$(date +%Y%m%d%H%M%S)"
-      mv "$PROJECT_DIR" "$backup_dir"
+      if [[ -w "$project_parent" ]]; then
+        mv "$PROJECT_DIR" "$backup_dir"
+      else
+        sudo mv "$PROJECT_DIR" "$backup_dir"
+      fi
       echo "Backed up non-git project dir to: $backup_dir"
+    fi
+
+    if [[ ! -d "$PROJECT_DIR" ]] && [[ ! -w "$project_parent" ]]; then
+      sudo install -d -o "$uid" -g "$gid" "$PROJECT_DIR"
     fi
 
     GIT_SSH_COMMAND="$(git_ssh_command)" git clone --branch "$BRANCH" "$REPO_URL" "$PROJECT_DIR"
