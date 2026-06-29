@@ -18,7 +18,7 @@
 - 远端不得执行 `docker compose down -v`、`docker volume rm` 或任何删除原 PostgreSQL volume 的命令。
 - 远端隔离目录固定为 `/opt/quantitative-trading-todo-p0-20260629`。
 - 远端隔离 Compose project 固定为 `quant_todo_p0`。
-- 远端隔离端口固定为 `15432:5432`、`18001:8000`、`15174:5173`。
+- 远端隔离端口固定为 `127.0.0.1:15433:5432`、`127.0.0.1:18002:8000`、`127.0.0.1:15175:5173`。
 - 原远端目录 `/opt/quantitative-trading` 只允许读取状态，不允许在该目录里构建、重启、写入代码或清理 volume。
 - 不把 `.env`、Tushare token、数据库密码或任何凭据写入源码、日志、前端、README、测试或聊天输出。
 
@@ -28,7 +28,7 @@
 
 1. `TODO.md` 是当前数据底座路线图，不是恢复旧策略研究路线的授权。
 2. 第一阶段成功标准是 P0 同步能力、只读查询和 DB overview 闭环成立；Tushare 权限敏感接口用固定小样本真实同步验收，不把全量数据拿齐作为阻塞条件。
-3. 当前 `docker-compose.yml` 写死了 `container_name`，所以远端隔离不能只换目录，必须同时覆盖容器名、端口和 volume。
+3. 当前 `docker-compose.yml` 写死了 `container_name`，且 Compose 对 `ports` 列表会追加合并，所以远端隔离不能叠加原 Compose 文件，必须使用完整的远端-only `docker-compose.sandbox.yml`。
 4. Tushare token 已存在于远端原目录 `.env` 中；执行时只在远端复制该 `.env` 到隔离目录，不在源码中保存。
 5. 如果 Tushare 某个指数、基金或行业接口权限不足，本阶段允许对应同步接口返回 `partial`，但必须记录失败接口、入参、错误信息和未完成的验收项；不能因为单个高权限样本失败而阻塞其他 P0 表验收。
 
@@ -49,8 +49,8 @@
 - 远端后端编译、后端 unittest、Compose config、前端 build 全部通过。
 - 权限敏感的 Tushare 接口只要求固定小样本真实同步闭环：`index_basic`、`index_daily`、`fund_basic`、`fund_daily`、`index_classify/index_member_all` 必须支持白名单入参，并在远端短窗口样本上返回 `ok` 或带具体原因的 `partial`。
 - 远端 curl 验证通过：
-  - `GET http://127.0.0.1:18001/api/health`
-  - `GET http://127.0.0.1:18001/api/db/overview`
+  - `GET http://127.0.0.1:18002/api/health`
+  - `GET http://127.0.0.1:18002/api/db/overview`
   - P0 新增只读查询接口。
 - 重复执行 P0 同步后，唯一键重复检查返回 `0`。
 
@@ -77,7 +77,7 @@
 
 **Interfaces:**
 - Consumes: pushed branch `codex/todo-p0-data-foundation`
-- Produces: isolated remote app at `http://127.0.0.1:15174` and isolated API at `http://127.0.0.1:18001`
+- Produces: isolated remote app at `http://127.0.0.1:15175` and isolated API at `http://127.0.0.1:18002`
 
 - [ ] **Step 1: Capture original remote service state**
 
@@ -111,7 +111,7 @@ cp /opt/quantitative-trading/.env /opt/quantitative-trading-todo-p0-20260629/.en
 
 Expected: the isolated directory contains the feature branch and a remote-only `.env` copied from the original server directory.
 
-- [ ] **Step 3: Add remote-only Compose override**
+- [ ] **Step 3: Add remote-only standalone Compose file**
 
 Run on the local machine:
 
@@ -119,23 +119,60 @@ Run on the local machine:
 ssh quant-trading-server 'cat > /opt/quantitative-trading-todo-p0-20260629/docker-compose.sandbox.yml <<'"'"'EOF'"'"'
 services:
   db:
+    image: postgres:16-alpine
     container_name: quant_trading_todo_p0_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-quant_trading}
+      POSTGRES_USER: ${POSTGRES_USER:-quant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quant_password}
     ports:
-      - "${POSTGRES_PORT:-15432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-15433}:5432"
     volumes:
       - postgres_data_todo_p0:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-quant} -d ${POSTGRES_DB:-quant_trading}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
   api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
     container_name: quant_trading_todo_p0_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-quant}:${POSTGRES_PASSWORD:-quant_password}@db:5432/${POSTGRES_DB:-quant_trading}
+      TUSHARE_TOKEN: ${TUSHARE_TOKEN:-}
+      DEEPSEEK_TOKEN: ${DEEPSEEK_TOKEN:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_API_BASE: ${DEEPSEEK_API_BASE:-https://api.deepseek.com}
     ports:
-      - "${API_PORT:-18001}:8000"
+      - "127.0.0.1:${API_PORT:-18002}:8000"
+    volumes:
+      - .:/app
 
   frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-}
     container_name: quant_trading_todo_p0_frontend
+    restart: unless-stopped
+    depends_on:
+      - api
     environment:
-      VITE_API_BASE_URL: http://localhost:${API_PORT:-18001}
+      VITE_API_BASE_URL: http://localhost:${API_PORT:-18002}
     ports:
-      - "${FRONTEND_PORT:-15174}:5173"
+      - "127.0.0.1:${FRONTEND_PORT:-15175}:5173"
     volumes:
       - ./frontend:/app
       - frontend_node_modules_todo_p0:/app/node_modules
@@ -146,7 +183,7 @@ volumes:
 EOF'
 ```
 
-Expected: this file exists only in the remote sandbox directory and is not committed.
+Expected: this file exists only in the remote sandbox directory and is not committed. Do not combine it with `docker-compose.yml`; it is intentionally standalone to avoid Compose list-merge port collisions with the original service.
 
 - [ ] **Step 4: Verify isolated Compose config**
 
@@ -155,8 +192,8 @@ Run on the local machine:
 ```bash
 ssh quant-trading-server '
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml config >/tmp/quant_todo_p0.compose.yml
-grep -E "quant_trading_todo_p0_(db|api|frontend)|15432|18001|15174|postgres_data_todo_p0" /tmp/quant_todo_p0.compose.yml
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml config >/tmp/quant_todo_p0.compose.yml
+grep -E "quant_trading_todo_p0_(db|api|frontend)|15433|18002|15175|postgres_data_todo_p0" /tmp/quant_todo_p0.compose.yml
 '
 ```
 
@@ -203,7 +240,7 @@ self.assertEqual(main.industry_classification_record_to_row({"index_code": "8010
 ```bash
 ssh quant-trading-server '
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml run --rm api python -m unittest backend.tests.test_data_api_contracts -v
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml run --rm api python -m unittest backend.tests.test_data_api_contracts -v
 '
 ```
 
@@ -218,7 +255,7 @@ In `backend/app/models.py`, add only the P0 models listed above. In `backend/app
 ```bash
 ssh quant-trading-server '
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml run --rm api python -m unittest backend.tests.test_data_api_contracts -v
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml run --rm api python -m unittest backend.tests.test_data_api_contracts -v
 '
 ```
 
@@ -251,7 +288,7 @@ Use FastAPI route inspection and fake Tushare objects. Tests should not call the
 ```bash
 ssh quant-trading-server '
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml run --rm api python -m unittest backend.tests.test_data_api_contracts -v
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml run --rm api python -m unittest backend.tests.test_data_api_contracts -v
 '
 ```
 
@@ -274,7 +311,7 @@ Use the existing pattern from `sync_stock_basic`, `sync_daily`, `sync_market_dai
 ```bash
 ssh quant-trading-server '
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml run --rm api python -m unittest backend.tests.test_data_api_contracts -v
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml run --rm api python -m unittest backend.tests.test_data_api_contracts -v
 '
 ```
 
@@ -309,7 +346,7 @@ Seed SQLite with one row per P0 table. Assert `get_db_overview(db)` includes non
 ```bash
 ssh quant-trading-server '
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml run --rm api python -m unittest backend.tests.test_data_api_contracts -v
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml run --rm api python -m unittest backend.tests.test_data_api_contracts -v
 '
 ```
 
@@ -324,7 +361,7 @@ Return JSON-safe values only. Convert `Decimal`, `date`, `datetime`, NaN and Inf
 ```bash
 ssh quant-trading-server '
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml run --rm api python -m unittest backend.tests.test_data_api_contracts -v
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml run --rm api python -m unittest backend.tests.test_data_api_contracts -v
 '
 ```
 
@@ -358,7 +395,7 @@ Update the existing data workbench overview area. Keep it read-only and concise.
 ```bash
 ssh quant-trading-server '
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml run --rm frontend npm run build
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml run --rm frontend npm run build
 '
 ```
 
@@ -378,7 +415,7 @@ Expected: PASS.
 ```bash
 ssh quant-trading-server '
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml run --rm api python -m py_compile backend/app/database.py backend/app/models.py backend/app/schemas.py backend/app/tushare_client.py backend/app/us_research.py backend/app/main.py
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml run --rm api python -m py_compile backend/app/database.py backend/app/models.py backend/app/schemas.py backend/app/tushare_client.py backend/app/us_research.py backend/app/main.py
 '
 ```
 
@@ -389,7 +426,7 @@ Expected: exit code `0`.
 ```bash
 ssh quant-trading-server '
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml run --rm api python -m unittest discover backend/tests -v
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml run --rm api python -m unittest discover backend/tests -v
 '
 ```
 
@@ -400,8 +437,8 @@ Expected: `OK`.
 ```bash
 ssh quant-trading-server '
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml config >/tmp/quant_todo_p0.compose.yml
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml run --rm frontend npm run build
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml config >/tmp/quant_todo_p0.compose.yml
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml run --rm frontend npm run build
 '
 ```
 
@@ -412,8 +449,8 @@ Expected: both commands exit `0`.
 ```bash
 ssh quant-trading-server '
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml up -d --build
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml ps
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml up -d --build
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml ps
 '
 ```
 
@@ -432,13 +469,13 @@ This step is the live-data gate for Tushare permission-sensitive interfaces. Do 
 ```bash
 ssh quant-trading-server '
 set -euo pipefail
-curl -fsS -X POST http://127.0.0.1:18001/api/tushare/sync-trade-calendar -H "Content-Type: application/json" -d "{\"start_date\":\"2026-06-01\",\"end_date\":\"2026-06-29\"}"
-curl -fsS -X POST http://127.0.0.1:18001/api/tushare/sync-index-basic -H "Content-Type: application/json" -d "{\"markets\":[\"CSI\",\"SSE\",\"SW\"],\"ts_codes\":[\"000300.SH\",\"931743.CSI\",\"801081.SI\"]}"
-curl -fsS -X POST http://127.0.0.1:18001/api/tushare/sync-fund-basic -H "Content-Type: application/json" -d "{\"market\":\"E\",\"ts_codes\":[\"512480.SH\",\"159995.SZ\"]}"
-curl -fsS -X POST http://127.0.0.1:18001/api/tushare/sync-index-daily -H "Content-Type: application/json" -d "{\"ts_codes\":[\"000300.SH\",\"931743.CSI\",\"801081.SI\"],\"start_date\":\"2026-06-01\",\"end_date\":\"2026-06-29\"}"
-curl -fsS -X POST http://127.0.0.1:18001/api/tushare/sync-fund-daily -H "Content-Type: application/json" -d "{\"ts_codes\":[\"512480.SH\",\"159995.SZ\"],\"start_date\":\"2026-06-01\",\"end_date\":\"2026-06-29\"}"
-curl -fsS -X POST http://127.0.0.1:18001/api/tushare/sync-adjust-factors -H "Content-Type: application/json" -d "{\"ts_code\":\"600703.SH\",\"start_date\":\"2026-06-01\",\"end_date\":\"2026-06-29\"}"
-curl -fsS -X POST http://127.0.0.1:18001/api/tushare/sync-industry-classifications -H "Content-Type: application/json" -d "{\"src\":\"SW2021\",\"index_codes\":[\"801081.SI\"]}"
+curl -fsS -X POST http://127.0.0.1:18002/api/tushare/sync-trade-calendar -H "Content-Type: application/json" -d "{\"start_date\":\"2026-06-01\",\"end_date\":\"2026-06-29\"}"
+curl -fsS -X POST http://127.0.0.1:18002/api/tushare/sync-index-basic -H "Content-Type: application/json" -d "{\"markets\":[\"CSI\",\"SSE\",\"SW\"],\"ts_codes\":[\"000300.SH\",\"931743.CSI\",\"801081.SI\"]}"
+curl -fsS -X POST http://127.0.0.1:18002/api/tushare/sync-fund-basic -H "Content-Type: application/json" -d "{\"market\":\"E\",\"ts_codes\":[\"512480.SH\",\"159995.SZ\"]}"
+curl -fsS -X POST http://127.0.0.1:18002/api/tushare/sync-index-daily -H "Content-Type: application/json" -d "{\"ts_codes\":[\"000300.SH\",\"931743.CSI\",\"801081.SI\"],\"start_date\":\"2026-06-01\",\"end_date\":\"2026-06-29\"}"
+curl -fsS -X POST http://127.0.0.1:18002/api/tushare/sync-fund-daily -H "Content-Type: application/json" -d "{\"ts_codes\":[\"512480.SH\",\"159995.SZ\"],\"start_date\":\"2026-06-01\",\"end_date\":\"2026-06-29\"}"
+curl -fsS -X POST http://127.0.0.1:18002/api/tushare/sync-adjust-factors -H "Content-Type: application/json" -d "{\"ts_code\":\"600703.SH\",\"start_date\":\"2026-06-01\",\"end_date\":\"2026-06-29\"}"
+curl -fsS -X POST http://127.0.0.1:18002/api/tushare/sync-industry-classifications -H "Content-Type: application/json" -d "{\"src\":\"SW2021\",\"index_codes\":[\"801081.SI\"]}"
 '
 ```
 
@@ -451,15 +488,15 @@ Run the same small-sample sync commands from Step 5 a second time, then run:
 ```bash
 ssh quant-trading-server '
 set -euo pipefail
-curl -fsS http://127.0.0.1:18001/api/health
-curl -fsS http://127.0.0.1:18001/api/db/overview
-curl -fsS "http://127.0.0.1:18001/api/trade-calendars/recent?limit=5"
-curl -fsS "http://127.0.0.1:18001/api/stocks/600703.SH/adjust-factors?start_date=2026-06-01&end_date=2026-06-29"
-curl -fsS "http://127.0.0.1:18001/api/indices?q=沪深300"
-curl -fsS "http://127.0.0.1:18001/api/funds?q=半导体"
-curl -fsS "http://127.0.0.1:18001/api/industries/801081.SI/members"
+curl -fsS http://127.0.0.1:18002/api/health
+curl -fsS http://127.0.0.1:18002/api/db/overview
+curl -fsS "http://127.0.0.1:18002/api/trade-calendars/recent?limit=5"
+curl -fsS "http://127.0.0.1:18002/api/stocks/600703.SH/adjust-factors?start_date=2026-06-01&end_date=2026-06-29"
+curl -fsS "http://127.0.0.1:18002/api/indices?q=沪深300"
+curl -fsS "http://127.0.0.1:18002/api/funds?q=半导体"
+curl -fsS "http://127.0.0.1:18002/api/industries/801081.SI/members"
 cd /opt/quantitative-trading-todo-p0-20260629
-POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15174 docker compose -p quant_todo_p0 -f docker-compose.yml -f docker-compose.sandbox.yml exec -T db sh -lc '"'"'
+POSTGRES_PORT=15433 API_PORT=18002 FRONTEND_PORT=15175 docker compose -p quant_todo_p0 -f docker-compose.sandbox.yml exec -T db sh -lc '"'"'
 psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 <<SQL
 SELECT COUNT(*) AS duplicate_trade_calendars FROM (SELECT exchange, cal_date FROM trade_calendars GROUP BY 1,2 HAVING COUNT(*) > 1) d;
 SELECT COUNT(*) AS duplicate_adjust_factors FROM (SELECT ts_code, trade_date FROM stock_adjust_factors GROUP BY 1,2 HAVING COUNT(*) > 1) d;
