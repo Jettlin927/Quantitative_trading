@@ -1,0 +1,186 @@
+{
+  "status": "ok",
+  "generated_at": "2026-06-29T17:23:30",
+  "strategy": "低估质量 + 行业止跌",
+  "rule": "value_quality_sector_stopfall",
+  "data_coverage": {
+    "min_date": "2023-07-19",
+    "max_date": "2026-05-29",
+    "rows": 1761492,
+    "symbols": 2591,
+    "industries": 109,
+    "financial_rows": 31025,
+    "financial_symbols": 2592
+  },
+  "assumptions": {
+    "market_filter": "不使用沪深300或大盘过滤，只使用行业等权走势止跌。",
+    "industry_stopfall": "行业等权净值从20日低点反弹至少3%，且行业20日均线5日斜率为正。",
+    "undervaluation_persistence": "过去 60 个交易日中至少 45 天满足 pe_ttm<=15 且 pb<=1.5。",
+    "quality": "ROE>=8，净利率>0，资产负债率<=70，营收同比>=-10，净利润同比>=-20。",
+    "tradability": "20日平均成交额 amount>=50000，总市值 total_mv>=300000。",
+    "event_returns": "收盘后确认，下一交易日开盘买入，观察 20/60/120/180/360 日。",
+    "account_curve": "100万初始资金，每 60 个交易日再平衡，最多 20 只等权持有。"
+  },
+  "counts": {
+    "signals": 3939,
+    "events": 3939,
+    "nav_rows": 692
+  },
+  "event_summary": [
+    {
+      "horizon": 20,
+      "event_count": 3938,
+      "mean_return": 0.0013765929482991116,
+      "median_return": -0.003502138525158647,
+      "win_rate": 0.4791772473336719,
+      "best_return": 0.6663393258426966,
+      "worst_return": -0.3598611182244984
+    },
+    {
+      "horizon": 60,
+      "event_count": 3715,
+      "mean_return": 0.016595535112520446,
+      "median_return": -0.0022,
+      "win_rate": 0.49448183041722743,
+      "best_return": 1.2288756972111552,
+      "worst_return": -0.46005474465453267
+    },
+    {
+      "horizon": 120,
+      "event_count": 3253,
+      "mean_return": 0.036407952637187366,
+      "median_return": 0.010243438914027105,
+      "win_rate": 0.5296649246849062,
+      "best_return": 1.0225933884297522,
+      "worst_return": -0.5148347411203393
+    },
+    {
+      "horizon": 180,
+      "event_count": 3015,
+      "mean_return": 0.08098370215784446,
+      "median_return": 0.03326592489568834,
+      "win_rate": 0.5890547263681593,
+      "best_return": 1.7905927927927927,
+      "worst_return": -0.5033486128291218
+    },
+    {
+      "horizon": 360,
+      "event_count": 2053,
+      "mean_return": 0.1577269245042149,
+      "median_return": 0.06940194174757285,
+      "win_rate": 0.6220165611300535,
+      "best_return": 2.671592557403008,
+      "worst_return": -0.5039818959372773
+    }
+  ],
+  "account_summary": {
+    "start_date": "2023-07-19 00:00:00",
+    "end_date": "2026-05-29 00:00:00",
+    "ending_equity": 1421367.1537930854,
+    "total_return": 0.4213671537930854,
+    "max_drawdown": -0.20179876691975374,
+    "final_position_count": 20
+  },
+  "top_industries": [
+    {
+      "industry": "水务",
+      "signal_count": 268,
+      "avg_score": 1.7071342481513108
+    },
+    {
+      "industry": "煤炭开采",
+      "signal_count": 248,
+      "avg_score": 1.9171004864135728
+    },
+    {
+      "industry": "港口",
+      "signal_count": 246,
+      "avg_score": 1.8422542270950373
+    },
+    {
+      "industry": "建筑工程",
+      "signal_count": 209,
+      "avg_score": 1.2219104763212743
+    },
+    {
+      "industry": "汽车配件",
+      "signal_count": 208,
+      "avg_score": 1.336673372439842
+    },
+    {
+      "industry": "火力发电",
+      "signal_count": 206,
+      "avg_score": 1.5412624766243865
+    },
+    {
+      "industry": "路桥",
+      "signal_count": 199,
+      "avg_score": 2.2069619346312366
+    },
+    {
+      "industry": "环境保护",
+      "signal_count": 178,
+      "avg_score": 1.5000509517862022
+    },
+    {
+      "industry": "家用电器",
+      "signal_count": 175,
+      "avg_score": 1.085795677429816
+    },
+    {
+      "industry": "出版业",
+      "signal_count": 168,
+      "avg_score": 1.2975893663849423
+    },
+    {
+      "industry": "水运",
+      "signal_count": 157,
+      "avg_score": 1.2373661151668793
+    },
+    {
+      "industry": "化工原料",
+      "signal_count": 143,
+      "avg_score": 1.1290734122589767
+    },
+    {
+      "industry": "造纸",
+      "signal_count": 123,
+      "avg_score": 0.9027980061203618
+    },
+    {
+      "industry": "农药化肥",
+      "signal_count": 119,
+      "avg_score": 1.169493626968802
+    },
+    {
+      "industry": "中成药",
+      "signal_count": 102,
+      "avg_score": 0.9891002930066722
+    },
+    {
+      "industry": "纺织",
+      "signal_count": 97,
+      "avg_score": 1.2679655607008131
+    },
+    {
+      "industry": "医药商业",
+      "signal_count": 93,
+      "avg_score": 0.9588058920083515
+    },
+    {
+      "industry": "铝",
+      "signal_count": 87,
+      "avg_score": 1.2178569131624186
+    },
+    {
+      "industry": "饲料",
+      "signal_count": 86,
+      "avg_score": 0.8907252849974038
+    },
+    {
+      "industry": "特种钢",
+      "signal_count": 64,
+      "avg_score": 1.0069837953818304
+    }
+  ]
+}

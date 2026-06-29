@@ -189,3 +189,50 @@ docker compose config
 ```
 
 如果 Docker daemon 权限不足或 Docker Desktop 未运行，不要假装已验证。
+
+## 服务器 CI/CD 优先
+
+云服务器运行入口为 `ubuntu@182.254.180.169`，默认部署目录为 `/opt/quantitative-trading`。后续 Agent 需要构建、验证、重启或排查本仓库服务时，优先通过 SSH 在服务器执行 Docker/CI/CD 流程，减少用户本地电脑资源消耗。
+
+本地 `.env` 维护远端连接变量：`REMOTE`、`REMOTE_SSH_PORT`、`REMOTE_SSH_KEY`、`PROJECT_DIR`、`REPO_URL`、`BRANCH`。优先使用 `scripts/ops/deploy_remote.sh` 和 `.env` 中的 SSH key；不要依赖交互式密码登录。
+
+默认远端操作顺序：
+
+1. 在本地确认工作区状态和将要同步的文件，不把 `.env`、token、密码、真实持仓、真实成交或其他凭据打包上传。
+2. 通过 SSH 登录服务器，在 `/opt/quantitative-trading` 更新代码或接收当前源码包。
+3. 在服务器运行 `docker compose config`。
+4. 修改 Dockerfile、依赖、后端或前端后，在服务器运行 `docker compose up -d --build`；只重启已有服务时运行 `docker compose up -d`。
+5. 在服务器运行 `docker compose ps`，并用 `curl` 验证 `http://127.0.0.1:18000/api/health` 和 `http://127.0.0.1:15173`。
+6. 若需查看 PostgreSQL，只在服务器内网或容器网络访问；不要把 `5432` 暴露给公网。
+
+## 服务器访问隧道
+
+服务器上的 `5432`、`18000`、`15173` 默认只监听 `127.0.0.1`，不是公网反代。用户从本机访问远端工作台时，优先使用 SSH tunnel：
+
+```bash
+ssh -M -S /tmp/quant-trading-tunnel-ctl -fN \
+  -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -L 15173:127.0.0.1:15173 \
+  -L 18000:127.0.0.1:18000 \
+  quant-trading-server
+```
+
+隧道建立后，本机打开：
+
+```text
+http://localhost:15173
+```
+
+这条隧道运行在用户本机上；本机关机、重启、睡眠或断网后隧道会消失，但服务器上的 Docker 服务不会因此停止。重开电脑后需要重新执行上面的 tunnel 命令。
+
+关闭隧道使用：
+
+```bash
+ssh -S /tmp/quant-trading-tunnel-ctl -O exit quant-trading-server
+```
+
+服务器 `.env` 可设置 `PIP_INDEX_URL`、`PIP_TRUSTED_HOST` 和 `NPM_CONFIG_REGISTRY`，用于让远端 Docker build 走更稳定的 pip/npm 镜像源；本地不配置这些变量时仍使用默认官方源。
+
+服务器部署仍必须遵守数据安全红线。禁止执行会删除远端 PostgreSQL volume 的命令，例如 `docker compose down -v` 或 `docker volume rm`，除非用户明确确认接受远端数据丢失。

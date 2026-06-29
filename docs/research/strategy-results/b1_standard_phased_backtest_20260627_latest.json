@@ -1,0 +1,68 @@
+{
+  "rows": [
+    {
+      "phase": "tail_close_ideal",
+      "label": "尾盘理想成交",
+      "entry_timing": "tail_close",
+      "buy_price_column": "close",
+      "sell_price_column": "close",
+      "symbol_count": 179,
+      "annual_return": 0.20573526337662362,
+      "max_drawdown": -0.297624687543787,
+      "calmar": 0.691257385516299,
+      "trade_count": 147.0,
+      "candidate_count": 376.0,
+      "passes_return_gate": false,
+      "passes_drawdown_gate": true,
+      "description": "收盘信号当日尾盘近似成交，不计细分费用，只用于确认信号基础正期望。"
+    },
+    {
+      "phase": "tail_close_standard",
+      "label": "尾盘标准成交",
+      "entry_timing": "tail_close",
+      "buy_price_column": "close",
+      "sell_price_column": "close",
+      "symbol_count": 179,
+      "annual_return": 0.10388572153608866,
+      "max_drawdown": -0.3015501882736902,
+      "calmar": 0.34450557676920057,
+      "trade_count": 184.0,
+      "candidate_count": 376.0,
+      "passes_return_gate": false,
+      "passes_drawdown_gate": false,
+      "description": "尾盘近似成交，加入万2.5佣金、最低5元、过户费、印花税、100股一手和5bp磨损。"
+    },
+    {
+      "phase": "next_open_standard",
+      "label": "次日开盘标准成交",
+      "entry_timing": "next_day",
+      "buy_price_column": "open",
+      "sell_price_column": "open",
+      "symbol_count": 179,
+      "annual_return": 0.44050949712235865,
+      "max_drawdown": -0.20138819567585076,
+      "calmar": 2.1873650322156486,
+      "trade_count": 203.0,
+      "candidate_count": 376.0,
+      "passes_return_gate": false,
+      "passes_drawdown_gate": true,
+      "description": "收盘出信号、次日开盘成交，加入标准费用、100股一手和10bp磨损。"
+    },
+    {
+      "phase": "next_open_realistic",
+      "label": "次日开盘现实压力",
+      "entry_timing": "next_day",
+      "buy_price_column": "open",
+      "sell_price_column": "open",
+      "symbol_count": 179,
+      "annual_return": 0.28664992813870294,
+      "max_drawdown": -0.23341238055243219,
+      "calmar": 1.228083649463109,
+      "trade_count": 353.0,
+      "candidate_count": 376.0,
+      "passes_return_gate": false,
+      "passes_drawdown_gate": true,
+      "description": "在标准成交上加入10%涨跌停阻断和单次成交量5%容量上限。"
+    }
+  ]
+}
