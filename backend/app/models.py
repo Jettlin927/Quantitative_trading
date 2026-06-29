@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Index as SqlIndex, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -24,7 +24,7 @@ class StockDailyBar(Base):
     __tablename__ = "stock_daily_bars"
     __table_args__ = (
         UniqueConstraint("ts_code", "trade_date", name="uq_stock_daily_bar_code_date"),
-        Index("ix_stock_daily_bars_code_date", "ts_code", "trade_date"),
+        SqlIndex("ix_stock_daily_bars_code_date", "ts_code", "trade_date"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -47,7 +47,7 @@ class StockDailyBasic(Base):
     __tablename__ = "stock_daily_basic"
     __table_args__ = (
         UniqueConstraint("ts_code", "trade_date", name="uq_stock_daily_basic_code_date"),
-        Index("ix_stock_daily_basic_code_date", "ts_code", "trade_date"),
+        SqlIndex("ix_stock_daily_basic_code_date", "ts_code", "trade_date"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -77,7 +77,7 @@ class StockFinancialIndicator(Base):
     __tablename__ = "stock_financial_indicators"
     __table_args__ = (
         UniqueConstraint("ts_code", "end_date", "ann_date", name="uq_stock_financial_indicator_period"),
-        Index("ix_stock_financial_indicators_code_period", "ts_code", "end_date", "ann_date"),
+        SqlIndex("ix_stock_financial_indicators_code_period", "ts_code", "end_date", "ann_date"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -107,6 +107,139 @@ class StockFinancialIndicator(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class TradeCalendar(Base):
+    __tablename__ = "trade_calendars"
+    __table_args__ = (
+        UniqueConstraint("exchange", "cal_date", name="uq_trade_calendar_exchange_date"),
+        SqlIndex("ix_trade_calendars_exchange_date", "exchange", "cal_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    exchange: Mapped[str] = mapped_column(String(16), index=True)
+    cal_date: Mapped[date] = mapped_column(Date, index=True)
+    is_open: Mapped[bool] = mapped_column(Boolean, default=False)
+    pretrade_date: Mapped[date | None] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class StockAdjustFactor(Base):
+    __tablename__ = "stock_adjust_factors"
+    __table_args__ = (
+        UniqueConstraint("ts_code", "trade_date", name="uq_stock_adjust_factor_code_date"),
+        SqlIndex("ix_stock_adjust_factors_code_date", "ts_code", "trade_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ts_code: Mapped[str] = mapped_column(String(16), index=True)
+    trade_date: Mapped[date] = mapped_column(Date, index=True)
+    adj_factor: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Index(Base):
+    __tablename__ = "indices"
+
+    ts_code: Mapped[str] = mapped_column(String(16), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), index=True)
+    market: Mapped[str | None] = mapped_column(String(40), index=True)
+    publisher: Mapped[str | None] = mapped_column(String(120))
+    category: Mapped[str | None] = mapped_column(String(80), index=True)
+    base_date: Mapped[date | None] = mapped_column(Date)
+    list_date: Mapped[date | None] = mapped_column(Date)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class IndexDailyBar(Base):
+    __tablename__ = "index_daily_bars"
+    __table_args__ = (
+        UniqueConstraint("ts_code", "trade_date", name="uq_index_daily_bar_code_date"),
+        SqlIndex("ix_index_daily_bars_code_date", "ts_code", "trade_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ts_code: Mapped[str] = mapped_column(String(16), index=True)
+    trade_date: Mapped[date] = mapped_column(Date, index=True)
+    open: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    high: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    low: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    close: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    pre_close: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    change_amount: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    pct_chg: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
+    vol: Mapped[Decimal | None] = mapped_column(Numeric(24, 4))
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(24, 4))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Fund(Base):
+    __tablename__ = "funds"
+
+    ts_code: Mapped[str] = mapped_column(String(16), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), index=True)
+    market: Mapped[str | None] = mapped_column(String(40), index=True)
+    fund_type: Mapped[str | None] = mapped_column(String(80), index=True)
+    management: Mapped[str | None] = mapped_column(String(120))
+    custodian: Mapped[str | None] = mapped_column(String(120))
+    list_date: Mapped[date | None] = mapped_column(Date)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class FundDailyBar(Base):
+    __tablename__ = "fund_daily_bars"
+    __table_args__ = (
+        UniqueConstraint("ts_code", "trade_date", name="uq_fund_daily_bar_code_date"),
+        SqlIndex("ix_fund_daily_bars_code_date", "ts_code", "trade_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ts_code: Mapped[str] = mapped_column(String(16), index=True)
+    trade_date: Mapped[date] = mapped_column(Date, index=True)
+    open: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    high: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    low: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    close: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    pre_close: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    change_amount: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    pct_chg: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
+    vol: Mapped[Decimal | None] = mapped_column(Numeric(24, 4))
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(24, 4))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class IndustryClassification(Base):
+    __tablename__ = "industry_classifications"
+
+    index_code: Mapped[str] = mapped_column(String(16), primary_key=True)
+    industry_name: Mapped[str] = mapped_column(String(120), index=True)
+    level: Mapped[str | None] = mapped_column(String(20), index=True)
+    industry_code: Mapped[str | None] = mapped_column(String(40), index=True)
+    parent_code: Mapped[str | None] = mapped_column(String(40), index=True)
+    src: Mapped[str | None] = mapped_column(String(40), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class IndustryMember(Base):
+    __tablename__ = "industry_members"
+    __table_args__ = (
+        UniqueConstraint("index_code", "con_code", "in_date", name="uq_industry_member_period"),
+        SqlIndex("ix_industry_members_index_con_code", "index_code", "con_code"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    index_code: Mapped[str] = mapped_column(ForeignKey("industry_classifications.index_code", ondelete="CASCADE"), index=True)
+    con_code: Mapped[str] = mapped_column(String(16), index=True)
+    con_name: Mapped[str | None] = mapped_column(String(120), index=True)
+    in_date: Mapped[date] = mapped_column(Date, index=True)
+    out_date: Mapped[date | None] = mapped_column(Date, index=True)
+    is_new: Mapped[bool | None] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class StockPool(Base):
     __tablename__ = "stock_pools"
 
@@ -121,7 +254,7 @@ class StockPoolMember(Base):
     __tablename__ = "stock_pool_members"
     __table_args__ = (
         UniqueConstraint("pool_id", "ts_code", name="uq_stock_pool_member_pool_code"),
-        Index("ix_stock_pool_members_pool_code", "pool_id", "ts_code"),
+        SqlIndex("ix_stock_pool_members_pool_code", "pool_id", "ts_code"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -134,7 +267,7 @@ class Asset(Base):
     __tablename__ = "assets"
     __table_args__ = (
         UniqueConstraint("market", "symbol", name="uq_asset_market_symbol"),
-        Index("ix_assets_market_symbol", "market", "symbol"),
+        SqlIndex("ix_assets_market_symbol", "market", "symbol"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -156,7 +289,7 @@ class AssetDailyPrice(Base):
     __tablename__ = "asset_daily_prices"
     __table_args__ = (
         UniqueConstraint("asset_natural_key", "trade_date", name="uq_asset_daily_price_key_date"),
-        Index("ix_asset_daily_prices_key_date", "asset_natural_key", "trade_date"),
+        SqlIndex("ix_asset_daily_prices_key_date", "asset_natural_key", "trade_date"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -181,7 +314,7 @@ class WatchlistItem(Base):
     __tablename__ = "watchlist_items"
     __table_args__ = (
         UniqueConstraint("watchlist_name", "asset_natural_key", name="uq_watchlist_item_name_asset"),
-        Index("ix_watchlist_items_name_asset", "watchlist_name", "asset_natural_key"),
+        SqlIndex("ix_watchlist_items_name_asset", "watchlist_name", "asset_natural_key"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

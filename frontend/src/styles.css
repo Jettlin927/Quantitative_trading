@@ -59,8 +59,7 @@ button:disabled {
 .command-bar,
 .metric-strip,
 .panel,
-.stock-workbench,
-.strategy-result-panel {
+.stock-workbench {
   border: 1px solid #bec7ce;
   background: #f7f9fa;
 }
@@ -178,7 +177,7 @@ h3 {
 
 .metric-strip {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   margin-top: 6px;
 }
 
@@ -412,51 +411,6 @@ h3 {
   text-align: right;
 }
 
-.strategy-result-panel {
-  margin-top: 6px;
-  background: #ffffff;
-}
-
-.strategy-head {
-  display: grid;
-  grid-template-columns: minmax(240px, 0.42fr) minmax(0, 1fr);
-  gap: 12px;
-  border-bottom: 1px solid #d3d9de;
-  background: #eef2f5;
-  padding: 10px;
-}
-
-.strategy-head span {
-  display: inline-flex;
-  border: 1px solid #c7d2da;
-  background: #ffffff;
-  color: #5d6b75;
-  font-size: 12px;
-  font-weight: 800;
-  padding: 3px 7px;
-}
-
-.strategy-head h2 {
-  margin-top: 5px;
-  font-size: 16px;
-}
-
-.strategy-head p {
-  color: #3d4952;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.strategy-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(420px, 0.75fr);
-  gap: 0;
-}
-
-.strategy-grid table:first-child {
-  border-right: 1px solid #d3d9de;
-}
-
 .data-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(420px, 0.8fr);
@@ -569,8 +523,7 @@ tbody tr:hover td {
 
 @media (max-width: 1260px) {
   .metric-strip,
-  .data-grid,
-  .strategy-grid {
+  .data-grid {
     grid-template-columns: 1fr;
   }
 
@@ -605,7 +558,6 @@ tbody tr:hover td {
 
   .terminal-header,
   .command-bar,
-  .strategy-head,
   .stock-workbench {
     grid-template-columns: 1fr;
   }

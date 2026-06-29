@@ -76,6 +76,50 @@ class SyncFundamentalsRequest(BaseModel):
     token: str | None = Field(default=None, repr=False)
 
 
+class SyncTradeCalendarRequest(BaseModel):
+    start_date: date
+    end_date: date
+    exchange: str = ""
+    token: str | None = Field(default=None, repr=False)
+
+
+class SyncAdjustFactorsRequest(BaseModel):
+    ts_code: str = Field(..., examples=["600703.SH"])
+    start_date: date
+    end_date: date
+    token: str | None = Field(default=None, repr=False)
+
+
+class SyncIndexBasicRequest(BaseModel):
+    markets: list[str] = Field(default_factory=lambda: ["CSI", "SSE", "SZSE", "SW"])
+    token: str | None = Field(default=None, repr=False)
+
+
+class SyncIndexDailyRequest(BaseModel):
+    ts_codes: list[str] = Field(default_factory=list)
+    start_date: date
+    end_date: date
+    token: str | None = Field(default=None, repr=False)
+
+
+class SyncFundBasicRequest(BaseModel):
+    market: str = "E"
+    token: str | None = Field(default=None, repr=False)
+
+
+class SyncFundDailyRequest(BaseModel):
+    ts_codes: list[str] = Field(default_factory=list)
+    start_date: date
+    end_date: date
+    token: str | None = Field(default=None, repr=False)
+
+
+class SyncIndustryClassificationsRequest(BaseModel):
+    src: str = "SW2021"
+    index_codes: list[str] = Field(default_factory=list)
+    token: str | None = Field(default=None, repr=False)
+
+
 class SyncMarketDataRequest(BaseModel):
     start_date: date
     end_date: date

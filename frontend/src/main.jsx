@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   Activity,
-  BarChart3,
   Database,
   DownloadCloud,
   RefreshCw,
@@ -26,7 +25,6 @@ function App() {
   const [syncProgress, setSyncProgress] = useState(null)
   const [stocks, setStocks] = useState([])
   const [usDb, setUsDb] = useState(null)
-  const [strategyResults, setStrategyResults] = useState(null)
   const [query, setQuery] = useState('')
   const [selectedCode, setSelectedCode] = useState('')
   const [stockBars, setStockBars] = useState([])
@@ -41,20 +39,18 @@ function App() {
     setError('')
     try {
       const q = query.trim()
-      const [healthRes, overviewRes, progressRes, stocksRes, usDbRes, strategyRes] = await Promise.all([
+      const [healthRes, overviewRes, progressRes, stocksRes, usDbRes] = await Promise.all([
         fetchJson('/api/health'),
         fetchJson('/api/db/overview'),
         fetchJson('/api/tushare/sync-progress'),
         fetchJson(`/api/stocks/screen?limit=80${q ? `&q=${encodeURIComponent(q)}` : ''}`),
         fetchJson('/api/us-research/db-overview'),
-        fetchJson('/api/strategy-results/overview'),
       ])
       setHealth(healthRes)
       setOverview(overviewRes)
       setSyncProgress(progressRes)
       setStocks(stocksRes)
       setUsDb(usDbRes)
-      setStrategyResults(strategyRes)
       setLastUpdated(new Date())
       if (!selectedCode && stocksRes[0]) {
         setSelectedCode(stocksRes[0].ts_code)
@@ -115,13 +111,11 @@ function App() {
 
   const aShare = overview?.aShare || {}
   const usCounts = usDb?.counts || {}
-  const strategySets = strategyResults?.resultSets || []
   const tableRows = useMemo(() => buildTableRows(overview, usDb), [overview, usDb])
   const syncRuns = syncProgress?.runs || []
   const usAssets = usDb?.assets || []
   const selectedStock = stocks.find((stock) => stock.ts_code === selectedCode) || stocks[0] || null
   const selectedLatestBar = stockBars[stockBars.length - 1] || selectedStock || null
-  const activeStrategy = strategySets[0] || null
 
   return (
     <main className="terminal-shell">
@@ -141,7 +135,7 @@ function App() {
       </header>
 
       <section className="command-bar" aria-label="工作台操作">
-        <span className="mode-chip">只读数据 / 样本 / 策略结果</span>
+        <span className="mode-chip">只读数据 / 样本 / P0 覆盖</span>
         <button onClick={refreshAll} disabled={loading}>
           <RefreshCw size={16} className={loading ? 'spin' : ''} />
           刷新数据
@@ -157,10 +151,12 @@ function App() {
       <section className="metric-strip" aria-label="核心覆盖">
         <Metric label="A股股票" value={formatInt(aShare.stocks)} note="stocks" icon={Server} />
         <Metric label="日线覆盖" value={dateRange(aShare.dailyBars)} note={`${formatInt(aShare.dailyBars?.rows)} rows`} icon={Table2} />
-        <Metric label="daily_basic" value={dateRange(aShare.dailyBasic)} note={`${formatInt(aShare.dailyBasic?.rows)} rows`} icon={Table2} />
-        <Metric label="财务指标" value={dateRange(aShare.financialIndicators)} note={`${formatInt(aShare.financialIndicators?.rows)} rows`} icon={Activity} />
+        <Metric label="交易日历" value={aShare.tradeCalendar?.latestOpenDate || dateRange(aShare.tradeCalendar)} note={`${formatInt(aShare.tradeCalendar?.rows)} rows`} icon={Activity} />
+        <Metric label="复权因子" value={dateRange(aShare.adjustFactors)} note={`${formatInt(aShare.adjustFactors?.rows)} rows`} icon={Table2} />
+        <Metric label="指数日线" value={dateRange(aShare.indexDailyBars)} note={`${formatInt(aShare.indices?.rows)} indices`} icon={Table2} />
+        <Metric label="ETF 日线" value={dateRange(aShare.fundDailyBars)} note={`${formatInt(aShare.funds?.rows)} funds`} icon={Table2} />
+        <Metric label="行业成分" value={formatInt(aShare.industryMembers)} note={`${formatInt(aShare.industries?.rows)} industries`} icon={Database} />
         <Metric label="美股 sample" value={formatInt(usCounts.assets)} note={`${formatInt(usCounts.assetDailyPrices)} prices`} icon={Database} />
-        <Metric label="策略结果" value={formatInt(strategySets.length)} note={strategyResults?.mode || 'readonly'} icon={BarChart3} />
       </section>
 
       <section className="stock-workbench" aria-label="股票样本分析台">
@@ -235,44 +231,6 @@ function App() {
           </InfoBlock>
         </aside>
       </section>
-
-      {activeStrategy ? (
-        <section className="strategy-result-panel">
-          <div className="strategy-head">
-            <div>
-              <span>{activeStrategy.status}</span>
-              <h2>{activeStrategy.title}</h2>
-            </div>
-            <p>{activeStrategy.conclusion}</p>
-          </div>
-          <div className="strategy-grid">
-            <DataTable columns={['阶段', '年化', '最大回撤', 'Calmar', '交易数', '收益门', '回撤门']}>
-              {(activeStrategy.phases || []).map((row) => (
-                <tr key={row.phase}>
-                  <td>{row.label}</td>
-                  <td>{formatPercentFromRatio(row.annual_return)}</td>
-                  <td className="negative">{formatPercentFromRatio(row.max_drawdown)}</td>
-                  <td>{formatNumber(row.calmar)}</td>
-                  <td>{formatInt(row.trade_count)}</td>
-                  <td><Badge value={row.passes_return_gate ? 'pass' : 'fail'} /></td>
-                  <td><Badge value={row.passes_drawdown_gate ? 'pass' : 'fail'} /></td>
-                </tr>
-              ))}
-            </DataTable>
-            <DataTable columns={['权重', '年化', '最大回撤', 'Calmar', '交易数']}>
-              {(activeStrategy.scoreScanTop || []).map((row) => (
-                <tr key={row.strategy}>
-                  <td className="mono">{row.strategy}</td>
-                  <td>{formatPercentFromRatio(row.annual_return)}</td>
-                  <td className="negative">{formatPercentFromRatio(row.max_drawdown)}</td>
-                  <td>{formatNumber(row.calmar)}</td>
-                  <td>{formatInt(row.trade_count)}</td>
-                </tr>
-              ))}
-            </DataTable>
-          </div>
-        </section>
-      ) : null}
 
       <section className="data-grid">
         <Panel title="A股覆盖">
@@ -527,6 +485,14 @@ function buildTableRows(overview, usDb) {
     { name: 'stock_daily_bars', ...coverageRow(aShare.dailyBars) },
     { name: 'stock_daily_basic', ...coverageRow(aShare.dailyBasic) },
     { name: 'stock_financial_indicators', ...coverageRow(aShare.financialIndicators) },
+    { name: 'trade_calendars', ...coverageRow(aShare.tradeCalendar) },
+    { name: 'stock_adjust_factors', ...coverageRow(aShare.adjustFactors) },
+    { name: 'indices', rows: aShare.indices?.rows, symbols: aShare.indices?.symbols, range: '-' },
+    { name: 'index_daily_bars', ...coverageRow(aShare.indexDailyBars) },
+    { name: 'funds', rows: aShare.funds?.rows, symbols: aShare.funds?.symbols, range: '-' },
+    { name: 'fund_daily_bars', ...coverageRow(aShare.fundDailyBars) },
+    { name: 'industry_classifications', rows: aShare.industries?.rows, symbols: aShare.industries?.symbols, range: '-' },
+    { name: 'industry_members', rows: aShare.industryMembers, symbols: aShare.industryMembers, range: '-' },
     { name: 'assets', rows: usDb?.counts?.assets, symbols: usDb?.counts?.assets, range: '-' },
     { name: 'asset_daily_prices', rows: usDb?.counts?.assetDailyPrices, symbols: usDb?.marketSnapshot?.symbolCount, range: '-' },
   ]
@@ -647,11 +613,6 @@ function formatNumber(value) {
 function formatPercent(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
   return `${Number(value).toFixed(2)}%`
-}
-
-function formatPercentFromRatio(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
-  return `${(Number(value) * 100).toFixed(2)}%`
 }
 
 function formatWanYi(value) {
