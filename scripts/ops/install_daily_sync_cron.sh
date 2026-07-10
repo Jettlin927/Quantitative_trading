@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROJECT_DIR="${PROJECT_DIR:-/opt/quantitative-trading}"
 API_BASE="${API_BASE:-http://127.0.0.1:18000}"
-LOG_DIR="${LOG_DIR:-${PROJECT_DIR}/logs}"
+LOG_DIR="${LOG_DIR:-$HOME/quantitative-trading-logs}"
 MARKER_BEGIN="# BEGIN quant-daily-market-sync"
 MARKER_END="# END quant-daily-market-sync"
 

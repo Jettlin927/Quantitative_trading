@@ -196,6 +196,31 @@ docker compose config
 
 本地 `.env` 维护远端连接变量：`REMOTE`、`REMOTE_SSH_PORT`、`REMOTE_SSH_KEY`、`PROJECT_DIR`、`REPO_URL`、`BRANCH`。优先使用 `scripts/ops/deploy_remote.sh` 和 `.env` 中的 SSH key；不要依赖交互式密码登录。
 
+### SSH 直连方式
+
+- 服务器：`ubuntu@182.254.180.169:22`
+- 默认私钥路径：`~/.ssh/quantitative_trading_server_ed25519`
+- 默认部署目录：`/opt/quantitative-trading`
+
+本机可直接连接：
+
+```bash
+ssh -i ~/.ssh/quantitative_trading_server_ed25519 -p 22 ubuntu@182.254.180.169
+```
+
+推荐在本机 `~/.ssh/config` 配置别名，便于复用部署、巡检和端口转发命令：
+
+```sshconfig
+Host quant-trading-server
+  HostName 182.254.180.169
+  User ubuntu
+  Port 22
+  IdentityFile ~/.ssh/quantitative_trading_server_ed25519
+  IdentitiesOnly yes
+```
+
+配置后使用 `ssh quant-trading-server` 登录。私钥内容、密码和 token 不得写入本仓库；如果本机密钥位置不同，仅在本地 `.env` 或 `~/.ssh/config` 中调整。
+
 默认远端操作顺序：
 
 1. 在本地确认工作区状态和将要同步的文件，不把 `.env`、token、密码、真实持仓、真实成交或其他凭据打包上传。
