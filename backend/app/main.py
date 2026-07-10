@@ -17,6 +17,7 @@ from .models import (
     AssetDailyPrice,
     DataSyncRun,
     Fund,
+    FundAdjustFactor,
     FundDailyBar,
     Index,
     IndexDailyBar,
@@ -28,8 +29,11 @@ from .models import (
     StockDailyBar,
     StockDailyBasic,
     StockFinancialIndicator,
+    StockLimitPrice,
+    StockListing,
     StockPool,
     StockPoolMember,
+    StockSuspendEvent,
     TradeCalendar,
     WatchlistItem,
 )
@@ -54,8 +58,11 @@ from .schemas import (
     SyncMarketDataRequest,
     SyncMarketFundamentalsRequest,
     SyncStockBasicRequest,
+    SyncStockListingsRequest,
+    SyncSuspendEventsRequest,
     SyncTradeCalendarRequest,
 )
+from .quant_research.readiness import evaluate_research_readiness
 from .tushare_client import decimal_or_none, get_pro_api, parse_tushare_date, tushare_date
 from .us_research import build_us_research_import_preview, build_us_research_overview
 from .strategy_results import build_strategy_results_overview
@@ -94,6 +101,9 @@ FUND_BASIC_FIELDS = "ts_code,name,management,custodian,fund_type,list_date,marke
 FUND_DAILY_FIELDS = "ts_code,trade_date,open,high,low,close,pre_close,change,pct_chg,vol,amount"
 INDUSTRY_CLASSIFY_FIELDS = "index_code,industry_name,level,industry_code,parent_code,src"
 INDUSTRY_MEMBER_FIELDS = "l1_code,l1_name,l2_code,l2_name,l3_code,l3_name,ts_code,name,in_date,out_date,is_new"
+STOCK_LISTING_FIELDS = "ts_code,symbol,name,area,industry,market,exchange,list_status,list_date,delist_date"
+STOCK_LIMIT_FIELDS = "ts_code,trade_date,pre_close,up_limit,down_limit"
+STOCK_SUSPEND_FIELDS = "ts_code,trade_date,suspend_timing,suspend_type"
 
 
 @app.get("/")
@@ -122,12 +132,16 @@ def get_db_overview(db: Session = Depends(get_db)) -> dict[str, Any]:
             "dailyBars": query_date_coverage(db, StockDailyBar.trade_date, StockDailyBar.ts_code),
             "dailyBasic": query_date_coverage(db, StockDailyBasic.trade_date, StockDailyBasic.ts_code),
             "financialIndicators": query_date_coverage(db, StockFinancialIndicator.ann_date, StockFinancialIndicator.ts_code),
+            "stockListings": query_listing_coverage(db),
+            "limitPrices": query_date_coverage(db, StockLimitPrice.trade_date, StockLimitPrice.ts_code),
+            "suspendEvents": query_date_coverage(db, StockSuspendEvent.trade_date, StockSuspendEvent.ts_code),
             "tradeCalendar": query_trade_calendar_coverage(db),
             "adjustFactors": query_date_coverage(db, StockAdjustFactor.trade_date, StockAdjustFactor.ts_code),
             "indices": query_entity_coverage(db, Index.ts_code),
             "indexDailyBars": query_date_coverage(db, IndexDailyBar.trade_date, IndexDailyBar.ts_code),
             "funds": query_entity_coverage(db, Fund.ts_code),
             "fundDailyBars": query_date_coverage(db, FundDailyBar.trade_date, FundDailyBar.ts_code),
+            "fundAdjustFactors": query_date_coverage(db, FundAdjustFactor.trade_date, FundAdjustFactor.ts_code),
             "industries": query_entity_coverage(db, IndustryClassification.index_code),
             "industryMembers": db.scalar(select(func.count(IndustryMember.id))) or 0,
         },
@@ -255,6 +269,30 @@ def sync_stock_basic(payload: SyncStockBasicRequest, db: Session = Depends(get_d
     return {"status": "ok", "rows_upserted": upserted}
 
 
+@app.post("/api/tushare/sync-stock-listings")
+def sync_stock_listings(payload: SyncStockListingsRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    pro = get_pro_api(payload.token)
+    rows: list[dict[str, Any]] = []
+    failed_statuses: list[str] = []
+    statuses = list(dict.fromkeys(payload.statuses))
+    for list_status in statuses:
+        try:
+            df = pro.stock_basic(exchange="", list_status=list_status, fields=STOCK_LISTING_FIELDS)
+            rows.extend(row for item in df.to_dict("records") if (row := stock_listing_record_to_row(item)))
+        except Exception as exc:  # noqa: BLE001
+            failed_statuses.append(f"{list_status}:{exc}")
+    upserted = upsert_rows(db, StockListing, dedupe_rows(rows, ("ts_code",)), ["ts_code"])
+    status = "partial" if failed_statuses else "ok"
+    record_sync_run(
+        db,
+        target="stock_listings",
+        rows_upserted=upserted,
+        status=status,
+        message=f"statuses={','.join(statuses)}, failed_statuses={len(failed_statuses)}",
+    )
+    return {"status": status, "rows_upserted": upserted, "failed_statuses": failed_statuses}
+
+
 @app.post("/api/tushare/sync-daily")
 def sync_daily(payload: SyncDailyRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     pro = get_pro_api(payload.token)
@@ -287,6 +325,76 @@ def sync_market_daily(payload: SyncMarketDataRequest, db: Session = Depends(get_
     status = "partial" if failed_dates else "ok"
     message = f"trade_dates={len(trade_dates)}, failed_dates={len(failed_dates)}"
     record_sync_run(db, target="market:daily", start_date=payload.start_date, end_date=payload.end_date, rows_upserted=rows_upserted, status=status, message=message)
+    return {"status": status, "rows_upserted": rows_upserted, "trade_dates": len(trade_dates), "failed_dates": failed_dates}
+
+
+@app.post("/api/tushare/sync-market-limit-prices")
+def sync_market_limit_prices(payload: SyncMarketDataRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    pro = get_pro_api(payload.token)
+    trade_dates = get_open_trade_dates(pro, payload.start_date, payload.end_date)
+    if payload.skip_existing:
+        trade_dates = filter_sparse_trade_dates(db, StockLimitPrice.trade_date, trade_dates, payload.min_existing_rows)
+    if payload.max_trade_dates:
+        trade_dates = trade_dates[: payload.max_trade_dates]
+
+    rows_upserted = 0
+    failed_dates: list[str] = []
+    for trade_day in trade_dates:
+        try:
+            df = pro.stk_limit(trade_date=tushare_date(trade_day), fields=STOCK_LIMIT_FIELDS)
+            rows = [row for item in df.to_dict("records") if (row := stock_limit_price_record_to_row(item))]
+            rows_upserted += upsert_rows(
+                db,
+                StockLimitPrice,
+                dedupe_rows(rows, ("ts_code", "trade_date")),
+                ["ts_code", "trade_date"],
+            )
+        except Exception as exc:  # noqa: BLE001
+            failed_dates.append(f"{trade_day}:{exc}")
+    status = "partial" if failed_dates else "ok"
+    record_sync_run(
+        db,
+        target="market:limit_prices",
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        rows_upserted=rows_upserted,
+        status=status,
+        message=f"trade_dates={len(trade_dates)}, failed_dates={len(failed_dates)}",
+    )
+    return {"status": status, "rows_upserted": rows_upserted, "trade_dates": len(trade_dates), "failed_dates": failed_dates}
+
+
+@app.post("/api/tushare/sync-market-suspend-events")
+def sync_market_suspend_events(payload: SyncSuspendEventsRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    pro = get_pro_api(payload.token)
+    trade_dates = get_open_trade_dates(pro, payload.start_date, payload.end_date)
+    if payload.max_trade_dates:
+        trade_dates = trade_dates[: payload.max_trade_dates]
+
+    rows_upserted = 0
+    failed_dates: list[str] = []
+    for trade_day in trade_dates:
+        try:
+            df = pro.suspend_d(trade_date=tushare_date(trade_day), fields=STOCK_SUSPEND_FIELDS)
+            rows = [row for item in df.to_dict("records") if (row := stock_suspend_event_record_to_row(item))]
+            rows_upserted += upsert_rows(
+                db,
+                StockSuspendEvent,
+                dedupe_rows(rows, ("ts_code", "trade_date", "suspend_type", "suspend_timing")),
+                ["ts_code", "trade_date", "suspend_type", "suspend_timing"],
+            )
+        except Exception as exc:  # noqa: BLE001
+            failed_dates.append(f"{trade_day}:{exc}")
+    status = "partial" if failed_dates else "ok"
+    record_sync_run(
+        db,
+        target="market:suspend_events",
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        rows_upserted=rows_upserted,
+        status=status,
+        message=f"trade_dates={len(trade_dates)}, failed_dates={len(failed_dates)}",
+    )
     return {"status": status, "rows_upserted": rows_upserted, "trade_dates": len(trade_dates), "failed_dates": failed_dates}
 
 
@@ -464,6 +572,27 @@ def sync_fund_daily(payload: SyncFundDailyRequest, db: Session = Depends(get_db)
     return {"status": status, "rows_upserted": rows_upserted, "failed_funds": failed_funds}
 
 
+@app.post("/api/tushare/sync-fund-adjust-factors")
+def sync_fund_adjust_factors(payload: SyncAdjustFactorsRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    pro = get_pro_api(payload.token)
+    df = pro.fund_adj(
+        ts_code=payload.ts_code,
+        start_date=tushare_date(payload.start_date),
+        end_date=tushare_date(payload.end_date),
+        fields=ADJUST_FACTOR_FIELDS,
+    )
+    rows = [row for item in df.to_dict("records") if (row := fund_adjust_factor_record_to_row(item))]
+    upserted = upsert_rows(db, FundAdjustFactor, dedupe_rows(rows, ("ts_code", "trade_date")), ["ts_code", "trade_date"])
+    record_sync_run(
+        db,
+        target=f"{payload.ts_code}:fund_adjust_factors",
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        rows_upserted=upserted,
+    )
+    return {"status": "ok", "rows_upserted": upserted}
+
+
 @app.post("/api/tushare/sync-industry-classifications")
 def sync_industry_classifications(payload: SyncIndustryClassificationsRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     pro = get_pro_api(payload.token)
@@ -501,6 +630,7 @@ def get_sync_progress(db: Session = Depends(get_db)) -> dict[str, Any]:
             "adjustFactors": query_date_coverage(db, StockAdjustFactor.trade_date, StockAdjustFactor.ts_code),
             "indexDailyBars": query_date_coverage(db, IndexDailyBar.trade_date, IndexDailyBar.ts_code),
             "fundDailyBars": query_date_coverage(db, FundDailyBar.trade_date, FundDailyBar.ts_code),
+            "fundAdjustFactors": query_date_coverage(db, FundAdjustFactor.trade_date, FundAdjustFactor.ts_code),
         },
     }
 
@@ -523,6 +653,61 @@ def get_stock_fundamentals(ts_code: str, db: Session = Depends(get_db)) -> Stock
     valuation = db.scalars(select(StockDailyBasic).where(StockDailyBasic.ts_code == code).order_by(StockDailyBasic.trade_date.desc()).limit(1)).first()
     financial = db.scalars(select(StockFinancialIndicator).where(StockFinancialIndicator.ts_code == code).order_by(StockFinancialIndicator.ann_date.desc()).limit(1)).first()
     return StockFundamentalsOut(ts_code=code, valuation=daily_basic_to_dict(valuation), financial=financial_indicator_to_dict(financial))
+
+
+@app.get("/api/stock-listings")
+def list_stock_listings(
+    as_of: date | None = None,
+    list_status: str | None = None,
+    limit: int = 500,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    stmt = select(StockListing).order_by(StockListing.ts_code).limit(min(max(limit, 1), 5000))
+    if as_of:
+        stmt = stmt.where(StockListing.list_date.is_not(None), StockListing.list_date <= as_of).where(
+            or_(StockListing.delist_date.is_(None), StockListing.delist_date >= as_of)
+        )
+    if list_status:
+        stmt = stmt.where(StockListing.list_status == list_status.upper())
+    return [stock_listing_to_dict(row) for row in db.scalars(stmt).all()]
+
+
+@app.get("/api/stocks/{ts_code}/limit-prices")
+def get_stock_limit_prices(
+    ts_code: str,
+    start_date: date,
+    end_date: date,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    rows = db.scalars(
+        select(StockLimitPrice)
+        .where(
+            StockLimitPrice.ts_code == ts_code.upper(),
+            StockLimitPrice.trade_date >= start_date,
+            StockLimitPrice.trade_date <= end_date,
+        )
+        .order_by(StockLimitPrice.trade_date)
+    ).all()
+    return [stock_limit_price_to_dict(row) for row in rows]
+
+
+@app.get("/api/stocks/{ts_code}/suspend-events")
+def get_stock_suspend_events(
+    ts_code: str,
+    start_date: date,
+    end_date: date,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    rows = db.scalars(
+        select(StockSuspendEvent)
+        .where(
+            StockSuspendEvent.ts_code == ts_code.upper(),
+            StockSuspendEvent.trade_date >= start_date,
+            StockSuspendEvent.trade_date <= end_date,
+        )
+        .order_by(StockSuspendEvent.trade_date, StockSuspendEvent.suspend_type)
+    ).all()
+    return [stock_suspend_event_to_dict(row) for row in rows]
 
 
 @app.get("/api/trade-calendars/recent")
@@ -591,6 +776,20 @@ def get_fund_daily_bars(ts_code: str, start_date: date, end_date: date, db: Sess
         ).all()
     )
     return [market_bar_to_dict(row) for row in rows]
+
+
+@app.get("/api/funds/{ts_code}/adjust-factors")
+def get_fund_adjust_factors(ts_code: str, start_date: date, end_date: date, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    rows = db.scalars(
+        select(FundAdjustFactor)
+        .where(
+            FundAdjustFactor.ts_code == ts_code.upper(),
+            FundAdjustFactor.trade_date >= start_date,
+            FundAdjustFactor.trade_date <= end_date,
+        )
+        .order_by(FundAdjustFactor.trade_date)
+    ).all()
+    return [fund_adjust_factor_to_dict(row) for row in rows]
 
 
 @app.get("/api/industries")
@@ -667,18 +866,30 @@ def get_strategy_results_overview() -> dict[str, Any]:
     return build_strategy_results_overview(REPO_ROOT)
 
 
+@app.get("/api/research/readiness")
+def get_research_readiness(scope: str = "a_share_cross_section", db: Session = Depends(get_db)) -> dict[str, Any]:
+    try:
+        return evaluate_research_readiness(scope, Base.metadata.tables.keys(), get_research_table_counts(db))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 def get_table_counts(db: Session) -> dict[str, int]:
     return {
         "stocks": db.scalar(select(func.count(Stock.ts_code))) or 0,
         "stockDailyBars": db.scalar(select(func.count(StockDailyBar.id))) or 0,
         "stockDailyBasic": db.scalar(select(func.count(StockDailyBasic.id))) or 0,
         "stockFinancialIndicators": db.scalar(select(func.count(StockFinancialIndicator.id))) or 0,
+        "stockListings": db.scalar(select(func.count(StockListing.ts_code))) or 0,
+        "stockLimitPrices": db.scalar(select(func.count(StockLimitPrice.id))) or 0,
+        "stockSuspendEvents": db.scalar(select(func.count(StockSuspendEvent.id))) or 0,
         "tradeCalendars": db.scalar(select(func.count(TradeCalendar.id))) or 0,
         "stockAdjustFactors": db.scalar(select(func.count(StockAdjustFactor.id))) or 0,
         "indices": db.scalar(select(func.count(Index.ts_code))) or 0,
         "indexDailyBars": db.scalar(select(func.count(IndexDailyBar.id))) or 0,
         "funds": db.scalar(select(func.count(Fund.ts_code))) or 0,
         "fundDailyBars": db.scalar(select(func.count(FundDailyBar.id))) or 0,
+        "fundAdjustFactors": db.scalar(select(func.count(FundAdjustFactor.id))) or 0,
         "industryClassifications": db.scalar(select(func.count(IndustryClassification.index_code))) or 0,
         "industryMembers": db.scalar(select(func.count(IndustryMember.id))) or 0,
         "stockPools": db.scalar(select(func.count(StockPool.id))) or 0,
@@ -688,6 +899,28 @@ def get_table_counts(db: Session) -> dict[str, int]:
         "watchlistItems": db.scalar(select(func.count(WatchlistItem.id))) or 0,
         "portfolioSnapshots": db.scalar(select(func.count(PortfolioSnapshot.id))) or 0,
         "dataSyncRuns": db.scalar(select(func.count(DataSyncRun.id))) or 0,
+    }
+
+
+def get_research_table_counts(db: Session) -> dict[str, int]:
+    counts = get_table_counts(db)
+    return {
+        "stocks": counts["stocks"],
+        "stock_daily_bars": counts["stockDailyBars"],
+        "stock_daily_basic": counts["stockDailyBasic"],
+        "stock_financial_indicators": counts["stockFinancialIndicators"],
+        "stock_listings": counts["stockListings"],
+        "stock_limit_prices": counts["stockLimitPrices"],
+        "stock_suspend_events": counts["stockSuspendEvents"],
+        "trade_calendars": counts["tradeCalendars"],
+        "stock_adjust_factors": counts["stockAdjustFactors"],
+        "indices": counts["indices"],
+        "index_daily_bars": counts["indexDailyBars"],
+        "funds": counts["funds"],
+        "fund_daily_bars": counts["fundDailyBars"],
+        "fund_adjust_factors": counts["fundAdjustFactors"],
+        "industry_classifications": counts["industryClassifications"],
+        "industry_members": counts["industryMembers"],
     }
 
 
@@ -768,6 +1001,18 @@ def query_trade_calendar_coverage(db: Session) -> dict[str, Any]:
     return coverage
 
 
+def query_listing_coverage(db: Session) -> dict[str, Any]:
+    rows = db.scalar(select(func.count(StockListing.ts_code))) or 0
+    by_status = dict(db.execute(select(StockListing.list_status, func.count()).group_by(StockListing.list_status)).all())
+    return {
+        "rows": int(rows),
+        "listed": int(by_status.get("L", 0)),
+        "delisted": int(by_status.get("D", 0)),
+        "paused": int(by_status.get("P", 0)),
+        "untraded": int(by_status.get("G", 0)),
+    }
+
+
 def build_catalog_filters(code_column: Any, name_column: Any, q: str | None = None, market_column: Any | None = None, market: str | None = None) -> list[Any]:
     filters: list[Any] = []
     if q:
@@ -838,6 +1083,54 @@ def stock_basic_record_to_row(item: dict[str, Any]) -> dict[str, Any] | None:
         "industry": item.get("industry"),
         "market": item.get("market"),
         "list_date": parse_tushare_date(item.get("list_date")),
+    }
+
+
+def stock_listing_record_to_row(item: dict[str, Any]) -> dict[str, Any] | None:
+    ts_code = item.get("ts_code")
+    name = item.get("name")
+    list_status = item.get("list_status")
+    if not ts_code or not name or not list_status:
+        return None
+    return {
+        "ts_code": str(ts_code),
+        "symbol": item.get("symbol"),
+        "name": str(name),
+        "area": item.get("area"),
+        "industry": item.get("industry"),
+        "market": item.get("market"),
+        "exchange": item.get("exchange"),
+        "list_status": str(list_status).upper(),
+        "list_date": parse_tushare_date(item.get("list_date")),
+        "delist_date": parse_tushare_date(item.get("delist_date")),
+    }
+
+
+def stock_limit_price_record_to_row(item: dict[str, Any]) -> dict[str, Any] | None:
+    ts_code = item.get("ts_code")
+    trade_date = parse_tushare_date(item.get("trade_date"))
+    if not ts_code or not trade_date:
+        return None
+    return {
+        "ts_code": str(ts_code),
+        "trade_date": trade_date,
+        "pre_close": decimal_or_none(item.get("pre_close")),
+        "up_limit": decimal_or_none(item.get("up_limit")),
+        "down_limit": decimal_or_none(item.get("down_limit")),
+    }
+
+
+def stock_suspend_event_record_to_row(item: dict[str, Any]) -> dict[str, Any] | None:
+    ts_code = item.get("ts_code")
+    trade_date = parse_tushare_date(item.get("trade_date"))
+    suspend_type = item.get("suspend_type")
+    if not ts_code or not trade_date or not suspend_type:
+        return None
+    return {
+        "ts_code": str(ts_code),
+        "trade_date": trade_date,
+        "suspend_type": str(suspend_type).upper(),
+        "suspend_timing": str(item.get("suspend_timing") or "").strip(),
     }
 
 
@@ -938,6 +1231,10 @@ def adjust_factor_record_to_row(item: dict[str, Any]) -> dict[str, Any] | None:
         "trade_date": trade_date,
         "adj_factor": decimal_or_none(item.get("adj_factor")),
     }
+
+
+def fund_adjust_factor_record_to_row(item: dict[str, Any]) -> dict[str, Any] | None:
+    return adjust_factor_record_to_row(item)
 
 
 def index_basic_record_to_row(item: dict[str, Any], fallback_market: str | None = None) -> dict[str, Any] | None:
@@ -1061,7 +1358,10 @@ def upsert_rows(db: Session, model: type[Any], rows: list[dict[str, Any]], confl
                 for key in chunk[0]
                 if key not in set(conflict_columns) and key not in {"id", "created_at"}
             }
-            stmt = stmt.on_conflict_do_update(index_elements=conflict_columns, set_=update_cols)
+            if update_cols:
+                stmt = stmt.on_conflict_do_update(index_elements=conflict_columns, set_=update_cols)
+            else:
+                stmt = stmt.on_conflict_do_nothing(index_elements=conflict_columns)
             db.execute(stmt)
         db.commit()
         return len(clean_rows)
@@ -1189,6 +1489,40 @@ def financial_indicator_to_dict(row: StockFinancialIndicator | None) -> dict[str
     }
 
 
+def stock_listing_to_dict(row: StockListing) -> dict[str, Any]:
+    return {
+        "tsCode": row.ts_code,
+        "symbol": row.symbol,
+        "name": row.name,
+        "area": row.area,
+        "industry": row.industry,
+        "market": row.market,
+        "exchange": row.exchange,
+        "listStatus": row.list_status,
+        "listDate": row.list_date.isoformat() if row.list_date else None,
+        "delistDate": row.delist_date.isoformat() if row.delist_date else None,
+    }
+
+
+def stock_limit_price_to_dict(row: StockLimitPrice) -> dict[str, Any]:
+    return {
+        "tsCode": row.ts_code,
+        "tradeDate": row.trade_date.isoformat(),
+        "preClose": decimal_to_float(row.pre_close),
+        "upLimit": decimal_to_float(row.up_limit),
+        "downLimit": decimal_to_float(row.down_limit),
+    }
+
+
+def stock_suspend_event_to_dict(row: StockSuspendEvent) -> dict[str, Any]:
+    return {
+        "tsCode": row.ts_code,
+        "tradeDate": row.trade_date.isoformat(),
+        "suspendType": row.suspend_type,
+        "suspendTiming": row.suspend_timing or None,
+    }
+
+
 def trade_calendar_to_dict(row: TradeCalendar) -> dict[str, Any]:
     return {
         "exchange": row.exchange,
@@ -1199,6 +1533,14 @@ def trade_calendar_to_dict(row: TradeCalendar) -> dict[str, Any]:
 
 
 def adjust_factor_to_dict(row: StockAdjustFactor) -> dict[str, Any]:
+    return {
+        "tsCode": row.ts_code,
+        "tradeDate": row.trade_date.isoformat(),
+        "adjFactor": decimal_to_float(row.adj_factor),
+    }
+
+
+def fund_adjust_factor_to_dict(row: FundAdjustFactor) -> dict[str, Any]:
     return {
         "tsCode": row.ts_code,
         "tradeDate": row.trade_date.isoformat(),
