@@ -23,6 +23,7 @@ from backend.app.database import (
     alembic_config,
     assert_schema_revision_at_head,
     current_schema_heads,
+    expected_schema_heads,
     schema_fingerprint,
     stamp_existing_schema_baseline,
 )
@@ -30,6 +31,21 @@ from backend.app.database import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MIGRATION_PATH = REPO_ROOT / "backend" / "migrations" / "versions" / "0001_existing_schema_baseline.py"
+DUPLICATE_INDEX_NAMES = {
+    "ix_asset_daily_prices_key_date",
+    "ix_assets_market_symbol",
+    "ix_fund_adjust_factors_code_date",
+    "ix_fund_daily_bars_code_date",
+    "ix_index_daily_bars_code_date",
+    "ix_stock_adjust_factors_code_date",
+    "ix_stock_daily_bars_code_date",
+    "ix_stock_daily_basic_code_date",
+    "ix_stock_financial_indicators_code_period",
+    "ix_stock_limit_prices_code_date",
+    "ix_stock_pool_members_pool_code",
+    "ix_trade_calendars_exchange_date",
+    "ix_watchlist_items_name_asset",
+}
 
 
 class SchemaMigrationTest(unittest.TestCase):
@@ -46,6 +62,7 @@ class SchemaMigrationTest(unittest.TestCase):
         self.assertIn("CREATE TABLE stocks", sql)
         self.assertIn("CREATE TABLE alembic_version", sql)
         self.assertIn("INSERT INTO alembic_version", sql)
+        self.assertIn("DROP INDEX CONCURRENTLY IF EXISTS", sql)
 
         migration_source = MIGRATION_PATH.read_text(encoding="utf-8")
         self.assertEqual(migration_source.count("op.create_table("), 25)
@@ -57,14 +74,20 @@ class SchemaMigrationTest(unittest.TestCase):
     def test_empty_sqlite_upgrade_reaches_head_and_is_idempotent(self):
         engine = create_engine("sqlite+pysqlite:///:memory:")
         try:
-            with engine.begin() as connection:
+            with engine.connect() as connection:
                 command.upgrade(alembic_config(connection), "head")
             expected_tables = set(Base.metadata.tables) | {"alembic_version"}
             self.assertEqual(set(inspect(engine).get_table_names()), expected_tables)
-            self.assertEqual(len(Base.metadata.tables), 25)
+            self.assertEqual(len(Base.metadata.tables), 28)
+            actual_indexes = {
+                index["name"]
+                for table_name in Base.metadata.tables
+                for index in inspect(engine).get_indexes(table_name)
+            }
+            self.assertTrue(DUPLICATE_INDEX_NAMES.isdisjoint(actual_indexes))
             assert_schema_revision_at_head(engine)
 
-            with engine.begin() as connection:
+            with engine.connect() as connection:
                 command.upgrade(alembic_config(connection), "head")
             self.assertEqual(set(inspect(engine).get_table_names()), expected_tables)
         finally:
@@ -74,7 +97,7 @@ class SchemaMigrationTest(unittest.TestCase):
         engine = create_engine("sqlite+pysqlite:///:memory:")
         Base.metadata.create_all(engine)
         try:
-            expected_message = rf"current=<none>, expected={re.escape(BASELINE_REVISION)}"
+            expected_message = rf"current=<none>, expected={re.escape(','.join(expected_schema_heads()))}"
             with self.assertRaisesRegex(SchemaRevisionError, expected_message):
                 assert_schema_revision_at_head(engine)
         finally:
@@ -110,21 +133,24 @@ class PostgresSchemaMigrationIntegrationTest(unittest.TestCase):
         try:
             self._reset_ephemeral_database(engine)
 
-            with engine.begin() as connection:
+            with engine.connect() as connection:
                 command.upgrade(alembic_config(connection), "head")
             with engine.connect() as connection:
-                self.assertEqual(current_schema_heads(connection), (BASELINE_REVISION,))
-            with engine.connect() as connection:
-                self.assertEqual(schema_fingerprint(connection)["sha256"], BASELINE_SCHEMA_FINGERPRINT)
+                self.assertEqual(current_schema_heads(connection), expected_schema_heads())
             assert_schema_revision_at_head(engine)
 
-            with engine.begin() as connection:
+            with engine.connect() as connection:
                 command.upgrade(alembic_config(connection), "head")
             expected_tables = set(Base.metadata.tables) | {"alembic_version"}
             self.assertEqual(set(inspect(engine).get_table_names()), expected_tables)
 
             self._reset_ephemeral_database(engine)
-            Base.metadata.create_all(engine)
+            with engine.connect() as connection:
+                command.upgrade(alembic_config(connection), BASELINE_REVISION)
+            with engine.connect() as connection:
+                self.assertEqual(schema_fingerprint(connection)["sha256"], BASELINE_SCHEMA_FINGERPRINT)
+            with engine.begin() as connection:
+                connection.execute(text("DROP TABLE alembic_version"))
             with engine.begin() as connection:
                 connection.execute(text("CREATE TABLE unexpected_schema_drift (id integer PRIMARY KEY)"))
             with self.assertRaisesRegex(SchemaFingerprintError, "unexpected_schema_drift"):
@@ -143,7 +169,23 @@ class PostgresSchemaMigrationIntegrationTest(unittest.TestCase):
             )
             self.assertEqual(stamped["revision"], BASELINE_REVISION)
             self.assertEqual(stamped["sha256"], BASELINE_SCHEMA_FINGERPRINT)
+            with engine.connect() as connection:
+                command.upgrade(alembic_config(connection), "head")
             assert_schema_revision_at_head(engine)
+            inspector = inspect(engine)
+            actual_indexes = {
+                index["name"]
+                for table_name in Base.metadata.tables
+                for index in inspector.get_indexes(table_name)
+            }
+            self.assertTrue(DUPLICATE_INDEX_NAMES.isdisjoint(actual_indexes))
+            unique_constraints = {
+                constraint["name"]
+                for table_name in Base.metadata.tables
+                for constraint in inspector.get_unique_constraints(table_name)
+            }
+            self.assertIn("uq_stock_daily_bar_code_date", unique_constraints)
+            self.assertIn("uq_stock_limit_price_code_date", unique_constraints)
         finally:
             engine.dispose()
 
