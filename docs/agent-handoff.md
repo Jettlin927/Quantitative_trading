@@ -5,10 +5,10 @@
 ## 当前接手状态
 
 - 本地仓库：`/Users/jettlin/code/Quantitative_trading`；用户常用 Windows 副本路径仍可能是 `E:\coding_things\Quantitative_trading`。
-- 当前开发分支：`codex/quant-foundation-trustworthiness`。接手先运行 `git status -sb`、`git log -3 --oneline` 和 `git rev-list --left-right --count origin/main...HEAD`。
+- 可信工程已于 2026-07-11 快进合入 GitHub `main`；合入时提交为 `b22d4fa18e98e669111dd73b620b85152317b18e`。本地任务分支仍为 `codex/quant-foundation-trustworthiness`，接手必须现场运行 `git status -sb`、`git log -3 --oneline` 和 `git rev-list --left-right --count origin/main...HEAD`。
 - 当前目标：数据完整性、无未来函数、结果可复现、进程重启可靠四条可信门禁。分钟线、期权、新付费源、券商和真实交易继续暂缓。
 - Phase 0–4 的代码和测试已完成；Phase 5 的 CI、远端 sandbox 和最终独立反例审计已经执行。首次审计发现 4 个问题，修复后同一审计者在精确提交 `f506d0e58c303afe7ad561b37ceff27c6e5e681f` 重放 39/39 反例并判定四项目标全部 PASS；PostgreSQL 16.14 全矩阵 162/162、0 跳过。
-- 精确提交 `f506d0e` 的 GitHub Actions CI run `29154412670` 已全绿，四个 job 均成功；最终文档提交和 `main` 推送仍应以现场 Git 状态与后续 CI 为准。
+- 精确运行时代码 `f506d0e` 的 GitHub Actions CI run `29154412670`、最终文档提交 `b22d4fa` 的特性分支 CI run `29157892860` 和 `main` CI run `29157928464` 均全绿，四个 job 全部成功。
 - 生产 PostgreSQL 尚未迁移：无 `alembic_version`，未执行 stamp、upgrade、DROP INDEX、DELETE 或历史数据清理。正式 DDL 与发布必须先让用户确认 `docs/deployment/2026-07-11-production-migration-approval.md`。
 
 ## 当前服务器事实

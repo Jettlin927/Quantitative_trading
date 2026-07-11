@@ -52,6 +52,7 @@
 - 最终代码在远端 PostgreSQL 16 再次通过 ResearchRun simulation 中断/显式 resume，以及双 worker 抢占、过期租约接管和自然键零重复。
 - 非实现者在精确提交 `f506d0e58c303afe7ad561b37ceff27c6e5e681f` 重放 39 个自定义反例，39/39 通过；隔离 PostgreSQL 16.14 全矩阵 162/162 通过、0 跳过。数据完整性、无未来函数、结果可复现、进程重启可靠四项均判定 PASS。
 - 同一提交的 GitHub Actions [CI run 29154412670](https://github.com/Jettlin927/Quantitative_trading/actions/runs/29154412670) 全绿：SQLite/Python、PostgreSQL 16 集成矩阵、前端 TypeScript/ESLint/build、Compose/Shell/差异检查四个 job 均成功。
+- 最终文档提交 `b22d4fa18e98e669111dd73b620b85152317b18e` 已按用户要求快进推送到 GitHub `main`；特性分支 [CI run 29157892860](https://github.com/Jettlin927/Quantitative_trading/actions/runs/29157892860) 和 `main` [CI run 29157928464](https://github.com/Jettlin927/Quantitative_trading/actions/runs/29157928464) 的同四个 job 也全部成功。
 - 临时 sandbox 已删除；活动数据库仍无 `alembic_version`。
 
 ## 备份证据
