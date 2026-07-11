@@ -14,6 +14,7 @@
 - 将 `my_quant/us_research/` 下的美股 sample 观察池、sample 快照和 sample 持仓结构 upsert 到 DB。
 - 在前端查看 API/DB 状态、A 股覆盖、美股 sample 入库状态和近期同步记录；所有写入型刷新操作通过持久化异步任务执行和轮询，不阻塞页面请求。
 - 用 `backend/app/quant_research/` 构造严格复权和公告日可见的数据集，执行受停牌/涨跌停约束的下一交易日开盘研究组合模拟，输出基准指标、walk-forward 窗口和可复现 manifest。
+- 研究运行逐阶段写入带输入/输出哈希链的 checkpoint；进程异常退出后可把陈旧 `running` 标记为 `interrupted`，校验冻结身份后显式续跑，已验证阶段不会重复计算。
 - 用 `GET /api/research/readiness` 区分 ETF 时间序列与 A 股横截面研究是否满足数据门槛。
 
 ## 技术栈
@@ -82,6 +83,18 @@ TUSHARE_TOKEN=你的_tushare_token
 4. 用 `GET /api/db/overview`、`GET /api/tushare/sync-progress` 和 `GET /api/research/readiness` 检查覆盖度与研究门槛。
 5. readiness 为 `blocked` 时先补数据，不允许研究代码静默回退到不完整口径。
 6. 如需美股 sample 数据，调用 `POST /api/us-research/import-sample` 入库。
+
+## 研究运行中断恢复
+
+研究 CLI 每次启动都会按心跳阈值扫描陈旧的 `running` 记录并转为 `interrupted`，保留临时目录和恢复审计。续跑必须显式指定原 run id：
+
+```bash
+python scripts/research/run_quant_research.py \
+  --resume <RUN_ID> \
+  --stale-after-seconds 300
+```
+
+续跑前会核对配置、代码提交、环境、数据快照、可复现键、checkpoint 哈希链及所有已完成阶段产物；任何漂移或损坏都会停止，不能通过重算覆盖。普通业务异常仍登记为 `failed`。该机制只用于离线研究，不启动 worker，也不连接交易或生产执行系统。
 
 ## 主要 API
 

@@ -15,6 +15,17 @@ from .portfolio import CostModel, simulate_target_weights
 from .snapshot import verify_materialized_inputs
 
 
+SENTINEL_LIMITATIONS = (
+    "research_only",
+    "not_investment_advice",
+    "pipeline_sentinel_not_alpha_research",
+    "fixed_single_etf_weight_no_parameter_search",
+    "daily_data_only_no_minute_or_options",
+    "no_financial_cross_section",
+    "warmup_excluded_from_metrics",
+)
+
+
 @dataclass(frozen=True)
 class SentinelBaselineResult:
     targets: pd.DataFrame
@@ -24,76 +35,19 @@ class SentinelBaselineResult:
     calendar: OpenTradeCalendar
 
 
-def run_sentinel_etf_baseline(
+def build_sentinel_targets(
     input_root: Path,
     config: dict[str, Any],
     *,
     compressed: bool,
     table_artifacts: dict[str, dict[str, Any]] | None = None,
-) -> SentinelBaselineResult:
-    if config.get("strategyId") != "sentinel_etf_baseline":
-        raise ValueError("Phase 3 runner 只允许 sentinel_etf_baseline")
-    if config.get("scope") != "etf_time_series":
-        raise ValueError("sentinel baseline 仅允许 ETF 时序范围")
-    if config.get("featureParameters") != {}:
-        raise ValueError("sentinel baseline 禁止参数搜索或特征网格")
-    target_parameters = config.get("targetWeightParameters") or {}
-    if set(target_parameters) != {"signalDate", "targetWeight"}:
-        raise ValueError("sentinel baseline 只接受固定 signalDate 与 targetWeight")
-
-    root = Path(input_root)
-    if compressed:
-        if table_artifacts is None:
-            raise ValueError("正式 baseline 必须绑定冻结输入 artifact")
-        verify_materialized_inputs(root, table_artifacts)
-    reader = _compressed_reader(root) if compressed else _plain_reader(root)
-    calendars = reader("trade_calendars")
-    bars = reader("fund_daily_bars")
-    factors = reader("fund_adjust_factors")
-    benchmark_bars = reader("index_daily_bars")
-    calendar = _build_frozen_calendar(
-        calendars,
-        source_path=(
-            root / "trade_calendars.csv.gz"
-            if compressed
-            else root / "trade_calendars.csv"
-        ),
-        artifact_sha256=(table_artifacts or {}).get("trade_calendars", {}).get("contentSha256"),
-        config=config,
-    )
-    if compressed:
-        universe = reader("universe")
-        actual_members = sorted(universe["ts_code"].dropna().astype(str).str.upper().tolist())
-        if actual_members != config["universe"]["members"]:
-            raise ValueError("冻结 universe artifact 与研究配置不一致")
-
-    members = set(config["universe"]["members"])
-    if len(members) != 1:
-        raise ValueError("sentinel baseline 只允许一只 ETF")
-    warmup_start = pd.Timestamp(config["warmupStart"])
+) -> pd.DataFrame:
+    target_parameters = _validate_sentinel_config(config)
+    root, reader = _input_reader(input_root, compressed, table_artifacts)
+    calendar = _load_calendar(root, reader, config, compressed, table_artifacts)
+    members = _validate_universe(reader, config, compressed)
     research_start = pd.Timestamp(config["startDate"])
     end = pd.Timestamp(config["endDate"])
-    bars["trade_date"] = pd.to_datetime(bars["trade_date"])
-    factors["trade_date"] = pd.to_datetime(factors["trade_date"])
-    benchmark_bars["trade_date"] = pd.to_datetime(benchmark_bars["trade_date"])
-    bars = bars[
-        bars["ts_code"].isin(members)
-        & bars["trade_date"].between(warmup_start, end)
-    ].copy()
-    factors = factors[
-        factors["ts_code"].isin(members)
-        & factors["trade_date"].between(warmup_start, end)
-    ].copy()
-    benchmark_bars = benchmark_bars[
-        (benchmark_bars["ts_code"] == config["benchmark"])
-        & benchmark_bars["trade_date"].between(warmup_start, end)
-    ].copy()
-    if bars.empty or factors.empty or benchmark_bars.empty:
-        raise ValueError("sentinel baseline 冻结输入不完整")
-
-    prices = build_adjusted_price_panel(bars, factors)
-    prices["is_buyable_at_open"] = True
-    prices["is_sellable_at_open"] = True
     target_weight = float(target_parameters["targetWeight"])
     if not 0 < target_weight <= 1:
         raise ValueError("sentinel targetWeight 必须在 (0, 1] 范围")
@@ -102,16 +56,49 @@ def run_sentinel_etf_baseline(
         raise ValueError("sentinel signalDate 必须位于 startDate 含至 endDate 不含的研究区间")
     if signal_date.date().isoformat() not in calendar.open_dates:
         raise ValueError("sentinel signalDate 必须来自冻结官方开市日历")
-    targets = pd.DataFrame(
+    return pd.DataFrame(
         [
             {
                 "signal_date": signal_date,
                 "available_date": signal_date,
-                "ts_code": sorted(members)[0],
+                "ts_code": next(iter(members)),
                 "target_weight": target_weight,
             }
         ]
     )
+
+
+def simulate_sentinel_targets(
+    input_root: Path,
+    config: dict[str, Any],
+    targets: pd.DataFrame,
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None = None,
+) -> tuple[pd.DataFrame, OpenTradeCalendar]:
+    _validate_sentinel_config(config)
+    root, reader = _input_reader(input_root, compressed, table_artifacts)
+    calendar = _load_calendar(root, reader, config, compressed, table_artifacts)
+    members = set(config["universe"]["members"])
+    bars = reader("fund_daily_bars")
+    factors = reader("fund_adjust_factors")
+    warmup_start = pd.Timestamp(config["warmupStart"])
+    end = pd.Timestamp(config["endDate"])
+    bars["trade_date"] = pd.to_datetime(bars["trade_date"])
+    factors["trade_date"] = pd.to_datetime(factors["trade_date"])
+    bars = bars[
+        bars["ts_code"].isin(members)
+        & bars["trade_date"].between(warmup_start, end)
+    ].copy()
+    factors = factors[
+        factors["ts_code"].isin(members)
+        & factors["trade_date"].between(warmup_start, end)
+    ].copy()
+    if bars.empty or factors.empty:
+        raise ValueError("sentinel baseline 冻结 ETF 输入不完整")
+    prices = build_adjusted_price_panel(bars, factors)
+    prices["is_buyable_at_open"] = True
+    prices["is_sellable_at_open"] = True
     cost_config = config["costModel"]
     nav = simulate_target_weights(
         prices,
@@ -123,30 +110,139 @@ def run_sentinel_etf_baseline(
             slippage_rate=float(cost_config["slippageRate"]),
         ),
     )
+    return nav, calendar
+
+
+def summarize_sentinel_metrics(
+    input_root: Path,
+    config: dict[str, Any],
+    nav: pd.DataFrame,
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    _validate_sentinel_config(config)
+    _, reader = _input_reader(input_root, compressed, table_artifacts)
+    benchmark_bars = reader("index_daily_bars")
+    warmup_start = pd.Timestamp(config["warmupStart"])
+    research_start = pd.Timestamp(config["startDate"])
+    end = pd.Timestamp(config["endDate"])
+    benchmark_bars["trade_date"] = pd.to_datetime(benchmark_bars["trade_date"])
+    benchmark_bars = benchmark_bars[
+        (benchmark_bars["ts_code"] == config["benchmark"])
+        & benchmark_bars["trade_date"].between(warmup_start, end)
+    ].copy()
+    if benchmark_bars.empty:
+        raise ValueError("sentinel baseline 冻结基准输入不完整")
     benchmark = benchmark_bars[["trade_date", "close"]].copy().sort_values("trade_date")
     benchmark["close"] = pd.to_numeric(benchmark["close"], errors="raise")
     benchmark["nav"] = benchmark["close"] / benchmark["close"].iloc[0]
-    evaluation_nav = nav[nav["trade_date"].between(research_start, end)]
+    normalized_nav = nav.copy()
+    normalized_nav["trade_date"] = pd.to_datetime(normalized_nav["trade_date"])
+    evaluation_nav = normalized_nav[normalized_nav["trade_date"].between(research_start, end)]
     evaluation_benchmark = benchmark[benchmark["trade_date"].between(research_start, end)]
-    metrics = summarize_performance(
+    return summarize_performance(
         evaluation_nav[["trade_date", "nav"]],
         evaluation_benchmark[["trade_date", "nav"]],
     )
-    limitations = [
-        "research_only",
-        "not_investment_advice",
-        "pipeline_sentinel_not_alpha_research",
-        "fixed_single_etf_weight_no_parameter_search",
-        "daily_data_only_no_minute_or_options",
-        "no_financial_cross_section",
-        "warmup_excluded_from_metrics",
-    ]
+
+
+def sentinel_limitations() -> list[str]:
+    return list(SENTINEL_LIMITATIONS)
+
+
+def run_sentinel_etf_baseline(
+    input_root: Path,
+    config: dict[str, Any],
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None = None,
+) -> SentinelBaselineResult:
+    targets = build_sentinel_targets(
+        input_root,
+        config,
+        compressed=compressed,
+        table_artifacts=table_artifacts,
+    )
+    nav, calendar = simulate_sentinel_targets(
+        input_root,
+        config,
+        targets,
+        compressed=compressed,
+        table_artifacts=table_artifacts,
+    )
+    metrics = summarize_sentinel_metrics(
+        input_root,
+        config,
+        nav,
+        compressed=compressed,
+        table_artifacts=table_artifacts,
+    )
     return SentinelBaselineResult(
         targets=targets,
         nav=nav,
         metrics=metrics,
-        limitations=limitations,
+        limitations=sentinel_limitations(),
         calendar=calendar,
+    )
+
+
+def _validate_sentinel_config(config: dict[str, Any]) -> dict[str, Any]:
+    if config.get("strategyId") != "sentinel_etf_baseline":
+        raise ValueError("Phase 3 runner 只允许 sentinel_etf_baseline")
+    if config.get("scope") != "etf_time_series":
+        raise ValueError("sentinel baseline 仅允许 ETF 时序范围")
+    if config.get("featureParameters") != {}:
+        raise ValueError("sentinel baseline 禁止参数搜索或特征网格")
+    target_parameters = config.get("targetWeightParameters") or {}
+    if set(target_parameters) != {"signalDate", "targetWeight"}:
+        raise ValueError("sentinel baseline 只接受固定 signalDate 与 targetWeight")
+    if len(set(config["universe"]["members"])) != 1:
+        raise ValueError("sentinel baseline 只允许一只 ETF")
+    return target_parameters
+
+
+def _input_reader(
+    input_root: Path,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None,
+) -> tuple[Path, Any]:
+    root = Path(input_root)
+    if compressed:
+        if table_artifacts is None:
+            raise ValueError("正式 baseline 必须绑定冻结输入 artifact")
+        verify_materialized_inputs(root, table_artifacts)
+        return root, _compressed_reader(root)
+    return root, _plain_reader(root)
+
+
+def _validate_universe(reader: Any, config: dict[str, Any], compressed: bool) -> tuple[str, ...]:
+    members = tuple(sorted(set(config["universe"]["members"])))
+    if compressed:
+        universe = reader("universe")
+        actual_members = tuple(sorted(universe["ts_code"].dropna().astype(str).str.upper().tolist()))
+        if actual_members != members:
+            raise ValueError("冻结 universe artifact 与研究配置不一致")
+    return members
+
+
+def _load_calendar(
+    root: Path,
+    reader: Any,
+    config: dict[str, Any],
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None,
+) -> OpenTradeCalendar:
+    calendars = reader("trade_calendars")
+    return _build_frozen_calendar(
+        calendars,
+        source_path=(
+            root / "trade_calendars.csv.gz"
+            if compressed
+            else root / "trade_calendars.csv"
+        ),
+        artifact_sha256=(table_artifacts or {}).get("trade_calendars", {}).get("contentSha256"),
+        config=config,
     )
 
 
