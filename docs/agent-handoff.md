@@ -8,7 +8,7 @@
 - 可信工程已于 2026-07-11 快进合入 GitHub `main`，生产运行时代码为 `c24ade495492f64ea82aa229827858cdef52cdf6`。本地任务分支仍为 `codex/quant-foundation-trustworthiness`；文档收口后 `main` 可能领先运行时代码，接手必须现场运行 `git status -sb`、`git log -3 --oneline` 和 `git rev-list --left-right --count origin/main...HEAD`，并把“仓库最新提交”与“生产运行时提交”分开核对。
 - 当前目标：数据完整性、无未来函数、结果可复现、进程重启可靠四条可信门禁。分钟线、期权、新付费源、券商和真实交易继续暂缓。
 - Phase 0–5 已完成。首次独立审计发现的 4 个问题修复后，同一审计者在精确提交 `f506d0e58c303afe7ad561b37ceff27c6e5e681f` 重放 39/39 反例；PostgreSQL 16.14 全矩阵 162/162、0 跳过。生产发布后又在精确部署代码上执行 73 项定向门禁，72 项通过、1 项显式 PG URL 用例按设计跳过。
-- 运行时代码对应的 GitHub Actions CI run `29158046019` 四个 job 全部成功；生产 quality、snapshot、sentinel、断库 reproduce 和 worker 重启恢复的完整证据见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
+- 运行时代码对应的 GitHub Actions CI run `29158046019` 四个 job 全部成功；生产验收证据提交 `1fe3162f4953c08fa4ad5de160994565b320406c` 已 fast-forward 推送 `main`，对应 CI run `29161789513` 的四个 job 也全部成功。生产 quality、snapshot、sentinel、断库 reproduce 和 worker 重启恢复的完整证据见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
 - 生产 PostgreSQL 已在用户明确确认后完成 fingerprint 门禁、baseline stamp、`0002→0006` 和 13 个普通重复索引清理。后续新的生产 DDL、数据删除、volume 操作或覆盖恢复仍必须再次确认。
 
 ## 当前服务器事实
