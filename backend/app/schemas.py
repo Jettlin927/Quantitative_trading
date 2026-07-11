@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -139,6 +139,23 @@ class SyncMarketFundamentalsRequest(BaseModel):
 
 class SyncStockBasicRequest(BaseModel):
     token: str | None = Field(default=None, repr=False)
+
+
+class SyncStockListingsRequest(BaseModel):
+    statuses: list[Literal["L", "D", "P", "G"]] = Field(default_factory=lambda: ["L", "D", "P", "G"], min_length=1)
+    token: str | None = Field(default=None, repr=False)
+
+
+class SyncSuspendEventsRequest(BaseModel):
+    start_date: date
+    end_date: date
+    token: str | None = Field(default=None, repr=False)
+    max_trade_dates: int = Field(default=0, ge=0)
+
+
+class SyncJobCreate(BaseModel):
+    action: Literal["stock_listings", "trade_calendar", "market_bundle", "daily_market", "us_sample"]
+    payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class StockFundamentalsOut(BaseModel):

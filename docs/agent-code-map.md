@@ -6,7 +6,7 @@
 
 ## 一句话架构
 
-本仓库是本地数据工作台：React/Vite 前端负责展示，FastAPI 后端负责 Tushare 同步、美股 sample 文件入库和 DB 查询，PostgreSQL 负责持久化 A 股与 sample 美股数据。
+本仓库是本地量化数据与离线研究工作台：React/Vite 前端负责只读展示，FastAPI 后端负责 Tushare 同步、美股 sample 文件入库和 DB 查询，PostgreSQL 负责持久化，`backend/app/quant_research/` 负责无实盘副作用的统一研究协议。
 
 ```text
 人类/AI Agent
@@ -14,6 +14,7 @@
   -> backend/app/main.py FastAPI 数据路由
   -> backend/app/models.py SQLAlchemy schema
   -> PostgreSQL 本地数据
+  -> backend/app/quant_research/ 严格数据集、组合模拟、评估与复现协议
 ```
 
 ## 启动入口
@@ -37,12 +38,20 @@
   - `StockDailyBar`：A 股日线 OHLCV，`ts_code + trade_date` 唯一。
   - `StockDailyBasic`：Tushare `daily_basic`，估值、换手率、市值等。
   - `StockFinancialIndicator`：Tushare `fina_indicator`，ROE、毛利率、负债率、增长率等。
+  - `StockListing`：L/D/P/G 历史上市状态。
+  - `StockLimitPrice` / `StockSuspendEvent`：每日涨跌停价格和停复牌事件。
+  - `TradeCalendar` / `StockAdjustFactor`：交易日历和股票复权因子。
+  - `Index` / `IndexDailyBar`：指数目录和日线。
+  - `Fund` / `FundDailyBar` / `FundAdjustFactor`：ETF/基金目录、日线和复权因子。
+  - `IndustryClassification` / `IndustryMember`：申万行业层级和历史成员。
   - `StockPool` / `StockPoolMember`：自选数据池和成员。
   - `Asset`：美股/ETF sample 资产主数据，`market + symbol` 与 `natural_key` 唯一。
   - `AssetDailyPrice`：美股 sample 快照，`asset_natural_key + trade_date` 唯一。
   - `WatchlistItem`：美股 sample 观察池，`watchlist_name + asset_natural_key` 唯一。
   - `PortfolioSnapshot`：美股 sample 持仓快照，`snapshot_id` 唯一，`holdings` 为 JSON。
-  - `DataSyncRun`：同步记录。
+  - `DataSyncRun`：单个同步接口的执行记录。
+  - `DataSyncJob`：前端和定时任务使用的持久化异步任务，`active_key` 防止同参数任务重复排队。
+  - `DataOverviewSnapshot`：千万级表精确覆盖矩阵的持久化快照，避免每次打开页面重复全表聚合。
 
 - `backend/app/schemas.py`
   - Pydantic 请求/响应模型。
@@ -59,25 +68,44 @@
 
 - `backend/app/main.py`
   - FastAPI 应用入口。
-  - 包含 A 股 Tushare 同步、DB overview、股票池 CRUD、美股 sample import preview/import 和 DB overview。
+  - 包含 A 股/指数/ETF/行业 Tushare 同步、异步任务提交/执行/轮询、DB overview、研究 readiness、股票池 CRUD、美股 sample import preview/import 和 DB overview。
   - 文件较长，先用函数名定位，不要盲目大改。
+
+- `backend/app/quant_research/`
+  - `dataset.py`：严格复权、公告日 point-in-time 关联、历史成员筛选。
+  - `repository.py`：从 DB 加载显式历史股票池和基准；缺历史上市、复权或涨跌停数据时失败。
+  - `portfolio.py`：信号在下一交易日开盘生效的目标权重模拟，含现金、权重漂移、成本及开盘可买卖硬约束。
+  - `metrics.py`：绝对和基准相对指标。
+  - `validation.py`：anchored/rolling walk-forward 窗口。
+  - `manifest.py`：run id、参数哈希、Git commit、数据快照和研究边界。
+  - `readiness.py`：ETF 时间序列与 A 股横截面研究的 `ready/blocked` 门禁。
 
 ## 主要 API
 
 - `GET /api/health`：健康检查。
 - `GET /api/db/overview`：A 股和美股 sample DB 覆盖概览。
+- `POST /api/sync-jobs`、`GET /api/sync-jobs...`：提交并轮询持久化异步同步任务。
 - `GET /api/stocks`：按代码、名称、简称、行业搜索股票。
 - `GET /api/stocks/screen`：返回股票基础信息加最新行情和估值；这里只是数据筛选。
 - `GET/POST/DELETE /api/stock-pools...`：自选数据池 CRUD 和成员管理。
 - `POST /api/tushare/sync-stock-basic`：同步 A 股基础列表。
+- `POST /api/tushare/sync-stock-listings`：同步历史上市状态。
 - `POST /api/tushare/sync-daily`：同步单票日线。
 - `POST /api/tushare/sync-market-daily`：按交易日补齐全市场日线。
+- `POST /api/tushare/sync-market-limit-prices`：按交易日同步涨跌停价格。
+- `POST /api/tushare/sync-market-suspend-events`：按日期同步停复牌事件。
 - `POST /api/tushare/sync-fundamentals`：同步单票估值和财务指标。
 - `POST /api/tushare/sync-market-daily-basic`：补齐全市场估值指标。
 - `POST /api/tushare/sync-market-fundamentals`：补齐全市场财务指标。
 - `GET /api/tushare/sync-progress`：查询日线或估值覆盖进度。
+- `POST /api/tushare/sync-trade-calendar`、`sync-adjust-factors`：同步交易日历和股票复权因子。
+- `POST /api/tushare/sync-index-basic`、`sync-index-daily`：同步指数目录和日线。
+- `POST /api/tushare/sync-fund-basic`、`sync-fund-daily`、`sync-fund-adjust-factors`：同步 ETF/基金数据。
+- `POST /api/tushare/sync-industry-classifications`：同步申万行业与历史成员。
 - `GET /api/daily-bars`：读取单票原始日线。
 - `GET /api/stocks/{ts_code}/fundamentals`：读取单票基本面概览。
+- `GET /api/stock-listings`、`/api/stocks/{ts_code}/limit-prices`、`suspend-events`：读取研究所需历史状态。
+- `GET /api/research/readiness`：检查指定研究类型是否具备关键表和有效数据。
 - `GET /api/us-research/overview`：读取美股 sample 文件预览。
 - `GET /api/us-research/import-preview`：预览美股 sample 文件将 upsert 到哪些表。
 - `POST /api/us-research/import-sample`：将 sample 数据 upsert 到 DB。
@@ -87,14 +115,20 @@
 
 - `frontend/src/main.jsx`
   - 数据工作台主入口。
-  - 读取 `/api/health`、`/api/db/overview`、`/api/tushare/sync-progress`、`/api/stocks/screen`、`/api/us-research/db-overview`。
-  - 提供美股 sample 入库按钮，调用 `POST /api/us-research/import-sample`。
+  - 轻量状态、股票列表和任务状态先加载，千万级表覆盖矩阵渐进加载。
+  - 写入型刷新统一调用 `POST /api/sync-jobs` 并轮询；标的研究一次读取数据库中的完整日线历史，可切换近 1/3/5 年和全部历史。
 
 - `frontend/src/styles.css`
   - 工业化数据终端视觉，维护高信息密度和可扫描性。
 
 - `frontend/package.json`
   - `npm run lint`、`npm run typecheck`、`npm run build`。
+
+## 运维与回补
+
+- `scripts/ops/backfill_a_share_history.py`：默认从 2012 年开始的可续跑历史回补；具备覆盖检查、checkpoint、重试、限速、dry-run 和小批量验证参数。
+- `scripts/ops/sync_today_market_data.sh`：提交 `daily_market` 异步任务并轮询完成，再补当日财务指标。
+- `scripts/ops/install_daily_sync_cron.sh`：安装 `CRON_TZ=Asia/Shanghai` 的 20:30 日更任务。
 
 ## my_quant 地图
 
@@ -132,15 +166,22 @@
 
 1. 先读 `.codex/skills/frontend-design/SKILL.md`。
 2. 保持第一屏为数据工作台。
-3. 不引入策略、回测、交易信号或真实账户入口。
+3. 不引入回测执行、交易信号、买卖评级或真实账户入口。
 4. 改完运行前端构建。
+
+新增离线研究能力：
+
+1. 先在 `docs/research/` 写明数据、时点、成交、成本、基准和失败口径。
+2. 共用协议放入 `backend/app/quant_research/`，不得复制旧探索脚本逻辑。
+3. 数据不完整时严格失败或让 readiness 返回 `blocked`，不允许静默回退。
+4. 新增单元测试，并让每次运行记录 manifest；大型结果只写入被忽略的 `outputs/research-runs/`。
 
 ## 验证命令
 
 后端最小检查：
 
 ```powershell
-python -m py_compile backend\app\database.py backend\app\models.py backend\app\schemas.py backend\app\tushare_client.py backend\app\us_research.py backend\app\main.py
+python -m py_compile backend\app\database.py backend\app\models.py backend\app\schemas.py backend\app\tushare_client.py backend\app\us_research.py backend\app\main.py backend\app\quant_research\dataset.py backend\app\quant_research\repository.py backend\app\quant_research\portfolio.py backend\app\quant_research\metrics.py backend\app\quant_research\validation.py backend\app\quant_research\manifest.py backend\app\quant_research\readiness.py
 python -m unittest discover backend\tests -v
 ```
 
@@ -161,5 +202,5 @@ docker compose run --rm frontend npm run build
 - 不要提交 `.env`、token、密码或真实凭据。
 - 不要执行 `docker compose down -v`，除非用户明确确认会丢数据。
 - 不要连接真实券商或导入真实持仓。
-- 不要把数据筛选写成策略筛选。
-- 不要恢复旧策略、旧回测、旧研究阶段或旧报告生成链路。
+- 不要把数据筛选或 readiness 写成买卖建议。
+- 不要恢复旧策略、旧回测、旧研究阶段或旧报告生成链路；新研究只使用新的协议层和验收口径。

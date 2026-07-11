@@ -14,7 +14,7 @@ fi
 
 existing_cron="$(crontab -l 2>/dev/null || true)"
 kept_cron="$(printf '%s\n' "$existing_cron" | sed "/${MARKER_BEGIN}/,/${MARKER_END}/d")"
-job_line="5 15 * * * cd ${PROJECT_DIR} && mkdir -p ${LOG_DIR} && TZ=Asia/Shanghai API_BASE=${API_BASE} ./scripts/ops/sync_today_market_data.sh >> ${LOG_DIR}/tushare_daily_sync.log 2>&1"
+job_line="30 20 * * * cd ${PROJECT_DIR} && mkdir -p ${LOG_DIR} && TZ=Asia/Shanghai API_BASE=${API_BASE} ./scripts/ops/sync_today_market_data.sh >> ${LOG_DIR}/tushare_daily_sync.log 2>&1"
 
 {
   printf '%s\n' "$kept_cron" | sed '/^[[:space:]]*$/d'

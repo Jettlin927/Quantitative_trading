@@ -6,20 +6,22 @@
 
 ## 当前目标
 
-截至 2026-06-27，本仓库已重置为本地“数据源 -> PostgreSQL DB”工作台。
+截至 2026-07-10，用户已明确重新开启“量化研究底座”，但仍保持研究模拟与真实交易隔离。
 
-当前主线只保留：
+当前主线包括：
 
 - A 股 Tushare 数据同步、持久化、覆盖度查询和原始数据展示。
+- 交易日历、复权因子、指数、ETF、申万行业及研究所需的历史可交易性数据。
 - 美股 sample 观察池、sample 快照、sample 持仓结构入库和只读展示。
-- PostgreSQL schema、upsert、同步日志、数据覆盖度和最小数据管理前端。
+- PostgreSQL schema、幂等 upsert、同步日志、数据覆盖度和最小数据管理前端。
+- 新建的 `backend/app/quant_research/` 纯研究协议层：point-in-time 数据集、研究组合模拟、基准指标、walk-forward、运行清单和 readiness 门禁。
 
-当前主线不保留：
+当前主线仍不包括：
 
-- 策略、策略库、策略生命周期、策略评估、回测引擎、研究阶段、研究报告生成。
-- AI 复盘、质量诊断、交易信号、交易评级、真实持仓导入、券商连接。
+- 真实交易信号、盘中实时策略服务、自动调参/自动发布策略、策略收益承诺。
+- AI 复盘、交易评级、真实持仓导入、券商连接或任何真实资金动作。
 
-如果用户未来重新开启策略研究，必须作为新的明确需求重新建目录、接口、文档和验证口径；不要复活旧策略文件或旧回测证据。
+旧策略文件和旧回测证据不作为新底座实现来源。新增研究能力必须使用新的目录、合同、验证口径和运行清单。
 
 ## 默认架构
 
@@ -37,11 +39,12 @@
 - `backend/app/main.py`：数据 API、Tushare 同步、美股 sample 导入和 DB overview。
 - `backend/app/tushare_client.py`：Tushare token、日期和 Decimal 清洗。
 - `backend/app/us_research.py`：美股 sample 文件到 DB preview 的适配器。
+- `backend/app/quant_research/`：无券商、无实盘副作用的量化研究协议层。
 - `frontend/`：只展示数据覆盖、同步状态、A 股样本、美股 sample 入库状态。
 - `my_quant/us_research/`：只保留美股 sample 文件、快照刷新脚本和配置；不保留报告生成或回测脚本。
 - `docs/research/a-share-data/`：只记录 A 股数据源、DB 覆盖和同步事实。
 
-不要新增 `strategy_research`、`backtest-reports`、`strategy-lab`、`research_engine` 等旧主线目录，除非用户明确要求重新开启策略研究。
+不要恢复 `strategy_research`、`backtest-reports`、`strategy-lab`、`research_engine` 等旧主线目录。新的研究底座统一放在 `backend/app/quant_research/`，一次性运行产物放在被 Git 忽略的 `outputs/research-runs/`。
 
 ## 数据安全红线
 
@@ -58,7 +61,7 @@ Tushare token 默认来自 `.env` 的 `TUSHARE_TOKEN`。请求体临时传 token
 
 ## 交易边界
 
-本仓库现在不是交易系统，也不是策略系统。禁止：
+本仓库现在不是交易系统。允许离线研究和组合模拟，但禁止：
 
 - 连接真实券商、交易账户、资金账户或下单接口。
 - 自动下单、撤单、调仓、融资融券、申购赎回或任何真实资金动作。
@@ -70,6 +73,8 @@ Tushare token 默认来自 `.env` 的 `TUSHARE_TOKEN`。请求体临时传 token
 - 同步和展示 Tushare A 股数据。
 - 导入和展示脱敏/sample 美股数据。
 - 查询 DB 表、行数、日期覆盖、最新快照和同步日志。
+- 使用复权、point-in-time 和下一交易日执行口径进行离线研究模拟。
+- 输出带数据快照、代码版本、参数哈希、基准和限制项的研究运行清单。
 
 ## 启动与构建
 
@@ -107,6 +112,10 @@ cd /d "%~dp0"
 `stock_daily_basic` 按 `ts_code + trade_date` 去重 upsert。
 
 `stock_financial_indicators` 按 `ts_code + end_date + ann_date` 去重 upsert。
+
+`stock_listings` 按 `ts_code` 去重 upsert；`stock_limit_prices`、`stock_adjust_factors` 和 `fund_adjust_factors` 按 `ts_code + trade_date` 去重 upsert。
+
+`stock_suspend_events` 按 `ts_code + trade_date + suspend_type + suspend_timing` 去重 upsert。
 
 美股 sample 表使用自然键去重：
 
@@ -153,7 +162,7 @@ API 返回必须 JSON-safe。指标和数值中的 `NaN`、`Infinity` 必须转�
 - 会改变 Tushare token、数据库密码或端口约定。
 - 会引入新的大型依赖、框架替换或数据库迁移工具。
 - 会导入真实持仓、真实成交、券商导出或连接真实账户。
-- 会从数据工作台重新升级为策略、回测、交易或研究自动化系统。
+- 会把当前离线研究底座升级为实时信号、自动研究发布或真实交易系统。
 
 ## 阶段操作日志
 
