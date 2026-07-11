@@ -1,6 +1,6 @@
 # 量化底座可信工程实施计划
 
-> 状态：待实施。按阶段执行，每个阶段独立验证、独立提交；前一阶段没有通过验收，不进入下一阶段。
+> 状态：Phase 0–4、CI、远端 sandbox 与最终独立反例审计已通过；当前停在 Task 5.3 生产迁移确认门禁。未经用户明确确认，不执行生产 stamp、upgrade、DROP INDEX 或发布。
 
 ## 目标
 
@@ -740,35 +740,35 @@ data_snapshots：
 
 **测试矩阵**
 
-- [ ] Python py_compile。
-- [ ] SQLite 快速单测。
-- [ ] PostgreSQL 16：空库 migration 到 head。
-- [ ] PostgreSQL 16：baseline schema stamp 后 migration 到 head。
-- [ ] 数据质量、快照、runner、worker lease 集成测试。
-- [ ] 黄金数据未来前缀不变和重现测试。
-- [ ] docker compose config。
-- [ ] 前端 typecheck/build（仅当前端有改动时仍作为 CI 常规门禁）。
-- [ ] bash -n 所有运维脚本。
-- [ ] git diff --check。
+- [x] Python py_compile。
+- [x] SQLite 快速单测。
+- [x] PostgreSQL 16：空库 migration 到 head。
+- [x] PostgreSQL 16：baseline schema stamp 后 migration 到 head。
+- [x] 数据质量、快照、runner、worker lease 集成测试。
+- [x] 黄金数据未来前缀不变和重现测试。
+- [x] docker compose config。
+- [x] 前端 typecheck/build（仅当前端有改动时仍作为 CI 常规门禁）。
+- [x] bash -n 所有运维脚本。
+- [x] git diff --check。
 
 ### Task 5.2：远端 sandbox 迁移演练
 
 **安全约束**
 
-- [ ] 不在当前活动 PG 直接试错。
-- [ ] 不执行 docker compose down -v 或 docker volume rm。
-- [ ] 服务器只有约 6.6 GiB 空间，不在同机复制完整 19 GB 数据库。
-- [ ] 使用当前 PG 的 schema-only dump + 代表性小样本创建隔离临时 PG。
-- [ ] 若生产迁移需要新全量备份，先验证空间；优先流式保存到本机/外部安全位置。空间不足时阻断，不挤满根盘。
+- [x] 不在当前活动 PG 直接试错。
+- [x] 不执行 docker compose down -v 或 docker volume rm。
+- [x] 服务器只有约 6.6 GiB 空间，不在同机复制完整 19 GB 数据库。
+- [x] 使用当前 PG 的 schema-only dump + 代表性小样本创建隔离临时 PG。
+- [x] 若生产迁移需要新全量备份，先验证空间；优先流式保存到本机/外部安全位置。空间不足时阻断，不挤满根盘。
 
 **演练**
 
-- [ ] 临时 PG 恢复 current schema。
-- [ ] fingerprint 校验与 stamp baseline。
-- [ ] upgrade head。
-- [ ] 运行质量规则、sentinel、reproduce 和 worker crash recovery。
-- [ ] 重复 migration 和重复同步验证幂等。
-- [ ] 记录 EXPLAIN、索引空间和迁移耗时。
+- [x] 临时 PG 恢复 current schema。
+- [x] fingerprint 校验与 stamp baseline。
+- [x] upgrade head。
+- [x] 运行质量规则、sentinel、reproduce 和 worker crash recovery。
+- [x] 重复 migration 和重复同步验证幂等。
+- [x] 记录 EXPLAIN、索引空间和迁移耗时。
 
 ### Task 5.3：生产迁移确认门禁
 

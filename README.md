@@ -15,7 +15,7 @@
 - 在前端查看 API/DB 状态、A 股覆盖、美股 sample 入库状态和近期同步记录；所有写入型刷新操作通过持久化异步任务执行和轮询，不阻塞页面请求。
 - 用 `backend/app/quant_research/` 构造严格复权和公告日可见的数据集，执行受停牌/涨跌停约束的下一交易日开盘研究组合模拟，输出基准指标、walk-forward 窗口和可复现 manifest。
 - 研究运行逐阶段写入带输入/输出哈希链的 checkpoint；进程异常退出后可把陈旧 `running` 标记为 `interrupted`，校验冻结身份后显式续跑，已验证阶段不会重复计算。
-- 用 `GET /api/research/readiness` 区分 ETF 时间序列与 A 股横截面研究是否满足数据门槛。
+- 用 `GET /api/research/readiness` 查看 inventory；研究级 readiness 必须绑定一个已经完成的质量运行 ID，不能由表存在直接推断。
 
 ## 技术栈
 
@@ -23,7 +23,7 @@
 - 后端：FastAPI + SQLAlchemy 2.0
 - 数据库：PostgreSQL 16
 - 数据源：Tushare Pro；美股侧当前只使用本仓 sample 文件
-- 运行方式：Docker Compose
+- 运行方式：Docker Compose（`db`、`api`、独立 `worker`、`frontend`）
 
 ## 快速启动
 
@@ -39,6 +39,16 @@ notepad .env
 ```dotenv
 TUSHARE_TOKEN=你的_tushare_token
 ```
+
+新建的空开发库第一次启动前，先显式建立 schema；API 不会自动迁移数据库：
+
+```powershell
+docker compose up -d db
+docker compose build api worker
+docker compose run --rm api alembic upgrade head
+```
+
+如果数据库已经有业务表但没有 `alembic_version`，不要直接运行 `upgrade head`。必须先计算并核对冻结 schema fingerprint，再显式 `stamp-existing`；生产库还必须经过 `docs/deployment/2026-07-11-production-migration-approval.md` 的独立确认门禁。
 
 然后启动：
 
@@ -68,12 +78,13 @@ TUSHARE_TOKEN=你的_tushare_token
 
 - 服务器部署目录：`/opt/quantitative-trading-release-20260710-2330`。
 - 服务器上的 PostgreSQL、API 和前端端口继续只绑定 `127.0.0.1`，不直接暴露数据库或 API 到公网。
-- 本机建立 SSH tunnel 后访问前端；当前验收入口为 `http://127.0.0.1:15174/`，隧道断开后需要重新建立。
-- 当前服务挂载历史数据卷 `quant_todo_p0_postgres_data_todo_p0`；切换前的 `quantitative-trading_postgres_data` 仍完整保留，可作为回滚来源，未删除任何 volume。
+- 本机建立 SSH tunnel 后访问前端；当前远端前端端口为 `127.0.0.1:15173`，隧道断开后需要重新建立。
+- 当前服务只挂载活动历史数据卷 `quant_todo_p0_postgres_data_todo_p0`；切换前的旧 volume 已按用户确认删除，不能把它写成现存回滚点。
 - 历史卷切换前备份为 `/opt/quantitative-trading-backups/pre-2012-history-volume-switch-20260711-0108.dump`，已通过 `pg_restore -l` 校验。
 - A 股日线、估值、股票复权、指数日线和 ETF 日线的主体历史已覆盖 2012 年和 2015 年股灾区间；`scripts/ops/backfill_a_share_history.py` 用于续跑并补齐涨跌停、停复牌和 ETF 复权等 P1 数据。
 - 服务器 `crontab` 使用 `CRON_TZ=Asia/Shanghai`，每天 20:30 调用 `scripts/ops/sync_today_market_data.sh`，提交异步日更任务并轮询结果。
-- 历史回补后服务器磁盘约使用 `94%`、剩余约 `2.5G`；新增美股或期权逐笔数据前必须先扩容或经用户确认清理旧回滚数据。
+- 可信底座生产 schema 和独立 worker 尚未发布；正式 stamp、migration 和切换前必须先确认 `docs/deployment/2026-07-11-production-migration-approval.md`。
+- 删除未挂载的旧 PostgreSQL volume 后，服务器磁盘约使用 `83%`、剩余约 `6.6G`；生产迁移预计还会因删除 13 个普通重复索引释放约 `3.9G`，但新增美股或期权逐笔数据前仍应先评估扩容。
 
 ## 推荐使用流程
 
@@ -153,7 +164,11 @@ python scripts/research/run_quant_research.py \
 - `watchlist_items`：美股 sample 观察池。
 - `portfolio_snapshots`：美股 sample 持仓快照，`holdings` 为 JSON。
 - `data_sync_runs`：同步记录。
-- `data_sync_jobs`：持久化异步任务，记录排队、运行、完成或失败状态；请求中的临时 token 不入库。
+- `data_sync_jobs`：持久化异步任务，记录排队、运行、租约、心跳、重试、完成或失败状态；请求中的临时 token 不入库。
+- `sync_worker_heartbeats`：独立 worker 的进程、代码提交、当前任务和最近心跳。
+- `data_quality_runs`、`data_quality_results`：研究范围级质量运行、规则计数和有上限的问题样例。
+- `data_snapshots`：冻结输入切片、canonical artifact 和内容哈希登记。
+- `research_runs`：配置、代码、环境、快照、checkpoint、结果指纹和中断状态登记。
 - `data_overview_snapshots`：缓存经精确聚合得到的覆盖矩阵；页面默认读取快照，日更或手动同步完成后用 `refresh=true` 重算。
 
 ## 2012 年起历史回补

@@ -1,72 +1,104 @@
 # Agent Handoff
 
-这份文档给后续 Agent 接手当前仓库状态用。规则仍以根目录 `AGENTS.md` 为准。
+这份文档给后续 Agent 接手可信量化研究底座用。规则仍以根目录 `AGENTS.md` 为准；所有运行状态都应现场复查，不能只信本文。
 
 ## 当前接手状态
 
-- 仓库：`E:\coding_things\Quantitative_trading`
-- 当前分支：任务完成后已合并到 `main`；接手时仍应先用 `git status -sb` 和 `git log -1` 实时确认。
-- 当前任务：异步同步任务、完整个股历史、2012 年起历史回补、覆盖快照、20:30 日更和远端真实 PostgreSQL 验收均已完成。
-- 当前边界：不删除 PostgreSQL volume，不导入真实账户数据，不连接券商，不发布交易信号。
-- 当前远端发布目录：`/opt/quantitative-trading-release-20260710-2330`；原 `/opt/quantitative-trading` 工作区未被覆盖。
-- 当前服务数据库 volume：`quant_todo_p0_postgres_data_todo_p0`。切换前的旧 volume `quantitative-trading_postgres_data` 已于 2026-07-11 经用户明确确认后删除，两份已验证 dump 继续保留作为回滚点。
-- 当前远端备份：`/opt/quantitative-trading-backups/pre-2012-history-volume-switch-20260711-0108.dump`，已通过 `pg_restore -l` 校验。
+- 本地仓库：`/Users/jettlin/code/Quantitative_trading`；用户常用 Windows 副本路径仍可能是 `E:\coding_things\Quantitative_trading`。
+- 当前开发分支：`codex/quant-foundation-trustworthiness`。接手先运行 `git status -sb`、`git log -3 --oneline` 和 `git rev-list --left-right --count origin/main...HEAD`。
+- 当前目标：数据完整性、无未来函数、结果可复现、进程重启可靠四条可信门禁。分钟线、期权、新付费源、券商和真实交易继续暂缓。
+- Phase 0–4 的代码和测试已完成；Phase 5 的 CI、远端 sandbox 和最终独立反例审计已经执行。首次审计发现 4 个问题，修复后同一审计者在精确提交 `f506d0e58c303afe7ad561b37ceff27c6e5e681f` 重放 39/39 反例并判定四项目标全部 PASS；PostgreSQL 16.14 全矩阵 162/162、0 跳过。
+- 精确提交 `f506d0e` 的 GitHub Actions CI run `29154412670` 已全绿，四个 job 均成功；最终文档提交和 `main` 推送仍应以现场 Git 状态与后续 CI 为准。
+- 生产 PostgreSQL 尚未迁移：无 `alembic_version`，未执行 stamp、upgrade、DROP INDEX、DELETE 或历史数据清理。正式 DDL 与发布必须先让用户确认 `docs/deployment/2026-07-11-production-migration-approval.md`。
 
-## 建议阅读顺序
+## 当前服务器事实
 
-1. `AGENTS.md`：项目主管规则、研究边界和数据安全红线。
-2. `docs/research/quant-research-foundation-plan-2026-07-10.md`：当前审计、缺口、范围与验收标准。
-3. `docs/agent-code-map.md`：从目标到代码位置的导航。
-4. `backend/app/models.py`、`backend/app/main.py`：DB schema、同步与查询 API。
-5. `backend/app/quant_research/`：新的统一研究协议层。
-6. `backend/tests/test_research_data_contracts.py`、`test_quant_research_foundation.py`：新能力合同。
-7. `操作日志.md`：实际操作和验证记录。
+- SSH：`ubuntu@182.254.180.169`；活动持久 volume 为 `quant_todo_p0_postgres_data_todo_p0`，严禁 `docker compose down -v` 或删除该 volume。
+- 活动容器仍是旧版 `db/api/frontend`，API/前端 bind 到 `/opt/quantitative-trading-release-20260710-2330`；当前 API 仍带 `--reload`。新代码目录 `/opt/quantitative-trading` 可以在不触发旧 API reload 的情况下先构建。
+- Compose project label 为 `quantitative-trading`；服务器覆盖文件位于 `/opt/quantitative-trading/docker-compose.server.yml`，继续把 DB/API/frontend 端口限制在 loopback，并指向上述 external PG volume。
+- 生产库约 19 GiB，根盘约 40 GiB、剩余约 6.6 GiB；13 个已证明与唯一约束完全重复的普通索引约占 3974 MiB。
+- `data_sync_jobs` 当前只有 3 行最终 `ok`，表约 112 KiB；正式迁移前仍需重新确认无 queued/running 和无异常长事务。
+- 最新生产全量 custom-format dump 已流式保存到本机 `/Users/jettlin/backups/Quantitative_trading/quant_trading_2026-07-11_2138+0800.dump`，大小 `2,232,308,654` bytes、权限 `0600`、SHA-256 `7c13b7ec933fd0ec965f07cea57db8add43a29fc96ec9b3d53d544aed040dd14`。PostgreSQL 16 `pg_restore -l` 得到 250 个非注释 TOC 条目/25 个 `TABLE DATA` 段，整包 `pg_restore --file=/dev/null` 读取也成功。
 
-## 当前能力分层
+## 已实现的可信闭环
 
-- P0 数据：交易日历、股票原始日线/复权、估值、财务、指数、ETF、申万行业及历史成员。
-- P1 本分支：历史上市状态、每日涨跌停、停复牌事件、ETF/基金复权因子。
-- 研究协议：严格复权和 point-in-time、显式历史股票池、下一交易日开盘组合模拟、标准指标、walk-forward、manifest 和 readiness。
-- 异步运维：`data_sync_jobs` 持久化任务状态；前端和日更脚本只提交任务并轮询，不把 Tushare token 保存到任务 payload。
-- 覆盖性能：`data_overview_snapshots` 保存精确聚合快照，页面默认读取快照；日更和手动同步后通过 `refresh=true` 在后台重算。
-- 历史展示：`GET /api/daily-bars` 的日期参数可省略；前端标的研究默认载入数据库全部历史并提供近 1/3/5 年与全部历史视图。
-- 美股 sample：继续只允许 sample/脱敏结构入库和只读展示，不属于当前 A 股研究协议扩展范围。
+### 数据完整性
 
-## 仍未完成
+- `backend/app/data_quality/` 按 scope、universe、日期、所需数据集和 benchmark 检查 schema、自然键、domain、引用、交易日覆盖、复权、涨跌停、OHLCV、新鲜度和基准重叠。
+- 状态严格区分 `ready`、`ready_with_warnings`、`blocked`、`failed`；CLI 退出码为 0/2/3。
+- formal snapshot gate 会重新读取全部 `DataQualityResult`，从明细重建状态、计数和规则引用，再与 `DataQualityRun.status/summary` 交叉核对；伪造主记录不能放行。
+- 真实生产只读审计：2025-12 的 A 股切片为 `ready_with_warnings`，明确报告非股票涨跌停历史；ETF 小切片 30 条规则为 `ready`。未删除这些历史行。
 
-- readiness 仍是表级门禁，不是逐标的逐日期的数据质量证明；正式研究仍需针对股票池和区间做缺口审计。
-- 尚未补指数历史成分/权重、行业代理净值和数据质量日报。
-- 尚未基于新协议建立教学 baseline；旧策略和旧结果不算新底座验收证据。
-- 服务器端口仍只监听 loopback；需要在用户本机维持 SSH tunnel，当前验收入口为 `http://127.0.0.1:15174/`。
-- TradingFlow 目前只做过产品/接入可行性评估，仓库未接入真实美股或期权流。购买前必须确认正式 API/数据库集成合同、历史深度、限流和数据许可，不能依赖浏览器抓取。
-- 服务器删除未挂载旧 PostgreSQL volume 后，磁盘使用率约 `83%`、剩余约 `6.6G`；两份数据库 dump 仍保留，扩展大体量美股/期权数据前仍应评估扩容。
-- Tushare `stk_limit` 会同时返回交易所基金。新同步已按股票主数据过滤，DB 中既有的非股票记录因未获删除授权而保留；覆盖快照和研究 loader 均只按股票范围使用。
+### 无未来函数
 
-## 验证命令
+- 复权改为因果 total-return index，未来复权因子不会重标历史前缀。
+- 公告时间未知的财务数据从公告后的下一开市日可用；严格财务研究在缺供应商修订历史时 blocked。
+- 收盘信号只能在下一交易日开盘执行；官方交易日历、显式/历史 universe、上市/退市、停牌和涨跌停边界都有硬校验。
+- 伪日历路径、日历文件篡改、伪 universe 来源、混合日期/布尔值和追加未来行情/公告均有反例测试。
 
-本机 PowerShell 使用仓库当前 Python 环境；测试显式切换到内存 SQLite，避免触碰真实 PG：
+### 可复现
 
-```powershell
-$env:DATABASE_URL='sqlite+pysqlite:///:memory:'
-python -m py_compile backend\app\database.py backend\app\models.py backend\app\schemas.py backend\app\tushare_client.py backend\app\us_research.py backend\app\main.py backend\app\quant_research\dataset.py backend\app\quant_research\repository.py backend\app\quant_research\portfolio.py backend\app\quant_research\metrics.py backend\app\quant_research\validation.py backend\app\quant_research\manifest.py backend\app\quant_research\readiness.py
-python -m unittest discover backend\tests -v
-docker compose config
-git diff --check
-git status -sb
+- PostgreSQL 输入在 `REPEATABLE READ + READ ONLY` 事务内按精确切片冻结；transaction 合同进入 `snapshot_id`。
+- canonical CSV.gz 固定列、排序、ISO 日期、gzip mtime=0 和 SHA-256；`\N` 只表示 null，非 null 值若恰等于该哨兵会在写入/hash 前严格拒绝。
+- `ResearchRun` 绑定 canonical config、代码提交、依赖/环境、随机种子和 snapshot；结果指纹只含确定性 targets/nav/metrics。
+- manifest 的输入副本、`dataSnapshot.tableArtifacts`、实际文件和 checkpoint hash 链交叉验证；reproduce 在任何计算前拒绝篡改。
+- `scripts/research/reproduce_quant_research.py` 只读取冻结输入；在线数据库后续改变不影响旧运行。
+
+### 重启可靠
+
+- API 只入队；独立 `worker` 使用 PostgreSQL `FOR UPDATE SKIP LOCKED`、租约、短事务心跳、有限退避和永久错误分流。
+- 语义为 at-least-once；自然键 upsert 保证崩溃重放不产生重复行，过期 owner 不能完成已被新 worker 接管的任务。
+- ResearchRun 每阶段写原子 hash-chain checkpoint；stale `running` 转为 `interrupted`，`--resume RUN_ID` 严格核对身份和归档后只执行未完成阶段。
+- snapshot、simulation、finalize 三个中断点均有恢复测试；损坏 checkpoint、归档、代码、环境、快照或可复现键会停止。
+
+## 关键远端 sandbox 证据
+
+- 生产 schema-only + `510300.SH`、`000300.SH`、SSE 日历真实小样本在独立 PostgreSQL 16 tmpfs 容器中完成 baseline fingerprint/stamp、`0001→0006` 和重复 upgrade；stamp 加 upgrade 约 4 秒。
+- 质量运行 ID：`731346b9-e1d9-46b4-8063-8a6c7fc09911`；当时 30/30 规则通过。
+- 最终修复提交重新生成：quality run `e35c0289-544a-47b3-8781-b6190c845aae`；snapshot `cb9bac39488283a13e5d31604471841b7ac5311e0e5852f1d9ac8d0639152dab`；research run `be5ef206-9291-4e24-82ad-7b01c0cb7b94`；reproducibility key `561c3e0be6d1a2b644a7bfdf531e20d70328f6b85c81df87a1f0220def74e2f7`；result fingerprint `61aa690cc0f7ea6e1b090cbbdae359696a74ad5434266167c175b6453bbe5079`。
+- 该 snapshot 明确绑定 PostgreSQL `REPEATABLE READ + READ ONLY`；数据库地址不可连接时连续两次 reproduce 都精确匹配结果指纹。
+- worker 双抢、锁行跳过、租约过期接管和自然键零重复已在最终代码的远端 PostgreSQL 16 通过；ResearchRun simulation resume 也已再次通过。
+- 临时 sandbox 已删除，生产容器保持健康且生产库仍无 `alembic_version`。
+
+## 当前验证入口
+
+快速 SQLite 门禁：
+
+```bash
+DATABASE_URL='sqlite+pysqlite:///:memory:' .venv/bin/python -m unittest discover -s backend/tests -p 'test_*.py'
 ```
 
-## 常见坑点
+完整 PostgreSQL 16 tmpfs 门禁：
 
-- `Base.metadata.create_all()` 只会补建缺失表，不替代正式的生产迁移审计；不要因为内存 SQLite 测试通过就直接操作真实 PG。
-- `stock_suspend_events` 在某一范围内为 0 行可能是合法结果；readiness 要求表存在，但不要求非空。
-- A 股横截面研究必须显式提供历史股票池，并具备 `stock_listings`、`stock_adjust_factors` 和 `stock_limit_prices`；禁止拿当前 `stocks` 全表替代历史样本。
-- 缺持仓价格、复权因子或基准重叠日期时应严格失败，不要用前值或原始价静默填充。
-- PostgreSQL volume 是本地持久化来源；不要执行 `docker compose down -v` 或删除 volume。
-- `outputs/research-runs/` 已被忽略，用于大型一次性研究结果；可复现配置和协议文档仍应进入 Git。
-- Windows 的 `core.autocrlf=true` 会破坏 Linux 定时脚本；根目录 `.gitattributes` 已固定 `*.sh text eol=lf`，不要删除。
+```bash
+PYTHON_BIN=.venv/bin/python scripts/ops/test_postgres_integration.sh
+```
 
-## 下一步建议
+其余必检：
 
-1. 增加按标的/日期检查覆盖连续性的质量报告，不只依赖表级 readiness。
-2. 补指数历史成分/权重，再建立一个简单教学 baseline，只验证全链路，不作策略候选或投资建议。
-3. 如用户确认开展美股/期权流研究，先做 TradingFlow 7 天试用和 1 周数据落盘 PoC，再决定是否新增正式美股 schema。
+```bash
+.venv/bin/python -m py_compile backend/app/database.py backend/app/models.py backend/app/schemas.py backend/app/tushare_client.py backend/app/us_research.py backend/app/main.py backend/app/sync_worker.py backend/app/quant_research/*.py scripts/research/*.py
+docker compose config --quiet
+docker compose -f docker-compose.test.yml config --quiet
+for file in scripts/ops/*.sh; do bash -n "$file"; done
+git diff --check
+```
+
+前端依赖如果本机 `node_modules` 不完整，使用正式 `node:22-alpine` Dockerfile 构建后在镜像内运行 `npm run typecheck`、`npm run lint`、`npm run build`，不要把本机缺失 `tsc` 误报成源码失败。
+
+## 生产确认后的固定顺序
+
+1. 复核最新备份、SHA-256、`pg_restore -l`、生产 fingerprint、active jobs、长事务、磁盘和当前 HTTP smoke。
+2. 把最终审计提交同步到非活动 `/opt/quantitative-trading`，先构建镜像；不要先覆盖活动 release bind。
+3. 用新镜像只读计算 fingerprint；精确匹配后才显式 `stamp-existing`，再单独 `alembic upgrade head`。
+4. 核对 revision、13 个普通重复索引、唯一约束、关键表行数和查询计划，再切换 API/worker/frontend。
+5. 运行 health、worker heartbeat、quality、sentinel、两次离线 reproduce、queued/running 重启恢复和 loopback 端口检查。
+6. 更新本文、生产确认单、`操作日志.md`，然后才允许把 Goal 标记完成。
+
+## 不要做
+
+- 不要把表存在或 inventory 写成研究级 ready。
+- 不要恢复旧策略目录或拿旧回测报告当可信底座证据。
+- 不要自动删除非股票涨跌停历史、旧快照、数据库 volume 或任何备份。
+- 不要导入真实持仓/成交、连接券商、开放公网 PostgreSQL 或把 sentinel 写成投资建议。
+- 不要在未获用户明确确认时执行生产 stamp、Alembic upgrade、`DROP INDEX` 或发布新 API/worker。

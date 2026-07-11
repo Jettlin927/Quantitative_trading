@@ -6,7 +6,7 @@
 
 ## 当前目标
 
-截至 2026-07-10，用户已明确重新开启“量化研究底座”，但仍保持研究模拟与真实交易隔离。
+截至 2026-07-11，用户已明确重新开启“量化研究底座”，但仍保持研究模拟与真实交易隔离。可信工程的代码、隔离 PostgreSQL、远端 sandbox 和独立反例审计已完成；生产 schema 迁移与发布仍停在用户确认门禁。
 
 当前主线包括：
 
@@ -15,6 +15,8 @@
 - 美股 sample 观察池、sample 快照、sample 持仓结构入库和只读展示。
 - PostgreSQL schema、幂等 upsert、同步日志、数据覆盖度和最小数据管理前端。
 - 新建的 `backend/app/quant_research/` 纯研究协议层：point-in-time 数据集、研究组合模拟、基准指标、walk-forward、运行清单和 readiness 门禁。
+- `backend/app/data_quality/` 研究范围级数据质量、canonical 输入快照、可复现运行和显式中断续跑。
+- PostgreSQL 持久任务、独立租约 worker、重启恢复和 worker 心跳。
 
 当前主线仍不包括：
 
@@ -25,18 +27,21 @@
 
 ## 默认架构
 
-默认架构是三容器本地系统：
+默认架构是四容器本地系统：
 
 - `frontend`：React + Vite，目录 `frontend/`，宿主机端口默认 `15173`，容器内监听 `5173`。
 - `api`：FastAPI + SQLAlchemy 2.0，目录 `backend/`，宿主机端口默认 `18000`，容器内监听 `8000`。
+- `worker`：复用后端镜像，通过 PostgreSQL 租约执行持久同步任务，不对外暴露端口。
 - `db`：PostgreSQL 16，使用 Docker volume 持久化本地数据。
 
 `docker-compose.yml` 是启动入口。不要把项目退回到单文件静态 HTML 方案，除非用户明确要求。
 
 ## 目录边界
 
-- `backend/app/models.py`：数据库 schema 的准绳。
-- `backend/app/main.py`：数据 API、Tushare 同步、美股 sample 导入和 DB overview。
+- `backend/app/models.py`：应用 schema 合同；生产 schema 演进必须通过 `backend/migrations/` 的 Alembic revision。
+- `backend/app/main.py`：数据 API、持久任务入队、Tushare 适配、美股 sample 导入和 DB overview；长同步不能回到 API 进程内执行。
+- `backend/app/sync_worker.py`：PostgreSQL 租约、抢占、心跳、退避和崩溃恢复。
+- `backend/app/data_quality/`：研究范围级完整性规则与持久质量运行。
 - `backend/app/tushare_client.py`：Tushare token、日期和 Decimal 清洗。
 - `backend/app/us_research.py`：美股 sample 文件到 DB preview 的适配器。
 - `backend/app/quant_research/`：无券商、无实盘副作用的量化研究协议层。
@@ -161,6 +166,7 @@ API 返回必须 JSON-safe。指标和数值中的 `NaN`、`Infinity` 必须转�
 - 会删除数据库 volume 或持久化数据。
 - 会改变 Tushare token、数据库密码或端口约定。
 - 会引入新的大型依赖、框架替换或数据库迁移工具。
+- 会对生产 PostgreSQL 执行 baseline stamp、Alembic upgrade、`DROP INDEX` 或覆盖性恢复。
 - 会导入真实持仓、真实成交、券商导出或连接真实账户。
 - 会把当前离线研究底座升级为实时信号、自动研究发布或真实交易系统。
 
@@ -181,8 +187,14 @@ API 返回必须 JSON-safe。指标和数值中的 `NaN`、`Infinity` 必须转�
 改后端时至少运行：
 
 ```powershell
-python -m py_compile backend\app\database.py backend\app\models.py backend\app\schemas.py backend\app\tushare_client.py backend\app\us_research.py backend\app\main.py
+python -m py_compile backend\app\database.py backend\app\models.py backend\app\schemas.py backend\app\tushare_client.py backend\app\us_research.py backend\app\main.py backend\app\sync_worker.py
 python -m unittest discover backend\tests -v
+```
+
+涉及 migration、质量、快照、runner 或 worker 时，还必须在 Git Bash/WSL/macOS/Linux 运行：
+
+```bash
+scripts/ops/test_postgres_integration.sh
 ```
 
 改前端时优先运行：
