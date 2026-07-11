@@ -68,22 +68,25 @@ def run_sentinel_etf_baseline(
             raise ValueError("冻结 universe artifact 与研究配置不一致")
 
     members = set(config["universe"]["members"])
-    start = pd.Timestamp(config["warmupStart"])
+    if len(members) != 1:
+        raise ValueError("sentinel baseline 只允许一只 ETF")
+    warmup_start = pd.Timestamp(config["warmupStart"])
+    research_start = pd.Timestamp(config["startDate"])
     end = pd.Timestamp(config["endDate"])
     bars["trade_date"] = pd.to_datetime(bars["trade_date"])
     factors["trade_date"] = pd.to_datetime(factors["trade_date"])
     benchmark_bars["trade_date"] = pd.to_datetime(benchmark_bars["trade_date"])
     bars = bars[
         bars["ts_code"].isin(members)
-        & bars["trade_date"].between(start, end)
+        & bars["trade_date"].between(warmup_start, end)
     ].copy()
     factors = factors[
         factors["ts_code"].isin(members)
-        & factors["trade_date"].between(start, end)
+        & factors["trade_date"].between(warmup_start, end)
     ].copy()
     benchmark_bars = benchmark_bars[
         (benchmark_bars["ts_code"] == config["benchmark"])
-        & benchmark_bars["trade_date"].between(start, end)
+        & benchmark_bars["trade_date"].between(warmup_start, end)
     ].copy()
     if bars.empty or factors.empty or benchmark_bars.empty:
         raise ValueError("sentinel baseline 冻结输入不完整")
@@ -95,6 +98,8 @@ def run_sentinel_etf_baseline(
     if not 0 < target_weight <= 1:
         raise ValueError("sentinel targetWeight 必须在 (0, 1] 范围")
     signal_date = pd.Timestamp(target_parameters["signalDate"])
+    if not research_start <= signal_date < end:
+        raise ValueError("sentinel signalDate 必须位于 startDate 含至 endDate 不含的研究区间")
     if signal_date.date().isoformat() not in calendar.open_dates:
         raise ValueError("sentinel signalDate 必须来自冻结官方开市日历")
     targets = pd.DataFrame(
@@ -121,7 +126,12 @@ def run_sentinel_etf_baseline(
     benchmark = benchmark_bars[["trade_date", "close"]].copy().sort_values("trade_date")
     benchmark["close"] = pd.to_numeric(benchmark["close"], errors="raise")
     benchmark["nav"] = benchmark["close"] / benchmark["close"].iloc[0]
-    metrics = summarize_performance(nav[["trade_date", "nav"]], benchmark[["trade_date", "nav"]])
+    evaluation_nav = nav[nav["trade_date"].between(research_start, end)]
+    evaluation_benchmark = benchmark[benchmark["trade_date"].between(research_start, end)]
+    metrics = summarize_performance(
+        evaluation_nav[["trade_date", "nav"]],
+        evaluation_benchmark[["trade_date", "nav"]],
+    )
     limitations = [
         "research_only",
         "not_investment_advice",
@@ -129,6 +139,7 @@ def run_sentinel_etf_baseline(
         "fixed_single_etf_weight_no_parameter_search",
         "daily_data_only_no_minute_or_options",
         "no_financial_cross_section",
+        "warmup_excluded_from_metrics",
     ]
     return SentinelBaselineResult(
         targets=targets,

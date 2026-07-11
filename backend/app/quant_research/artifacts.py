@@ -149,6 +149,15 @@ def verify_csv_artifact(path: Path, artifact: Mapping[str, Any]) -> None:
         raise ArtifactIntegrityError(f"canonical 内容 SHA-256 不匹配：{path.name}")
 
 
+def verify_file_artifact(path: Path, artifact: Mapping[str, Any]) -> None:
+    try:
+        digest = sha256_file(path)
+    except OSError as exc:
+        raise ArtifactIntegrityError(f"产物文件无法读取：{Path(path).name}") from exc
+    if digest != artifact.get("fileSha256") or digest != artifact.get("contentSha256"):
+        raise ArtifactIntegrityError(f"产物 SHA-256 不匹配：{Path(path).name}")
+
+
 def atomic_write_json(path: Path, value: Any) -> dict[str, Any]:
     payload = canonical_json_bytes(value) + b"\n"
     atomic_write_bytes(path, payload)

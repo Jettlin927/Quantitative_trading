@@ -97,6 +97,17 @@ class ResearchReproductionTest(unittest.TestCase):
             self.assertTrue(failed)
             self.assertFalse(any(item.status == "succeeded" for item in failed))
 
+    def test_reproduce_rejects_corrupted_archived_outputs_and_audit_files(self):
+        for name in ("targets.csv.gz", "nav.csv.gz", "metrics.json", "quality.json", "limitations.json"):
+            with self.subTest(name=name):
+                run = self._run()
+                path = run.path / name
+                payload = bytearray(path.read_bytes())
+                payload[-1] ^= 0x01
+                path.write_bytes(payload)
+                with self.assertRaisesRegex(SnapshotIntegrityError, "归档研究产物"):
+                    reproduce_quant_research(run.path)
+
 
 if __name__ == "__main__":
     unittest.main()

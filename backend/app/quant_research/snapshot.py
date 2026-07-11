@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 from typing import Any, Iterable
 from uuid import uuid4
@@ -32,6 +33,16 @@ from .run_config import canonical_sha256, validate_run_config
 
 
 GIB = 1024**3
+SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+ETF_SNAPSHOT_TABLES = {
+    "universe",
+    "trade_calendars",
+    "funds",
+    "fund_daily_bars",
+    "fund_adjust_factors",
+    "indices",
+    "index_daily_bars",
+}
 
 
 class SnapshotError(RuntimeError):
@@ -187,6 +198,7 @@ def freeze_input_snapshot(
             shutil.rmtree(temporary)
             try:
                 actual_manifest = verify_snapshot(final_path)
+                _verify_registry_snapshot(existing, actual_manifest, final_path)
             except Exception:
                 existing.status = "failed"
                 registry_db.commit()
@@ -242,7 +254,7 @@ def verify_snapshot(path: Path) -> dict[str, Any]:
         if manifest.get("snapshotId") != path.name:
             raise SnapshotIntegrityError("snapshot 目录名与 snapshotId 不一致")
         verify_snapshot_identity(manifest)
-        for artifact in manifest.get("tableArtifacts", {}).values():
+        for artifact in manifest["tableArtifacts"].values():
             artifact_path = path / artifact["filename"]
             verify_csv_artifact(artifact_path, artifact)
     except ArtifactIntegrityError as exc:
@@ -266,6 +278,15 @@ def verify_snapshot_identity(manifest: dict[str, Any]) -> None:
     missing = sorted(required - set(manifest))
     if missing:
         raise SnapshotIntegrityError(f"snapshot identity 缺少字段：{', '.join(missing)}")
+    artifacts = manifest["tableArtifacts"]
+    if not isinstance(artifacts, dict) or set(artifacts) != ETF_SNAPSHOT_TABLES:
+        raise SnapshotIntegrityError("snapshot tableArtifacts 不是完整 ETF 输入集")
+    for name, artifact in artifacts.items():
+        _validate_table_artifact(name, artifact)
+    if "rowCounts" in manifest:
+        expected_counts = {name: artifact["rowCount"] for name, artifact in artifacts.items()}
+        if manifest["rowCounts"] != expected_counts:
+            raise SnapshotIntegrityError("snapshot rowCounts 与 tableArtifacts 不一致")
     identity = {
         "scope": manifest["scope"],
         "warmupStart": manifest["warmupStart"],
@@ -305,7 +326,10 @@ def verify_materialized_inputs(
     table_artifacts: dict[str, dict[str, Any]],
 ) -> None:
     try:
-        for artifact in table_artifacts.values():
+        if set(table_artifacts) != ETF_SNAPSHOT_TABLES:
+            raise SnapshotIntegrityError("冻结输入表集不完整")
+        for name, artifact in table_artifacts.items():
+            _validate_table_artifact(name, artifact)
             verify_csv_artifact(Path(inputs_dir) / Path(artifact["filename"]).name, artifact)
     except ArtifactIntegrityError as exc:
         raise SnapshotIntegrityError(str(exc)) from exc
@@ -321,6 +345,8 @@ def validate_quality_gate(registry_db: Session, config: dict[str, Any]) -> DataQ
         raise SnapshotError("质量运行尚未完成")
     if (run.summary or {}).get("status") != run.status:
         raise SnapshotError("质量运行 summary.status 与 registry status 不一致")
+    if (run.summary or {}).get("blockers") or (run.summary or {}).get("failedRules"):
+        raise SnapshotError("质量运行仍包含 blocker 或 failed rule")
     if run.scope != config["scope"]:
         raise SnapshotError("质量运行 scope 与研究配置不一致")
     if run.start_date > date.fromisoformat(config["warmupStart"]) or run.end_date < date.fromisoformat(config["endDate"]):
@@ -361,6 +387,48 @@ def validate_quality_gate(registry_db: Session, config: dict[str, Any]) -> DataQ
     if unexpected:
         raise SnapshotError(f"质量 warning 未在白名单：{', '.join(unexpected)}")
     return run
+
+
+def _validate_table_artifact(name: str, artifact: Any) -> None:
+    if not isinstance(artifact, dict):
+        raise SnapshotIntegrityError(f"snapshot artifact 无效：{name}")
+    expected_filename = f"inputs/{name}.csv.gz"
+    columns = artifact.get("columns")
+    natural_key = artifact.get("naturalKey")
+    row_count = artifact.get("rowCount")
+    if artifact.get("filename") != expected_filename:
+        raise SnapshotIntegrityError(f"snapshot artifact 文件名非 canonical：{name}")
+    if not isinstance(columns, list) or not columns or len(columns) != len(set(columns)):
+        raise SnapshotIntegrityError(f"snapshot artifact columns 无效：{name}")
+    if not isinstance(natural_key, list) or not natural_key or not set(natural_key).issubset(columns):
+        raise SnapshotIntegrityError(f"snapshot artifact naturalKey 无效：{name}")
+    if isinstance(row_count, bool) or not isinstance(row_count, int) or row_count < 0:
+        raise SnapshotIntegrityError(f"snapshot artifact rowCount 无效：{name}")
+    if not SHA256_PATTERN.fullmatch(str(artifact.get("contentSha256") or "")):
+        raise SnapshotIntegrityError(f"snapshot artifact content hash 无效：{name}")
+    if not SHA256_PATTERN.fullmatch(str(artifact.get("fileSha256") or "")):
+        raise SnapshotIntegrityError(f"snapshot artifact file hash 无效：{name}")
+    if (
+        artifact.get("nullValue") != r"\N"
+        or artifact.get("compression") != "gzip"
+        or artifact.get("gzipMtime") != 0
+    ):
+        raise SnapshotIntegrityError(f"snapshot artifact canonical 压缩合同无效：{name}")
+
+
+def _verify_registry_snapshot(row: DataSnapshot, manifest: dict[str, Any], final_path: Path) -> None:
+    expected = {
+        "qualityRunId": row.quality_run_id,
+        "scope": row.scope,
+        "warmupStart": row.start_date.isoformat(),
+        "endDate": row.end_date.isoformat(),
+        "universeHash": row.universe_hash,
+        "tableArtifacts": row.table_artifacts,
+        "rowCounts": row.row_counts,
+    }
+    actual = {key: manifest.get(key) for key in expected}
+    if actual != expected or Path(row.artifact_root) != final_path:
+        raise SnapshotIntegrityError("snapshot 磁盘 manifest 与 registry 不一致")
 
 
 def _configure_snapshot_transaction(db: Session, statement_timeout_ms: int) -> None:

@@ -83,6 +83,16 @@ class ResearchSnapshotTest(unittest.TestCase):
         with self.assertRaises(SnapshotIntegrityError):
             verify_snapshot(snapshot.path)
 
+    def test_snapshot_rejects_noncanonical_artifact_path(self):
+        with Session(self.engine) as db:
+            snapshot = freeze_input_snapshot(db, self.config, self.snapshot_root, capacity_policy=self.capacity)
+        manifest_path = snapshot.path / "snapshot.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["tableArtifacts"]["universe"]["filename"] = "../universe.csv.gz"
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(SnapshotIntegrityError, "文件名非 canonical"):
+            verify_snapshot(snapshot.path)
+
     def test_capacity_gate_blocks_before_export_and_never_deletes_candidates(self):
         candidate = self.snapshot_root / "old-candidate"
         candidate.mkdir(parents=True)
@@ -104,6 +114,7 @@ class ResearchSnapshotTest(unittest.TestCase):
             ("source hash", {"universeSourceSha256": "f" * 64}, None, "keep"),
             ("registry hash", {"universeHash": "f" * 64}, None, "keep"),
             ("summary status", {}, {"status": "blocked"}, "keep"),
+            ("summary blockers", {}, {"blockers": [{"ruleId": "forged"}]}, "keep"),
             ("unfinished", {}, None, None),
         )
         with Session(self.engine) as db:

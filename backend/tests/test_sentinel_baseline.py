@@ -24,6 +24,17 @@ class SentinelBaselineTest(unittest.TestCase):
         config["scope"] = "a_share_cross_section"
         with self.assertRaises(ValueError):
             run_sentinel_etf_baseline(FIXTURE_DIR, config, compressed=False)
+
+    def test_baseline_rejects_multiple_etfs_or_signal_outside_research_window(self):
+        config = golden_run_config("quality", "a" * 64)
+        config["universe"]["members"] = ["ANOTHER.SH", "SYNETF.SZ"]
+        with self.assertRaisesRegex(ValueError, "一只 ETF"):
+            run_sentinel_etf_baseline(FIXTURE_DIR, config, compressed=False)
+
+        config = golden_run_config("quality", "a" * 64)
+        config["targetWeightParameters"]["signalDate"] = config["endDate"]
+        with self.assertRaisesRegex(ValueError, "研究区间"):
+            run_sentinel_etf_baseline(FIXTURE_DIR, config, compressed=False)
         config = golden_run_config("quality", "a" * 64)
         config["featureParameters"] = {"lookbackGrid": [5, 10]}
         with self.assertRaises(ValueError):
