@@ -1,6 +1,6 @@
 # 量化底座可信工程实施计划
 
-> 状态：Phase 0–4、CI、远端 sandbox 与最终独立反例审计已通过；当前停在 Task 5.3 生产迁移确认门禁。未经用户明确确认，不执行生产 stamp、upgrade、DROP INDEX 或发布。
+> 状态：Phase 0–4、CI、远端 sandbox、最终独立反例审计和 GitHub `main` 合入已通过；当前停在 Task 5.3 生产迁移确认门禁。未经用户明确确认，不执行生产 stamp、upgrade、DROP INDEX 或发布。
 
 ## 目标
 
