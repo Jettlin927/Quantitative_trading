@@ -1,20 +1,28 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
+from hashlib import sha256
+import json
+import math
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import and_, delete, func, or_, select
+from pydantic import ValidationError
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .database import Base, engine, get_db
+from .database import Base, SessionLocal, engine, get_db
 from .models import (
     Asset,
     AssetDailyPrice,
+    DataOverviewSnapshot,
+    DataSyncJob,
     DataSyncRun,
     Fund,
     FundAdjustFactor,
@@ -55,6 +63,7 @@ from .schemas import (
     SyncIndexBasicRequest,
     SyncIndexDailyRequest,
     SyncIndustryClassificationsRequest,
+    SyncJobCreate,
     SyncMarketDataRequest,
     SyncMarketFundamentalsRequest,
     SyncStockBasicRequest,
@@ -112,40 +121,109 @@ def root() -> dict[str, str]:
 
 
 @app.get("/api/health")
-def health(db: Session = Depends(get_db)) -> dict[str, Any]:
+def health(db: Session = Depends(get_db), include_counts: bool = False) -> dict[str, Any]:
     db.execute(select(1))
-    return {
+    payload = {
         "status": "ok",
         "service": "quant-data-workspace",
         "database": "ok",
-        "tables": get_table_counts(db),
     }
+    if include_counts:
+        payload["tables"] = get_table_counts(db)
+    return payload
 
 
 @app.get("/api/db/overview")
-def get_db_overview(db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_db_overview(db: Session = Depends(get_db), refresh: bool = False) -> dict[str, Any]:
+    snapshot = db.get(DataOverviewSnapshot, "default")
+    if snapshot and not refresh:
+        payload = dict(snapshot.payload)
+        payload["snapshotAt"] = snapshot.updated_at.isoformat() if snapshot.updated_at else None
+        return payload
+
+    payload = build_db_overview_payload(db)
+    snapshot = snapshot or DataOverviewSnapshot(key="default", payload=payload)
+    snapshot.payload = payload
+    db.add(snapshot)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        snapshot = db.get(DataOverviewSnapshot, "default")
+        if not snapshot:
+            raise
+        snapshot.payload = payload
+        db.commit()
+    db.refresh(snapshot)
+    payload["snapshotAt"] = snapshot.updated_at.isoformat() if snapshot.updated_at else None
+    return payload
+
+
+def build_db_overview_payload(db: Session) -> dict[str, Any]:
+    stocks = db.scalar(select(func.count(Stock.ts_code))) or 0
+    daily_bars = query_date_coverage(db, StockDailyBar.trade_date, StockDailyBar.ts_code)
+    daily_basic = query_date_coverage(db, StockDailyBasic.trade_date, StockDailyBasic.ts_code)
+    financial_indicators = query_date_coverage(db, StockFinancialIndicator.ann_date, StockFinancialIndicator.ts_code)
+    stock_listings = query_listing_coverage(db)
+    limit_prices = query_stock_limit_coverage(db)
+    suspend_events = query_date_coverage(db, StockSuspendEvent.trade_date, StockSuspendEvent.ts_code)
+    trade_calendar = query_trade_calendar_coverage(db)
+    adjust_factors = query_date_coverage(db, StockAdjustFactor.trade_date, StockAdjustFactor.ts_code)
+    indices = query_entity_coverage(db, Index.ts_code)
+    index_daily_bars = query_date_coverage(db, IndexDailyBar.trade_date, IndexDailyBar.ts_code)
+    funds = query_entity_coverage(db, Fund.ts_code)
+    fund_daily_bars = query_date_coverage(db, FundDailyBar.trade_date, FundDailyBar.ts_code)
+    fund_adjust_factors = query_date_coverage(db, FundAdjustFactor.trade_date, FundAdjustFactor.ts_code)
+    industries = query_entity_coverage(db, IndustryClassification.index_code)
+    industry_members = db.scalar(select(func.count(IndustryMember.id))) or 0
+    us_sample = build_us_research_db_overview(db)
     return {
         "source": "postgresql",
-        "tables": get_table_counts(db),
-        "aShare": {
-            "stocks": db.scalar(select(func.count(Stock.ts_code))) or 0,
-            "dailyBars": query_date_coverage(db, StockDailyBar.trade_date, StockDailyBar.ts_code),
-            "dailyBasic": query_date_coverage(db, StockDailyBasic.trade_date, StockDailyBasic.ts_code),
-            "financialIndicators": query_date_coverage(db, StockFinancialIndicator.ann_date, StockFinancialIndicator.ts_code),
-            "stockListings": query_listing_coverage(db),
-            "limitPrices": query_date_coverage(db, StockLimitPrice.trade_date, StockLimitPrice.ts_code),
-            "suspendEvents": query_date_coverage(db, StockSuspendEvent.trade_date, StockSuspendEvent.ts_code),
-            "tradeCalendar": query_trade_calendar_coverage(db),
-            "adjustFactors": query_date_coverage(db, StockAdjustFactor.trade_date, StockAdjustFactor.ts_code),
-            "indices": query_entity_coverage(db, Index.ts_code),
-            "indexDailyBars": query_date_coverage(db, IndexDailyBar.trade_date, IndexDailyBar.ts_code),
-            "funds": query_entity_coverage(db, Fund.ts_code),
-            "fundDailyBars": query_date_coverage(db, FundDailyBar.trade_date, FundDailyBar.ts_code),
-            "fundAdjustFactors": query_date_coverage(db, FundAdjustFactor.trade_date, FundAdjustFactor.ts_code),
-            "industries": query_entity_coverage(db, IndustryClassification.index_code),
-            "industryMembers": db.scalar(select(func.count(IndustryMember.id))) or 0,
+        "tables": {
+            "stocks": stocks,
+            "stockDailyBars": daily_bars["rows"],
+            "stockDailyBasic": daily_basic["rows"],
+            "stockFinancialIndicators": financial_indicators["rows"],
+            "stockListings": stock_listings["rows"],
+            "stockLimitPrices": limit_prices["rows"],
+            "stockSuspendEvents": suspend_events["rows"],
+            "tradeCalendars": trade_calendar["rows"],
+            "stockAdjustFactors": adjust_factors["rows"],
+            "indices": indices["rows"],
+            "indexDailyBars": index_daily_bars["rows"],
+            "funds": funds["rows"],
+            "fundDailyBars": fund_daily_bars["rows"],
+            "fundAdjustFactors": fund_adjust_factors["rows"],
+            "industryClassifications": industries["rows"],
+            "industryMembers": industry_members,
+            "stockPools": db.scalar(select(func.count(StockPool.id))) or 0,
+            "stockPoolMembers": db.scalar(select(func.count(StockPoolMember.id))) or 0,
+            "assets": us_sample["counts"]["assets"],
+            "assetDailyPrices": us_sample["counts"]["assetDailyPrices"],
+            "watchlistItems": us_sample["counts"]["watchlistItems"],
+            "portfolioSnapshots": us_sample["counts"]["portfolioSnapshots"],
+            "dataSyncRuns": db.scalar(select(func.count(DataSyncRun.id))) or 0,
+            "dataSyncJobs": db.scalar(select(func.count(DataSyncJob.id))) or 0,
         },
-        "usSample": build_us_research_db_overview(db),
+        "aShare": {
+            "stocks": stocks,
+            "dailyBars": daily_bars,
+            "dailyBasic": daily_basic,
+            "financialIndicators": financial_indicators,
+            "stockListings": stock_listings,
+            "limitPrices": limit_prices,
+            "suspendEvents": suspend_events,
+            "tradeCalendar": trade_calendar,
+            "adjustFactors": adjust_factors,
+            "indices": indices,
+            "indexDailyBars": index_daily_bars,
+            "funds": funds,
+            "fundDailyBars": fund_daily_bars,
+            "fundAdjustFactors": fund_adjust_factors,
+            "industries": industries,
+            "industryMembers": industry_members,
+        },
+        "usSample": us_sample,
     }
 
 
@@ -332,6 +410,7 @@ def sync_market_daily(payload: SyncMarketDataRequest, db: Session = Depends(get_
 def sync_market_limit_prices(payload: SyncMarketDataRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     pro = get_pro_api(payload.token)
     trade_dates = get_open_trade_dates(pro, payload.start_date, payload.end_date)
+    stock_codes = set(db.scalars(select(StockListing.ts_code)).all()) or set(db.scalars(select(Stock.ts_code)).all())
     if payload.skip_existing:
         trade_dates = filter_sparse_trade_dates(db, StockLimitPrice.trade_date, trade_dates, payload.min_existing_rows)
     if payload.max_trade_dates:
@@ -342,7 +421,11 @@ def sync_market_limit_prices(payload: SyncMarketDataRequest, db: Session = Depen
     for trade_day in trade_dates:
         try:
             df = pro.stk_limit(trade_date=tushare_date(trade_day), fields=STOCK_LIMIT_FIELDS)
-            rows = [row for item in df.to_dict("records") if (row := stock_limit_price_record_to_row(item))]
+            rows = [
+                row
+                for item in df.to_dict("records")
+                if (row := stock_limit_price_record_to_row(item)) and (not stock_codes or row["ts_code"] in stock_codes)
+            ]
             rows_upserted += upsert_rows(
                 db,
                 StockLimitPrice,
@@ -617,12 +700,63 @@ def sync_industry_classifications(payload: SyncIndustryClassificationsRequest, d
     return {"status": status, "rows_upserted": rows_upserted, "classifications": classification_upserted, "members": member_upserted, "failed_indices": failed_indices}
 
 
+@app.post("/api/sync-jobs", status_code=202)
+def create_sync_job(payload: SyncJobCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)) -> dict[str, Any]:
+    normalized_payload = validate_sync_job_payload(payload.action, payload.payload)
+    payload_hash = sync_job_payload_hash(payload.action, normalized_payload)
+    existing = db.scalars(
+        select(DataSyncJob).where(DataSyncJob.active_key == payload_hash).order_by(DataSyncJob.created_at.desc()).limit(1)
+    ).first()
+    if existing:
+        return sync_job_to_dict(existing)
+
+    job = DataSyncJob(
+        id=str(uuid4()),
+        action=payload.action,
+        status="queued",
+        payload=normalized_payload,
+        payload_hash=payload_hash,
+        active_key=payload_hash,
+        rows_upserted=0,
+        message="任务已进入后台队列",
+    )
+    db.add(job)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = db.scalars(
+            select(DataSyncJob).where(DataSyncJob.active_key == payload_hash).order_by(DataSyncJob.created_at.desc()).limit(1)
+        ).first()
+        if not existing:
+            raise
+        return sync_job_to_dict(existing)
+
+    db.refresh(job)
+    background_tasks.add_task(run_sync_job, job.id)
+    return sync_job_to_dict(job)
+
+
+@app.get("/api/sync-jobs")
+def list_sync_jobs(limit: int = 20, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    jobs = db.scalars(select(DataSyncJob).order_by(DataSyncJob.created_at.desc()).limit(min(max(limit, 1), 200))).all()
+    return [sync_job_to_dict(job) for job in jobs]
+
+
+@app.get("/api/sync-jobs/{job_id}")
+def get_sync_job(job_id: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+    job = db.get(DataSyncJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="同步任务不存在")
+    return sync_job_to_dict(job)
+
+
 @app.get("/api/tushare/sync-progress")
-def get_sync_progress(db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_sync_progress(db: Session = Depends(get_db), include_coverage: bool = True) -> dict[str, Any]:
     runs = list(db.scalars(select(DataSyncRun).order_by(DataSyncRun.created_at.desc()).limit(20)).all())
-    return {
-        "runs": [sync_run_to_dict(row) for row in runs],
-        "coverage": {
+    payload = {"runs": [sync_run_to_dict(row) for row in runs]}
+    if include_coverage:
+        payload["coverage"] = {
             "daily": query_date_coverage(db, StockDailyBar.trade_date, StockDailyBar.ts_code),
             "dailyBasic": query_date_coverage(db, StockDailyBasic.trade_date, StockDailyBasic.ts_code),
             "financialIndicators": query_date_coverage(db, StockFinancialIndicator.ann_date, StockFinancialIndicator.ts_code),
@@ -631,19 +765,23 @@ def get_sync_progress(db: Session = Depends(get_db)) -> dict[str, Any]:
             "indexDailyBars": query_date_coverage(db, IndexDailyBar.trade_date, IndexDailyBar.ts_code),
             "fundDailyBars": query_date_coverage(db, FundDailyBar.trade_date, FundDailyBar.ts_code),
             "fundAdjustFactors": query_date_coverage(db, FundAdjustFactor.trade_date, FundAdjustFactor.ts_code),
-        },
-    }
+        }
+    return payload
 
 
 @app.get("/api/daily-bars", response_model=list[DailyBarOut])
-def get_daily_bars(ts_code: str, start_date: date, end_date: date, db: Session = Depends(get_db)) -> list[DailyBarOut]:
-    bars = list(
-        db.scalars(
-            select(StockDailyBar)
-            .where(StockDailyBar.ts_code == ts_code.upper(), StockDailyBar.trade_date >= start_date, StockDailyBar.trade_date <= end_date)
-            .order_by(StockDailyBar.trade_date)
-        ).all()
-    )
+def get_daily_bars(
+    ts_code: str,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    db: Session = Depends(get_db),
+) -> list[DailyBarOut]:
+    stmt = select(StockDailyBar).where(StockDailyBar.ts_code == ts_code.upper())
+    if start_date:
+        stmt = stmt.where(StockDailyBar.trade_date >= start_date)
+    if end_date:
+        stmt = stmt.where(StockDailyBar.trade_date <= end_date)
+    bars = list(db.scalars(stmt.order_by(StockDailyBar.trade_date)).all())
     return [daily_bar_to_schema(row) for row in bars]
 
 
@@ -899,28 +1037,32 @@ def get_table_counts(db: Session) -> dict[str, int]:
         "watchlistItems": db.scalar(select(func.count(WatchlistItem.id))) or 0,
         "portfolioSnapshots": db.scalar(select(func.count(PortfolioSnapshot.id))) or 0,
         "dataSyncRuns": db.scalar(select(func.count(DataSyncRun.id))) or 0,
+        "dataSyncJobs": db.scalar(select(func.count(DataSyncJob.id))) or 0,
+        "dataOverviewSnapshots": db.scalar(select(func.count(DataOverviewSnapshot.key))) or 0,
     }
 
 
 def get_research_table_counts(db: Session) -> dict[str, int]:
-    counts = get_table_counts(db)
+    def exists(model: type[Base]) -> int:
+        return int(db.scalar(select(1).select_from(model).limit(1)) is not None)
+
     return {
-        "stocks": counts["stocks"],
-        "stock_daily_bars": counts["stockDailyBars"],
-        "stock_daily_basic": counts["stockDailyBasic"],
-        "stock_financial_indicators": counts["stockFinancialIndicators"],
-        "stock_listings": counts["stockListings"],
-        "stock_limit_prices": counts["stockLimitPrices"],
-        "stock_suspend_events": counts["stockSuspendEvents"],
-        "trade_calendars": counts["tradeCalendars"],
-        "stock_adjust_factors": counts["stockAdjustFactors"],
-        "indices": counts["indices"],
-        "index_daily_bars": counts["indexDailyBars"],
-        "funds": counts["funds"],
-        "fund_daily_bars": counts["fundDailyBars"],
-        "fund_adjust_factors": counts["fundAdjustFactors"],
-        "industry_classifications": counts["industryClassifications"],
-        "industry_members": counts["industryMembers"],
+        "stocks": exists(Stock),
+        "stock_daily_bars": exists(StockDailyBar),
+        "stock_daily_basic": exists(StockDailyBasic),
+        "stock_financial_indicators": exists(StockFinancialIndicator),
+        "stock_listings": exists(StockListing),
+        "stock_limit_prices": exists(StockLimitPrice),
+        "stock_suspend_events": exists(StockSuspendEvent),
+        "trade_calendars": exists(TradeCalendar),
+        "stock_adjust_factors": exists(StockAdjustFactor),
+        "indices": exists(Index),
+        "index_daily_bars": exists(IndexDailyBar),
+        "funds": exists(Fund),
+        "fund_daily_bars": exists(FundDailyBar),
+        "fund_adjust_factors": exists(FundAdjustFactor),
+        "industry_classifications": exists(IndustryClassification),
+        "industry_members": exists(IndustryMember),
     }
 
 
@@ -992,6 +1134,27 @@ def query_date_coverage(db: Session, date_column: Any, code_column: Any) -> dict
 def query_entity_coverage(db: Session, code_column: Any) -> dict[str, Any]:
     rows, symbols = db.execute(select(func.count(), func.count(func.distinct(code_column)))).one()
     return {"rows": int(rows or 0), "symbols": int(symbols or 0)}
+
+
+def query_stock_limit_coverage(db: Session) -> dict[str, Any]:
+    min_date, max_date, rows, symbols, trade_dates = db.execute(
+        select(
+            func.min(StockLimitPrice.trade_date),
+            func.max(StockLimitPrice.trade_date),
+            func.count(),
+            func.count(func.distinct(StockLimitPrice.ts_code)),
+            func.count(func.distinct(StockLimitPrice.trade_date)),
+        )
+        .select_from(StockLimitPrice)
+        .join(StockListing, StockListing.ts_code == StockLimitPrice.ts_code)
+    ).one()
+    return {
+        "minDate": min_date.isoformat() if min_date else None,
+        "maxDate": max_date.isoformat() if max_date else None,
+        "rows": int(rows or 0),
+        "symbols": int(symbols or 0),
+        "dates": int(trade_dates or 0),
+    }
 
 
 def query_trade_calendar_coverage(db: Session) -> dict[str, Any]:
@@ -1381,6 +1544,184 @@ def upsert_rows(db: Session, model: type[Any], rows: list[dict[str, Any]], confl
 
 def chunked(rows: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]]:
     return [rows[index : index + size] for index in range(0, len(rows), size)]
+
+
+def validate_sync_job_payload(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+    without_token = {key: value for key, value in payload.items() if key != "token"}
+    if action == "us_sample":
+        return {}
+    request_models = {
+        "stock_listings": SyncStockListingsRequest,
+        "trade_calendar": SyncTradeCalendarRequest,
+        "market_bundle": SyncMarketDataRequest,
+        "daily_market": SyncMarketDataRequest,
+    }
+    try:
+        request = request_models[action].model_validate(without_token)
+    except (KeyError, ValidationError) as exc:
+        detail = exc.errors(include_url=False) if isinstance(exc, ValidationError) else f"不支持的同步动作: {action}"
+        raise HTTPException(status_code=422, detail=detail) from exc
+    return request.model_dump(mode="json", exclude={"token"})
+
+
+def sync_job_payload_hash(action: str, payload: dict[str, Any]) -> str:
+    canonical = json.dumps({"action": action, "payload": payload}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def run_sync_job(job_id: str) -> None:
+    with SessionLocal() as db:
+        claimed = db.execute(
+            update(DataSyncJob)
+            .where(DataSyncJob.id == job_id, DataSyncJob.status == "queued")
+            .values(status="running", started_at=datetime.now(timezone.utc), message="任务执行中")
+        )
+        db.commit()
+        if claimed.rowcount != 1:
+            return
+
+        job = db.get(DataSyncJob, job_id)
+        if not job:
+            return
+        action = job.action
+        normalized_payload = dict(job.payload or {})
+
+        try:
+            raw_result = execute_sync_job_action(action, normalized_payload, db)
+            result = json_safe_value(raw_result)
+            status = normalize_sync_job_status(result.get("status") if isinstance(result, dict) else None)
+            rows_upserted = sync_result_rows(result)
+            message = sync_result_message(action, status, result)
+        except Exception as exc:  # noqa: BLE001
+            db.rollback()
+            status = "failed"
+            rows_upserted = 0
+            message = f"{type(exc).__name__}: {exc}"[:1000]
+            result = {"error": message}
+
+        job = db.get(DataSyncJob, job_id)
+        if not job:
+            return
+        job.status = status
+        job.rows_upserted = rows_upserted
+        job.message = message
+        job.result = result
+        job.finished_at = datetime.now(timezone.utc)
+        job.active_key = None
+        db.commit()
+
+
+def execute_sync_job_action(action: str, payload: dict[str, Any], db: Session) -> dict[str, Any]:
+    if action == "stock_listings":
+        return sync_stock_listings(SyncStockListingsRequest.model_validate(payload), db)
+    if action == "trade_calendar":
+        return sync_trade_calendar(SyncTradeCalendarRequest.model_validate(payload), db)
+    if action == "us_sample":
+        result = import_us_research_sample_to_db(db)
+        return {**result, "rows_upserted": sum(int(value or 0) for value in result.get("summary", {}).values())}
+    if action in {"market_bundle", "daily_market"}:
+        return execute_market_sync_bundle(action, SyncMarketDataRequest.model_validate(payload), db)
+    raise ValueError(f"不支持的同步动作: {action}")
+
+
+def execute_market_sync_bundle(action: str, payload: SyncMarketDataRequest, db: Session) -> dict[str, Any]:
+    suspend_payload = SyncSuspendEventsRequest(
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        max_trade_dates=payload.max_trade_dates,
+    )
+    components: list[tuple[str, Any]] = []
+    if action == "daily_market":
+        components.extend(
+            [
+                ("stock_basic", lambda: sync_stock_basic(SyncStockBasicRequest(), db)),
+                ("daily_basic", lambda: sync_market_daily_basic(payload, db)),
+            ]
+        )
+    components.extend(
+        [
+            ("daily", lambda: sync_market_daily(payload, db)),
+            ("limit_prices", lambda: sync_market_limit_prices(payload, db)),
+            ("suspend_events", lambda: sync_market_suspend_events(suspend_payload, db)),
+        ]
+    )
+
+    component_results: dict[str, Any] = {}
+    rows_upserted = 0
+    statuses: list[str] = []
+    for name, operation in components:
+        try:
+            result = json_safe_value(operation())
+            status = normalize_sync_job_status(result.get("status") if isinstance(result, dict) else None)
+            rows_upserted += sync_result_rows(result)
+        except Exception as exc:  # noqa: BLE001
+            db.rollback()
+            status = "failed"
+            result = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"[:500]}
+        statuses.append(status)
+        component_results[name] = result
+
+    failed = statuses.count("failed")
+    partial = statuses.count("partial")
+    status = "failed" if failed == len(statuses) else "partial" if failed or partial else "ok"
+    return {
+        "status": status,
+        "rows_upserted": rows_upserted,
+        "message": f"components={len(statuses)}, failed={failed}, partial={partial}",
+        "components": component_results,
+    }
+
+
+def normalize_sync_job_status(status: Any) -> str:
+    return status if status in {"ok", "partial", "failed"} else "ok"
+
+
+def sync_result_rows(result: Any) -> int:
+    if not isinstance(result, dict):
+        return 0
+    if "rows_upserted" in result:
+        return int(result.get("rows_upserted") or 0)
+    summary = result.get("summary")
+    if isinstance(summary, dict):
+        return sum(int(value or 0) for value in summary.values())
+    return 0
+
+
+def sync_result_message(action: str, status: str, result: Any) -> str:
+    if isinstance(result, dict) and result.get("message"):
+        return str(result["message"])[:1000]
+    return f"{action} {status}"[:1000]
+
+
+def json_safe_value(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, bool)):
+        return value
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        number = float(value)
+        return number if math.isfinite(number) else None
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {str(key): json_safe_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [json_safe_value(item) for item in value]
+    return str(value)
+
+
+def sync_job_to_dict(job: DataSyncJob) -> dict[str, Any]:
+    return {
+        "id": job.id,
+        "action": job.action,
+        "status": job.status,
+        "rowsUpserted": job.rows_upserted,
+        "message": job.message,
+        "result": json_safe_value(job.result),
+        "createdAt": job.created_at.isoformat() if job.created_at else None,
+        "startedAt": job.started_at.isoformat() if job.started_at else None,
+        "finishedAt": job.finished_at.isoformat() if job.finished_at else None,
+    }
 
 
 def record_sync_run(

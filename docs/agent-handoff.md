@@ -5,12 +5,12 @@
 ## 当前接手状态
 
 - 仓库：`E:\coding_things\Quantitative_trading`
-- 当前分支：`codex/research-foundation`
-- 基线：`origin/main` 的 `0e8dde0`。
-- 当前任务：P1 历史可交易性、统一离线研究协议、四视图 React 数据终端和远端真实 PostgreSQL 验收均已完成。
+- 当前分支：任务完成后已合并到 `main`；接手时仍应先用 `git status -sb` 和 `git log -1` 实时确认。
+- 当前任务：异步同步任务、完整个股历史、2012 年起历史回补、覆盖快照、20:30 日更和远端真实 PostgreSQL 验收均已完成。
 - 当前边界：不删除 PostgreSQL volume，不导入真实账户数据，不连接券商，不发布交易信号。
-- 当前远端发布目录：`/opt/quantitative-trading-release-20260710-2330`；原 `/opt/quantitative-trading` 脏工作区未被覆盖。
-- 当前远端备份：`/opt/quantitative-trading-backups/pre-research-foundation-20260710-2330.dump`；数据库 volume 为 `quantitative-trading_postgres_data`。
+- 当前远端发布目录：`/opt/quantitative-trading-release-20260710-2330`；原 `/opt/quantitative-trading` 工作区未被覆盖。
+- 当前服务数据库 volume：`quant_todo_p0_postgres_data_todo_p0`。切换前的 `quantitative-trading_postgres_data` 完整保留，禁止删除。
+- 当前远端备份：`/opt/quantitative-trading-backups/pre-2012-history-volume-switch-20260711-0108.dump`，已通过 `pg_restore -l` 校验。
 
 ## 建议阅读顺序
 
@@ -27,14 +27,20 @@
 - P0 数据：交易日历、股票原始日线/复权、估值、财务、指数、ETF、申万行业及历史成员。
 - P1 本分支：历史上市状态、每日涨跌停、停复牌事件、ETF/基金复权因子。
 - 研究协议：严格复权和 point-in-time、显式历史股票池、下一交易日开盘组合模拟、标准指标、walk-forward、manifest 和 readiness。
+- 异步运维：`data_sync_jobs` 持久化任务状态；前端和日更脚本只提交任务并轮询，不把 Tushare token 保存到任务 payload。
+- 覆盖性能：`data_overview_snapshots` 保存精确聚合快照，页面默认读取快照；日更和手动同步后通过 `refresh=true` 在后台重算。
+- 历史展示：`GET /api/daily-bars` 的日期参数可省略；前端标的研究默认载入数据库全部历史并提供近 1/3/5 年与全部历史视图。
 - 美股 sample：继续只允许 sample/脱敏结构入库和只读展示，不属于当前 A 股研究协议扩展范围。
 
 ## 仍未完成
 
-- 当前 readiness 是表级门禁，不是全市场全历史完整性证明：股票复权仅 5 个样本标的，涨跌停和停复牌仅 2026-06-26 至 2026-07-10；正式研究前按目标股票池和区间回填。
+- readiness 仍是表级门禁，不是逐标的逐日期的数据质量证明；正式研究仍需针对股票池和区间做缺口审计。
 - 尚未补指数历史成分/权重、行业代理净值和数据质量日报。
 - 尚未基于新协议建立教学 baseline；旧策略和旧结果不算新底座验收证据。
 - 服务器端口仍只监听 loopback；需要在用户本机维持 SSH tunnel，当前验收入口为 `http://127.0.0.1:15174/`。
+- TradingFlow 目前只做过产品/接入可行性评估，仓库未接入真实美股或期权流。购买前必须确认正式 API/数据库集成合同、历史深度、限流和数据许可，不能依赖浏览器抓取。
+- 服务器磁盘使用率约 `94%`、剩余约 `2.5G`；扩展美股/期权数据前必须先扩容，或由用户明确确认后清理旧回滚 volume/备份。
+- Tushare `stk_limit` 会同时返回交易所基金。新同步已按股票主数据过滤，DB 中既有的非股票记录因未获删除授权而保留；覆盖快照和研究 loader 均只按股票范围使用。
 
 ## 验证命令
 
@@ -57,9 +63,10 @@ git status -sb
 - 缺持仓价格、复权因子或基准重叠日期时应严格失败，不要用前值或原始价静默填充。
 - PostgreSQL volume 是本地持久化来源；不要执行 `docker compose down -v` 或删除 volume。
 - `outputs/research-runs/` 已被忽略，用于大型一次性研究结果；可复现配置和协议文档仍应进入 Git。
+- Windows 的 `core.autocrlf=true` 会破坏 Linux 定时脚本；根目录 `.gitattributes` 已固定 `*.sh text eol=lf`，不要删除。
 
 ## 下一步建议
 
-1. 根据具体研究目标确定股票池、区间和基准，批量回填对应复权、涨跌停、停复牌和指数成分历史。
-2. 增加按标的/日期检查覆盖连续性的质量报告，不只依赖表级 readiness。
-3. 数据完整性门禁通过后，新建一个简单教学 baseline，只验证全链路，不作策略候选或投资建议。
+1. 增加按标的/日期检查覆盖连续性的质量报告，不只依赖表级 readiness。
+2. 补指数历史成分/权重，再建立一个简单教学 baseline，只验证全链路，不作策略候选或投资建议。
+3. 如用户确认开展美股/期权流研究，先做 TradingFlow 7 天试用和 1 周数据落盘 PoC，再决定是否新增正式美股 schema。

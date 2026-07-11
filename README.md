@@ -10,9 +10,9 @@
 - 同步指数及指数日线、ETF 及 ETF 日线/复权因子、申万行业分类和历史成员。
 - 用 PostgreSQL 持久化行情、基本面、研究主数据、自选数据池和同步记录，并保证自然键幂等 upsert。
 - 查询 A 股数据覆盖度、最新交易日、表行数和同步历史。
-- 读取股票列表、原始日线、复权/可交易性数据、最新估值和最新财务指标。
+- 读取股票列表、完整原始日线历史、复权/可交易性数据、最新估值和最新财务指标；标的研究图表支持近 1/3/5 年及全部历史切换。
 - 将 `my_quant/us_research/` 下的美股 sample 观察池、sample 快照和 sample 持仓结构 upsert 到 DB。
-- 在前端查看 API/DB 状态、A 股覆盖、美股 sample 入库状态和近期同步记录。
+- 在前端查看 API/DB 状态、A 股覆盖、美股 sample 入库状态和近期同步记录；所有写入型刷新操作通过持久化异步任务执行和轮询，不阻塞页面请求。
 - 用 `backend/app/quant_research/` 构造严格复权和公告日可见的数据集，执行受停牌/涨跌停约束的下一交易日开盘研究组合模拟，输出基准指标、walk-forward 窗口和可复现 manifest。
 - 用 `GET /api/research/readiness` 区分 ETF 时间序列与 A 股横截面研究是否满足数据门槛。
 
@@ -68,13 +68,16 @@ TUSHARE_TOKEN=你的_tushare_token
 - 服务器部署目录：`/opt/quantitative-trading-release-20260710-2330`。
 - 服务器上的 PostgreSQL、API 和前端端口继续只绑定 `127.0.0.1`，不直接暴露数据库或 API 到公网。
 - 本机建立 SSH tunnel 后访问前端；当前验收入口为 `http://127.0.0.1:15174/`，隧道断开后需要重新建立。
-- 部署前备份位于 `/opt/quantitative-trading-backups/pre-research-foundation-20260710-2330.dump`；现有 `quantitative-trading_postgres_data` volume 已原位保留。
-- 当前 A 股横截面和 ETF 时序 readiness 均为 `ready`，但这是表级门禁。股票复权只回填了 5 个样本标的，涨跌停与停复牌只回填了 2026-06-26 至 2026-07-10；正式研究前仍需按目标股票池和研究区间补齐历史数据。
+- 当前服务挂载历史数据卷 `quant_todo_p0_postgres_data_todo_p0`；切换前的 `quantitative-trading_postgres_data` 仍完整保留，可作为回滚来源，未删除任何 volume。
+- 历史卷切换前备份为 `/opt/quantitative-trading-backups/pre-2012-history-volume-switch-20260711-0108.dump`，已通过 `pg_restore -l` 校验。
+- A 股日线、估值、股票复权、指数日线和 ETF 日线的主体历史已覆盖 2012 年和 2015 年股灾区间；`scripts/ops/backfill_a_share_history.py` 用于续跑并补齐涨跌停、停复牌和 ETF 复权等 P1 数据。
+- 服务器 `crontab` 使用 `CRON_TZ=Asia/Shanghai`，每天 20:30 调用 `scripts/ops/sync_today_market_data.sh`，提交异步日更任务并轮询结果。
+- 历史回补后服务器磁盘约使用 `94%`、剩余约 `2.5G`；新增美股或期权逐笔数据前必须先扩容或经用户确认清理旧回滚数据。
 
 ## 推荐使用流程
 
 1. 打开前端工作台，确认 API、DB 和两类研究门禁状态正常。
-2. 先同步交易日历和资产目录，再同步日线、复权因子及对应研究数据；具体接口见 API 文档。
+2. 前端刷新按钮会提交 `/api/sync-jobs` 异步任务；可离开当前页面，任务状态会持久化，重新打开页面后继续显示。
 3. A 股横截面研究还必须同步历史上市状态、每日涨跌停和停复牌事件。
 4. 用 `GET /api/db/overview`、`GET /api/tushare/sync-progress` 和 `GET /api/research/readiness` 检查覆盖度与研究门槛。
 5. readiness 为 `blocked` 时先补数据，不允许研究代码静默回退到不完整口径。
@@ -82,8 +85,10 @@ TUSHARE_TOKEN=你的_tushare_token
 
 ## 主要 API
 
-- `GET /api/health`：健康检查和表行数。
+- `GET /api/health`：默认只做轻量 DB 连通检查；排障时可用 `include_counts=true` 读取全表行数。
 - `GET /api/db/overview`：A 股和美股 sample 的 DB 覆盖概览。
+- `POST /api/sync-jobs`：提交 `stock_listings`、`trade_calendar`、`market_bundle`、`daily_market` 或 `us_sample` 异步任务。
+- `GET /api/sync-jobs`、`GET /api/sync-jobs/{id}`：读取任务列表或轮询单个任务状态。
 - `GET /api/stocks`：按代码、名称、行业和市场查询 A 股基础信息。
 - `GET /api/stocks/screen`：返回股票基础信息加最新行情和估值；这里只是数据筛选，不是策略筛选。
 - `GET/POST/DELETE /api/stock-pools...`：自选数据池 CRUD。
@@ -96,7 +101,7 @@ TUSHARE_TOKEN=你的_tushare_token
 - `POST /api/tushare/sync-fundamentals`：同步单票估值和财务指标。
 - `POST /api/tushare/sync-market-daily-basic`：补齐全市场估值指标。
 - `POST /api/tushare/sync-market-fundamentals`：补齐全市场财务指标。
-- `GET /api/tushare/sync-progress`：查询同步覆盖进度。
+- `GET /api/tushare/sync-progress`：查询同步覆盖进度；`include_coverage=false` 只读取近期运行记录。
 - `POST /api/tushare/sync-trade-calendar`：同步正式交易日历。
 - `POST /api/tushare/sync-adjust-factors`：同步股票复权因子。
 - `POST /api/tushare/sync-index-basic`、`sync-index-daily`：同步指数目录和日线。
@@ -135,6 +140,22 @@ TUSHARE_TOKEN=你的_tushare_token
 - `watchlist_items`：美股 sample 观察池。
 - `portfolio_snapshots`：美股 sample 持仓快照，`holdings` 为 JSON。
 - `data_sync_runs`：同步记录。
+- `data_sync_jobs`：持久化异步任务，记录排队、运行、完成或失败状态；请求中的临时 token 不入库。
+- `data_overview_snapshots`：缓存经精确聚合得到的覆盖矩阵；页面默认读取快照，日更或手动同步完成后用 `refresh=true` 重算。
+
+## 2012 年起历史回补
+
+默认回补区间为 `2012-01-01` 到当天，脚本会检查现有覆盖并跳过已完整项目，失败后可以使用同一命令续跑：
+
+```bash
+docker exec quant_trading_api python scripts/ops/backfill_a_share_history.py \
+  --start-date 2012-01-01 \
+  --end-date 2026-07-10 \
+  --rate 120 \
+  --resume
+```
+
+先用 `--dry-run` 查看计划；`--max-items` 可做小批量验证。脚本覆盖股票目录、交易日历、全市场日线/估值、股票复权、股票范围涨跌停、停复牌、指数日线和真实 ETF 复权（排除 LOF/分级基金与 ETF 联接）。不要通过删除或重建 PostgreSQL volume 来“重新同步”。
 
 ## 数据库软件连接
 

@@ -21,7 +21,7 @@
 | ETF 日线 | 用可交易 ETF 作为行业代理和宽基替代。 | 新增 `fund_daily_bars` 表；同步 Tushare `fund_daily`；先覆盖宽基 ETF 和半导体 ETF 白名单。 | ETF 日线可按 `ts_code + trade_date` 去重；日期覆盖和最新价可在 DB overview 或 API 中验证。 |
 | 申万行业分类 | 建立行业层级和个股行业归属的正式口径。 | 新增 `industry_classifications` 和 `industry_members` 表；同步 `index_classify` 与 `index_member_all`。 | 可查 `801081.SI 半导体` 及其 L3 子行业；成分股有 `in_date/out_date/is_new`，可按日期还原行业池。 |
 
-## P1 研究可信性数据（本分支代码和内存库合同已完成，真实 PG 未迁移）
+## P1 研究可信性数据（代码、真实 PG 前向建表和 2012 年起回补流程已完成）
 
 | 任务 | 任务目标 | 修改范围 | 验收条件 |
 | --- | --- | --- | --- |
