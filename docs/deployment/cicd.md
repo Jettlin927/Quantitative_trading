@@ -76,3 +76,17 @@ COMPOSE_SERVER_FILE=docker-compose.server.yml
 ```
 
 `SKIP_GIT_PULL=1 ./scripts/ops/deploy_server.sh backend` 可以跳过远端 Git 拉取，仅对服务器现有代码执行部署。
+
+## PostgreSQL 重复索引审计
+
+只读候选审计使用：
+
+```bash
+docker compose exec -T db sh -lc \
+  'psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+  < scripts/ops/audit_postgres_indexes.sql
+```
+
+脚本只报告“非唯一索引与唯一索引在键、操作符类、排序、表达式和谓词上完全相同”的候选项，不删除索引。2026-07-11 对生产库的只读审计发现 13 组候选，普通重复索引合计约 3974 MB；代表性股票日线、复权因子和涨跌停范围查询已记录 `EXPLAIN (ANALYZE, BUFFERS)` 基线。
+
+`0003_remove_verified_duplicate_indexes` 只删除上述普通索引，保留全部唯一约束索引；PostgreSQL 使用 `DROP INDEX CONCURRENTLY`，避免长时间阻塞读写。正式库仍必须先完成 sandbox 演练，并在生产迁移清单获用户确认后单独运行 Alembic，不能绑在 API 启动流程中。

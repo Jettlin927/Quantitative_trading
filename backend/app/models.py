@@ -22,10 +22,7 @@ class Stock(Base):
 
 class StockDailyBar(Base):
     __tablename__ = "stock_daily_bars"
-    __table_args__ = (
-        UniqueConstraint("ts_code", "trade_date", name="uq_stock_daily_bar_code_date"),
-        SqlIndex("ix_stock_daily_bars_code_date", "ts_code", "trade_date"),
-    )
+    __table_args__ = (UniqueConstraint("ts_code", "trade_date", name="uq_stock_daily_bar_code_date"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     ts_code: Mapped[str] = mapped_column(String(16), index=True)
@@ -45,10 +42,7 @@ class StockDailyBar(Base):
 
 class StockDailyBasic(Base):
     __tablename__ = "stock_daily_basic"
-    __table_args__ = (
-        UniqueConstraint("ts_code", "trade_date", name="uq_stock_daily_basic_code_date"),
-        SqlIndex("ix_stock_daily_basic_code_date", "ts_code", "trade_date"),
-    )
+    __table_args__ = (UniqueConstraint("ts_code", "trade_date", name="uq_stock_daily_basic_code_date"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     ts_code: Mapped[str] = mapped_column(String(16), index=True)
@@ -77,7 +71,6 @@ class StockFinancialIndicator(Base):
     __tablename__ = "stock_financial_indicators"
     __table_args__ = (
         UniqueConstraint("ts_code", "end_date", "ann_date", name="uq_stock_financial_indicator_period"),
-        SqlIndex("ix_stock_financial_indicators_code_period", "ts_code", "end_date", "ann_date"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -126,10 +119,7 @@ class StockListing(Base):
 
 class StockLimitPrice(Base):
     __tablename__ = "stock_limit_prices"
-    __table_args__ = (
-        UniqueConstraint("ts_code", "trade_date", name="uq_stock_limit_price_code_date"),
-        SqlIndex("ix_stock_limit_prices_code_date", "ts_code", "trade_date"),
-    )
+    __table_args__ = (UniqueConstraint("ts_code", "trade_date", name="uq_stock_limit_price_code_date"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     ts_code: Mapped[str] = mapped_column(String(16), index=True)
@@ -159,10 +149,7 @@ class StockSuspendEvent(Base):
 
 class TradeCalendar(Base):
     __tablename__ = "trade_calendars"
-    __table_args__ = (
-        UniqueConstraint("exchange", "cal_date", name="uq_trade_calendar_exchange_date"),
-        SqlIndex("ix_trade_calendars_exchange_date", "exchange", "cal_date"),
-    )
+    __table_args__ = (UniqueConstraint("exchange", "cal_date", name="uq_trade_calendar_exchange_date"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     exchange: Mapped[str] = mapped_column(String(16), index=True)
@@ -175,10 +162,7 @@ class TradeCalendar(Base):
 
 class StockAdjustFactor(Base):
     __tablename__ = "stock_adjust_factors"
-    __table_args__ = (
-        UniqueConstraint("ts_code", "trade_date", name="uq_stock_adjust_factor_code_date"),
-        SqlIndex("ix_stock_adjust_factors_code_date", "ts_code", "trade_date"),
-    )
+    __table_args__ = (UniqueConstraint("ts_code", "trade_date", name="uq_stock_adjust_factor_code_date"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     ts_code: Mapped[str] = mapped_column(String(16), index=True)
@@ -203,10 +187,7 @@ class Index(Base):
 
 class IndexDailyBar(Base):
     __tablename__ = "index_daily_bars"
-    __table_args__ = (
-        UniqueConstraint("ts_code", "trade_date", name="uq_index_daily_bar_code_date"),
-        SqlIndex("ix_index_daily_bars_code_date", "ts_code", "trade_date"),
-    )
+    __table_args__ = (UniqueConstraint("ts_code", "trade_date", name="uq_index_daily_bar_code_date"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     ts_code: Mapped[str] = mapped_column(String(16), index=True)
@@ -239,10 +220,7 @@ class Fund(Base):
 
 class FundDailyBar(Base):
     __tablename__ = "fund_daily_bars"
-    __table_args__ = (
-        UniqueConstraint("ts_code", "trade_date", name="uq_fund_daily_bar_code_date"),
-        SqlIndex("ix_fund_daily_bars_code_date", "ts_code", "trade_date"),
-    )
+    __table_args__ = (UniqueConstraint("ts_code", "trade_date", name="uq_fund_daily_bar_code_date"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     ts_code: Mapped[str] = mapped_column(String(16), index=True)
@@ -262,10 +240,7 @@ class FundDailyBar(Base):
 
 class FundAdjustFactor(Base):
     __tablename__ = "fund_adjust_factors"
-    __table_args__ = (
-        UniqueConstraint("ts_code", "trade_date", name="uq_fund_adjust_factor_code_date"),
-        SqlIndex("ix_fund_adjust_factors_code_date", "ts_code", "trade_date"),
-    )
+    __table_args__ = (UniqueConstraint("ts_code", "trade_date", name="uq_fund_adjust_factor_code_date"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     ts_code: Mapped[str] = mapped_column(String(16), index=True)
@@ -317,10 +292,7 @@ class StockPool(Base):
 
 class StockPoolMember(Base):
     __tablename__ = "stock_pool_members"
-    __table_args__ = (
-        UniqueConstraint("pool_id", "ts_code", name="uq_stock_pool_member_pool_code"),
-        SqlIndex("ix_stock_pool_members_pool_code", "pool_id", "ts_code"),
-    )
+    __table_args__ = (UniqueConstraint("pool_id", "ts_code", name="uq_stock_pool_member_pool_code"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     pool_id: Mapped[int] = mapped_column(ForeignKey("stock_pools.id", ondelete="CASCADE"), index=True)
@@ -330,10 +302,7 @@ class StockPoolMember(Base):
 
 class Asset(Base):
     __tablename__ = "assets"
-    __table_args__ = (
-        UniqueConstraint("market", "symbol", name="uq_asset_market_symbol"),
-        SqlIndex("ix_assets_market_symbol", "market", "symbol"),
-    )
+    __table_args__ = (UniqueConstraint("market", "symbol", name="uq_asset_market_symbol"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     natural_key: Mapped[str] = mapped_column(String(80), unique=True, index=True)
@@ -352,10 +321,7 @@ class Asset(Base):
 
 class AssetDailyPrice(Base):
     __tablename__ = "asset_daily_prices"
-    __table_args__ = (
-        UniqueConstraint("asset_natural_key", "trade_date", name="uq_asset_daily_price_key_date"),
-        SqlIndex("ix_asset_daily_prices_key_date", "asset_natural_key", "trade_date"),
-    )
+    __table_args__ = (UniqueConstraint("asset_natural_key", "trade_date", name="uq_asset_daily_price_key_date"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     natural_key: Mapped[str] = mapped_column(String(120), unique=True, index=True)
@@ -377,10 +343,7 @@ class AssetDailyPrice(Base):
 
 class WatchlistItem(Base):
     __tablename__ = "watchlist_items"
-    __table_args__ = (
-        UniqueConstraint("watchlist_name", "asset_natural_key", name="uq_watchlist_item_name_asset"),
-        SqlIndex("ix_watchlist_items_name_asset", "watchlist_name", "asset_natural_key"),
-    )
+    __table_args__ = (UniqueConstraint("watchlist_name", "asset_natural_key", name="uq_watchlist_item_name_asset"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     natural_key: Mapped[str] = mapped_column(String(160), unique=True, index=True)
