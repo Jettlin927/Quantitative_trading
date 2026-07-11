@@ -6,7 +6,7 @@
 
 ## 当前目标
 
-截至 2026-07-11，用户已明确重新开启“量化研究底座”，但仍保持研究模拟与真实交易隔离。可信工程的代码、隔离 PostgreSQL、远端 sandbox 和独立反例审计已完成；生产 schema 迁移与发布仍停在用户确认门禁。
+截至 2026-07-12，用户已明确重新开启“量化研究底座”，但仍保持研究模拟与真实交易隔离。可信工程的代码、隔离 PostgreSQL、远端 sandbox、独立反例审计以及经用户确认的生产 schema 迁移与发布均已完成；当前生产 revision 为 `0006_worker_heartbeats`。完整验收证据见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
 
 当前主线包括：
 
