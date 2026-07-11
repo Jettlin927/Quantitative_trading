@@ -393,6 +393,8 @@ class DataSyncJob(Base):
     __table_args__ = (
         UniqueConstraint("active_key", name="uq_data_sync_jobs_active_key"),
         SqlIndex("ix_data_sync_jobs_status_created", "status", "created_at"),
+        SqlIndex("ix_data_sync_jobs_claim", "status", "next_attempt_at", "created_at"),
+        SqlIndex("ix_data_sync_jobs_lease_expiry", "status", "lease_expires_at"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -406,7 +408,31 @@ class DataSyncJob(Base):
     result: Mapped[dict | list | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempt_count: Mapped[int] = mapped_column(default=0, server_default="0")
+    max_attempts: Mapped[int] = mapped_column(default=3, server_default="3")
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    lease_owner: Mapped[str | None] = mapped_column(String(128))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(String(1000))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class SyncWorkerHeartbeat(Base):
+    __tablename__ = "sync_worker_heartbeats"
+    __table_args__ = (
+        SqlIndex("ix_sync_worker_heartbeats_status_heartbeat", "status", "heartbeat_at"),
+    )
+
+    worker_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    status: Mapped[str] = mapped_column(String(20), default="starting", server_default="starting")
+    current_job_id: Mapped[str | None] = mapped_column(String(36))
+    process_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    heartbeat_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    code_commit: Mapped[str] = mapped_column(String(64), default="unknown", server_default="unknown")
+    last_error: Mapped[str | None] = mapped_column(String(1000))
 
 
 class DataOverviewSnapshot(Base):

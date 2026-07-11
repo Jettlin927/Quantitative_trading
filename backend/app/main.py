@@ -1,24 +1,25 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from hashlib import sha256
 import json
 import math
 from pathlib import Path
+import time
 from typing import Any
 from uuid import uuid4
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
-from sqlalchemy import and_, delete, func, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .database import Base, SessionLocal, assert_schema_revision_at_head, engine, get_db
+from .database import Base, assert_schema_revision_at_head, engine, get_db
 from .models import (
     Asset,
     AssetDailyPrice,
@@ -46,6 +47,7 @@ from .models import (
     StockPool,
     StockPoolMember,
     StockSuspendEvent,
+    SyncWorkerHeartbeat,
     TradeCalendar,
     WatchlistItem,
 )
@@ -138,10 +140,91 @@ def health(db: Session = Depends(get_db), include_counts: bool = False) -> dict[
         "status": "ok",
         "service": "quant-data-workspace",
         "database": "ok",
+        **build_sync_runtime_status(db),
     }
     if include_counts:
         payload["tables"] = get_table_counts(db)
     return payload
+
+
+def build_sync_runtime_status(db: Session, *, now: datetime | None = None, stale_seconds: int = 45) -> dict[str, Any]:
+    checked_at = now or datetime.now(timezone.utc)
+    if checked_at.tzinfo is None:
+        checked_at = checked_at.replace(tzinfo=timezone.utc)
+    stale_cutoff = checked_at - timedelta(seconds=stale_seconds)
+    status_counts = {
+        str(status): int(count)
+        for status, count in db.execute(select(DataSyncJob.status, func.count()).group_by(DataSyncJob.status)).all()
+    }
+    active_workers = int(
+        db.scalar(
+            select(func.count())
+            .select_from(SyncWorkerHeartbeat)
+            .where(
+                SyncWorkerHeartbeat.status.in_(["starting", "idle", "running"]),
+                SyncWorkerHeartbeat.heartbeat_at >= stale_cutoff,
+            )
+        )
+        or 0
+    )
+    latest_worker = db.scalar(
+        select(SyncWorkerHeartbeat).order_by(SyncWorkerHeartbeat.heartbeat_at.desc()).limit(1)
+    )
+    latest_heartbeat = latest_worker.heartbeat_at if latest_worker else None
+    normalized_heartbeat = latest_heartbeat
+    if normalized_heartbeat is not None and normalized_heartbeat.tzinfo is None:
+        normalized_heartbeat = normalized_heartbeat.replace(tzinfo=timezone.utc)
+    heartbeat_age_seconds = (
+        max(0, int((checked_at - normalized_heartbeat).total_seconds()))
+        if normalized_heartbeat is not None
+        else None
+    )
+    heartbeat_stale = heartbeat_age_seconds is None or heartbeat_age_seconds > stale_seconds
+    expired_leases = int(
+        db.scalar(
+            select(func.count())
+            .select_from(DataSyncJob)
+            .where(
+                DataSyncJob.status == "running",
+                or_(DataSyncJob.lease_expires_at.is_(None), DataSyncJob.lease_expires_at < checked_at),
+            )
+        )
+        or 0
+    )
+    oldest_queued = db.scalar(
+        select(func.min(DataSyncJob.created_at)).where(DataSyncJob.status == "queued")
+    )
+    latest_completed = db.scalar(
+        select(func.max(DataSyncJob.finished_at)).where(
+            DataSyncJob.status.in_(["ok", "partial", "failed"]),
+            DataSyncJob.finished_at.is_not(None),
+        )
+    )
+    queued = status_counts.get("queued", 0)
+    running = status_counts.get("running", 0)
+    active_jobs = queued + running
+    queue_status = "stalled" if active_jobs and not active_workers else "pending" if active_jobs else "idle"
+    return {
+        "worker": {
+            "status": "ok" if active_workers else "unavailable",
+            "active": active_workers,
+            "latestHeartbeatAt": latest_heartbeat.isoformat() if latest_heartbeat else None,
+            "ageSeconds": heartbeat_age_seconds,
+            "stale": heartbeat_stale,
+            "staleAfterSeconds": stale_seconds,
+            "codeCommit": latest_worker.code_commit if latest_worker else None,
+        },
+        "queue": {
+            "status": queue_status,
+            "active": active_jobs,
+            "queued": queued,
+            "running": running,
+            "failed": status_counts.get("failed", 0),
+            "expiredLeases": expired_leases,
+            "oldestQueuedAt": oldest_queued.isoformat() if oldest_queued else None,
+            "latestCompletedAt": latest_completed.isoformat() if latest_completed else None,
+        },
+    }
 
 
 @app.get("/api/db/overview")
@@ -554,6 +637,8 @@ def sync_market_fundamentals(payload: SyncMarketFundamentalsRequest, db: Session
     rows_upserted = 0
     failed_stocks: list[str] = []
     skipped_stocks = 0
+    request_interval = 60.0 / payload.rate_per_minute
+    last_request_at: float | None = None
     for ts_code in stocks:
         if payload.skip_existing:
             existing = db.scalar(
@@ -567,6 +652,11 @@ def sync_market_fundamentals(payload: SyncMarketFundamentalsRequest, db: Session
                 skipped_stocks += 1
                 continue
         try:
+            if last_request_at is not None:
+                wait_seconds = request_interval - (time.monotonic() - last_request_at)
+                if wait_seconds > 0:
+                    time.sleep(wait_seconds)
+            last_request_at = time.monotonic()
             df = pro.fina_indicator(ts_code=ts_code, start_date=tushare_date(payload.start_date), end_date=tushare_date(payload.end_date), fields=FINA_INDICATOR_FIELDS)
             rows = [row for item in df.to_dict("records") if (row := financial_indicator_record_to_row(item))]
             rows_upserted += upsert_rows(
@@ -578,10 +668,19 @@ def sync_market_fundamentals(payload: SyncMarketFundamentalsRequest, db: Session
         except Exception as exc:  # noqa: BLE001
             failed_stocks.append(f"{ts_code}:{exc}")
 
-    status = "partial" if failed_stocks else "ok"
-    message = f"stocks={len(stocks)}, skipped_stocks={skipped_stocks}, failed_stocks={len(failed_stocks)}"
+    status = "failed" if stocks and len(failed_stocks) == len(stocks) else "partial" if failed_stocks else "ok"
+    message = (
+        f"stocks={len(stocks)}, skipped_stocks={skipped_stocks}, "
+        f"failed_stocks={len(failed_stocks)}, rate_per_minute={payload.rate_per_minute}"
+    )
     record_sync_run(db, target="market:fundamentals", start_date=payload.start_date, end_date=payload.end_date, rows_upserted=rows_upserted, status=status, message=message)
-    return {"status": status, "rows_upserted": rows_upserted, "skipped_stocks": skipped_stocks, "failed_stocks": failed_stocks}
+    return {
+        "status": status,
+        "rows_upserted": rows_upserted,
+        "skipped_stocks": skipped_stocks,
+        "failed_stocks": failed_stocks,
+        "rate_per_minute": payload.rate_per_minute,
+    }
 
 
 @app.post("/api/tushare/sync-trade-calendar")
@@ -603,6 +702,47 @@ def sync_adjust_factors(payload: SyncAdjustFactorsRequest, db: Session = Depends
     upserted = upsert_rows(db, StockAdjustFactor, dedupe_rows(rows, ("ts_code", "trade_date")), ["ts_code", "trade_date"])
     record_sync_run(db, target=f"{payload.ts_code}:adjust_factors", start_date=payload.start_date, end_date=payload.end_date, rows_upserted=upserted)
     return {"status": "ok", "rows_upserted": upserted}
+
+
+def sync_market_adjust_factors(payload: SyncMarketDataRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    pro = get_pro_api(payload.token)
+    trade_dates = get_open_trade_dates(pro, payload.start_date, payload.end_date)
+    if payload.skip_existing:
+        trade_dates = filter_sparse_trade_dates(db, StockAdjustFactor.trade_date, trade_dates, payload.min_existing_rows)
+    if payload.max_trade_dates:
+        trade_dates = trade_dates[: payload.max_trade_dates]
+
+    rows_upserted = 0
+    failed_dates: list[str] = []
+    for trade_day in trade_dates:
+        try:
+            df = pro.adj_factor(trade_date=tushare_date(trade_day), fields=ADJUST_FACTOR_FIELDS)
+            rows = [row for item in df.to_dict("records") if (row := adjust_factor_record_to_row(item))]
+            rows_upserted += upsert_rows(
+                db,
+                StockAdjustFactor,
+                dedupe_rows(rows, ("ts_code", "trade_date")),
+                ["ts_code", "trade_date"],
+            )
+        except Exception as exc:  # noqa: BLE001
+            failed_dates.append(f"{trade_day}:{exc}")
+
+    status = "partial" if failed_dates else "ok"
+    record_sync_run(
+        db,
+        target="market:adjust_factors",
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        rows_upserted=rows_upserted,
+        status=status,
+        message=f"trade_dates={len(trade_dates)}, failed_dates={len(failed_dates)}",
+    )
+    return {
+        "status": status,
+        "rows_upserted": rows_upserted,
+        "trade_dates": len(trade_dates),
+        "failed_dates": failed_dates,
+    }
 
 
 @app.post("/api/tushare/sync-index-basic")
@@ -712,7 +852,7 @@ def sync_industry_classifications(payload: SyncIndustryClassificationsRequest, d
 
 
 @app.post("/api/sync-jobs", status_code=202)
-def create_sync_job(payload: SyncJobCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)) -> dict[str, Any]:
+def create_sync_job(payload: SyncJobCreate, db: Session = Depends(get_db)) -> dict[str, Any]:
     normalized_payload = validate_sync_job_payload(payload.action, payload.payload)
     payload_hash = sync_job_payload_hash(payload.action, normalized_payload)
     existing = db.scalars(
@@ -721,6 +861,7 @@ def create_sync_job(payload: SyncJobCreate, background_tasks: BackgroundTasks, d
     if existing:
         return sync_job_to_dict(existing)
 
+    queued_at = datetime.now(timezone.utc)
     job = DataSyncJob(
         id=str(uuid4()),
         action=payload.action,
@@ -729,7 +870,11 @@ def create_sync_job(payload: SyncJobCreate, background_tasks: BackgroundTasks, d
         payload_hash=payload_hash,
         active_key=payload_hash,
         rows_upserted=0,
-        message="任务已进入后台队列",
+        message="任务已进入持久队列，等待独立 worker",
+        attempt_count=0,
+        max_attempts=3,
+        next_attempt_at=queued_at,
+        updated_at=queued_at,
     )
     db.add(job)
     try:
@@ -744,7 +889,6 @@ def create_sync_job(payload: SyncJobCreate, background_tasks: BackgroundTasks, d
         return sync_job_to_dict(existing)
 
     db.refresh(job)
-    background_tasks.add_task(run_sync_job, job.id)
     return sync_job_to_dict(job)
 
 
@@ -1605,6 +1749,7 @@ def validate_sync_job_payload(action: str, payload: dict[str, Any]) -> dict[str,
         "trade_calendar": SyncTradeCalendarRequest,
         "market_bundle": SyncMarketDataRequest,
         "daily_market": SyncMarketDataRequest,
+        "market_fundamentals": SyncMarketFundamentalsRequest,
     }
     try:
         request = request_models[action].model_validate(without_token)
@@ -1619,48 +1764,6 @@ def sync_job_payload_hash(action: str, payload: dict[str, Any]) -> str:
     return sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def run_sync_job(job_id: str) -> None:
-    with SessionLocal() as db:
-        claimed = db.execute(
-            update(DataSyncJob)
-            .where(DataSyncJob.id == job_id, DataSyncJob.status == "queued")
-            .values(status="running", started_at=datetime.now(timezone.utc), message="任务执行中")
-        )
-        db.commit()
-        if claimed.rowcount != 1:
-            return
-
-        job = db.get(DataSyncJob, job_id)
-        if not job:
-            return
-        action = job.action
-        normalized_payload = dict(job.payload or {})
-
-        try:
-            raw_result = execute_sync_job_action(action, normalized_payload, db)
-            result = json_safe_value(raw_result)
-            status = normalize_sync_job_status(result.get("status") if isinstance(result, dict) else None)
-            rows_upserted = sync_result_rows(result)
-            message = sync_result_message(action, status, result)
-        except Exception as exc:  # noqa: BLE001
-            db.rollback()
-            status = "failed"
-            rows_upserted = 0
-            message = f"{type(exc).__name__}: {exc}"[:1000]
-            result = {"error": message}
-
-        job = db.get(DataSyncJob, job_id)
-        if not job:
-            return
-        job.status = status
-        job.rows_upserted = rows_upserted
-        job.message = message
-        job.result = result
-        job.finished_at = datetime.now(timezone.utc)
-        job.active_key = None
-        db.commit()
-
-
 def execute_sync_job_action(action: str, payload: dict[str, Any], db: Session) -> dict[str, Any]:
     if action == "stock_listings":
         return sync_stock_listings(SyncStockListingsRequest.model_validate(payload), db)
@@ -1671,6 +1774,8 @@ def execute_sync_job_action(action: str, payload: dict[str, Any], db: Session) -
         return {**result, "rows_upserted": sum(int(value or 0) for value in result.get("summary", {}).values())}
     if action in {"market_bundle", "daily_market"}:
         return execute_market_sync_bundle(action, SyncMarketDataRequest.model_validate(payload), db)
+    if action == "market_fundamentals":
+        return sync_market_fundamentals(SyncMarketFundamentalsRequest.model_validate(payload), db)
     raise ValueError(f"不支持的同步动作: {action}")
 
 
@@ -1685,6 +1790,7 @@ def execute_market_sync_bundle(action: str, payload: SyncMarketDataRequest, db: 
         components.extend(
             [
                 ("stock_basic", lambda: sync_stock_basic(SyncStockBasicRequest(), db)),
+                ("stock_listings", lambda: sync_stock_listings(SyncStockListingsRequest(), db)),
                 ("daily_basic", lambda: sync_market_daily_basic(payload, db)),
             ]
         )
@@ -1695,6 +1801,23 @@ def execute_market_sync_bundle(action: str, payload: SyncMarketDataRequest, db: 
             ("suspend_events", lambda: sync_market_suspend_events(suspend_payload, db)),
         ]
     )
+    if action == "daily_market":
+        components.extend(
+            [
+                ("adjust_factors", lambda: sync_market_adjust_factors(payload, db)),
+                (
+                    "benchmark_index_daily",
+                    lambda: sync_index_daily(
+                        SyncIndexDailyRequest(
+                            ts_codes=[payload.benchmark],
+                            start_date=payload.start_date,
+                            end_date=payload.end_date,
+                        ),
+                        db,
+                    ),
+                ),
+            ]
+        )
 
     component_results: dict[str, Any] = {}
     rows_upserted = 0
@@ -1723,7 +1846,11 @@ def execute_market_sync_bundle(action: str, payload: SyncMarketDataRequest, db: 
 
 
 def normalize_sync_job_status(status: Any) -> str:
-    return status if status in {"ok", "partial", "failed"} else "ok"
+    if status is None:
+        return "ok"
+    if status in {"ok", "partial", "failed"}:
+        return str(status)
+    raise ValueError(f"未知同步任务状态：{status}")
 
 
 def sync_result_rows(result: Any) -> int:
@@ -1735,12 +1862,6 @@ def sync_result_rows(result: Any) -> int:
     if isinstance(summary, dict):
         return sum(int(value or 0) for value in summary.values())
     return 0
-
-
-def sync_result_message(action: str, status: str, result: Any) -> str:
-    if isinstance(result, dict) and result.get("message"):
-        return str(result["message"])[:1000]
-    return f"{action} {status}"[:1000]
 
 
 def json_safe_value(value: Any) -> Any:
@@ -1770,7 +1891,16 @@ def sync_job_to_dict(job: DataSyncJob) -> dict[str, Any]:
         "result": json_safe_value(job.result),
         "createdAt": job.created_at.isoformat() if job.created_at else None,
         "startedAt": job.started_at.isoformat() if job.started_at else None,
+        "lastAttemptAt": job.last_attempt_at.isoformat() if job.last_attempt_at else None,
         "finishedAt": job.finished_at.isoformat() if job.finished_at else None,
+        "attemptCount": int(job.attempt_count or 0),
+        "maxAttempts": int(job.max_attempts or 0),
+        "nextAttemptAt": job.next_attempt_at.isoformat() if job.next_attempt_at else None,
+        "leaseOwner": job.lease_owner,
+        "leaseExpiresAt": job.lease_expires_at.isoformat() if job.lease_expires_at else None,
+        "heartbeatAt": job.heartbeat_at.isoformat() if job.heartbeat_at else None,
+        "lastError": job.last_error,
+        "updatedAt": job.updated_at.isoformat() if job.updated_at else None,
     }
 
 

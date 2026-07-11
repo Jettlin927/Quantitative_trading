@@ -26,6 +26,7 @@ services:
         PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
         APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
     container_name: quant_trading_api
+    command: ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     restart: unless-stopped
     depends_on:
       db:
@@ -42,6 +43,34 @@ services:
     volumes:
       - .:/app
       - research_artifacts:/app/outputs/research-runs
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
+        APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+    container_name: quant_trading_worker
+    command: ["python", "-m", "backend.app.sync_worker"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-quant}:${POSTGRES_PASSWORD:-quant_password}@db:5432/${POSTGRES_DB:-quant_trading}
+      TUSHARE_TOKEN: ${TUSHARE_TOKEN:-}
+      DEEPSEEK_TOKEN: ${DEEPSEEK_TOKEN:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_API_BASE: ${DEEPSEEK_API_BASE:-https://api.deepseek.com}
+      SYNC_WORKER_POLL_SECONDS: ${SYNC_WORKER_POLL_SECONDS:-2}
+      SYNC_WORKER_HEARTBEAT_SECONDS: ${SYNC_WORKER_HEARTBEAT_SECONDS:-15}
+      SYNC_WORKER_LEASE_SECONDS: ${SYNC_WORKER_LEASE_SECONDS:-60}
+      SYNC_WORKER_ID: ${SYNC_WORKER_ID:-}
+      APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+    volumes:
+      - .:/app
 
   frontend:
     build:

@@ -154,6 +154,23 @@ verify_backend() {
   wait_for_http "http://127.0.0.1:${api_port}/api/health" "backend"
 }
 
+verify_worker() {
+  local api_port
+  local attempt
+  local payload
+  api_port="$(env_value API_PORT 18000)"
+  for attempt in {1..30}; do
+    payload="$(curl -fsS --max-time 5 "http://127.0.0.1:${api_port}/api/health" 2>/dev/null || true)"
+    if printf '%s' "$payload" | python3 -c 'import json,sys; raise SystemExit(0 if json.load(sys.stdin).get("worker", {}).get("status") == "ok" else 1)' 2>/dev/null; then
+      echo "worker OK: heartbeat is current"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "worker failed: heartbeat unavailable" >&2
+  return 1
+}
+
 verify_frontend() {
   local frontend_port
   frontend_port="$(env_value FRONTEND_PORT 15173)"
@@ -167,9 +184,10 @@ deploy_pg() {
 
 deploy_backend() {
   deploy_pg
-  compose_cmd build api
-  compose_cmd up -d --no-deps api
+  compose_cmd build api worker
+  compose_cmd up -d --no-deps api worker
   verify_backend
+  verify_worker
 }
 
 deploy_frontend() {
@@ -185,6 +203,7 @@ show_status() {
 run_verify() {
   verify_pg
   verify_backend
+  verify_worker
   verify_frontend
   show_status
 }

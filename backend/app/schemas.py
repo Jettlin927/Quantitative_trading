@@ -127,6 +127,15 @@ class SyncMarketDataRequest(BaseModel):
     max_trade_dates: int = Field(default=0, ge=0)
     skip_existing: bool = True
     min_existing_rows: int = Field(default=5000, ge=1)
+    benchmark: str = Field(default="000300.SH", min_length=1, max_length=16)
+
+    @field_validator("benchmark")
+    @classmethod
+    def normalize_market_benchmark(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if "." not in normalized:
+            raise ValueError("benchmark 必须是 Tushare 指数代码")
+        return normalized
 
 
 class SyncMarketFundamentalsRequest(BaseModel):
@@ -134,6 +143,7 @@ class SyncMarketFundamentalsRequest(BaseModel):
     end_date: date
     token: str | None = Field(default=None, repr=False)
     max_stocks: int = Field(default=0, ge=0)
+    rate_per_minute: int = Field(default=150, ge=1, le=150)
     skip_existing: bool = True
 
 
@@ -154,7 +164,14 @@ class SyncSuspendEventsRequest(BaseModel):
 
 
 class SyncJobCreate(BaseModel):
-    action: Literal["stock_listings", "trade_calendar", "market_bundle", "daily_market", "us_sample"]
+    action: Literal[
+        "stock_listings",
+        "trade_calendar",
+        "market_bundle",
+        "daily_market",
+        "market_fundamentals",
+        "us_sample",
+    ]
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
