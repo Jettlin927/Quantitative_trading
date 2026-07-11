@@ -143,6 +143,7 @@ class QuantTrustGoldenFixtureTest(unittest.TestCase):
     def test_etf_signal_executes_next_trade_open_and_matches_golden_outputs(self):
         fund_bars = read_fixture("fund_daily_bars.csv")
         fund_factors = read_fixture("fund_adjust_factors.csv")
+        calendar = read_fixture("trade_calendars.csv")
         targets = read_fixture("target_weights.csv")
         expected_execution = read_fixture("expected_execution_dates.csv")
         expected_nav = read_fixture("expected_nav.csv")
@@ -153,6 +154,7 @@ class QuantTrustGoldenFixtureTest(unittest.TestCase):
         actual_nav = simulate_target_weights(
             prices,
             targets,
+            open_trade_dates=calendar.loc[calendar["is_open"] == 1, "cal_date"],
             cost=CostModel(buy_rate=0, sell_rate=0, slippage_rate=0),
         )
         actual_nav["trade_date"] = actual_nav["trade_date"].dt.strftime("%Y-%m-%d")
@@ -240,7 +242,7 @@ class QuantTrustNoLookaheadTest(unittest.TestCase):
         fundamentals = read_fixture("stock_financial_indicators.csv")
         fundamentals = fundamentals[fundamentals["ts_code"] == "SYN001.SZ"]
 
-        merged = attach_fundamentals_asof(panel, fundamentals)
+        merged = attach_fundamentals_asof(panel, fundamentals, trade_dates=open_dates)
         by_date = merged.set_index(merged["trade_date"].dt.strftime("%Y-%m-%d"))
 
         self.assertTrue(pd.isna(by_date.loc["2026-01-09", "roe"]))
