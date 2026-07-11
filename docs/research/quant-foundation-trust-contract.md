@@ -85,7 +85,7 @@ in_date   <= trade_date <= out_date（out_date 为空时无上界）
 
 正式 `explicit_snapshot` 必须能读取实际成员文件，文件内容经去空行、去注释、代码大写和排序后必须与 members 完全一致；仅提供任意非空 source 文本不能通过。`universe_hash` 绑定成员文件内容哈希而不是本机路径，因此同一工件跨 worktree/容器保持一致。`as_of_date` 必须是有效 ISO 日期，`NaT`、数字和无效字符串均拒绝。
 
-正式交易日历必须由完整 `trade_calendars` 源记录构造 `OpenTradeCalendar`，同时绑定 canonical CSV 内容 SHA-256。组合模拟和财务可用日映射拒绝裸日期列表；从源记录删掉一个真实开市日但继续使用原 artifact hash 时必须在计算前失败。
+正式交易日历必须由完整 `trade_calendars` 源记录构造 `OpenTradeCalendar`，同时绑定真实存在的 CSV/CSV.GZ 工件及其 canonical CSV 内容 SHA-256。构造和每次使用时都必须重新读取工件，并验证工件实际规范化记录、传入记录和内容哈希三者一致。组合模拟和财务可用日映射拒绝裸日期列表；伪造路径、修改工件，或从源记录删掉一个真实开市日，都必须在计算前失败。
 
 ## 信息可得时间矩阵
 

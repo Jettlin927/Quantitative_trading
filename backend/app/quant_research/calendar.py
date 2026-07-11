@@ -3,10 +3,12 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass
 from datetime import date, datetime
+import gzip
 from hashlib import sha256
 from io import StringIO
 import json
 from numbers import Integral, Real
+from pathlib import Path
 import re
 from typing import Any, Iterable, Mapping
 
@@ -54,7 +56,13 @@ def build_open_trade_calendar(
     source = str(source_artifact).strip()
     if not source:
         raise ValueError("交易日历必须绑定 source_artifact")
-    expected_source_hash = sha256(canonical_trade_calendar_bytes(_records_as_dicts(normalized))).hexdigest()
+    source_path = Path(source).expanduser()
+    if not source_path.is_file():
+        raise ValueError(f"交易日历 source_artifact 文件不存在：{source}")
+    source_records = _normalize_records(_read_source_records(source_path))
+    if source_records != normalized:
+        raise ValueError("交易日历 source_artifact 实际内容与源记录不一致")
+    expected_source_hash = sha256(canonical_trade_calendar_bytes(_records_as_dicts(source_records))).hexdigest()
     supplied_source_hash = str(source_artifact_sha256).strip().lower()
     if not _SHA256_PATTERN.fullmatch(supplied_source_hash) or supplied_source_hash != expected_source_hash:
         raise ValueError("交易日历 source_artifact_sha256 与规范化源记录不一致")
@@ -72,7 +80,7 @@ def build_open_trade_calendar(
     }
     return OpenTradeCalendar(
         exchange=normalized_exchange,
-        source_artifact=source,
+        source_artifact=str(source_path),
         source_artifact_sha256=supplied_source_hash,
         records=normalized,
         open_dates=open_dates,
@@ -118,6 +126,27 @@ def _records_as_dicts(records: Iterable[tuple[str, str, bool]]) -> list[dict[str
         {"exchange": exchange, "cal_date": cal_date, "is_open": is_open}
         for exchange, cal_date, is_open in records
     ]
+
+
+def _read_source_records(path: Path) -> list[dict[str, Any]]:
+    opener = gzip.open if path.name.endswith(".gz") else open
+    with opener(path, mode="rt", encoding="utf-8-sig", newline="") as source:
+        reader = csv.DictReader(source)
+        required = {"exchange", "cal_date", "is_open"}
+        if not reader.fieldnames or not required.issubset(reader.fieldnames):
+            raise ValueError("交易日历 source_artifact 缺少 exchange/cal_date/is_open 列")
+        records: list[dict[str, Any]] = []
+        for row in reader:
+            raw_is_open = str(row.get("is_open") or "").strip()
+            is_open: Any = {"0": 0, "1": 1}.get(raw_is_open, raw_is_open)
+            records.append(
+                {
+                    "exchange": row.get("exchange"),
+                    "cal_date": row.get("cal_date"),
+                    "is_open": is_open,
+                }
+            )
+    return records
 
 
 def _strict_iso_date(value: Any, label: str) -> str:
