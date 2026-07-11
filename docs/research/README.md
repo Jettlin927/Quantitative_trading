@@ -12,6 +12,36 @@
 - 一次性运行产物写入被 Git 忽略的 `outputs/research-runs/`，不再把大型逐事件 CSV 提交到主仓库。
 - `docs/research/strategy-results/` 仅为历史只读档案，不代表当前策略候选或新底座验收结果。
 
+## 可复现 ETF sentinel
+
+`configs/research/sentinel_etf_baseline.json` 是第一条正式研究闭环配置。它只使用日频 ETF、基金复权因子、冻结的官方交易日历和指数基准，采用固定信号日、固定目标权重、下一交易日开盘执行；没有参数搜索，不依赖分钟线、期权或财务横截面。
+
+正式运行前先执行同一 scope、日期、universe 和 benchmark 的数据质量检查。universe 必须来自实际存在的排序成员文件，不能只传一组内存代码：
+
+```bash
+python scripts/research/check_data_quality.py \
+  --scope etf_time_series \
+  --start-date 2025-12-01 \
+  --end-date 2025-12-31 \
+  --universe 510300.SH \
+  --universe-type explicit_snapshot \
+  --universe-source configs/research/sentinel_etf_universe.txt \
+  --universe-as-of-date 2025-12-01 \
+  --benchmark 000300.SH
+
+python scripts/research/run_quant_research.py --quality-run-id <QUALITY_RUN_ID>
+```
+
+正式镜像必须注入真实 `APP_GIT_COMMIT`。运行顺序固定为 quality gate → input snapshot → features/targets → simulation → metrics → manifest → finalize，产物保存于 `outputs/research-runs/` 的独立持久卷。输入 CSV 使用稳定列、writer 强制的自然键单调去重、固定 null 语义和 `gzip mtime=0`；文件登记 complete 前会 fsync 并原子 rename。universe 路径只作相对审计元数据，不进入 config/snapshot 身份；身份绑定实际来源 SHA、成员工件 SHA 和 `universeHash`。
+
+离线复现只读取运行目录内的冻结输入，不访问在线行情表：
+
+```bash
+python scripts/research/reproduce_quant_research.py outputs/research-runs/runs/<RUN_ID>
+```
+
+sentinel 仅验证研究管线，所有 manifest 都标记 `researchOnly=true`、`notInvestmentAdvice=true`、`executionEnabled=false`。它不是 alpha 研究、买卖评级或收益承诺。
+
 ## 当前保留文档
 
 - `a-share-data/README.md`：A 股 DB 覆盖结论入口。

@@ -40,6 +40,7 @@
 | `fund_adjust_factors.csv` | `ts_code, trade_date` |
 | `indices.csv` | `ts_code` |
 | `index_daily_bars.csv` | `ts_code, trade_date` |
+| `universe.txt` | 每行一个升序、去重代码；绑定实际来源文件 SHA |
 | `target_weights.csv` | `signal_date, ts_code` |
 | `expected_fundamental_availability.csv` | `ts_code, end_date, ann_date` |
 | `expected_execution_dates.csv` | `signal_date, ts_code` |

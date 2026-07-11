@@ -483,3 +483,36 @@ class DataSnapshot(Base):
     source_cutoff: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(16), default="building")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ResearchRun(Base):
+    __tablename__ = "research_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status in ('running', 'succeeded', 'failed', 'interrupted')",
+            name="ck_research_runs_status",
+        ),
+        SqlIndex("ix_research_runs_strategy_started", "strategy_id", "started_at"),
+        SqlIndex("ix_research_runs_reproducibility", "reproducibility_key"),
+    )
+
+    run_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    reproducibility_key: Mapped[str | None] = mapped_column(String(64))
+    strategy_id: Mapped[str] = mapped_column(String(80))
+    status: Mapped[str] = mapped_column(String(16), default="running")
+    stage: Mapped[str] = mapped_column(String(40))
+    config: Mapped[dict] = mapped_column(JSON)
+    config_sha256: Mapped[str] = mapped_column(String(64))
+    data_snapshot_id: Mapped[str | None] = mapped_column(
+        ForeignKey("data_snapshots.snapshot_id", ondelete="RESTRICT")
+    )
+    code_commit: Mapped[str] = mapped_column(String(64))
+    environment_sha256: Mapped[str] = mapped_column(String(64))
+    random_seed: Mapped[int] = mapped_column()
+    metrics: Mapped[dict] = mapped_column(JSON, default=dict)
+    result_fingerprint: Mapped[str | None] = mapped_column(String(64))
+    artifact_root: Mapped[str] = mapped_column(String(500))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error: Mapped[str | None] = mapped_column(String(2000))

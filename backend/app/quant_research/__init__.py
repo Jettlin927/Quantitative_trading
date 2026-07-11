@@ -28,7 +28,21 @@ __all__ = [
     "evaluate_quality_run_readiness",
     "load_index_benchmark",
     "load_stock_research_panel",
+    "reproduce_quant_research",
+    "run_quant_research",
     "simulate_target_weights",
     "summarize_performance",
     "trade_calendar_content_sha256",
 ]
+
+
+def run_quant_research(*args, **kwargs):
+    from .runner import run_quant_research as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def reproduce_quant_research(*args, **kwargs):
+    from .runner import reproduce_quant_research as implementation
+
+    return implementation(*args, **kwargs)
