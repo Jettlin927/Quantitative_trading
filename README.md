@@ -193,6 +193,24 @@ docker exec quant_trading_api python scripts/ops/backfill_a_share_history.py \
 - 不要提交真实持仓、真实成交或券商导出。
 - 不要执行 `docker compose down -v`，除非明确接受会删除本地 PostgreSQL volume 数据。
 
+## 测试与 CI
+
+后端快速门禁使用内存 SQLite，不会连接本地或服务器 PostgreSQL：
+
+```bash
+DATABASE_URL=sqlite+pysqlite:///:memory: python -m unittest discover -s backend/tests -p 'test_*.py' -v
+```
+
+真实 PostgreSQL 语义使用隔离的 PostgreSQL 16 tmpfs 容器验证：
+
+```bash
+scripts/ops/test_postgres_integration.sh
+```
+
+该脚本使用独立 Compose project、随机本机端口和专用的 `quant_migration_test` / `quant_worker_test` 数据库，自动发现 migration、数据质量、快照、runner 与 worker lease 集成测试。退出时只清理本次测试容器；`docker-compose.test.yml` 不声明命名卷，不会读取或删除日常 `postgres_data`。
+
+GitHub Actions 还会固定运行 Python `py_compile`、黄金数据前缀不变/重现门禁、前端 typecheck/lint/build、主/测试 Compose 配置、全部运维 Shell 语法和 Git 空白差异检查。
+
 ## 发布前检查
 
 ```powershell
