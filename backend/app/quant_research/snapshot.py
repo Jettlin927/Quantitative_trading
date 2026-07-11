@@ -89,7 +89,7 @@ def freeze_input_snapshot(
 ) -> SnapshotResult:
     normalized = validate_run_config(config)
     quality_run = validate_quality_gate(registry_db, normalized)
-    snapshot_root = Path(snapshot_root)
+    snapshot_root = Path(snapshot_root).expanduser().resolve()
     snapshot_root.mkdir(parents=True, exist_ok=True)
     capacity = capacity_policy or SnapshotCapacityPolicy()
     temporary = snapshot_root / f".building-{uuid4()}"
@@ -196,16 +196,19 @@ def freeze_input_snapshot(
                     f"同内容 snapshot registry 不是 complete：{snapshot_id}, status={existing.status}"
                 )
             shutil.rmtree(temporary)
+            existing_path = Path(existing.artifact_root).expanduser()
+            if not existing_path.is_absolute():
+                existing_path = existing_path.resolve()
             try:
-                actual_manifest = verify_snapshot(final_path)
-                _verify_registry_snapshot(existing, actual_manifest, final_path)
+                actual_manifest = verify_snapshot(existing_path)
+                _verify_registry_snapshot(existing, actual_manifest, existing_path)
             except Exception:
                 existing.status = "failed"
                 registry_db.commit()
                 raise
             return SnapshotResult(
                 snapshot_id=snapshot_id,
-                path=final_path,
+                path=existing_path,
                 manifest=actual_manifest,
                 reused=True,
             )
@@ -427,7 +430,10 @@ def _verify_registry_snapshot(row: DataSnapshot, manifest: dict[str, Any], final
         "rowCounts": row.row_counts,
     }
     actual = {key: manifest.get(key) for key in expected}
-    if actual != expected or Path(row.artifact_root) != final_path:
+    stored_path = Path(row.artifact_root).expanduser()
+    if not stored_path.is_absolute():
+        stored_path = stored_path.resolve()
+    if actual != expected or stored_path != final_path:
         raise SnapshotIntegrityError("snapshot 磁盘 manifest 与 registry 不一致")
 
 
