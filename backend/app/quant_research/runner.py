@@ -15,7 +15,13 @@ from sqlalchemy.orm import Session
 
 from ..database import current_schema_heads
 from ..models import DataQualityRun, ResearchRun
-from .artifacts import atomic_write_json, write_dataframe_csv_gz
+from .artifacts import (
+    ArtifactIntegrityError,
+    atomic_write_json,
+    verify_csv_artifact,
+    verify_file_artifact,
+    write_dataframe_csv_gz,
+)
 from .baselines import run_sentinel_etf_baseline
 from .manifest import (
     build_environment_fingerprint,
@@ -178,7 +184,8 @@ def run_quant_research(
         _checkpoint(registry_db, run, temporary, "simulation", {"nav": nav_artifact})
         metrics_artifact = atomic_write_json(temporary / "metrics.json", baseline.metrics)
         _checkpoint(registry_db, run, temporary, "metrics", {"metrics": metrics_artifact})
-        limitations_artifact = atomic_write_json(temporary / "limitations.json", baseline.limitations)
+        limitations = sorted(set(baseline.limitations))
+        limitations_artifact = atomic_write_json(temporary / "limitations.json", limitations)
 
         artifact_hashes = {
             **{
@@ -217,7 +224,7 @@ def run_quant_research(
             },
             random_seed=normalized["randomSeed"],
             environment=environment,
-            limitations=baseline.limitations,
+            limitations=limitations,
             artifact_hashes=artifact_hashes,
         )
         atomic_write_json(temporary / "manifest.json", manifest)
@@ -270,6 +277,10 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
     )
     if canonical_run_config_sha256(config) != manifest.get("configSha256"):
         raise SnapshotIntegrityError("config.json 与 manifest configSha256 不一致")
+    if canonical_run_config_sha256(manifest.get("config") or {}) != manifest.get("configSha256"):
+        raise SnapshotIntegrityError("manifest config 与 configSha256 不一致")
+    if canonical_sha256(config) != canonical_sha256(manifest["config"]):
+        raise SnapshotIntegrityError("config.json 与 manifest config 不一致")
     verify_snapshot_identity(manifest["dataSnapshot"])
     table_artifacts = manifest["dataSnapshot"]["tableArtifacts"]
     verify_materialized_inputs(run_path / "inputs", table_artifacts)
@@ -286,6 +297,28 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
     )
     if identity != manifest.get("reproducibilityKey"):
         raise SnapshotIntegrityError("manifest reproducibilityKey 与冻结身份不一致")
+    if manifest.get("codeCommit") != manifest["environment"].get("appGitCommit"):
+        raise SnapshotIntegrityError("manifest codeCommit 与 environment 不一致")
+    if manifest.get("randomSeed") != config["randomSeed"]:
+        raise SnapshotIntegrityError("manifest randomSeed 与 config 不一致")
+
+    expected = manifest["artifactHashes"]
+    if build_result_fingerprint(expected) != manifest.get("resultFingerprint"):
+        raise SnapshotIntegrityError("manifest resultFingerprint 与产物哈希不一致")
+    for name in ("targets.csv.gz", "nav.csv.gz"):
+        try:
+            verify_csv_artifact(run_path / name, expected[name])
+        except (ArtifactIntegrityError, KeyError) as exc:
+            raise SnapshotIntegrityError(f"归档研究产物无效：{name}") from exc
+    for name in ("quality.json", "metrics.json", "limitations.json"):
+        try:
+            verify_file_artifact(run_path / name, expected[name])
+        except (ArtifactIntegrityError, KeyError) as exc:
+            raise SnapshotIntegrityError(f"归档研究产物无效：{name}") from exc
+    quality = json.loads((run_path / "quality.json").read_text(encoding="utf-8"))
+    limitations = json.loads((run_path / "limitations.json").read_text(encoding="utf-8"))
+    if quality != manifest.get("qualityRun") or limitations != manifest.get("limitations"):
+        raise SnapshotIntegrityError("归档审计产物与 manifest 不一致")
 
     with tempfile.TemporaryDirectory(prefix="quant-reproduce-") as temporary_name:
         temporary = Path(temporary_name)
@@ -310,7 +343,6 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
             ),
             "metrics.json": atomic_write_json(temporary / "metrics.json", baseline.metrics),
         }
-    expected = manifest["artifactHashes"]
     mismatches = [
         name
         for name, artifact in actual.items()
