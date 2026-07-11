@@ -60,7 +60,7 @@
 - `blocked`：研究切片缺少关键数据，或违反时点、宇宙或基准合同。
 - `failed`：质量检查本身超时或异常。它不能被降级成 warning，也不能被解释为数据缺失。
 
-表存在、全表非空、全表最早/最晚日期或全表总行数，都不能单独产生研究级 `ready`。质量结果必须能定位到 `rule_id`、表、失败数量和有上限的样例键。
+表存在、全表非空、全表最早/最晚日期或全表总行数，都不能单独产生研究级 `ready`。质量结果必须能定位到 `rule_id`、表、失败数量和有上限的样例键。formal snapshot gate 必须重新读取持久化结果明细，并从明细重建 status、计数和 blocker/warning/failed 引用；只修改 `DataQualityRun.status/summary` 不能放行。
 
 ## Universe provenance 合同
 
@@ -128,11 +128,15 @@ in_date   <= trade_date <= out_date（out_date 为空时无上界）
 
 ```text
 config_sha256 = sha256(canonical_json(config))
-data_snapshot_id = sha256(canonical_json(scope + universe_hash + table_artifact_hashes))
+data_snapshot_id = sha256(
+  canonical_json(scope + universe_hash + transaction_contract + table_artifact_hashes)
+)
 reproducibility_key = sha256(
   canonical_json(config_sha256 + data_snapshot_id + code_commit + environment_sha256 + random_seed)
 )
 ```
+
+`transaction_contract` 必须精确记录 dialect、isolation 和 readOnly；正式 PostgreSQL 只接受 `REPEATABLE READ + READ ONLY`。磁盘 manifest、snapshot registry 主键和复用目录必须绑定同一 snapshot identity，任一处漂移都不得复用。
 
 canonical 序列化不得包含 `run_id`、生成时间、临时目录、本机绝对路径或未排序字典。正式运行缺少真实 `code_commit`、`data_snapshot_id`、环境指纹或随机种子时必须拒绝。
 

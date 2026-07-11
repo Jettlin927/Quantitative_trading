@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from backend.app.data_quality.contracts import QualityCheckContract
 from backend.app.database import Base
 from backend.app.models import (
+    DataQualityResult,
     DataQualityRun,
     Fund,
     FundAdjustFactor,
@@ -130,13 +131,33 @@ def seed_golden_database(db: Session) -> tuple[str, str]:
             config=contract.to_config(),
             summary={
                 "status": "ready",
+                "resultCount": 1,
+                "passedCount": 1,
+                "warningCount": 0,
+                "blockerCount": 0,
+                "failedCount": 0,
+                "blockers": [],
                 "warnings": [],
+                "failedRules": [],
                 "limitations": [],
                 "benchmark": "SYNIDX.SH",
             },
             code_commit="golden",
             started_at=datetime(2026, 1, 24, tzinfo=timezone.utc),
             finished_at=datetime(2026, 1, 24, tzinfo=timezone.utc),
+        )
+    )
+    db.flush()
+    db.add(
+        DataQualityResult(
+            run_id=quality_run_id,
+            rule_id="fixture.complete",
+            table_name="fund_daily_bars",
+            severity="info",
+            status="passed",
+            checked_rows=1,
+            failed_rows=0,
+            sample_issues=[],
         )
     )
     db.commit()
