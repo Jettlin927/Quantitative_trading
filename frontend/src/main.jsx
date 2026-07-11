@@ -312,6 +312,18 @@ function Topbar({ activeView, health, loading, lastUpdated, onRefresh }) {
       <div className="system-strip" aria-label="系统状态">
         <SystemState label="API" value={health?.status || 'UNKNOWN'} healthy={healthy} icon={Server} />
         <SystemState label="PostgreSQL" value={health?.database || 'UNKNOWN'} healthy={['connected', 'ok'].includes(health?.database)} icon={Database} />
+        <SystemState
+          label="Worker"
+          value={health?.worker ? `${health.worker.status} · ${health.worker.ageSeconds ?? '-'}s` : 'UNKNOWN'}
+          healthy={health?.worker?.status === 'ok' && !health.worker.stale}
+          icon={Activity}
+        />
+        <SystemState
+          label="Queue"
+          value={health?.queue ? `${health.queue.active} ACTIVE` : 'UNKNOWN'}
+          healthy={Boolean(health?.queue) && health.queue.status !== 'stalled'}
+          icon={ListChecks}
+        />
         <span className="updated-at"><Clock3 size={14} /> {lastUpdated ? lastUpdated.toLocaleTimeString() : '尚未刷新'}</span>
         <button className="primary-action" onClick={onRefresh} disabled={loading}>
           <RefreshCw size={15} className={loading ? 'spin' : ''} />

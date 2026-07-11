@@ -22,6 +22,7 @@ yarn-error.log*
 *.tmp
 artifacts/
 outputs/research-runs/
+outputs/quality-universes/
 .agent/
 tmp/
 
