@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import gzip
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,7 +12,11 @@ from sqlalchemy.orm import Session
 
 from backend.app.database import Base
 from backend.app.models import StockAdjustFactor, StockDailyBar, StockLimitPrice, StockListing, StockSuspendEvent
-from backend.app.quant_research.calendar import build_open_trade_calendar, trade_calendar_content_sha256
+from backend.app.quant_research.calendar import (
+    build_open_trade_calendar,
+    canonical_trade_calendar_bytes,
+    trade_calendar_content_sha256,
+)
 from backend.app.quant_research.dataset import active_members_as_of, attach_fundamentals_asof, build_adjusted_price_panel
 from backend.app.quant_research.manifest import build_run_manifest
 from backend.app.quant_research.metrics import summarize_performance
@@ -34,13 +40,17 @@ FIXTURE_DIR = Path(__file__).parent / "fixtures"
 UNIVERSE_ONE = FIXTURE_DIR / "universe-000001.txt"
 UNIVERSE_TWO = FIXTURE_DIR / "universe-000001-000002.txt"
 HISTORICAL_SOURCE = FIXTURE_DIR / "quant_research_golden" / "industry_members.csv"
+TEST_CALENDAR_DIR = tempfile.TemporaryDirectory(prefix="quant-trade-calendar-")
 
 
 def calendar_for_dates(dates: list[object] | pd.Series) -> object:
     records = [{"exchange": "SSE", "cal_date": value, "is_open": True} for value in list(dates)]
+    content = canonical_trade_calendar_bytes(records)
+    source = Path(TEST_CALENDAR_DIR.name) / f"{trade_calendar_content_sha256(records)}.csv"
+    source.write_bytes(content)
     return build_open_trade_calendar(
         records,
-        source_artifact="synthetic://unit-test-trade-calendars.csv",
+        source_artifact=str(source),
         source_artifact_sha256=trade_calendar_content_sha256(records),
     )
 
@@ -532,6 +542,23 @@ class QuantResearchUniverseTest(unittest.TestCase):
 
 
 class QuantResearchPortfolioTest(unittest.TestCase):
+    def test_accepts_verified_gzip_calendar_artifact(self):
+        records = [
+            {"exchange": "SSE", "cal_date": "2026-01-02", "is_open": True},
+            {"exchange": "SSE", "cal_date": "2026-01-03", "is_open": False},
+        ]
+        source = Path(TEST_CALENDAR_DIR.name) / "calendar.csv.gz"
+        with gzip.GzipFile(filename=source, mode="wb", mtime=0) as compressed:
+            compressed.write(canonical_trade_calendar_bytes(records))
+
+        calendar = build_open_trade_calendar(
+            records,
+            source_artifact=str(source),
+            source_artifact_sha256=trade_calendar_content_sha256(records),
+        )
+
+        self.assertEqual(calendar.open_dates, ("2026-01-02",))
+
     def test_executes_close_signal_at_next_trade_open(self):
         prices = pd.DataFrame(
             [
@@ -705,12 +732,30 @@ class QuantResearchPortfolioTest(unittest.TestCase):
             for value in ("2026-01-02", "2026-01-05", "2026-01-06")
         ]
         subset = [full_records[0], full_records[2]]
-        with self.assertRaisesRegex(ValueError, "source_artifact_sha256"):
+        source = Path(TEST_CALENDAR_DIR.name) / "complete-calendar.csv"
+        source.write_bytes(canonical_trade_calendar_bytes(full_records))
+        with self.assertRaisesRegex(ValueError, "source_artifact 实际内容"):
             build_open_trade_calendar(
                 subset,
-                source_artifact="snapshot://trade_calendars.csv.gz",
+                source_artifact=str(source),
                 source_artifact_sha256=trade_calendar_content_sha256(full_records),
             )
+
+        with self.assertRaisesRegex(ValueError, "source_artifact 文件不存在"):
+            build_open_trade_calendar(
+                subset,
+                source_artifact="/definitely/not/existing/official-calendar.csv",
+                source_artifact_sha256=trade_calendar_content_sha256(subset),
+            )
+
+        verified = build_open_trade_calendar(
+            full_records,
+            source_artifact=str(source),
+            source_artifact_sha256=trade_calendar_content_sha256(full_records),
+        )
+        source.write_bytes(canonical_trade_calendar_bytes(subset))
+        with self.assertRaisesRegex(ValueError, "source_artifact 实际内容"):
+            simulate_target_weights(prices, targets, trade_calendar=verified)
 
     def test_formal_targets_require_nonempty_available_date(self):
         prices = pd.DataFrame(
