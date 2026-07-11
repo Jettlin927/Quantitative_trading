@@ -102,6 +102,10 @@ def evaluate_quality_run_readiness(run: Any, results: Iterable[Any]) -> dict[str
             not config.get("universeSource") or not config.get("universeAsOfDate")
         ):
             blockers.append("universe.provenance:stock_listings")
+        if universe_type == "explicit_snapshot" and (
+            config.get("universeSourceVerified") is not True or not config.get("universeSourceSha256")
+        ):
+            blockers.append("universe.source_artifact:stock_listings")
         elif universe_type == "explicit_snapshot" and str(config.get("universeAsOfDate")) > run.start_date.isoformat():
             blockers.append("universe.provenance:stock_listings")
         if universe_type == "industry_membership":

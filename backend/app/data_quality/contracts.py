@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from hashlib import sha256
 import json
+from pathlib import Path
 from typing import Any, Iterable
 
 
@@ -57,7 +58,11 @@ class QualityCheckContract:
     benchmark: str | None
     universe_type: str
     universe_source: str | None
+    universe_source_sha256: str | None
+    universe_source_verified: bool
+    universe_source_issue: str | None
     universe_as_of_date: date | None
+    universe_as_of_issue: str | None
     statement_timeout_ms: int
     universe_hash: str
 
@@ -104,11 +109,17 @@ class QualityCheckContract:
         normalized_source = universe_source.strip() if universe_source and universe_source.strip() else None
         if normalized_source and len(normalized_source) > 200:
             raise ValueError("universe_source 最多 200 个字符")
+        source_sha256, source_verified, source_issue = _verify_universe_source(
+            normalized_source,
+            normalized_universe,
+            universe_type,
+        )
+        normalized_as_of, as_of_issue = _normalize_optional_date(universe_as_of_date)
         universe_payload = json.dumps(
             {
                 "type": universe_type,
-                "source": normalized_source,
-                "asOfDate": universe_as_of_date.isoformat() if universe_as_of_date else None,
+                "sourceSha256": source_sha256,
+                "asOfDate": normalized_as_of.isoformat() if normalized_as_of else None,
                 "codes": normalized_universe,
             },
             ensure_ascii=False,
@@ -124,7 +135,11 @@ class QualityCheckContract:
             benchmark=normalized_benchmark,
             universe_type=universe_type,
             universe_source=normalized_source,
-            universe_as_of_date=universe_as_of_date,
+            universe_source_sha256=source_sha256,
+            universe_source_verified=source_verified,
+            universe_source_issue=source_issue,
+            universe_as_of_date=normalized_as_of,
+            universe_as_of_issue=as_of_issue,
             statement_timeout_ms=int(statement_timeout_ms),
             universe_hash=sha256(universe_payload.encode("utf-8")).hexdigest(),
         )
@@ -141,13 +156,57 @@ class QualityCheckContract:
             "universe": list(self.universe),
             "universeType": self.universe_type,
             "universeSource": self.universe_source,
+            "universeSourceSha256": self.universe_source_sha256,
+            "universeSourceVerified": self.universe_source_verified,
+            "universeSourceIssue": self.universe_source_issue,
             "universeAsOfDate": self.universe_as_of_date.isoformat() if self.universe_as_of_date else None,
+            "universeAsOfIssue": self.universe_as_of_issue,
             "universeHash": self.universe_hash,
             "requiredDatasets": list(self.required_datasets),
             "effectiveDatasets": list(self.datasets),
             "benchmark": self.benchmark,
             "statementTimeoutMs": self.statement_timeout_ms,
         }
+
+
+def _verify_universe_source(
+    source: str | None,
+    universe: tuple[str, ...],
+    universe_type: str,
+) -> tuple[str | None, bool, str | None]:
+    if not source:
+        return None, False, "universe_source_required"
+    path = Path(source).expanduser()
+    if not path.is_file():
+        return None, False, "universe_source_file_missing"
+    if universe_type == "explicit_snapshot":
+        source_members = tuple(
+            sorted(
+                {
+                    line.strip().upper()
+                    for line in path.read_text(encoding="utf-8").splitlines()
+                    if line.strip() and not line.lstrip().startswith("#")
+                }
+            )
+        )
+        if source_members != universe:
+            return None, False, "universe_source_members_mismatch"
+        digest = sha256(("\n".join(source_members) + "\n").encode("utf-8")).hexdigest()
+        return digest, True, None
+    return sha256(path.read_bytes()).hexdigest(), True, None
+
+
+def _normalize_optional_date(value: Any) -> tuple[date | None, str | None]:
+    if value is None:
+        return None, None
+    if isinstance(value, bool) or isinstance(value, (int, float)):
+        return None, "universe_as_of_date_invalid"
+    try:
+        text = value.isoformat() if hasattr(value, "isoformat") else str(value)
+        normalized = date.fromisoformat(text)
+    except (TypeError, ValueError):
+        return None, "universe_as_of_date_invalid"
+    return normalized, None
 
 
 @dataclass

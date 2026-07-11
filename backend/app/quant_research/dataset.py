@@ -4,6 +4,8 @@ from typing import Iterable
 
 import pandas as pd
 
+from .calendar import OpenTradeCalendar, validate_open_trade_calendar
+
 
 PRICE_COLUMNS = ("open", "high", "low", "close")
 
@@ -53,7 +55,7 @@ def attach_fundamentals_asof(
     panel: pd.DataFrame,
     fundamentals: pd.DataFrame,
     *,
-    trade_dates: Iterable[object],
+    trade_calendar: OpenTradeCalendar,
     period_policy: str | None = None,
 ) -> pd.DataFrame:
     """Attach fundamentals from their conservative next-trading-day availability."""
@@ -71,9 +73,7 @@ def attach_fundamentals_asof(
     if period_policy not in {None, "latest_end_date"}:
         raise ValueError(f"不支持的 period_policy：{period_policy}")
 
-    calendar = pd.DatetimeIndex(pd.to_datetime(list(trade_dates), errors="coerce")).dropna().drop_duplicates().sort_values()
-    if calendar.empty:
-        raise ValueError("官方开市交易日历不能为空")
+    calendar = validate_open_trade_calendar(trade_calendar)
     outside_calendar = sorted(set(left["trade_date"]) - set(calendar))
     if outside_calendar:
         sample = ", ".join(value.date().isoformat() for value in outside_calendar[:5])
