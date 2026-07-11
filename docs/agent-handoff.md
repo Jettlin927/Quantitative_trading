@@ -9,7 +9,7 @@
 - 当前任务：异步同步任务、完整个股历史、2012 年起历史回补、覆盖快照、20:30 日更和远端真实 PostgreSQL 验收均已完成。
 - 当前边界：不删除 PostgreSQL volume，不导入真实账户数据，不连接券商，不发布交易信号。
 - 当前远端发布目录：`/opt/quantitative-trading-release-20260710-2330`；原 `/opt/quantitative-trading` 工作区未被覆盖。
-- 当前服务数据库 volume：`quant_todo_p0_postgres_data_todo_p0`。切换前的 `quantitative-trading_postgres_data` 完整保留，禁止删除。
+- 当前服务数据库 volume：`quant_todo_p0_postgres_data_todo_p0`。切换前的旧 volume `quantitative-trading_postgres_data` 已于 2026-07-11 经用户明确确认后删除，两份已验证 dump 继续保留作为回滚点。
 - 当前远端备份：`/opt/quantitative-trading-backups/pre-2012-history-volume-switch-20260711-0108.dump`，已通过 `pg_restore -l` 校验。
 
 ## 建议阅读顺序
@@ -39,7 +39,7 @@
 - 尚未基于新协议建立教学 baseline；旧策略和旧结果不算新底座验收证据。
 - 服务器端口仍只监听 loopback；需要在用户本机维持 SSH tunnel，当前验收入口为 `http://127.0.0.1:15174/`。
 - TradingFlow 目前只做过产品/接入可行性评估，仓库未接入真实美股或期权流。购买前必须确认正式 API/数据库集成合同、历史深度、限流和数据许可，不能依赖浏览器抓取。
-- 服务器磁盘使用率约 `94%`、剩余约 `2.5G`；扩展美股/期权数据前必须先扩容，或由用户明确确认后清理旧回滚 volume/备份。
+- 服务器删除未挂载旧 PostgreSQL volume 后，磁盘使用率约 `83%`、剩余约 `6.6G`；两份数据库 dump 仍保留，扩展大体量美股/期权数据前仍应评估扩容。
 - Tushare `stk_limit` 会同时返回交易所基金。新同步已按股票主数据过滤，DB 中既有的非股票记录因未获删除授权而保留；覆盖快照和研究 loader 均只按股票范围使用。
 
 ## 验证命令
