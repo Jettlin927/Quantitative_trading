@@ -38,7 +38,7 @@ def load_stock_research_panel(
             StockSuspendEvent.trade_date == StockDailyBar.trade_date,
             StockSuspendEvent.suspend_type == "S",
             or_(
-                StockSuspendEvent.suspend_timing == "",
+                StockSuspendEvent.suspend_timing.in_(["", "全天", "盘前", "开盘"]),
                 StockSuspendEvent.suspend_timing.like("09:30%"),
                 StockSuspendEvent.suspend_timing.like("9:30%"),
             ),
@@ -144,7 +144,7 @@ def _append_full_day_suspension_rows(
             StockSuspendEvent.trade_date >= start_date,
             StockSuspendEvent.trade_date <= end_date,
             StockSuspendEvent.suspend_type == "S",
-            StockSuspendEvent.suspend_timing == "",
+            StockSuspendEvent.suspend_timing.in_(["", "全天", "盘前", "开盘"]),
         )
         .order_by(StockSuspendEvent.ts_code, StockSuspendEvent.trade_date)
     )

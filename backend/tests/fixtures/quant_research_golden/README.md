@@ -52,4 +52,4 @@
 
 `target_weights.csv` 表达一个无参数搜索的管线验收基线：`2026-01-09` 收盘后产生 `SYNETF.SZ=100%` 的目标权重，零成本下于 `2026-01-12` 开盘执行。`expected_nav.csv` 和 `expected_metrics.json` 是该固定输入的黄金产物，只验证管线语义，不代表策略收益主张或投资建议。
 
-Phase 0 的合同测试使用 `unittest.expectedFailure` 明确锁定两个已知缺口：区间末复权锚定会改变历史前缀，以及时间未知的公告被同日使用。Phase 2 实现因果复权和 `available_from` 后，应移除这两个装饰器，让它们成为永久正常断言。
+Phase 0 曾用两个预期失败锁定区间末复权锚定和公告日同日可见问题。Phase 2 实现因果复权和 `available_from` 后，这两项已升级为永久正常断言，任何回归都会直接使测试失败。

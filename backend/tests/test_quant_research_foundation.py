@@ -230,7 +230,7 @@ class QuantResearchDatasetTest(unittest.TestCase):
             db.add(StockDailyBar(ts_code="000001.SZ", trade_date=pd.Timestamp("2026-01-05").date(), open=10, high=11, low=9, close=10, pre_close=10))
             db.add(StockAdjustFactor(ts_code="000001.SZ", trade_date=pd.Timestamp("2026-01-05").date(), adj_factor=1))
             db.add(StockLimitPrice(ts_code="000001.SZ", trade_date=pd.Timestamp("2026-01-05").date(), pre_close=10, up_limit=11, down_limit=9))
-            db.add(StockSuspendEvent(ts_code="000001.SZ", trade_date=pd.Timestamp("2026-01-06").date(), suspend_type="S", suspend_timing=""))
+            db.add(StockSuspendEvent(ts_code="000001.SZ", trade_date=pd.Timestamp("2026-01-06").date(), suspend_type="S", suspend_timing="全天"))
             db.commit()
 
         panel = load_stock_research_panel(engine, ["000001.SZ"], pd.Timestamp("2026-01-05").date(), pd.Timestamp("2026-01-06").date())
