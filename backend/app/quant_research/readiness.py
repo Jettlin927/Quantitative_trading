@@ -28,15 +28,35 @@ def evaluate_research_readiness(
     scope: str,
     available_tables: Iterable[str],
     table_counts: dict[str, int],
+    *,
+    uses_financials: bool = False,
+    strict_point_in_time: bool = False,
+    financial_revision_history_available: bool = False,
+    financial_revision_policy: str | None = None,
 ) -> dict[str, Any]:
     if scope not in SCOPES:
         raise ValueError(f"未知研究范围：{scope}")
     available = set(available_tables)
     requirements = SCOPES[scope]
     required = requirements["nonempty"] | requirements["present"]
+    if uses_financials:
+        required = required | {"stock_financial_indicators"}
     missing = sorted(required - available)
     empty = sorted(table for table in requirements["nonempty"] if table in available and int(table_counts.get(table, 0)) <= 0)
+    if uses_financials and "stock_financial_indicators" in available and int(table_counts.get("stock_financial_indicators", 0)) <= 0:
+        empty.append("stock_financial_indicators")
+    empty = sorted(set(empty))
     blockers = [f"missing_table:{table}" for table in missing] + [f"empty_table:{table}" for table in empty]
+    warnings: list[str] = []
+    limitations: list[str] = []
+    if uses_financials and not financial_revision_history_available:
+        limitations.append("historical_financial_revisions_not_reconstructable")
+        if strict_point_in_time:
+            blockers.append("financial_revision_history_unavailable")
+        else:
+            warnings.append("financial_revision_history_unavailable")
+    elif uses_financials and strict_point_in_time and not financial_revision_policy:
+        blockers.append("missing_financial_revision_policy")
     return {
         "level": "inventory",
         "scope": scope,
@@ -46,8 +66,9 @@ def evaluate_research_readiness(
         "missingTables": missing,
         "emptyTables": empty,
         "blockers": blockers,
+        "warnings": warnings,
         "tableCounts": {table: int(table_counts.get(table, 0)) for table in sorted(required)},
-        "limitations": ["inventory_only_requires_quality_run_for_research_readiness"],
+        "limitations": ["inventory_only_requires_quality_run_for_research_readiness", *limitations],
         "boundaries": {
             "researchOnly": True,
             "executionEnabled": False,

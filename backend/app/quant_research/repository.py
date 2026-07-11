@@ -7,20 +7,19 @@ from sqlalchemy.engine import Engine
 
 from ..models import IndexDailyBar, StockAdjustFactor, StockDailyBar, StockLimitPrice, StockListing, StockSuspendEvent
 from .dataset import build_adjusted_price_panel
+from .universe import resolve_universe_members
 
 
 def load_stock_research_panel(
     engine: Engine,
-    ts_codes: list[str],
+    universe: dict[str, object],
     start_date: date,
     end_date: date,
 ) -> pd.DataFrame:
-    """Load an explicit, historical-universe-safe A-share panel from PostgreSQL."""
-    symbols = sorted({code.strip().upper() for code in ts_codes if code.strip()})
-    if not symbols:
-        raise ValueError("必须显式提供研究股票池，禁止隐式加载当前全市场")
+    """Load a source-bound A-share panel from a validated universe artifact."""
     if start_date > end_date:
         raise ValueError("start_date 不能晚于 end_date")
+    symbols, historical_members, provenance = resolve_universe_members(universe, start_date, end_date)
 
     suspended = (
         select(StockSuspendEvent.id)
@@ -97,6 +96,14 @@ def load_stock_research_panel(
         frame["delist_date"].isna() | (frame["delist_date"] >= frame["trade_date"])
     )
     frame = frame[eligible].copy()
+    eligible_member_dates: set[tuple[str, pd.Timestamp]] | None = None
+    if historical_members is not None:
+        frame = frame.merge(historical_members, on=["trade_date", "ts_code"], how="inner", validate="one_to_one")
+        eligible_member_dates = set(
+            zip(historical_members["ts_code"].astype(str), historical_members["trade_date"], strict=True)
+        )
+        if frame.empty:
+            raise ValueError("universe 成员工件与上市边界求交后无可用日线")
     missing_limit = frame["up_limit"].isna() | frame["down_limit"].isna()
     if missing_limit.any():
         sample = frame.loc[missing_limit, ["ts_code", "trade_date"]].head(5).to_dict("records")
@@ -108,7 +115,17 @@ def load_stock_research_panel(
     adjusted["is_buyable_at_open"] = (~open_suspended) & (adjusted["open"] < adjusted["up_limit"])
     adjusted["is_sellable_at_open"] = (~open_suspended) & (adjusted["open"] > adjusted["down_limit"])
     adjusted["is_valuation_carried"] = False
-    return _append_full_day_suspension_rows(engine, adjusted, symbols, start_date, end_date)
+    adjusted["valuation_carry_reason"] = ""
+    result = _append_full_day_suspension_rows(
+        engine,
+        adjusted,
+        symbols,
+        start_date,
+        end_date,
+        eligible_member_dates=eligible_member_dates,
+    )
+    result.attrs["universeProvenance"] = provenance
+    return result
 
 
 def load_index_benchmark(engine: Engine, ts_code: str, start_date: date, end_date: date) -> pd.DataFrame:
@@ -136,6 +153,7 @@ def _append_full_day_suspension_rows(
     symbols: list[str],
     start_date: date,
     end_date: date,
+    eligible_member_dates: set[tuple[str, pd.Timestamp]] | None = None,
 ) -> pd.DataFrame:
     stmt = (
         select(StockSuspendEvent.ts_code, StockSuspendEvent.trade_date)
@@ -175,10 +193,16 @@ def _append_full_day_suspension_rows(
         key = (str(event.ts_code), event.trade_date)
         if key in existing:
             continue
+        if eligible_member_dates is not None and key not in eligible_member_dates:
+            continue
         symbol_rows = panel[panel["ts_code"] == event.ts_code]
         if symbol_rows.empty:
             continue
         row = symbol_rows.iloc[0].to_dict()
+        if pd.isna(row.get("list_date")) or event.trade_date < row["list_date"]:
+            continue
+        if pd.notna(row.get("delist_date")) and event.trade_date > row["delist_date"]:
+            continue
         row["trade_date"] = event.trade_date
         for column in price_columns & set(row):
             row[column] = float("nan")
@@ -187,6 +211,7 @@ def _append_full_day_suspension_rows(
         row["is_buyable_at_open"] = False
         row["is_sellable_at_open"] = False
         row["is_valuation_carried"] = True
+        row["valuation_carry_reason"] = "full_day_suspension"
         carried_rows.append(row)
     if not carried_rows:
         return panel.reset_index(drop=True)

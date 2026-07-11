@@ -52,7 +52,8 @@ def build_adjusted_price_panel(bars: pd.DataFrame, factors: pd.DataFrame) -> pd.
 def attach_fundamentals_asof(
     panel: pd.DataFrame,
     fundamentals: pd.DataFrame,
-    trade_dates: Iterable[object] | None = None,
+    *,
+    trade_dates: Iterable[object],
     period_policy: str | None = None,
 ) -> pd.DataFrame:
     """Attach fundamentals from their conservative next-trading-day availability."""
@@ -70,10 +71,13 @@ def attach_fundamentals_asof(
     if period_policy not in {None, "latest_end_date"}:
         raise ValueError(f"不支持的 period_policy：{period_policy}")
 
-    calendar_source = list(trade_dates) if trade_dates is not None else left["trade_date"].tolist()
-    calendar = pd.DatetimeIndex(pd.to_datetime(calendar_source)).drop_duplicates().sort_values()
-    if calendar.empty and not right.empty:
-        raise ValueError("缺少交易日历，无法计算财务数据 available_date")
+    calendar = pd.DatetimeIndex(pd.to_datetime(list(trade_dates), errors="coerce")).dropna().drop_duplicates().sort_values()
+    if calendar.empty:
+        raise ValueError("官方开市交易日历不能为空")
+    outside_calendar = sorted(set(left["trade_date"]) - set(calendar))
+    if outside_calendar:
+        sample = ", ".join(value.date().isoformat() for value in outside_calendar[:5])
+        raise ValueError(f"研究面板包含非官方开市日：{sample}")
     right["available_date"] = right["ann_date"].map(lambda value: _next_trade_date(calendar, value))
 
     duplicate_available = right["available_date"].notna() & right.duplicated(
