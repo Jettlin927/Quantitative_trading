@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.app import main
 from backend.app.database import Base
-from backend.app.models import Stock, StockDailyBar
+from backend.app.models import DataOverviewSnapshot, Stock, StockDailyBar
 
 
 class DataApiContractTest(unittest.TestCase):
@@ -44,24 +44,56 @@ class DataApiContractTest(unittest.TestCase):
 
     def test_health_and_db_overview_are_data_only(self):
         with self.open_session() as db:
-            health = main.health(db)
+            health = main.health(db, include_counts=True)
+            light_health = main.health(db, include_counts=False)
             overview = main.get_db_overview(db)
+            cached_overview = main.get_db_overview(db)
+            snapshot = db.get(DataOverviewSnapshot, "default")
+            db.add(
+                StockDailyBar(
+                    ts_code="600703.SH",
+                    trade_date=date(2026, 6, 1),
+                    open=12.3,
+                    high=12.6,
+                    low=12.2,
+                    close=12.5,
+                )
+            )
+            db.commit()
+            stale_overview = main.get_db_overview(db)
+            refreshed_overview = main.get_db_overview(db, refresh=True)
 
         self.assertEqual(health["service"], "quant-data-workspace")
+        self.assertIn("tables", health)
+        self.assertNotIn("tables", light_health)
         payload = overview
         self.assertEqual(payload["aShare"]["stocks"], 1)
         self.assertEqual(payload["aShare"]["dailyBars"]["maxDate"], "2026-05-29")
+        self.assertEqual(payload["tables"]["stockDailyBars"], 1)
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(cached_overview["aShare"]["dailyBars"]["rows"], 1)
+        self.assertEqual(stale_overview["aShare"]["dailyBars"]["rows"], 1)
+        self.assertEqual(refreshed_overview["aShare"]["dailyBars"]["rows"], 2)
+
+    def test_light_sync_progress_skips_coverage_queries(self):
+        with self.open_session() as db:
+            payload = main.get_sync_progress(db, include_coverage=False)
+
+        self.assertIn("runs", payload)
+        self.assertNotIn("coverage", payload)
 
     def test_stock_queries_return_raw_db_data(self):
         with self.open_session() as db:
             stocks = main.list_stocks(q="三安", db=db)
             screen = main.screen_stocks(q="600703", db=db)
             bars = main.get_daily_bars("600703.SH", date(2026, 5, 1), date(2026, 5, 31), db)
+            all_bars = main.get_daily_bars("600703.SH", db=db)
 
         self.assertEqual(stocks[0].ts_code, "600703.SH")
         self.assertEqual(screen[0].close, 12.3)
         self.assertFalse(hasattr(screen[0], "signal_summary"))
         self.assertEqual(bars[0].trade_date, date(2026, 5, 29))
+        self.assertEqual(all_bars[0].trade_date, date(2026, 5, 29))
 
     def test_strategy_and_backtest_routes_are_gone(self):
         paths = {route.path for route in main.app.routes}

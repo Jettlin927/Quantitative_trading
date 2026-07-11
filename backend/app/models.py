@@ -107,6 +107,56 @@ class StockFinancialIndicator(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class StockListing(Base):
+    __tablename__ = "stock_listings"
+
+    ts_code: Mapped[str] = mapped_column(String(16), primary_key=True)
+    symbol: Mapped[str | None] = mapped_column(String(12), index=True)
+    name: Mapped[str] = mapped_column(String(80), index=True)
+    area: Mapped[str | None] = mapped_column(String(50))
+    industry: Mapped[str | None] = mapped_column(String(80), index=True)
+    market: Mapped[str | None] = mapped_column(String(50), index=True)
+    exchange: Mapped[str | None] = mapped_column(String(16), index=True)
+    list_status: Mapped[str] = mapped_column(String(2), index=True)
+    list_date: Mapped[date | None] = mapped_column(Date, index=True)
+    delist_date: Mapped[date | None] = mapped_column(Date, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class StockLimitPrice(Base):
+    __tablename__ = "stock_limit_prices"
+    __table_args__ = (
+        UniqueConstraint("ts_code", "trade_date", name="uq_stock_limit_price_code_date"),
+        SqlIndex("ix_stock_limit_prices_code_date", "ts_code", "trade_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ts_code: Mapped[str] = mapped_column(String(16), index=True)
+    trade_date: Mapped[date] = mapped_column(Date, index=True)
+    pre_close: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
+    up_limit: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
+    down_limit: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class StockSuspendEvent(Base):
+    __tablename__ = "stock_suspend_events"
+    __table_args__ = (
+        UniqueConstraint("ts_code", "trade_date", "suspend_type", "suspend_timing", name="uq_stock_suspend_event"),
+        SqlIndex("ix_stock_suspend_events_code_date", "ts_code", "trade_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ts_code: Mapped[str] = mapped_column(String(16), index=True)
+    trade_date: Mapped[date] = mapped_column(Date, index=True)
+    suspend_type: Mapped[str] = mapped_column(String(2), index=True)
+    suspend_timing: Mapped[str] = mapped_column(String(40), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class TradeCalendar(Base):
     __tablename__ = "trade_calendars"
     __table_args__ = (
@@ -206,6 +256,21 @@ class FundDailyBar(Base):
     pct_chg: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
     vol: Mapped[Decimal | None] = mapped_column(Numeric(24, 4))
     amount: Mapped[Decimal | None] = mapped_column(Numeric(24, 4))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class FundAdjustFactor(Base):
+    __tablename__ = "fund_adjust_factors"
+    __table_args__ = (
+        UniqueConstraint("ts_code", "trade_date", name="uq_fund_adjust_factor_code_date"),
+        SqlIndex("ix_fund_adjust_factors_code_date", "ts_code", "trade_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ts_code: Mapped[str] = mapped_column(String(16), index=True)
+    trade_date: Mapped[date] = mapped_column(Date, index=True)
+    adj_factor: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -358,3 +423,32 @@ class DataSyncRun(Base):
     status: Mapped[str] = mapped_column(String(20), default="ok")
     message: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DataSyncJob(Base):
+    __tablename__ = "data_sync_jobs"
+    __table_args__ = (
+        UniqueConstraint("active_key", name="uq_data_sync_jobs_active_key"),
+        SqlIndex("ix_data_sync_jobs_status_created", "status", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    action: Mapped[str] = mapped_column(String(40), index=True)
+    status: Mapped[str] = mapped_column(String(20), default="queued", index=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    payload_hash: Mapped[str] = mapped_column(String(64), index=True)
+    active_key: Mapped[str | None] = mapped_column(String(64))
+    rows_upserted: Mapped[int] = mapped_column(default=0)
+    message: Mapped[str | None] = mapped_column(String(1000))
+    result: Mapped[dict | list | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DataOverviewSnapshot(Base):
+    __tablename__ = "data_overview_snapshots"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
