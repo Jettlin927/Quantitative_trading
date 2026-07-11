@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 import pandas as pd
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.engine import Engine
 
 from ..models import IndexDailyBar, StockAdjustFactor, StockDailyBar, StockLimitPrice, StockListing, StockSuspendEvent
@@ -31,6 +31,20 @@ def load_stock_research_panel(
         )
         .exists()
     )
+    suspended_at_open = (
+        select(StockSuspendEvent.id)
+        .where(
+            StockSuspendEvent.ts_code == StockDailyBar.ts_code,
+            StockSuspendEvent.trade_date == StockDailyBar.trade_date,
+            StockSuspendEvent.suspend_type == "S",
+            or_(
+                StockSuspendEvent.suspend_timing == "",
+                StockSuspendEvent.suspend_timing.like("09:30%"),
+                StockSuspendEvent.suspend_timing.like("9:30%"),
+            ),
+        )
+        .exists()
+    )
     stmt = (
         select(
             StockDailyBar.ts_code,
@@ -49,6 +63,7 @@ def load_stock_research_panel(
             StockLimitPrice.up_limit,
             StockLimitPrice.down_limit,
             suspended.label("is_suspended"),
+            suspended_at_open.label("is_suspended_at_open"),
         )
         .select_from(StockDailyBar)
         .outerjoin(
@@ -89,9 +104,11 @@ def load_stock_research_panel(
 
     factors = frame[["ts_code", "trade_date", "adj_factor"]]
     adjusted = build_adjusted_price_panel(frame.drop(columns=["adj_factor"]), factors)
-    adjusted["is_buyable_at_open"] = (~adjusted["is_suspended"].astype(bool)) & (adjusted["open"] < adjusted["up_limit"])
-    adjusted["is_sellable_at_open"] = (~adjusted["is_suspended"].astype(bool)) & (adjusted["open"] > adjusted["down_limit"])
-    return adjusted
+    open_suspended = adjusted["is_suspended_at_open"].astype(bool)
+    adjusted["is_buyable_at_open"] = (~open_suspended) & (adjusted["open"] < adjusted["up_limit"])
+    adjusted["is_sellable_at_open"] = (~open_suspended) & (adjusted["open"] > adjusted["down_limit"])
+    adjusted["is_valuation_carried"] = False
+    return _append_full_day_suspension_rows(engine, adjusted, symbols, start_date, end_date)
 
 
 def load_index_benchmark(engine: Engine, ts_code: str, start_date: date, end_date: date) -> pd.DataFrame:
@@ -111,3 +128,70 @@ def load_index_benchmark(engine: Engine, ts_code: str, start_date: date, end_dat
         raise ValueError(f"基准 {ts_code.upper()} 在指定范围内没有有效日线")
     frame["nav"] = frame["close"] / frame["close"].iloc[0]
     return frame[["trade_date", "nav"]]
+
+
+def _append_full_day_suspension_rows(
+    engine: Engine,
+    panel: pd.DataFrame,
+    symbols: list[str],
+    start_date: date,
+    end_date: date,
+) -> pd.DataFrame:
+    stmt = (
+        select(StockSuspendEvent.ts_code, StockSuspendEvent.trade_date)
+        .where(
+            StockSuspendEvent.ts_code.in_(symbols),
+            StockSuspendEvent.trade_date >= start_date,
+            StockSuspendEvent.trade_date <= end_date,
+            StockSuspendEvent.suspend_type == "S",
+            StockSuspendEvent.suspend_timing == "",
+        )
+        .order_by(StockSuspendEvent.ts_code, StockSuspendEvent.trade_date)
+    )
+    events = pd.read_sql_query(stmt, engine, parse_dates=["trade_date"])
+    if events.empty:
+        return panel.reset_index(drop=True)
+    existing = set(zip(panel["ts_code"].astype(str), panel["trade_date"], strict=True))
+    price_columns = {
+        "open",
+        "high",
+        "low",
+        "close",
+        "pre_close",
+        "vol",
+        "amount",
+        "up_limit",
+        "down_limit",
+        "adj_factor",
+        "adj_open",
+        "adj_high",
+        "adj_low",
+        "adj_close",
+        "adjusted_return",
+        "total_return_index",
+    }
+    carried_rows: list[dict[str, object]] = []
+    for event in events.itertuples(index=False):
+        key = (str(event.ts_code), event.trade_date)
+        if key in existing:
+            continue
+        symbol_rows = panel[panel["ts_code"] == event.ts_code]
+        if symbol_rows.empty:
+            continue
+        row = symbol_rows.iloc[0].to_dict()
+        row["trade_date"] = event.trade_date
+        for column in price_columns & set(row):
+            row[column] = float("nan")
+        row["is_suspended"] = True
+        row["is_suspended_at_open"] = True
+        row["is_buyable_at_open"] = False
+        row["is_sellable_at_open"] = False
+        row["is_valuation_carried"] = True
+        carried_rows.append(row)
+    if not carried_rows:
+        return panel.reset_index(drop=True)
+    return (
+        pd.concat([panel, pd.DataFrame(carried_rows)], ignore_index=True)
+        .sort_values(["ts_code", "trade_date"])
+        .reset_index(drop=True)
+    )

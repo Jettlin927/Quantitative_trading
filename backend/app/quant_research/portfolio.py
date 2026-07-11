@@ -24,8 +24,9 @@ def simulate_target_weights(
 ) -> pd.DataFrame:
     """Simulate full target portfolios that execute at the next trade-date open.
 
-    This is a research return-space simulator. It deliberately rejects missing
-    prices instead of inventing fills or silently carrying stale valuations.
+    This is a research return-space simulator. Missing prices remain hard data
+    errors, while market constraints keep affected positions frozen and record
+    the unfilled target instead of inventing fills.
     """
     _validate_prices(prices)
     _validate_targets(targets)
@@ -53,6 +54,15 @@ def simulate_target_weights(
         close_prices = pd.to_numeric(day["adj_close"], errors="coerce").to_dict()
         buyable = day["is_buyable_at_open"].fillna(False).astype(bool).to_dict()
         sellable = day["is_sellable_at_open"].fillna(False).astype(bool).to_dict()
+        carried = day.get("is_valuation_carried", pd.Series(False, index=day.index)).fillna(False).astype(bool).to_dict()
+        carried_valuation_count = 0
+        for symbol, should_carry in carried.items():
+            if should_carry and symbol in previous_close and previous_close[symbol] > 0:
+                open_prices[symbol] = previous_close[symbol]
+                close_prices[symbol] = previous_close[symbol]
+                buyable[symbol] = False
+                sellable[symbol] = False
+                carried_valuation_count += 1
 
         if weights:
             _require_held_prices(weights, previous_close, open_prices, trade_date, "开盘")
@@ -68,6 +78,9 @@ def simulate_target_weights(
         traded_weight = 0.0
         one_way_turnover = 0.0
         transaction_cost = 0.0
+        blocked_buys: list[str] = []
+        blocked_sells: list[str] = []
+        unfilled_target_weight = 0.0
         if trade_date in schedule:
             executed_signal_date, target_weights = schedule[trade_date]
             missing_targets = sorted(symbol for symbol in target_weights if symbol not in open_prices or pd.isna(open_prices[symbol]))
@@ -84,23 +97,42 @@ def simulate_target_weights(
             blocked_sells = sorted(
                 symbol for symbol, change in sell_changes.items() if change > 0 and not sellable.get(symbol, False)
             )
-            if blocked_buys or blocked_sells:
-                details = []
-                if blocked_buys:
-                    details.append(f"不可买入={','.join(blocked_buys[:10])}")
-                if blocked_sells:
-                    details.append(f"不可卖出={','.join(blocked_sells[:10])}")
-                raise ValueError(f"{trade_date.date()} 目标组合无法按开盘价执行：{'；'.join(details)}")
-            buys = sum(buy_changes.values())
-            sells = sum(sell_changes.values())
-            transaction_cost = buys * (cost_model.buy_rate + cost_model.slippage_rate) + sells * (
-                cost_model.sell_rate + cost_model.slippage_rate
+            executable_sells = {
+                symbol: change for symbol, change in sell_changes.items() if change > 0 and symbol not in blocked_sells
+            }
+            requested_buys = {
+                symbol: change for symbol, change in buy_changes.items() if change > 0 and symbol not in blocked_buys
+            }
+            sells = sum(executable_sells.values())
+            sell_cost = sells * (cost_model.sell_rate + cost_model.slippage_rate)
+            requested_buy_total = sum(requested_buys.values())
+            unfilled_target_weight = (
+                sum(buy_changes[symbol] for symbol in blocked_buys)
+                + sum(sell_changes[symbol] for symbol in blocked_sells)
+                + max(requested_buy_total - (cash_weight + sells), 0.0)
             )
+            buy_cost_rate = cost_model.buy_rate + cost_model.slippage_rate
+            buy_capacity = max(cash_weight + sells - sell_cost, 0.0) / (1 + buy_cost_rate)
+            buy_scale = min(1.0, buy_capacity / requested_buy_total) if requested_buy_total > 0 else 0.0
+            executable_buys = {symbol: change * buy_scale for symbol, change in requested_buys.items()}
+            buys = sum(executable_buys.values())
+            transaction_cost = sell_cost + buys * buy_cost_rate
             if transaction_cost >= 1:
                 raise ValueError("交易成本超过组合净值")
+
+            pre_cost_weights = dict(weights)
+            for symbol, change in executable_sells.items():
+                pre_cost_weights[symbol] = pre_cost_weights.get(symbol, 0.0) - change
+            for symbol, change in executable_buys.items():
+                pre_cost_weights[symbol] = pre_cost_weights.get(symbol, 0.0) + change
+            pre_cost_weights = {symbol: value for symbol, value in pre_cost_weights.items() if value > 1e-12}
+            pre_cost_cash = cash_weight + sells - buys - transaction_cost
+            if pre_cost_cash < -1e-9:
+                raise ValueError("交易成本导致现金为负")
             nav *= 1 - transaction_cost
-            weights = target_weights
-            cash_weight = 1 - sum(weights.values())
+            remaining_nav = 1 - transaction_cost
+            weights = {symbol: value / remaining_nav for symbol, value in pre_cost_weights.items()}
+            cash_weight = max(pre_cost_cash, 0.0) / remaining_nav
             traded_weight = buys + sells
             one_way_turnover = max(buys, sells)
 
@@ -124,6 +156,10 @@ def simulate_target_weights(
                 "traded_weight": float(traded_weight),
                 "one_way_turnover": float(one_way_turnover),
                 "transaction_cost_rate": float(transaction_cost),
+                "blocked_buys": ",".join(blocked_buys),
+                "blocked_sells": ",".join(blocked_sells),
+                "unfilled_target_weight": float(unfilled_target_weight),
+                "carried_valuation_count": carried_valuation_count,
             }
         )
         previous_close = close_prices
@@ -142,7 +178,14 @@ def _schedule_targets(targets: pd.DataFrame, trade_dates: list[pd.Timestamp]) ->
             for symbol, weight in zip(group["ts_code"].astype(str), group["target_weight"].astype(float), strict=True)
             if weight > 0
         }
-        schedule[future_dates[0]] = (signal_date, target_weights)
+        execution_date = future_dates[0]
+        if execution_date in schedule:
+            previous_signal = schedule[execution_date][0]
+            raise ValueError(
+                f"多个信号日映射到同一执行日 {execution_date.date()}："
+                f"{previous_signal.date()} 与 {signal_date.date()}"
+            )
+        schedule[execution_date] = (signal_date, target_weights)
     return schedule
 
 
@@ -177,6 +220,11 @@ def _validate_targets(targets: pd.DataFrame) -> None:
     totals = targets.assign(target_weight=numeric).groupby("signal_date")["target_weight"].sum()
     if (totals > 1 + 1e-9).any():
         raise ValueError("同一信号日目标权重之和不能超过 1")
+    if "available_date" in targets.columns:
+        available_dates = pd.to_datetime(targets["available_date"])
+        signal_dates = pd.to_datetime(targets["signal_date"])
+        if (available_dates > signal_dates).any():
+            raise ValueError("目标权重使用了信号日之后才可得的 available_date")
 
 
 def _require_held_prices(
