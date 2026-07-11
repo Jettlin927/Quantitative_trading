@@ -138,7 +138,9 @@ reproducibility_key = sha256(
 
 `transaction_contract` 必须精确记录 dialect、isolation 和 readOnly；正式 PostgreSQL 只接受 `REPEATABLE READ + READ ONLY`。磁盘 manifest、snapshot registry 主键和复用目录必须绑定同一 snapshot identity，任一处漂移都不得复用。
 
-canonical 序列化不得包含 `run_id`、生成时间、临时目录、本机绝对路径或未排序字典。正式运行缺少真实 `code_commit`、`data_snapshot_id`、环境指纹或随机种子时必须拒绝。
+canonical 序列化不得包含 `run_id`、生成时间、临时目录、本机绝对路径或未排序字典。canonical CSV 仅用字面值 `\\N` 表示 null；任何非 null 值若会渲染为同一字面值，writer 必须在计算 hash 前明确拒绝，不能让合法字符串与 null 同字节或回读混淆。正式运行缺少真实 `code_commit`、`data_snapshot_id`、环境指纹或随机种子时必须拒绝。
+
+归档校验和离线复现必须在任何重新计算前，将 `manifest.artifactHashes` 的全部 `inputs/*` 元数据与 `dataSnapshot.tableArtifacts` 逐项严格比对，并验证 checkpoint index、前向 hash 链、冻结输入和各阶段输入/输出 artifact 的交叉引用。只改 manifest 或重签一条内部自洽但与冻结 snapshot 不一致的 checkpoint 链，都必须失败。
 
 ## 输入合同示例
 
