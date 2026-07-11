@@ -29,6 +29,7 @@
 - `README.md`：面向人类的使用说明。
 - `AGENTS.md`：面向 AI Agent 的项目主管规则。
 - `docs/agent-handoff.md`：当前分支、PR、验证命令和本机坑点交接。
+- 当前生产 release 为 `/opt/quantitative-trading-release-20260712-0101`，schema 为 `0006_worker_heartbeats`，运行时代码为 `c24ade495492f64ea82aa229827858cdef52cdf6`；验收 ID 与输入哈希见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
 
 ## 后端地图
 

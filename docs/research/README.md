@@ -52,6 +52,12 @@ python scripts/research/reproduce_quant_research.py outputs/research-runs/runs/<
 
 sentinel 仅验证研究管线，所有 manifest 都标记 `researchOnly=true`、`notInvestmentAdvice=true`、`executionEnabled=false`。它不是 alpha 研究、买卖评级或收益承诺。
 
+## 生产验收基线
+
+2026-07-12 已在生产 PostgreSQL 上完成固定 2025-12 `510300.SH` / `000300.SH` 验收：质量运行 `4930ff05-a332-4a62-b7a8-1c7479126bca` 的 30 条规则全部通过；冻结快照为 `cb9bac39488283a13e5d31604471841b7ac5311e0e5852f1d9ac8d0639152dab`；研究运行 `a22fb663-1b66-4579-ab58-e6d3236d1843` 的结果指纹为 `61aa690cc0f7ea6e1b090cbbdae359696a74ad5434266167c175b6453bbe5079`。数据库地址不可连接时连续两次 reproduce 均精确匹配。
+
+这组 ID 是管线验收基线，不是可交易策略。基金全量数据当前最新到 2026-06-29；严格财务横截面仍受历史修订不可重建限制。完整输入哈希、生产迁移和重启恢复证据见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
+
 ## 当前保留文档
 
 - `a-share-data/README.md`：A 股 DB 覆盖结论入口。

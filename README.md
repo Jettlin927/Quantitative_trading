@@ -76,15 +76,16 @@ docker compose run --rm api alembic upgrade head
 
 ## 当前服务器部署
 
-- 服务器部署目录：`/opt/quantitative-trading-release-20260710-2330`。
-- 服务器上的 PostgreSQL、API 和前端端口继续只绑定 `127.0.0.1`，不直接暴露数据库或 API 到公网。
+- 当前 release：`/opt/quantitative-trading-release-20260712-0101`；生产运行时代码为 `c24ade495492f64ea82aa229827858cdef52cdf6`。
+- 服务器运行 PostgreSQL、API、独立 worker 和前端四个容器；PostgreSQL、API 和前端端口继续只绑定 `127.0.0.1`，worker 不对宿主机暴露端口。
 - 本机建立 SSH tunnel 后访问前端；当前远端前端端口为 `127.0.0.1:15173`，隧道断开后需要重新建立。
 - 当前服务只挂载活动历史数据卷 `quant_todo_p0_postgres_data_todo_p0`；切换前的旧 volume 已按用户确认删除，不能把它写成现存回滚点。
 - 历史卷切换前备份为 `/opt/quantitative-trading-backups/pre-2012-history-volume-switch-20260711-0108.dump`，已通过 `pg_restore -l` 校验。
 - A 股日线、估值、股票复权、指数日线和 ETF 日线的主体历史已覆盖 2012 年和 2015 年股灾区间；`scripts/ops/backfill_a_share_history.py` 用于续跑并补齐涨跌停、停复牌和 ETF 复权等 P1 数据。
 - 服务器 `crontab` 使用 `CRON_TZ=Asia/Shanghai`，每天 20:30 调用 `scripts/ops/sync_today_market_data.sh`，提交异步日更任务并轮询结果。
-- 可信底座生产 schema 和独立 worker 尚未发布；正式 stamp、migration 和切换前必须先确认 `docs/deployment/2026-07-11-production-migration-approval.md`。
-- 删除未挂载的旧 PostgreSQL volume 后，服务器磁盘约使用 `83%`、剩余约 `6.6G`；生产迁移预计还会因删除 13 个普通重复索引释放约 `3.9G`，但新增美股或期权逐笔数据前仍应先评估扩容。
+- 可信底座生产 schema 已到 `0006_worker_heartbeats (head)`；独立 worker 已发布，API 启动只校验 revision，不自动迁移。
+- 13 个经验证的重复普通索引已经删除，对应唯一约束完整；服务器磁盘当前约使用 `77%`、剩余约 `9.0G`。新增美股、分钟线或期权数据前仍应先评估扩容。
+- 固定 2025-12 ETF 生产 quality、冻结 snapshot、sentinel、两次断库 reproduce 以及 queued/expired-running 恢复均已通过；完整 ID、输入哈希和限制见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
 
 ## 推荐使用流程
 

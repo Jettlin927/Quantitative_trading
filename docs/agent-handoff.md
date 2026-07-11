@@ -5,20 +5,20 @@
 ## 当前接手状态
 
 - 本地仓库：`/Users/jettlin/code/Quantitative_trading`；用户常用 Windows 副本路径仍可能是 `E:\coding_things\Quantitative_trading`。
-- 可信工程已于 2026-07-11 快进合入 GitHub `main`；合入时提交为 `b22d4fa18e98e669111dd73b620b85152317b18e`。本地任务分支仍为 `codex/quant-foundation-trustworthiness`，接手必须现场运行 `git status -sb`、`git log -3 --oneline` 和 `git rev-list --left-right --count origin/main...HEAD`。
+- 可信工程已于 2026-07-11 快进合入 GitHub `main`，生产运行时代码为 `c24ade495492f64ea82aa229827858cdef52cdf6`。本地任务分支仍为 `codex/quant-foundation-trustworthiness`；文档收口后 `main` 可能领先运行时代码，接手必须现场运行 `git status -sb`、`git log -3 --oneline` 和 `git rev-list --left-right --count origin/main...HEAD`，并把“仓库最新提交”与“生产运行时提交”分开核对。
 - 当前目标：数据完整性、无未来函数、结果可复现、进程重启可靠四条可信门禁。分钟线、期权、新付费源、券商和真实交易继续暂缓。
-- Phase 0–4 的代码和测试已完成；Phase 5 的 CI、远端 sandbox 和最终独立反例审计已经执行。首次审计发现 4 个问题，修复后同一审计者在精确提交 `f506d0e58c303afe7ad561b37ceff27c6e5e681f` 重放 39/39 反例并判定四项目标全部 PASS；PostgreSQL 16.14 全矩阵 162/162、0 跳过。
-- 精确运行时代码 `f506d0e` 的 GitHub Actions CI run `29154412670`、最终文档提交 `b22d4fa` 的特性分支 CI run `29157892860` 和 `main` CI run `29157928464` 均全绿，四个 job 全部成功。
-- 生产 PostgreSQL 尚未迁移：无 `alembic_version`，未执行 stamp、upgrade、DROP INDEX、DELETE 或历史数据清理。正式 DDL 与发布必须先让用户确认 `docs/deployment/2026-07-11-production-migration-approval.md`。
+- Phase 0–5 已完成。首次独立审计发现的 4 个问题修复后，同一审计者在精确提交 `f506d0e58c303afe7ad561b37ceff27c6e5e681f` 重放 39/39 反例；PostgreSQL 16.14 全矩阵 162/162、0 跳过。生产发布后又在精确部署代码上执行 73 项定向门禁，72 项通过、1 项显式 PG URL 用例按设计跳过。
+- 运行时代码对应的 GitHub Actions CI run `29158046019` 四个 job 全部成功；生产 quality、snapshot、sentinel、断库 reproduce 和 worker 重启恢复的完整证据见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
+- 生产 PostgreSQL 已在用户明确确认后完成 fingerprint 门禁、baseline stamp、`0002→0006` 和 13 个普通重复索引清理。后续新的生产 DDL、数据删除、volume 操作或覆盖恢复仍必须再次确认。
 
 ## 当前服务器事实
 
 - SSH：`ubuntu@182.254.180.169`；活动持久 volume 为 `quant_todo_p0_postgres_data_todo_p0`，严禁 `docker compose down -v` 或删除该 volume。
-- 活动容器仍是旧版 `db/api/frontend`，API/前端 bind 到 `/opt/quantitative-trading-release-20260710-2330`；当前 API 仍带 `--reload`。新代码目录 `/opt/quantitative-trading` 可以在不触发旧 API reload 的情况下先构建。
-- Compose project label 为 `quantitative-trading`；服务器覆盖文件位于 `/opt/quantitative-trading/docker-compose.server.yml`，继续把 DB/API/frontend 端口限制在 loopback，并指向上述 external PG volume。
-- 生产库约 19 GiB，根盘约 40 GiB、剩余约 6.6 GiB；13 个已证明与唯一约束完全重复的普通索引约占 3974 MiB。
-- `data_sync_jobs` 当前只有 3 行最终 `ok`，表约 112 KiB；正式迁移前仍需重新确认无 queued/running 和无异常长事务。
-- 最新生产全量 custom-format dump 已流式保存到本机 `/Users/jettlin/backups/Quantitative_trading/quant_trading_2026-07-11_2138+0800.dump`，大小 `2,232,308,654` bytes、权限 `0600`、SHA-256 `7c13b7ec933fd0ec965f07cea57db8add43a29fc96ec9b3d53d544aed040dd14`。PostgreSQL 16 `pg_restore -l` 得到 250 个非注释 TOC 条目/25 个 `TABLE DATA` 段，整包 `pg_restore --file=/dev/null` 读取也成功。
+- 当前四容器为 `db/api/worker/frontend`；API/worker/frontend bind 到 `/opt/quantitative-trading-release-20260712-0101`，API 使用无 `--reload` 的生产命令。API/worker 的 `APP_GIT_COMMIT` 均为 `c24ade495492f64ea82aa229827858cdef52cdf6`。
+- Compose project label 为 `quantitative-trading`；当前 release 的服务器覆盖文件继续把 DB/API/frontend 端口限制在 loopback，并指向上述 external PG volume。PostgreSQL 只监听 `127.0.0.1:5432`，worker 不对宿主机暴露端口。
+- 生产 schema revision 为 `0006_worker_heartbeats`。13 个重复普通索引迁移前逻辑大小合计 `4,166,868,992` bytes、迁移后为 0，唯一守卫完整；迁移后 `pg_database_size=16,295,099,415` bytes，`public` 索引逻辑大小合计 `7,166,763,008` bytes，根盘约 40 GiB、剩余约 9.0 GiB。镜像构建与索引迁移发生在同一窗口，不能把索引逻辑大小表述为 `df` 的精确净释放。
+- `data_sync_jobs` 当前 6 行均为最终 `ok`，其中 2 行是生产 queued/expired-running 恢复演练；queued/running/failed/expired lease 均为 0，worker 心跳新鲜。
+- 最新生产全量 custom-format dump 已流式保存到本机 `/Users/jettlin/backups/Quantitative_trading/quant_trading_2026-07-11_2138+0800.dump`，大小 `2,232,308,654` bytes、权限 `0600`、SHA-256 `7c13b7ec933fd0ec965f07cea57db8add43a29fc96ec9b3d53d544aed040dd14`。PostgreSQL 16 `pg_restore -l` 得到 250 个非注释 TOC 条目/25 个 `TABLE DATA` 段，整包 `pg_restore --file=/dev/null` 读取也成功。该备份是迁移前恢复点，迁移后新增 registry 记录不在其中。
 
 ## 已实现的可信闭环
 
@@ -58,7 +58,7 @@
 - 最终修复提交重新生成：quality run `e35c0289-544a-47b3-8781-b6190c845aae`；snapshot `cb9bac39488283a13e5d31604471841b7ac5311e0e5852f1d9ac8d0639152dab`；research run `be5ef206-9291-4e24-82ad-7b01c0cb7b94`；reproducibility key `561c3e0be6d1a2b644a7bfdf531e20d70328f6b85c81df87a1f0220def74e2f7`；result fingerprint `61aa690cc0f7ea6e1b090cbbdae359696a74ad5434266167c175b6453bbe5079`。
 - 该 snapshot 明确绑定 PostgreSQL `REPEATABLE READ + READ ONLY`；数据库地址不可连接时连续两次 reproduce 都精确匹配结果指纹。
 - worker 双抢、锁行跳过、租约过期接管和自然键零重复已在最终代码的远端 PostgreSQL 16 通过；ResearchRun simulation resume 也已再次通过。
-- 临时 sandbox 已删除，生产容器保持健康且生产库仍无 `alembic_version`。
+- 临时 sandbox 已删除；上述 sandbox ID 只保留为迁移前证据。当前生产 registry 应使用下文“当前生产验收身份”的 ID，不要混用。
 
 ## 当前验证入口
 
@@ -86,14 +86,17 @@ git diff --check
 
 前端依赖如果本机 `node_modules` 不完整，使用正式 `node:22-alpine` Dockerfile 构建后在镜像内运行 `npm run typecheck`、`npm run lint`、`npm run build`，不要把本机缺失 `tsc` 误报成源码失败。
 
-## 生产确认后的固定顺序
+## 当前生产验收身份
 
-1. 复核最新备份、SHA-256、`pg_restore -l`、生产 fingerprint、active jobs、长事务、磁盘和当前 HTTP smoke。
-2. 把最终审计提交同步到非活动 `/opt/quantitative-trading`，先构建镜像；不要先覆盖活动 release bind。
-3. 用新镜像只读计算 fingerprint；精确匹配后才显式 `stamp-existing`，再单独 `alembic upgrade head`。
-4. 核对 revision、13 个普通重复索引、唯一约束、关键表行数和查询计划，再切换 API/worker/frontend。
-5. 运行 health、worker heartbeat、quality、sentinel、两次离线 reproduce、queued/running 重启恢复和 loopback 端口检查。
-6. 更新本文、生产确认单、`操作日志.md`，然后才允许把 Goal 标记完成。
+- quality run：`4930ff05-a332-4a62-b7a8-1c7479126bca`，固定 2025-12 ETF 切片 30/30 规则通过。
+- snapshot：`cb9bac39488283a13e5d31604471841b7ac5311e0e5852f1d9ac8d0639152dab`，PostgreSQL `REPEATABLE READ + READ ONLY`。
+- research run：`a22fb663-1b66-4579-ab58-e6d3236d1843`。
+- reproducibility key：`ddbaa1b1c19793c3bb55db107d634935de03025cdf69c14334994ddad694d9b3`。
+- result fingerprint：`61aa690cc0f7ea6e1b090cbbdae359696a74ad5434266167c175b6453bbe5079`；数据库不可连接时两次 reproduce 均精确匹配。
+- queued 恢复任务：`f1360532-9227-408c-8f19-716768c8cce6`，API 重启后仍 queued，worker 恢复后第 1 次尝试成功。
+- expired-running 恢复任务：`5f5dc534-b757-42e4-8193-418c17d8b62d`，5 秒租约过期后由新 worker 第 2 次尝试接管成功。
+
+完整表行数、输入文件哈希、时间线、限制和回滚证据统一见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`，不要只复制其中一个 ID 就宣称整个闭环通过。
 
 ## 不要做
 
@@ -101,4 +104,4 @@ git diff --check
 - 不要恢复旧策略目录或拿旧回测报告当可信底座证据。
 - 不要自动删除非股票涨跌停历史、旧快照、数据库 volume 或任何备份。
 - 不要导入真实持仓/成交、连接券商、开放公网 PostgreSQL 或把 sentinel 写成投资建议。
-- 不要在未获用户明确确认时执行生产 stamp、Alembic upgrade、`DROP INDEX` 或发布新 API/worker。
+- 不要把本次授权扩展为未来生产变更的长期授权；新的 stamp、Alembic upgrade、`DROP INDEX`、数据删除、volume 操作或覆盖恢复仍需单独确认。

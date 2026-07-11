@@ -1,8 +1,16 @@
 # 2026-07-11 生产 PostgreSQL 迁移确认单
 
-> 状态：最终独立复审和最新全量备份校验均已通过；等待用户明确确认。本文不是执行授权。
+> 状态：用户已于 2026-07-12 明确确认，清单内生产迁移与发布已经执行并通过验收。完整结果见 `2026-07-12-production-trustworthiness-acceptance.md`。
 
-## 生产现状
+## 执行结果
+
+- 生产 schema 已到 `0006_worker_heartbeats (head)`；baseline fingerprint 精确匹配后才执行 stamp，重复 upgrade 和 `alembic check` 均通过。
+- 13 个普通重复索引全部删除，13 个唯一守卫全部有效；核心表精确行数与日期覆盖和迁移前一致，根盘可用空间由约 6.5 GiB 增至约 9.0 GiB。
+- 当前 release 为 `/opt/quantitative-trading-release-20260712-0101`，API/worker 运行时代码为 `c24ade495492f64ea82aa229827858cdef52cdf6`；PostgreSQL 容器和活动 volume 未重建。
+- 生产 quality、冻结 snapshot、sentinel、两次断库 reproduce、queued/API 重启及过期 running 租约接管均通过；最终队列为空且 sample 自然键重复为 0。
+- 未执行行情/基本面数据行删除、volume 删除、覆盖恢复或真实持仓/成交导入。
+
+## 执行前生产现状
 
 - 活动数据库：PostgreSQL 16，数据库约 19 GiB，持久 volume 为 `quant_todo_p0_postgres_data_todo_p0`。
 - 活动 schema 仍无 `alembic_version`；截至本确认单生成时未执行 stamp、upgrade、DROP、DELETE 或历史数据清理。
@@ -53,7 +61,7 @@
 - 非实现者在精确提交 `f506d0e58c303afe7ad561b37ceff27c6e5e681f` 重放 39 个自定义反例，39/39 通过；隔离 PostgreSQL 16.14 全矩阵 162/162 通过、0 跳过。数据完整性、无未来函数、结果可复现、进程重启可靠四项均判定 PASS。
 - 同一提交的 GitHub Actions [CI run 29154412670](https://github.com/Jettlin927/Quantitative_trading/actions/runs/29154412670) 全绿：SQLite/Python、PostgreSQL 16 集成矩阵、前端 TypeScript/ESLint/build、Compose/Shell/差异检查四个 job 均成功。
 - 最终文档提交 `b22d4fa18e98e669111dd73b620b85152317b18e` 已按用户要求快进推送到 GitHub `main`；特性分支 [CI run 29157892860](https://github.com/Jettlin927/Quantitative_trading/actions/runs/29157892860) 和 `main` [CI run 29157928464](https://github.com/Jettlin927/Quantitative_trading/actions/runs/29157928464) 的同四个 job 也全部成功。
-- 临时 sandbox 已删除；活动数据库仍无 `alembic_version`。
+- 临时 sandbox 已删除；本条记录描述的是生产执行前状态，当时活动数据库仍无 `alembic_version`。
 
 ## 备份证据
 
@@ -82,6 +90,6 @@
 - 新应用 smoke 失败：切回旧 release 容器；数据库的新增表/列保持不动，随后做前向修复。
 - 只有发生无法前向修复的灾难性问题时，才从已验证 dump 恢复到新的隔离 volume；任何覆盖活动 volume 的恢复仍需用户再次明确确认。
 
-## 所需确认
+## 确认记录
 
-只有用户在看到填写完整的备份与最终审计证据后，明确回复同意生产 migration/发布，才允许执行 Task 5.3/5.4。仅同意代码、sandbox 或备份，不等同于授权生产 DDL。
+用户在看到填写完整的备份、sandbox、锁与回滚证据后，于 2026-07-12 明确回复“可以，开始吧”。本次只将该回复解释为本文列明的 Task 5.3/5.4 生产 migration/发布授权；后续新的生产 DDL、数据删除、volume 操作或覆盖恢复仍需重新确认。

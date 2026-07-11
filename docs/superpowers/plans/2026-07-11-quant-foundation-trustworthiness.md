@@ -1,6 +1,6 @@
 # 量化底座可信工程实施计划
 
-> 状态：Phase 0–4、CI、远端 sandbox、最终独立反例审计和 GitHub `main` 合入已通过；当前停在 Task 5.3 生产迁移确认门禁。未经用户明确确认，不执行生产 stamp、upgrade、DROP INDEX 或发布。
+> 状态：Phase 0–5 已完成。用户于 2026-07-12 明确确认生产迁移；fingerprint、baseline、`0002→0006`、索引治理、四容器发布、quality/snapshot/sentinel/reproduce、queued/expired-running 恢复和独立只读终审均已通过。完整证据见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
 
 ## 目标
 
@@ -786,30 +786,30 @@ data_snapshots：
 
 **实施**
 
-- [ ] 使用服务器 CI/CD 流程构建新 release，不覆盖活动 volume。
-- [ ] 注入可验证 APP_GIT_COMMIT。
-- [ ] 依次启动 db、api、worker、frontend。
-- [ ] migration 单独执行，不绑在 API 自动启动中。
-- [ ] 运行 health、readiness、quality、sentinel 和 reproduce。
-- [ ] 执行 queued/running 重启恢复演练。
-- [ ] 确认 PostgreSQL 5432 仍不暴露公网。
+- [x] 使用服务器 CI/CD 流程构建新 release，不覆盖活动 volume。
+- [x] 注入可验证 APP_GIT_COMMIT。
+- [x] 依次启动 db、api、worker、frontend。
+- [x] migration 单独执行，不绑在 API 自动启动中。
+- [x] 运行 health、readiness、quality、sentinel 和 reproduce。
+- [x] 执行 queued/running 重启恢复演练。
+- [x] 确认 PostgreSQL 5432 仍不暴露公网。
 
 **最终证据**
 
-- [ ] quality run ID 与规则汇总。
-- [ ] data snapshot ID 与每个输入文件 SHA-256。
-- [ ] research run ID、reproducibility key、result fingerprint。
-- [ ] 两次重现结果对比。
-- [ ] worker crash/recovery 时间线。
-- [ ] migration revision、Git commit、Docker 状态和 HTTP smoke。
-- [ ] 磁盘前后、数据库和索引体积。
+- [x] quality run ID 与规则汇总。
+- [x] data snapshot ID 与每个输入文件 SHA-256。
+- [x] research run ID、reproducibility key、result fingerprint。
+- [x] 两次重现结果对比。
+- [x] worker crash/recovery 时间线。
+- [x] migration revision、Git commit、Docker 状态和 HTTP smoke。
+- [x] 磁盘前后、数据库和索引体积。
 
 **文档**
 
-- [ ] 更新 docs/agent-handoff.md。
-- [ ] 更新 docs/agent-code-map.md。
-- [ ] 更新 README.md 和 docs/research/README.md。
-- [ ] 每个阶段开始和结束追加操作日志.md。
+- [x] 更新 docs/agent-handoff.md。
+- [x] 更新 docs/agent-code-map.md。
+- [x] 更新 README.md 和 docs/research/README.md。
+- [x] 每个阶段开始和结束追加操作日志.md。
 
 ---
 
