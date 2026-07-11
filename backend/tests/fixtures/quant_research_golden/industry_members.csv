@@ -1,0 +1,3 @@
+index_code,con_code,con_name,in_date,out_date,source
+SYNIND.SI,SYN001.SZ,合成股票甲,2025-01-02,,synthetic
+SYNIND.SI,SYN002.SH,合成股票乙,2025-01-02,2026-01-20,synthetic

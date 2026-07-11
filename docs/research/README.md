@@ -6,7 +6,9 @@
 
 ## 当前研究底座
 
+- `quant-foundation-trust-contract.md`：新研究链路的统一可信合同，定义 quality scope、宇宙血缘、信息可得时点、下一交易日执行、输入快照和可复现键。
 - `quant-research-foundation-plan-2026-07-10.md`：专业研究底座能力矩阵、缺口、实施顺序和验收标准。
+- `backend/tests/fixtures/quant_research_golden/`：完全合成的最小黄金数据集，用于锁定周末、停牌、涨跌停、复权、公告可用日和退市边界。
 - 一次性运行产物写入被 Git 忽略的 `outputs/research-runs/`，不再把大型逐事件 CSV 提交到主仓库。
 - `docs/research/strategy-results/` 仅为历史只读档案，不代表当前策略候选或新底座验收结果。
 
@@ -27,9 +29,22 @@ A 股：
 - `stock_daily_bars`
 - `stock_daily_basic`
 - `stock_financial_indicators`
+- `stock_listings`
+- `stock_limit_prices`
+- `stock_suspend_events`
+- `trade_calendars`
+- `stock_adjust_factors`
+- `indices`
+- `index_daily_bars`
+- `funds`
+- `fund_daily_bars`
+- `fund_adjust_factors`
+- `industry_classifications`
+- `industry_members`
 - `stock_pools`
 - `stock_pool_members`
 - `data_sync_runs`
+- `data_sync_jobs`
 
 美股 sample：
 
