@@ -20,6 +20,7 @@ Environment:
   SSH_KEY=$HOME/.ssh/quantitative_trading_github
   COMPOSE_SERVER_FILE=docker-compose.server.yml
   SKIP_GIT_PULL=1
+  APP_GIT_COMMIT=<required when deployment directory has no .git>
 EOF
 }
 
@@ -110,6 +111,22 @@ compose_cmd() {
   "${cmd[@]}" "$@"
 }
 
+set_deploy_identity() {
+  local resolved_commit=""
+
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    resolved_commit="$(git rev-parse HEAD)"
+  elif [[ -n "${APP_GIT_COMMIT:-}" ]]; then
+    resolved_commit="$APP_GIT_COMMIT"
+  fi
+
+  if [[ ! "$resolved_commit" =~ ^[0-9a-f]{40,64}$ ]]; then
+    echo "APP_GIT_COMMIT 缺失或无效，拒绝构建无法追溯的正式镜像。" >&2
+    return 1
+  fi
+  export APP_GIT_COMMIT="$resolved_commit"
+}
+
 wait_for_http() {
   local url="$1"
   local name="$2"
@@ -179,6 +196,7 @@ case "$TARGET" in
     ;;
   all|frontend|backend|api|pg|db)
     sync_code
+    set_deploy_identity
     compose_cmd config >/dev/null
     ;;
   status|verify)

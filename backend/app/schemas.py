@@ -200,3 +200,22 @@ class DataQualityRunRequest(BaseModel):
         if self.start_date > self.end_date:
             raise ValueError("start_date 不能晚于 end_date")
         return self
+
+
+class ResearchRunOut(BaseModel):
+    run_id: str
+    reproducibility_key: str | None = None
+    strategy_id: str
+    status: Literal["running", "succeeded", "failed", "interrupted"]
+    stage: str
+    config_sha256: str
+    data_snapshot_id: str | None = None
+    code_commit: str
+    environment_sha256: str
+    random_seed: int
+    result_fingerprint: str | None = None
+    artifact_root: str
+    started_at: datetime | None = None
+    heartbeat_at: datetime | None = None
+    finished_at: datetime | None = None
+    error: str | None = None

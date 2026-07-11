@@ -24,6 +24,7 @@ services:
       args:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-}
         PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
+        APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
     container_name: quant_trading_api
     restart: unless-stopped
     depends_on:
@@ -35,10 +36,12 @@ services:
       DEEPSEEK_TOKEN: ${DEEPSEEK_TOKEN:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
       DEEPSEEK_API_BASE: ${DEEPSEEK_API_BASE:-https://api.deepseek.com}
+      APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
     ports:
       - "${API_PORT:-18000}:8000"
     volumes:
       - .:/app
+      - research_artifacts:/app/outputs/research-runs
 
   frontend:
     build:
@@ -62,3 +65,5 @@ services:
 volumes:
   postgres_data:
   frontend_node_modules:
+  research_artifacts:
+    name: ${RESEARCH_ARTIFACT_VOLUME:-quant_research_artifacts}

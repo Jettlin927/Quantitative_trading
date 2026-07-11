@@ -78,7 +78,8 @@ class SchemaMigrationTest(unittest.TestCase):
                 command.upgrade(alembic_config(connection), "head")
             expected_tables = set(Base.metadata.tables) | {"alembic_version"}
             self.assertEqual(set(inspect(engine).get_table_names()), expected_tables)
-            self.assertEqual(len(Base.metadata.tables), 28)
+            self.assertEqual(len(Base.metadata.tables), 29)
+            self.assertIn("research_runs", Base.metadata.tables)
             actual_indexes = {
                 index["name"]
                 for table_name in Base.metadata.tables
