@@ -60,6 +60,19 @@ class ResearchSnapshotTest(unittest.TestCase):
         verify_snapshot(first.path)
         verify_snapshot(changed.path)
 
+    def test_same_snapshot_reuses_registered_artifact_root_across_output_roots(self):
+        second_root = Path(self.tmp.name) / "other-snapshots"
+        with Session(self.engine) as db:
+            first = freeze_input_snapshot(db, self.config, self.snapshot_root, capacity_policy=self.capacity)
+            reused = freeze_input_snapshot(db, self.config, second_root, capacity_policy=self.capacity)
+            row = db.get(DataSnapshot, first.snapshot_id)
+
+        self.assertTrue(reused.reused)
+        self.assertEqual(reused.path, first.path)
+        self.assertEqual(row.status, "complete")
+        self.assertFalse((second_root / first.snapshot_id).exists())
+        verify_snapshot(first.path)
+
     def test_canonical_writer_rejects_unsorted_or_duplicate_natural_keys(self):
         for rows in (
             [{"ts_code": "B"}, {"ts_code": "A"}],
