@@ -200,10 +200,9 @@ class QuantTrustGoldenFixtureTest(unittest.TestCase):
                     self.assertEqual(actual_metrics[key], expected_value)
 
 
-class QuantTrustKnownGapTest(unittest.TestCase):
-    @unittest.expectedFailure
+class QuantTrustNoLookaheadTest(unittest.TestCase):
     def test_future_adjustment_factor_does_not_reanchor_historical_prefix(self):
-        """Phase 2 应移除 expectedFailure：当前实现使用区间末因子锚定。"""
+        """追加未来复权因子不得重标已有历史前缀。"""
 
         bars = read_fixture("stock_daily_bars.csv")
         factors = read_fixture("stock_adjust_factors.csv")
@@ -227,9 +226,8 @@ class QuantTrustKnownGapTest(unittest.TestCase):
             check_names=False,
         )
 
-    @unittest.expectedFailure
     def test_unknown_time_announcement_is_not_visible_on_announcement_date(self):
-        """Phase 2 应移除 expectedFailure：当前 as-of 允许公告日精确匹配。"""
+        """公告时刻未知时，财务数据从下一交易日起可见。"""
 
         calendar = read_fixture("trade_calendars.csv")
         open_dates = calendar.loc[calendar["is_open"] == 1, "cal_date"]
