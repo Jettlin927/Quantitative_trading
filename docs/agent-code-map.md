@@ -72,6 +72,7 @@
   - 文件较长，先用函数名定位，不要盲目大改。
 
 - `backend/app/quant_research/`
+  - 信任边界以 `docs/research/quant-foundation-trust-contract.md` 为准；新 loader、特征、模拟器和 runner 必须先满足其 quality scope、宇宙血缘和时点可得合同。
   - `dataset.py`：严格复权、公告日 point-in-time 关联、历史成员筛选。
   - `repository.py`：从 DB 加载显式历史股票池和基准；缺历史上市、复权或涨跌停数据时失败。
   - `portfolio.py`：信号在下一交易日开盘生效的目标权重模拟，含现金、权重漂移、成本及开盘可买卖硬约束。
@@ -79,6 +80,14 @@
   - `validation.py`：anchored/rolling walk-forward 窗口。
   - `manifest.py`：run id、参数哈希、Git commit、数据快照和研究边界。
   - `readiness.py`：ETF 时间序列与 A 股横截面研究的 `ready/blocked` 门禁。
+
+- `backend/tests/fixtures/quant_research_golden/`
+  - 完全合成的 2 股票 + 1 ETF + 1 指数、15 交易日黄金夹具。
+  - 固定时点可得日、信号/执行日、净值和指标预期；不包含真实 Tushare 数据、持仓或凭据。
+
+- `backend/tests/test_quant_trust_contract.py`
+  - 验证黄金夹具的稳定排序、边界事件、下一交易日执行和固定产物。
+  - Phase 0 用 `expectedFailure` 锁定当前已知的区间末复权锚定和公告日同日可见问题；Phase 2 修复后改为普通断言。
 
 ## 主要 API
 
@@ -171,10 +180,11 @@
 
 新增离线研究能力：
 
-1. 先在 `docs/research/` 写明数据、时点、成交、成本、基准和失败口径。
+1. 先阅读 `docs/research/quant-foundation-trust-contract.md`，再在 `docs/research/` 写明数据、时点、成交、成本、基准和失败口径。
 2. 共用协议放入 `backend/app/quant_research/`，不得复制旧探索脚本逻辑。
-3. 数据不完整时严格失败或让 readiness 返回 `blocked`，不允许静默回退。
-4. 新增单元测试，并让每次运行记录 manifest；大型结果只写入被忽略的 `outputs/research-runs/`。
+3. 先用黄金夹具表达新语义，并验证追加未来数据不改变历史前缀。
+4. 数据不完整时严格失败或让 readiness 返回 `blocked`，不允许静默回退。
+5. 新增单元测试，并让每次运行记录 manifest；大型结果只写入被忽略的 `outputs/research-runs/`。
 
 ## 验证命令
 

@@ -1,0 +1,3 @@
+ts_code,symbol,name,exchange,list_status,list_date,delist_date,source
+SYN001.SZ,SYN001,合成股票甲,SZSE,L,2025-01-02,,synthetic
+SYN002.SH,SYN002,合成股票乙,SSE,D,2025-01-02,2026-01-20,synthetic
