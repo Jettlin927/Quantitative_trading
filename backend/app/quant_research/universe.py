@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from numbers import Real
+from pathlib import Path
 from typing import Any, Iterable
 
 import pandas as pd
@@ -10,15 +12,13 @@ import pandas as pd
 def build_explicit_universe(
     ts_codes: Iterable[str],
     as_of_date: object | None = None,
-    source: str = "explicit",
+    source: str | None = None,
 ) -> dict[str, Any]:
     members = sorted({str(code).strip().upper() for code in ts_codes if str(code).strip()})
     if not members:
         raise ValueError("显式 universe 不能为空")
-    normalized_source = str(source).strip()
-    if not normalized_source:
-        raise ValueError("显式 universe 必须记录 source")
-    normalized_as_of = pd.Timestamp(as_of_date).date().isoformat() if as_of_date is not None else None
+    source_artifact = _verify_symbol_source(source, members)
+    normalized_as_of = _normalize_optional_date(as_of_date, "as_of_date")
     member_artifact = {
         "format": "inline_sorted_symbols",
         "count": len(members),
@@ -26,12 +26,13 @@ def build_explicit_universe(
     }
     payload = {
         "mode": "explicit_snapshot",
-        "source": normalized_source,
+        "source": source_artifact["path"],
+        "sourceArtifact": source_artifact,
         "asOfDate": normalized_as_of,
         "members": members,
         "memberArtifact": member_artifact,
     }
-    payload["universeHash"] = _canonical_hash(payload)
+    payload["universeHash"] = _canonical_hash(_hashable_universe(payload))
     return payload
 
 
@@ -92,9 +93,7 @@ def build_historical_universe(
     index_code: str,
     source: str,
 ) -> dict[str, Any]:
-    normalized_source = str(source).strip()
-    if not normalized_source:
-        raise ValueError("历史 universe 必须记录 source")
+    source_artifact = _verify_existing_source(source, "历史 universe")
     dates = _normalize_dates(trade_dates, "历史 universe 交易日历")
     panel = build_historical_membership_panel(memberships, listings, dates, index_code)
     if panel.empty:
@@ -111,13 +110,14 @@ def build_historical_universe(
     }
     payload = {
         "mode": "historical_membership",
-        "source": normalized_source,
+        "source": source_artifact["path"],
+        "sourceArtifact": source_artifact,
         "indexCode": str(index_code),
         "startDate": dates[0].date().isoformat(),
         "endDate": dates[-1].date().isoformat(),
         "memberArtifact": member_artifact,
     }
-    payload["universeHash"] = _canonical_hash(payload)
+    payload["universeHash"] = _canonical_hash(_hashable_universe(payload))
     return payload
 
 
@@ -139,9 +139,12 @@ def evaluate_universe_provenance(
 
     mode = universe.get("mode")
     source = str(universe.get("source") or "").strip()
+    source_artifact = universe.get("sourceArtifact")
     if not source:
         blockers.append("missing_universe_source")
-    expected_universe_hash = _canonical_hash({key: value for key, value in universe.items() if key != "universeHash"})
+    if not _source_artifact_matches(source, source_artifact):
+        blockers.append("invalid_universe_source_artifact")
+    expected_universe_hash = _canonical_hash(_hashable_universe(universe))
     if universe.get("universeHash") != expected_universe_hash:
         blockers.append("invalid_universe_hash")
 
@@ -158,9 +161,14 @@ def evaluate_universe_provenance(
         if scope == "a_share_cross_section":
             survivorship_risk = True
             as_of_date = universe.get("asOfDate")
-            if not as_of_date:
+            try:
+                normalized_as_of = _normalize_optional_date(as_of_date, "as_of_date")
+            except ValueError:
+                blockers.append("invalid_as_of_date")
+                normalized_as_of = None
+            if not normalized_as_of:
                 blockers.append("missing_as_of_date")
-            elif pd.Timestamp(as_of_date) > pd.Timestamp(research_start):
+            elif pd.Timestamp(normalized_as_of) > pd.Timestamp(research_start):
                 blockers.append("survivorship_risk")
             else:
                 warnings.append("static_universe")
@@ -239,6 +247,84 @@ def _normalize_dates(values: Iterable[object], label: str) -> pd.DatetimeIndex:
     return dates
 
 
+def _verify_symbol_source(source: str | None, expected_members: list[str]) -> dict[str, str]:
+    artifact = _verify_existing_source(source, "显式 universe")
+    path = Path(artifact["path"])
+    source_members = sorted(
+        {
+            line.strip().upper()
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+    )
+    if source_members != expected_members:
+        raise ValueError("显式 universe source 文件与 members 不一致")
+    artifact["format"] = "sorted_symbols_v1"
+    artifact["sha256"] = _canonical_symbol_hash(source_members)
+    return artifact
+
+
+def _verify_existing_source(source: str | None, label: str) -> dict[str, str]:
+    normalized = str(source or "").strip()
+    if not normalized:
+        raise ValueError(f"{label} 必须记录可验证 source 文件")
+    path = Path(normalized).expanduser()
+    if not path.is_file():
+        raise ValueError(f"{label} source 文件不存在：{normalized}")
+    return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+
+
+def _source_artifact_matches(source: str, artifact: object) -> bool:
+    if not isinstance(artifact, dict) or artifact.get("path") != source:
+        return False
+    path = Path(source).expanduser()
+    if not path.is_file():
+        return False
+    expected = str(artifact.get("sha256") or "")
+    if not expected:
+        return False
+    if artifact.get("format") == "sorted_symbols_v1":
+        members = sorted(
+            {
+                line.strip().upper()
+                for line in path.read_text(encoding="utf-8").splitlines()
+                if line.strip() and not line.lstrip().startswith("#")
+            }
+        )
+        return expected == _canonical_symbol_hash(members)
+    return expected == hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _canonical_symbol_hash(members: list[str]) -> str:
+    return hashlib.sha256(("\n".join(members) + "\n").encode("utf-8")).hexdigest()
+
+
+def _normalize_optional_date(value: object | None, label: str) -> str | None:
+    if value is None:
+        return None
+    if pd.isna(value) or isinstance(value, bool) or isinstance(value, Real):
+        raise ValueError(f"{label} 必须是有效日期")
+    try:
+        parsed = pd.Timestamp(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} 必须是有效日期") from exc
+    if pd.isna(parsed):
+        raise ValueError(f"{label} 必须是有效日期")
+    return parsed.date().isoformat()
+
+
 def _canonical_hash(payload: object) -> str:
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _hashable_universe(universe: dict[str, Any]) -> dict[str, Any]:
+    payload = {key: value for key, value in universe.items() if key not in {"universeHash", "source"}}
+    source_artifact = payload.get("sourceArtifact")
+    if isinstance(source_artifact, dict):
+        payload["sourceArtifact"] = {
+            key: source_artifact.get(key)
+            for key in ("format", "sha256")
+            if source_artifact.get(key) is not None
+        }
+    return payload

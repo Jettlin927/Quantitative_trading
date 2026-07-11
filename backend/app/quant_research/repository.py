@@ -92,6 +92,10 @@ def load_stock_research_panel(
     if missing_listing.any():
         sample = sorted(frame.loc[missing_listing, "ts_code"].dropna().unique())[:10]
         raise ValueError(f"历史上市状态缺失：{', '.join(sample)}")
+    missing_delist_boundary = frame["list_status"].eq("D") & frame["delist_date"].isna()
+    if missing_delist_boundary.any():
+        sample = sorted(frame.loc[missing_delist_boundary, "ts_code"].dropna().unique())[:10]
+        raise ValueError(f"退市标的缺少 delist_date：{', '.join(sample)}")
     eligible = (frame["list_date"] <= frame["trade_date"]) & (
         frame["delist_date"].isna() | (frame["delist_date"] >= frame["trade_date"])
     )

@@ -469,6 +469,8 @@ def check_universe_provenance(contract: QualityCheckContract) -> QualityRuleResu
         issues: list[dict[str, Any]] = []
         if not contract.universe_source:
             issues.append({"issue": "universe_source_required"})
+        elif not contract.universe_source_verified:
+            issues.append({"issue": contract.universe_source_issue or "universe_source_unverified"})
         if not contract.universe_as_of_date:
             issues.append({"issue": "universe_as_of_date_required"})
         elif contract.scope == "a_share_cross_section" and contract.universe_as_of_date > contract.start_date:
@@ -479,6 +481,8 @@ def check_universe_provenance(contract: QualityCheckContract) -> QualityRuleResu
                     "researchStartDate": contract.start_date.isoformat(),
                 }
             )
+        if contract.universe_as_of_issue:
+            issues.append({"issue": contract.universe_as_of_issue})
         return _quality_result(
             rule_id="universe.provenance",
             table_name="stock_listings" if contract.scope == "a_share_cross_section" else "funds",

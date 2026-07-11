@@ -6,6 +6,7 @@ import unittest
 
 import pandas as pd
 
+from backend.app.quant_research.calendar import build_open_trade_calendar, trade_calendar_content_sha256
 from backend.app.quant_research.dataset import attach_fundamentals_asof, build_adjusted_price_panel
 from backend.app.quant_research.metrics import summarize_performance
 from backend.app.quant_research.portfolio import CostModel, simulate_target_weights
@@ -17,6 +18,15 @@ CONTRACT_PATH = Path(__file__).parents[2] / "docs" / "research" / "quant-foundat
 
 def read_fixture(name: str) -> pd.DataFrame:
     return pd.read_csv(FIXTURE_DIR / name)
+
+
+def fixture_trade_calendar():
+    records = read_fixture("trade_calendars.csv")[["exchange", "cal_date", "is_open"]].to_dict("records")
+    return build_open_trade_calendar(
+        records,
+        source_artifact=str(FIXTURE_DIR / "trade_calendars.csv"),
+        source_artifact_sha256=trade_calendar_content_sha256(records),
+    )
 
 
 class QuantTrustContractDocumentationTest(unittest.TestCase):
@@ -154,7 +164,7 @@ class QuantTrustGoldenFixtureTest(unittest.TestCase):
         actual_nav = simulate_target_weights(
             prices,
             targets,
-            open_trade_dates=calendar.loc[calendar["is_open"] == 1, "cal_date"],
+            trade_calendar=fixture_trade_calendar(),
             cost=CostModel(buy_rate=0, sell_rate=0, slippage_rate=0),
         )
         actual_nav["trade_date"] = actual_nav["trade_date"].dt.strftime("%Y-%m-%d")
@@ -242,7 +252,11 @@ class QuantTrustNoLookaheadTest(unittest.TestCase):
         fundamentals = read_fixture("stock_financial_indicators.csv")
         fundamentals = fundamentals[fundamentals["ts_code"] == "SYN001.SZ"]
 
-        merged = attach_fundamentals_asof(panel, fundamentals, trade_dates=open_dates)
+        merged = attach_fundamentals_asof(
+            panel,
+            fundamentals,
+            trade_calendar=fixture_trade_calendar(),
+        )
         by_date = merged.set_index(merged["trade_date"].dt.strftime("%Y-%m-%d"))
 
         self.assertTrue(pd.isna(by_date.loc["2026-01-09", "roe"]))

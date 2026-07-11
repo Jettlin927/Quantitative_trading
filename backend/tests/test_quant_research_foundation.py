@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.database import Base
 from backend.app.models import StockAdjustFactor, StockDailyBar, StockLimitPrice, StockListing, StockSuspendEvent
+from backend.app.quant_research.calendar import build_open_trade_calendar, trade_calendar_content_sha256
 from backend.app.quant_research.dataset import active_members_as_of, attach_fundamentals_asof, build_adjusted_price_panel
 from backend.app.quant_research.manifest import build_run_manifest
 from backend.app.quant_research.metrics import summarize_performance
@@ -28,8 +30,23 @@ def formal_targets(rows: list[dict[str, object]]) -> pd.DataFrame:
     return pd.DataFrame([{**row, "available_date": row.get("available_date", row["signal_date"])} for row in rows])
 
 
-def open_dates(prices: pd.DataFrame) -> list[object]:
-    return prices["trade_date"].drop_duplicates().tolist()
+FIXTURE_DIR = Path(__file__).parent / "fixtures"
+UNIVERSE_ONE = FIXTURE_DIR / "universe-000001.txt"
+UNIVERSE_TWO = FIXTURE_DIR / "universe-000001-000002.txt"
+HISTORICAL_SOURCE = FIXTURE_DIR / "quant_research_golden" / "industry_members.csv"
+
+
+def calendar_for_dates(dates: list[object] | pd.Series) -> object:
+    records = [{"exchange": "SSE", "cal_date": value, "is_open": True} for value in list(dates)]
+    return build_open_trade_calendar(
+        records,
+        source_artifact="synthetic://unit-test-trade-calendars.csv",
+        source_artifact_sha256=trade_calendar_content_sha256(records),
+    )
+
+
+def open_dates(prices: pd.DataFrame) -> object:
+    return calendar_for_dates(prices["trade_date"].drop_duplicates().tolist())
 
 
 class QuantResearchDatasetTest(unittest.TestCase):
@@ -114,7 +131,9 @@ class QuantResearchDatasetTest(unittest.TestCase):
         merged = attach_fundamentals_asof(
             panel,
             fundamentals,
-            trade_dates=["2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09"],
+            trade_calendar=calendar_for_dates(
+                ["2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09"]
+            ),
         )
 
         self.assertTrue(pd.isna(merged.iloc[0]["roe"]))
@@ -133,7 +152,11 @@ class QuantResearchDatasetTest(unittest.TestCase):
             [{"ts_code": "000001.SZ", "ann_date": "2026-01-09", "end_date": "2025-12-31", "roe": 10.0}]
         )
 
-        merged = attach_fundamentals_asof(panel, fundamentals, trade_dates=["2026-01-09", "2026-01-12"])
+        merged = attach_fundamentals_asof(
+            panel,
+            fundamentals,
+            trade_calendar=calendar_for_dates(["2026-01-09", "2026-01-12"]),
+        )
 
         self.assertTrue(pd.isna(merged.iloc[0]["roe"]))
         self.assertEqual(merged.iloc[1]["roe"], 10.0)
@@ -154,11 +177,15 @@ class QuantResearchDatasetTest(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(ValueError, "period_policy"):
-            attach_fundamentals_asof(panel, fundamentals, trade_dates=["2026-01-09", "2026-01-12"])
+            attach_fundamentals_asof(
+                panel,
+                fundamentals,
+                trade_calendar=calendar_for_dates(["2026-01-09", "2026-01-12"]),
+            )
         merged = attach_fundamentals_asof(
             panel,
             fundamentals,
-            trade_dates=["2026-01-09", "2026-01-12"],
+            trade_calendar=calendar_for_dates(["2026-01-09", "2026-01-12"]),
             period_policy="latest_end_date",
         )
         self.assertEqual(merged.iloc[1]["roe"], 10.0)
@@ -174,11 +201,11 @@ class QuantResearchDatasetTest(unittest.TestCase):
         baseline_fundamentals = pd.DataFrame(
             [{"ts_code": "000001.SZ", "ann_date": "2026-01-09", "end_date": "2025-12-31", "roe": 10.0}]
         )
-        official_calendar = ["2026-01-09", "2026-01-12", "2026-01-13"]
+        official_calendar = calendar_for_dates(["2026-01-09", "2026-01-12", "2026-01-13"])
         baseline = attach_fundamentals_asof(
             baseline_panel,
             baseline_fundamentals,
-            trade_dates=official_calendar,
+            trade_calendar=official_calendar,
         )
         extended = attach_fundamentals_asof(
             pd.concat(
@@ -192,7 +219,7 @@ class QuantResearchDatasetTest(unittest.TestCase):
                 ],
                 ignore_index=True,
             ),
-            trade_dates=official_calendar,
+            trade_calendar=official_calendar,
         )
 
         pd.testing.assert_frame_equal(
@@ -206,7 +233,7 @@ class QuantResearchDatasetTest(unittest.TestCase):
             [{"ts_code": "000001.SZ", "ann_date": "2026-01-07", "end_date": "2025-12-31", "roe": 10.0}]
         )
 
-        with self.assertRaisesRegex((TypeError, ValueError), "trade_dates|交易日历"):
+        with self.assertRaisesRegex((TypeError, ValueError), "trade_calendar|交易日历"):
             attach_fundamentals_asof(panel, fundamentals)
 
     def test_filters_historical_industry_membership(self):
@@ -233,7 +260,7 @@ class QuantResearchDatasetTest(unittest.TestCase):
         universe = build_explicit_universe(
             ["000001.SZ"],
             as_of_date="2026-01-02",
-            source="synthetic-test",
+            source=str(UNIVERSE_ONE),
         )
         panel = load_stock_research_panel(
             engine,
@@ -266,7 +293,7 @@ class QuantResearchDatasetTest(unittest.TestCase):
                 db.add(StockSuspendEvent(ts_code="000001.SZ", trade_date=day, suspend_type="S", suspend_timing=timing))
             db.commit()
 
-        universe = build_explicit_universe(["000001.SZ"], as_of_date="2026-01-05", source="synthetic-test")
+        universe = build_explicit_universe(["000001.SZ"], as_of_date="2026-01-05", source=str(UNIVERSE_ONE))
         panel = load_stock_research_panel(
             engine,
             universe,
@@ -288,7 +315,7 @@ class QuantResearchDatasetTest(unittest.TestCase):
             db.add(StockSuspendEvent(ts_code="000001.SZ", trade_date=pd.Timestamp("2026-01-06").date(), suspend_type="S", suspend_timing="全天"))
             db.commit()
 
-        universe = build_explicit_universe(["000001.SZ"], as_of_date="2026-01-05", source="synthetic-test")
+        universe = build_explicit_universe(["000001.SZ"], as_of_date="2026-01-05", source=str(UNIVERSE_ONE))
         panel = load_stock_research_panel(
             engine,
             universe,
@@ -322,7 +349,7 @@ class QuantResearchDatasetTest(unittest.TestCase):
             db.add(StockSuspendEvent(ts_code="000001.SZ", trade_date=pd.Timestamp("2026-01-06").date(), suspend_type="S", suspend_timing="全天"))
             db.commit()
 
-        universe = build_explicit_universe(["000001.SZ"], as_of_date="2026-01-05", source="synthetic-test")
+        universe = build_explicit_universe(["000001.SZ"], as_of_date="2026-01-05", source=str(UNIVERSE_ONE))
         panel = load_stock_research_panel(
             engine,
             universe,
@@ -331,6 +358,34 @@ class QuantResearchDatasetTest(unittest.TestCase):
         )
 
         self.assertEqual(panel["trade_date"].dt.strftime("%Y-%m-%d").tolist(), ["2026-01-05"])
+
+    def test_repository_rejects_delisted_status_without_delist_date(self):
+        engine = create_engine("sqlite+pysqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        day = pd.Timestamp("2026-01-05").date()
+        with Session(engine) as db:
+            db.add(
+                StockListing(
+                    ts_code="000001.SZ",
+                    symbol="000001",
+                    name="缺退市边界",
+                    list_status="D",
+                    list_date=pd.Timestamp("2020-01-01").date(),
+                    delist_date=None,
+                )
+            )
+            db.add(StockDailyBar(ts_code="000001.SZ", trade_date=day, open=10, high=10, low=10, close=10))
+            db.add(StockAdjustFactor(ts_code="000001.SZ", trade_date=day, adj_factor=1))
+            db.add(StockLimitPrice(ts_code="000001.SZ", trade_date=day, up_limit=11, down_limit=9))
+            db.commit()
+
+        universe = build_explicit_universe(
+            ["000001.SZ"],
+            as_of_date="2026-01-05",
+            source=str(UNIVERSE_ONE),
+        )
+        with self.assertRaisesRegex(ValueError, "delist_date"):
+            load_stock_research_panel(engine, universe, day, day)
 
     def test_repository_filters_rows_by_historical_member_artifact(self):
         engine = create_engine("sqlite+pysqlite:///:memory:")
@@ -369,7 +424,7 @@ class QuantResearchDatasetTest(unittest.TestCase):
             listings,
             dates,
             "SYN.SI",
-            source="synthetic-membership.csv",
+            source=str(HISTORICAL_SOURCE),
         )
 
         panel = load_stock_research_panel(engine, universe, dates[0], dates[-1])
@@ -386,8 +441,16 @@ class QuantResearchDatasetTest(unittest.TestCase):
 
 class QuantResearchUniverseTest(unittest.TestCase):
     def test_explicit_universe_hash_is_order_independent(self):
-        first = build_explicit_universe(["000002.SZ", "000001.SZ"], as_of_date="2025-12-31")
-        second = build_explicit_universe(["000001.SZ", "000002.SZ"], as_of_date="2025-12-31")
+        first = build_explicit_universe(
+            ["000002.SZ", "000001.SZ"],
+            as_of_date="2025-12-31",
+            source=str(UNIVERSE_TWO),
+        )
+        second = build_explicit_universe(
+            ["000001.SZ", "000002.SZ"],
+            as_of_date="2025-12-31",
+            source=str(UNIVERSE_TWO),
+        )
 
         self.assertEqual(first["members"], ["000001.SZ", "000002.SZ"])
         self.assertEqual(first["universeHash"], second["universeHash"])
@@ -395,9 +458,18 @@ class QuantResearchUniverseTest(unittest.TestCase):
         self.assertEqual(first["memberArtifact"]["sha256"], second["memberArtifact"]["sha256"])
 
     def test_cross_section_requires_historical_universe_provenance(self):
-        missing = build_explicit_universe(["000001.SZ"])
-        future = build_explicit_universe(["000001.SZ"], as_of_date="2026-06-01")
-        historical = build_explicit_universe(["000001.SZ"], as_of_date="2025-12-31")
+        valid = build_explicit_universe(
+            ["000001.SZ"],
+            as_of_date="2025-12-31",
+            source=str(UNIVERSE_ONE),
+        )
+        missing = {**valid, "asOfDate": None}
+        future = build_explicit_universe(
+            ["000001.SZ"],
+            as_of_date="2026-06-01",
+            source=str(UNIVERSE_ONE),
+        )
+        historical = valid
 
         self.assertIn("missing_as_of_date", evaluate_universe_provenance(missing, "a_share_cross_section", "2026-01-01")["blockers"])
         self.assertIn("survivorship_risk", evaluate_universe_provenance(future, "a_share_cross_section", "2026-01-01")["blockers"])
@@ -407,6 +479,19 @@ class QuantResearchUniverseTest(unittest.TestCase):
 
         forged = {"mode": "historical_membership", "source": "x"}
         self.assertEqual(evaluate_universe_provenance(forged, "a_share_cross_section", "2026-01-01")["status"], "blocked")
+
+        with self.assertRaisesRegex(ValueError, "source 文件不存在"):
+            build_explicit_universe(
+                ["000001.SZ"],
+                as_of_date="2025-12-31",
+                source="/definitely/not/a/real.csv",
+            )
+        with self.assertRaisesRegex(ValueError, "as_of_date"):
+            build_explicit_universe(
+                ["000001.SZ"],
+                as_of_date=pd.NaT,
+                source=str(UNIVERSE_ONE),
+            )
 
     def test_builds_historical_membership_by_trade_date(self):
         memberships = pd.DataFrame(
@@ -439,7 +524,7 @@ class QuantResearchUniverseTest(unittest.TestCase):
             listings,
             ["2026-01-05", "2026-01-06", "2026-01-07"],
             "801080.SI",
-            source="synthetic-membership.csv",
+            source=str(HISTORICAL_SOURCE),
         )
         self.assertEqual(evaluate_universe_provenance(universe, "a_share_cross_section", "2026-01-05")["status"], "ready")
         tampered = {**universe, "memberArtifact": {**universe["memberArtifact"], "count": 99}}
@@ -460,7 +545,7 @@ class QuantResearchPortfolioTest(unittest.TestCase):
         nav = simulate_target_weights(
             prices,
             targets,
-            open_trade_dates=open_dates(prices),
+            trade_calendar=open_dates(prices),
             cost=CostModel(buy_rate=0, sell_rate=0, slippage_rate=0),
         )
 
@@ -482,7 +567,7 @@ class QuantResearchPortfolioTest(unittest.TestCase):
             simulate_target_weights(
                 prices,
                 targets,
-                open_trade_dates=open_dates(prices),
+                trade_calendar=open_dates(prices),
                 cost=CostModel(buy_rate=0, sell_rate=0, slippage_rate=0),
             )
 
@@ -504,7 +589,7 @@ class QuantResearchPortfolioTest(unittest.TestCase):
         nav = simulate_target_weights(
             prices,
             targets,
-            open_trade_dates=open_dates(prices),
+            trade_calendar=open_dates(prices),
             cost=CostModel(buy_rate=0, sell_rate=0, slippage_rate=0),
         )
 
@@ -523,7 +608,7 @@ class QuantResearchPortfolioTest(unittest.TestCase):
         nav = simulate_target_weights(
             prices,
             targets,
-            open_trade_dates=open_dates(prices),
+            trade_calendar=open_dates(prices),
             cost=CostModel(buy_rate=0, sell_rate=0, slippage_rate=0),
         )
 
@@ -549,7 +634,7 @@ class QuantResearchPortfolioTest(unittest.TestCase):
         nav = simulate_target_weights(
             prices,
             targets,
-            open_trade_dates=open_dates(prices),
+            trade_calendar=open_dates(prices),
             cost=CostModel(buy_rate=0, sell_rate=0, slippage_rate=0),
         )
 
@@ -575,7 +660,7 @@ class QuantResearchPortfolioTest(unittest.TestCase):
         nav = simulate_target_weights(
             prices,
             targets,
-            open_trade_dates=open_dates(prices),
+            trade_calendar=open_dates(prices),
             cost=CostModel(buy_rate=0, sell_rate=0, slippage_rate=0),
         )
 
@@ -594,7 +679,7 @@ class QuantResearchPortfolioTest(unittest.TestCase):
         targets = formal_targets([{"signal_date": "2026-01-02", "ts_code": "A", "target_weight": 1.0}])
 
         with self.assertRaisesRegex(ValueError, "full_day_suspension|沿用证据"):
-            simulate_target_weights(prices, targets, open_trade_dates=open_dates(prices))
+            simulate_target_weights(prices, targets, trade_calendar=open_dates(prices))
 
     def test_missing_official_open_day_cannot_silently_delay_execution(self):
         prices = pd.DataFrame(
@@ -609,7 +694,22 @@ class QuantResearchPortfolioTest(unittest.TestCase):
             simulate_target_weights(
                 prices,
                 targets,
-                open_trade_dates=["2026-01-02", "2026-01-05", "2026-01-06"],
+                trade_calendar=calendar_for_dates(["2026-01-02", "2026-01-05", "2026-01-06"]),
+            )
+
+        with self.assertRaisesRegex(ValueError, "OpenTradeCalendar|裸交易日"):
+            simulate_target_weights(prices, targets, trade_calendar=["2026-01-02", "2026-01-06"])
+
+        full_records = [
+            {"exchange": "SSE", "cal_date": value, "is_open": True}
+            for value in ("2026-01-02", "2026-01-05", "2026-01-06")
+        ]
+        subset = [full_records[0], full_records[2]]
+        with self.assertRaisesRegex(ValueError, "source_artifact_sha256"):
+            build_open_trade_calendar(
+                subset,
+                source_artifact="snapshot://trade_calendars.csv.gz",
+                source_artifact_sha256=trade_calendar_content_sha256(full_records),
             )
 
     def test_formal_targets_require_nonempty_available_date(self):
@@ -625,7 +725,50 @@ class QuantResearchPortfolioTest(unittest.TestCase):
         ):
             with self.subTest(columns=targets.columns.tolist()):
                 with self.assertRaisesRegex(ValueError, "available_date"):
-                    simulate_target_weights(prices, targets, open_trade_dates=open_dates(prices))
+                    simulate_target_weights(prices, targets, trade_calendar=open_dates(prices))
+
+        numeric_date = pd.DataFrame(
+            [{"signal_date": "2026-01-02", "available_date": 0, "ts_code": "A", "target_weight": 1.0}]
+        )
+        with self.assertRaisesRegex(ValueError, "available_date"):
+            simulate_target_weights(prices, numeric_date, trade_calendar=open_dates(prices))
+
+    def test_target_dates_are_normalized_before_duplicate_and_total_checks(self):
+        prices = pd.DataFrame(
+            [
+                {"ts_code": code, "trade_date": trade_date, "adj_open": 10, "adj_close": 10, "is_buyable_at_open": True, "is_sellable_at_open": True}
+                for trade_date in ("2026-01-02", "2026-01-05")
+                for code in ("A", "B")
+            ]
+        )
+        duplicate = pd.DataFrame(
+            [
+                {"signal_date": "2026-01-02", "available_date": "2026-01-02", "ts_code": "A", "target_weight": 0.2},
+                {"signal_date": pd.Timestamp("2026-01-02"), "available_date": pd.Timestamp("2026-01-02"), "ts_code": "a", "target_weight": 0.8},
+            ]
+        )
+        with self.assertRaisesRegex(ValueError, "重复"):
+            simulate_target_weights(prices, duplicate, trade_calendar=open_dates(prices))
+
+        overweight = pd.DataFrame(
+            [
+                {"signal_date": "2026-01-02", "available_date": "2026-01-02", "ts_code": "A", "target_weight": 0.7},
+                {"signal_date": pd.Timestamp("2026-01-02"), "available_date": pd.Timestamp("2026-01-02"), "ts_code": "B", "target_weight": 0.7},
+            ]
+        )
+        with self.assertRaisesRegex(ValueError, "不能超过 1"):
+            simulate_target_weights(prices, overweight, trade_calendar=open_dates(prices))
+
+    def test_string_false_cannot_forge_carry_evidence(self):
+        prices = pd.DataFrame(
+            [
+                {"ts_code": "A", "trade_date": "2026-01-02", "adj_open": 10, "adj_close": 10, "is_buyable_at_open": True, "is_sellable_at_open": True, "is_valuation_carried": False, "valuation_carry_reason": "", "is_suspended": False, "is_suspended_at_open": False},
+                {"ts_code": "A", "trade_date": "2026-01-05", "adj_open": None, "adj_close": None, "is_buyable_at_open": False, "is_sellable_at_open": False, "is_valuation_carried": True, "valuation_carry_reason": "full_day_suspension", "is_suspended": "False", "is_suspended_at_open": "False"},
+            ]
+        )
+        targets = formal_targets([{"signal_date": "2026-01-02", "ts_code": "A", "target_weight": 1.0}])
+        with self.assertRaisesRegex(ValueError, "禁止字符串真值|必须是 bool"):
+            simulate_target_weights(prices, targets, trade_calendar=open_dates(prices))
 
     def test_rejects_feature_available_after_signal(self):
         prices = pd.DataFrame(
@@ -639,7 +782,7 @@ class QuantResearchPortfolioTest(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(ValueError, "available_date"):
-            simulate_target_weights(prices, targets, open_trade_dates=open_dates(prices))
+            simulate_target_weights(prices, targets, trade_calendar=open_dates(prices))
 
     def test_transaction_cost_reaches_exact_post_cost_target_without_repeat_churn(self):
         prices = pd.DataFrame(
@@ -656,7 +799,7 @@ class QuantResearchPortfolioTest(unittest.TestCase):
             ]
         )
 
-        nav = simulate_target_weights(prices, targets, open_trade_dates=open_dates(prices))
+        nav = simulate_target_weights(prices, targets, trade_calendar=open_dates(prices))
 
         self.assertLess(nav.iloc[1]["nav"], 1.0)
         self.assertAlmostEqual(nav.iloc[1]["gross_exposure"], 0.5, places=12)

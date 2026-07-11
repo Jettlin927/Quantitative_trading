@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from datetime import date, datetime
+from numbers import Integral, Real
 
 import pandas as pd
+
+from .calendar import OpenTradeCalendar, validate_open_trade_calendar
 
 
 @dataclass(frozen=True)
@@ -21,7 +24,7 @@ def simulate_target_weights(
     prices: pd.DataFrame,
     targets: pd.DataFrame,
     *,
-    open_trade_dates: Iterable[object],
+    trade_calendar: OpenTradeCalendar,
     initial_nav: float = 1.0,
     cost: CostModel | None = None,
 ) -> pd.DataFrame:
@@ -31,18 +34,13 @@ def simulate_target_weights(
     errors, while market constraints keep affected positions frozen and record
     the unfilled target instead of inventing fills.
     """
-    _validate_prices(prices)
-    _validate_targets(targets)
     if initial_nav <= 0:
         raise ValueError("initial_nav 必须大于 0")
 
-    price_frame = prices.copy()
-    target_frame = targets.copy()
-    price_frame["trade_date"] = pd.to_datetime(price_frame["trade_date"])
-    target_frame["signal_date"] = pd.to_datetime(target_frame["signal_date"])
-    target_frame["available_date"] = pd.to_datetime(target_frame["available_date"])
+    price_frame = _normalize_prices(prices)
+    target_frame = _normalize_targets(targets)
     price_frame = price_frame.sort_values(["trade_date", "ts_code"]).reset_index(drop=True)
-    trade_dates = list(_validate_open_trade_calendar(price_frame, target_frame, open_trade_dates))
+    trade_dates = list(_validate_open_trade_calendar(price_frame, target_frame, trade_calendar))
     schedule = _schedule_targets(target_frame, trade_dates)
     cost_model = cost or CostModel()
 
@@ -56,9 +54,9 @@ def simulate_target_weights(
         day = price_frame[price_frame["trade_date"] == trade_date].set_index("ts_code")
         open_prices = pd.to_numeric(day["adj_open"], errors="coerce").to_dict()
         close_prices = pd.to_numeric(day["adj_close"], errors="coerce").to_dict()
-        buyable = day["is_buyable_at_open"].fillna(False).astype(bool).to_dict()
-        sellable = day["is_sellable_at_open"].fillna(False).astype(bool).to_dict()
-        carried = day.get("is_valuation_carried", pd.Series(False, index=day.index)).fillna(False).astype(bool).to_dict()
+        buyable = day["is_buyable_at_open"].to_dict()
+        sellable = day["is_sellable_at_open"].to_dict()
+        carried = day.get("is_valuation_carried", pd.Series(False, index=day.index)).to_dict()
         carried_valuation_count = 0
         for symbol, should_carry in carried.items():
             if should_carry and symbol in previous_close and previous_close[symbol] > 0:
@@ -245,13 +243,9 @@ def _plan_rebalance(
 def _validate_open_trade_calendar(
     prices: pd.DataFrame,
     targets: pd.DataFrame,
-    open_trade_dates: Iterable[object],
+    trade_calendar: OpenTradeCalendar,
 ) -> pd.DatetimeIndex:
-    raw_dates = list(open_trade_dates)
-    parsed = pd.DatetimeIndex(pd.to_datetime(raw_dates, errors="coerce"))
-    if parsed.isna().any() or parsed.empty:
-        raise ValueError("官方开市交易日历不能为空或包含无效日期")
-    calendar = parsed.drop_duplicates().sort_values()
+    calendar = validate_open_trade_calendar(trade_calendar)
     price_dates = pd.DatetimeIndex(prices["trade_date"].drop_duplicates())
     outside = price_dates.difference(calendar)
     if not outside.empty:
@@ -268,7 +262,7 @@ def _validate_open_trade_calendar(
     return calendar
 
 
-def _validate_prices(prices: pd.DataFrame) -> None:
+def _normalize_prices(prices: pd.DataFrame) -> pd.DataFrame:
     required = {
         "ts_code",
         "trade_date",
@@ -282,44 +276,95 @@ def _validate_prices(prices: pd.DataFrame) -> None:
         raise ValueError(f"价格数据缺少字段：{', '.join(missing)}")
     if prices.empty:
         raise ValueError("价格数据为空")
-    if prices.duplicated(["ts_code", "trade_date"]).any():
+    frame = prices.copy()
+    frame["trade_date"] = _strict_date_series(frame["trade_date"], "价格 trade_date")
+    frame["ts_code"] = frame["ts_code"].astype(str).str.strip().str.upper()
+    if frame["ts_code"].eq("").any():
+        raise ValueError("价格数据 ts_code 不能为空")
+    if frame.duplicated(["ts_code", "trade_date"]).any():
         raise ValueError("价格数据存在重复的 ts_code + trade_date")
-    if "is_valuation_carried" in prices.columns:
+    for column in ("is_buyable_at_open", "is_sellable_at_open"):
+        frame[column] = _strict_bool_series(frame[column], column, allow_null=False)
+    if "is_valuation_carried" in frame.columns:
         evidence_columns = {"valuation_carry_reason", "is_suspended", "is_suspended_at_open"}
-        missing_evidence = sorted(evidence_columns - set(prices.columns))
+        missing_evidence = sorted(evidence_columns - set(frame.columns))
         if missing_evidence:
             raise ValueError("估值沿用缺少 full_day_suspension 证据")
-        carried = prices["is_valuation_carried"].fillna(False).astype(bool)
-        reasons = prices["valuation_carry_reason"].fillna("").astype(str)
-        suspended = prices["is_suspended"].fillna(False).astype(bool)
-        suspended_at_open = prices["is_suspended_at_open"].fillna(False).astype(bool)
+        carried = _strict_bool_series(frame["is_valuation_carried"], "is_valuation_carried", allow_null=True)
+        reasons = frame["valuation_carry_reason"].fillna("").astype(str)
+        suspended = _strict_bool_series(frame["is_suspended"], "is_suspended", allow_null=True)
+        suspended_at_open = _strict_bool_series(frame["is_suspended_at_open"], "is_suspended_at_open", allow_null=True)
         invalid = carried & ((reasons != "full_day_suspension") | ~suspended | ~suspended_at_open)
         orphan_reason = ~carried & reasons.ne("")
         if invalid.any() or orphan_reason.any():
             raise ValueError("估值沿用必须有 full_day_suspension 证据")
+        frame["is_valuation_carried"] = carried
+        frame["is_suspended"] = suspended
+        frame["is_suspended_at_open"] = suspended_at_open
+    return frame
 
 
-def _validate_targets(targets: pd.DataFrame) -> None:
+def _normalize_targets(targets: pd.DataFrame) -> pd.DataFrame:
     required = {"signal_date", "available_date", "ts_code", "target_weight"}
     missing = sorted(required - set(targets.columns))
     if missing:
         raise ValueError(f"目标权重缺少字段：{', '.join(missing)}")
-    if targets.duplicated(["signal_date", "ts_code"]).any():
+    frame = targets.copy()
+    frame["signal_date"] = _strict_date_series(frame["signal_date"], "signal_date")
+    frame["available_date"] = _strict_date_series(frame["available_date"], "available_date")
+    frame["ts_code"] = frame["ts_code"].astype(str).str.strip().str.upper()
+    if frame["ts_code"].eq("").any():
+        raise ValueError("目标权重 ts_code 不能为空")
+    if frame.duplicated(["signal_date", "ts_code"]).any():
         raise ValueError("目标权重存在重复的 signal_date + ts_code")
-    numeric = pd.to_numeric(targets["target_weight"], errors="coerce")
+    numeric = pd.to_numeric(frame["target_weight"], errors="coerce")
     if numeric.isna().any() or (numeric < 0).any():
         raise ValueError("目标权重必须是非负数")
-    totals = targets.assign(target_weight=numeric).groupby("signal_date")["target_weight"].sum()
+    frame["target_weight"] = numeric
+    totals = frame.groupby("signal_date")["target_weight"].sum()
     if (totals > 1 + 1e-9).any():
         raise ValueError("同一信号日目标权重之和不能超过 1")
-    available_dates = pd.to_datetime(targets["available_date"], errors="coerce")
-    signal_dates = pd.to_datetime(targets["signal_date"], errors="coerce")
-    if available_dates.isna().any():
-        raise ValueError("正式目标权重的 available_date 不能为空")
-    if signal_dates.isna().any():
-        raise ValueError("目标权重的 signal_date 无效")
-    if (available_dates > signal_dates).any():
+    if (frame["available_date"] > frame["signal_date"]).any():
         raise ValueError("目标权重使用了信号日之后才可得的 available_date")
+    return frame
+
+
+def _strict_date_series(values: pd.Series, label: str) -> pd.Series:
+    normalized: list[pd.Timestamp] = []
+    for value in values:
+        if value is None or pd.isna(value) or isinstance(value, bool) or isinstance(value, Real):
+            raise ValueError(f"{label} 必须是非空 YYYY-MM-DD 日期")
+        if isinstance(value, datetime):
+            parsed = value.date()
+        elif isinstance(value, date):
+            parsed = value
+        elif isinstance(value, str):
+            try:
+                parsed = date.fromisoformat(value.strip())
+            except ValueError as exc:
+                raise ValueError(f"{label} 必须是 YYYY-MM-DD 日期") from exc
+        else:
+            raise ValueError(f"{label} 必须是 YYYY-MM-DD 日期")
+        normalized.append(pd.Timestamp(parsed))
+    return pd.Series(normalized, index=values.index, dtype="datetime64[ns]")
+
+
+def _strict_bool_series(values: pd.Series, label: str, *, allow_null: bool) -> pd.Series:
+    normalized: list[bool] = []
+    for value in values:
+        if value is None or pd.isna(value):
+            if allow_null:
+                normalized.append(False)
+                continue
+            raise ValueError(f"{label} 不能为空")
+        if isinstance(value, bool) or type(value).__name__ == "bool_":
+            normalized.append(bool(value))
+            continue
+        if isinstance(value, Integral) and not isinstance(value, bool) and value in {0, 1}:
+            normalized.append(bool(value))
+            continue
+        raise ValueError(f"{label} 必须是 bool 或 0/1，禁止字符串真值")
+    return pd.Series(normalized, index=values.index, dtype=bool)
 
 
 def _require_held_prices(

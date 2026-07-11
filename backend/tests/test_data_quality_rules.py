@@ -7,6 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+import pandas as pd
 from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -261,6 +262,16 @@ class DataQualityRulesTest(unittest.TestCase):
         provenance = next(result for result in missing_provenance if result.rule_id == "universe.provenance")
         self.assertEqual(provenance.status, "blocked")
         self.assertEqual(provenance.failed_rows, 2)
+
+        fake_source = self.evaluate(self.contract(universe_source="/definitely/not/a/real.csv"))
+        fake_provenance = next(result for result in fake_source if result.rule_id == "universe.provenance")
+        self.assertEqual(fake_provenance.status, "blocked")
+        self.assertEqual(fake_provenance.sample_issues[0]["issue"], "universe_source_file_missing")
+
+        invalid_as_of = self.evaluate(self.contract(universe_as_of_date=pd.NaT))
+        invalid_provenance = next(result for result in invalid_as_of if result.rule_id == "universe.provenance")
+        self.assertEqual(invalid_provenance.status, "blocked")
+        self.assertIn("universe_as_of_date_invalid", {item["issue"] for item in invalid_provenance.sample_issues})
 
         future_snapshot = self.evaluate(self.contract(universe_as_of_date=date(2026, 1, 5)))
         future = next(result for result in future_snapshot if result.rule_id == "universe.provenance")
@@ -611,6 +622,8 @@ class DataQualityRegistryAndReadinessTest(unittest.TestCase):
                 "benchmark": "000300.SH",
                 "universeType": "explicit_snapshot",
                 "universeSource": "fixture",
+                "universeSourceSha256": "c" * 64,
+                "universeSourceVerified": True,
                 "universeAsOfDate": "2026-01-02",
             },
             summary={"limitations": ["static_current_universe"]},
