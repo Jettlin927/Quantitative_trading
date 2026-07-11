@@ -6,20 +6,23 @@
 
 ## 一句话架构
 
-本仓库是本地量化数据与离线研究工作台：React/Vite 前端负责只读展示，FastAPI 后端负责 Tushare 同步、美股 sample 文件入库和 DB 查询，PostgreSQL 负责持久化，`backend/app/quant_research/` 负责无实盘副作用的统一研究协议。
+本仓库是本地量化数据与离线研究工作台：React/Vite 前端负责只读展示，FastAPI 后端负责入队、查询和 Tushare 数据适配，独立 worker 执行持久同步任务，PostgreSQL 负责业务数据、质量运行、快照和任务状态，`backend/app/quant_research/` 负责无实盘副作用的统一研究协议与可复现运行。
 
 ```text
 人类/AI Agent
   -> frontend/ React 数据工作台，或直接调用 http://localhost:18000 API
-  -> backend/app/main.py FastAPI 数据路由
+  -> backend/app/main.py FastAPI 数据路由与持久任务入队
+  -> backend/app/sync_worker.py PostgreSQL 租约 worker
   -> backend/app/models.py SQLAlchemy schema
   -> PostgreSQL 本地数据
-  -> backend/app/quant_research/ 严格数据集、组合模拟、评估与复现协议
+  -> backend/app/data_quality/ 研究范围级完整性门禁
+  -> backend/app/quant_research/ 严格数据集、冻结快照、组合模拟、评估与复现协议
 ```
 
 ## 启动入口
 
-- `docker-compose.yml`：三容器入口，服务名是 `db`、`api`、`frontend`。
+- `docker-compose.yml`：四容器入口，服务名是 `db`、`api`、`worker`、`frontend`；研究产物使用独立命名 volume。
+- `docker-compose.test.yml`：PostgreSQL 16 tmpfs 测试入口，不挂载日常数据库 volume。
 - `启动数据工作台.cmd`：日常启动，只应 `docker compose up -d`。
 - `重新构建并启动数据工作台.cmd`：改 Dockerfile、依赖或代码后使用。
 - `停止数据工作台.cmd`：停止服务。
@@ -31,6 +34,7 @@
 
 - `backend/app/database.py`
   - SQLAlchemy engine、`SessionLocal`、`Base`、`get_db()`。
+  - Alembic revision 检查、冻结 schema fingerprint 和既有库安全 `stamp-existing`；应用启动只校验 head，不自动迁移。
   - 默认本地 `DATABASE_URL` 只作开发兜底；容器内由 Compose 注入。
 
 - `backend/app/models.py`
@@ -50,8 +54,12 @@
   - `WatchlistItem`：美股 sample 观察池，`watchlist_name + asset_natural_key` 唯一。
   - `PortfolioSnapshot`：美股 sample 持仓快照，`snapshot_id` 唯一，`holdings` 为 JSON。
   - `DataSyncRun`：单个同步接口的执行记录。
-  - `DataSyncJob`：前端和定时任务使用的持久化异步任务，`active_key` 防止同参数任务重复排队。
+  - `DataSyncJob`：持久异步任务；含 `active_key`、尝试上限、退避、lease owner/expiry 和 heartbeat。
+  - `SyncWorkerHeartbeat`：独立 worker 的代码提交、进程起点、当前任务和最近心跳。
   - `DataOverviewSnapshot`：千万级表精确覆盖矩阵的持久化快照，避免每次打开页面重复全表聚合。
+  - `DataQualityRun` / `DataQualityResult`：研究范围、日期、universe、规则结果和质量状态的审计登记。
+  - `DataSnapshot`：冻结输入切片及每张表的 canonical artifact/hash 登记。
+  - `ResearchRun`：代码、配置、环境、快照、checkpoint、结果指纹和中断状态登记。
 
 - `backend/app/schemas.py`
   - Pydantic 请求/响应模型。
@@ -68,8 +76,18 @@
 
 - `backend/app/main.py`
   - FastAPI 应用入口。
-  - 包含 A 股/指数/ETF/行业 Tushare 同步、异步任务提交/执行/轮询、DB overview、研究 readiness、股票池 CRUD、美股 sample import preview/import 和 DB overview。
+  - 包含 A 股/指数/ETF/行业 Tushare 同步适配、持久任务提交/轮询、DB overview、质量运行/readiness、股票池 CRUD、美股 sample import preview/import 和 DB overview。
+  - API 只入队，不在请求进程里执行长同步；启动时 revision 落后会明确失败。
   - 文件较长，先用函数名定位，不要盲目大改。
+
+- `backend/app/sync_worker.py`
+  - 使用 `FOR UPDATE SKIP LOCKED` 领取任务，独立短事务续租/心跳，过期租约可由新 worker 接管。
+  - 语义为 at-least-once；幂等依赖各表自然键 upsert，永久错误和重试耗尽会进入最终失败。
+
+- `backend/app/data_quality/`
+  - `contracts.py`：scope、universe、日期、数据集与状态合同。
+  - `rules.py`：schema、唯一性、domain、引用、日历覆盖、复权、OHLCV、新鲜度和基准重叠规则。
+  - `runner.py`：PostgreSQL `REPEATABLE READ READ ONLY` 执行、statement timeout、规则登记和 `ready/ready_with_warnings/blocked/failed` 分流。
 
 - `backend/app/quant_research/`
   - 信任边界以 `docs/research/quant-foundation-trust-contract.md` 为准；新 loader、特征、模拟器和 runner 必须先满足其 quality scope、宇宙血缘和时点可得合同。
@@ -79,7 +97,11 @@
   - `metrics.py`：绝对和基准相对指标。
   - `validation.py`：anchored/rolling walk-forward 窗口。
   - `manifest.py`：run id、参数哈希、Git commit、数据快照和研究边界。
-  - `readiness.py`：ETF 时间序列与 A 股横截面研究的 `ready/blocked` 门禁。
+  - `run_config.py`：canonical 配置、环境和可复现键。
+  - `snapshot.py` / `artifacts.py`：只读一致性切片、canonical CSV.gz、容量门禁、SHA-256 和原子完成语义。
+  - `runner.py`：质量门禁、快照、目标、模拟、指标、manifest、finalize 的 hash-chain checkpoint；支持 stale `running`→`interrupted` 和严格 `--resume`。
+  - `baselines.py`：仅用于管线验收、无参数搜索和无收益主张的单 ETF sentinel。
+  - `readiness.py`：inventory 与基于质量运行 ID 的研究级 readiness 分层。
 
 - `backend/tests/fixtures/quant_research_golden/`
   - 完全合成的 2 股票 + 1 ETF + 1 指数、15 交易日黄金夹具。
@@ -87,7 +109,13 @@
 
 - `backend/tests/test_quant_trust_contract.py`
   - 验证黄金夹具的稳定排序、边界事件、下一交易日执行和固定产物。
-  - Phase 0 用 `expectedFailure` 锁定当前已知的区间末复权锚定和公告日同日可见问题；Phase 2 修复后改为普通断言。
+  - 区间末复权锚定和公告日同日可见问题已修复，当前都是必须正常通过的硬断言。
+
+- `backend/tests/test_research_snapshot*.py` / `test_research_reproduction.py` / `test_research_resume.py`
+  - 验证一致性快照、跨产物根复用、在线库变更后的离线重现、归档篡改拒绝，以及 snapshot/simulation/finalize 中断续跑。
+
+- `backend/tests/test_sync_worker*.py`
+  - 验证双 worker 排他领取、租约过期接管、重试上限、旧 owner 失效和 PostgreSQL 自然键零重复。
 
 ## 主要 API
 
@@ -114,7 +142,9 @@
 - `GET /api/daily-bars`：读取单票原始日线。
 - `GET /api/stocks/{ts_code}/fundamentals`：读取单票基本面概览。
 - `GET /api/stock-listings`、`/api/stocks/{ts_code}/limit-prices`、`suspend-events`：读取研究所需历史状态。
-- `GET /api/research/readiness`：检查指定研究类型是否具备关键表和有效数据。
+- `GET /api/research/readiness`：只返回 inventory 级状态，不能代表某个研究切片 ready。
+- `POST /api/data-quality/runs`、`GET /api/data-quality/runs/{id}`：执行/读取研究范围级质量门禁。
+- `GET /api/research/readiness/{quality_run_id}`：读取绑定 quality run 的研究级 readiness。
 - `GET /api/us-research/overview`：读取美股 sample 文件预览。
 - `GET /api/us-research/import-preview`：预览美股 sample 文件将 upsert 到哪些表。
 - `POST /api/us-research/import-sample`：将 sample 数据 upsert 到 DB。
@@ -136,8 +166,12 @@
 ## 运维与回补
 
 - `scripts/ops/backfill_a_share_history.py`：默认从 2012 年开始的可续跑历史回补；具备覆盖检查、checkpoint、重试、限速、dry-run 和小批量验证参数。
-- `scripts/ops/sync_today_market_data.sh`：提交 `daily_market` 异步任务并轮询完成，再补当日财务指标。
+- `scripts/ops/sync_today_market_data.sh`：`flock` 互斥；先持久同步交易日历，再提交/轮询 `daily_market` 和财务任务，刷新 overview 后执行最新交易日质量门禁。
 - `scripts/ops/install_daily_sync_cron.sh`：安装 `CRON_TZ=Asia/Shanghai` 的 20:30 日更任务。
+- `scripts/ops/test_postgres_integration.sh`：启动 PostgreSQL 16 tmpfs，自动发现全部后端测试并在退出时清理容器/网络。
+- `scripts/research/check_data_quality.py`：研究范围质量 CLI，`blocked=2`、`failed=3`。
+- `scripts/research/run_quant_research.py`：新运行或 `--resume RUN_ID`；正式运行要求 `APP_GIT_COMMIT`。
+- `scripts/research/reproduce_quant_research.py`：只读冻结输入离线重现，不访问在线行情库。
 
 ## my_quant 地图
 
@@ -193,6 +227,12 @@
 ```powershell
 python -m py_compile backend\app\database.py backend\app\models.py backend\app\schemas.py backend\app\tushare_client.py backend\app\us_research.py backend\app\main.py backend\app\quant_research\dataset.py backend\app\quant_research\repository.py backend\app\quant_research\portfolio.py backend\app\quant_research\metrics.py backend\app\quant_research\validation.py backend\app\quant_research\manifest.py backend\app\quant_research\readiness.py
 python -m unittest discover backend\tests -v
+```
+
+在 Git Bash、WSL、macOS 或 Linux 运行完整 PostgreSQL 16 隔离矩阵：
+
+```bash
+scripts/ops/test_postgres_integration.sh
 ```
 
 Compose 检查：
