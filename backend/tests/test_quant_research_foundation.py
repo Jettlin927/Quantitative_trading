@@ -525,8 +525,10 @@ class QuantResearchEvaluationTest(unittest.TestCase):
         etf = evaluate_research_readiness("etf_time_series", available, counts)
         stocks = evaluate_research_readiness("a_share_cross_section", available, counts)
 
-        self.assertEqual(etf["status"], "ready")
-        self.assertEqual(stocks["status"], "blocked")
+        self.assertEqual(etf["level"], "inventory")
+        self.assertEqual(etf["status"], "inventory_available")
+        self.assertFalse(etf["researchReady"])
+        self.assertEqual(stocks["status"], "inventory_incomplete")
         self.assertIn("stock_listings", stocks["missingTables"])
         self.assertIn("stock_limit_prices", stocks["missingTables"])
 

@@ -23,6 +23,9 @@ from .models import (
     Asset,
     AssetDailyPrice,
     DataOverviewSnapshot,
+    DataQualityResult,
+    DataQualityRun,
+    DataSnapshot,
     DataSyncJob,
     DataSyncRun,
     Fund,
@@ -48,6 +51,7 @@ from .models import (
 )
 from .schemas import (
     DailyBarOut,
+    DataQualityRunRequest,
     StockFundamentalsOut,
     StockOut,
     StockPoolCreate,
@@ -72,7 +76,9 @@ from .schemas import (
     SyncSuspendEventsRequest,
     SyncTradeCalendarRequest,
 )
-from .quant_research.readiness import evaluate_research_readiness
+from .data_quality.contracts import QualityCheckContract
+from .data_quality.runner import list_quality_results, quality_run_to_dict, run_data_quality_check
+from .quant_research.readiness import evaluate_quality_run_readiness, evaluate_research_readiness
 from .tushare_client import decimal_or_none, get_pro_api, parse_tushare_date, tushare_date
 from .us_research import build_us_research_import_preview, build_us_research_overview
 from .strategy_results import build_strategy_results_overview
@@ -1017,6 +1023,42 @@ def get_research_readiness(scope: str = "a_share_cross_section", db: Session = D
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@app.post("/api/data-quality/runs", status_code=201)
+def create_data_quality_run(payload: DataQualityRunRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    try:
+        contract = QualityCheckContract.create(
+            scope=payload.scope,
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+            universe=payload.universe,
+            universe_type=payload.universe_type,
+            universe_source=payload.universe_source,
+            universe_as_of_date=payload.universe_as_of_date,
+            required_datasets=payload.required_datasets,
+            benchmark=payload.benchmark,
+            statement_timeout_ms=payload.statement_timeout_ms,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return run_data_quality_check(db, contract, code_commit=payload.code_commit)
+
+
+@app.get("/api/data-quality/runs/{quality_run_id}")
+def get_data_quality_run(quality_run_id: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+    run = db.get(DataQualityRun, quality_run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="数据质量运行不存在")
+    return quality_run_to_dict(run, list_quality_results(db, quality_run_id))
+
+
+@app.get("/api/research/readiness/{quality_run_id}")
+def get_research_readiness_by_quality_run(quality_run_id: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+    run = db.get(DataQualityRun, quality_run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="数据质量运行不存在")
+    return evaluate_quality_run_readiness(run, list_quality_results(db, quality_run_id))
+
+
 def get_table_counts(db: Session) -> dict[str, int]:
     return {
         "stocks": db.scalar(select(func.count(Stock.ts_code))) or 0,
@@ -1044,6 +1086,9 @@ def get_table_counts(db: Session) -> dict[str, int]:
         "dataSyncRuns": db.scalar(select(func.count(DataSyncRun.id))) or 0,
         "dataSyncJobs": db.scalar(select(func.count(DataSyncJob.id))) or 0,
         "dataOverviewSnapshots": db.scalar(select(func.count(DataOverviewSnapshot.key))) or 0,
+        "dataQualityRuns": db.scalar(select(func.count(DataQualityRun.id))) or 0,
+        "dataQualityResults": db.scalar(select(func.count(DataQualityResult.id))) or 0,
+        "dataSnapshots": db.scalar(select(func.count(DataSnapshot.snapshot_id))) or 0,
     }
 
 
