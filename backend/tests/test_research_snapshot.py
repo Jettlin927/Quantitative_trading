@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -18,8 +19,7 @@ from backend.app.quant_research.snapshot import (
     freeze_input_snapshot,
     verify_snapshot,
 )
-from backend.app.quant_research.artifacts import write_canonical_csv_gz
-from backend.app.quant_research.artifacts import read_canonical_csv_gz
+from backend.app.quant_research.artifacts import NULL_VALUE, canonical_cell, read_canonical_csv_gz, write_canonical_csv_gz
 from backend.app.quant_research.run_config import canonical_sha256
 from backend.tests.research_test_support import create_golden_database, golden_run_config
 
@@ -86,6 +86,34 @@ class ResearchSnapshotTest(unittest.TestCase):
                     rows=rows,
                     natural_key=("ts_code",),
                 )
+
+    def test_canonical_null_is_unambiguous_in_round_trip_and_hash(self):
+        null_path = Path(self.tmp.name) / "null.csv.gz"
+        empty_path = Path(self.tmp.name) / "empty.csv.gz"
+        null_artifact = write_canonical_csv_gz(
+            null_path,
+            columns=("id", "note"),
+            rows=[{"id": "A", "note": None}],
+            natural_key=("id",),
+        )
+        empty_artifact = write_canonical_csv_gz(
+            empty_path,
+            columns=("id", "note"),
+            rows=[{"id": "A", "note": ""}],
+            natural_key=("id",),
+        )
+
+        self.assertNotEqual(null_artifact["contentSha256"], empty_artifact["contentSha256"])
+        self.assertTrue(pd.isna(read_canonical_csv_gz(null_path).iloc[0]["note"]))
+        self.assertEqual(read_canonical_csv_gz(empty_path).iloc[0]["note"], "")
+        self.assertEqual(canonical_cell(None), NULL_VALUE)
+        with self.assertRaisesRegex(ValueError, "null 哨兵"):
+            write_canonical_csv_gz(
+                Path(self.tmp.name) / "literal-sentinel.csv.gz",
+                columns=("id", "note"),
+                rows=[{"id": "A", "note": NULL_VALUE}],
+                natural_key=("id",),
+            )
 
     def test_corrupted_input_is_rejected(self):
         with Session(self.engine) as db:

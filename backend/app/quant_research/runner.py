@@ -591,6 +591,7 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
         raise SnapshotIntegrityError("manifest randomSeed 与 config 不一致")
 
     expected = manifest["artifactHashes"]
+    _validate_manifest_input_artifacts(expected, table_artifacts)
     if build_result_fingerprint(expected) != manifest.get("resultFingerprint"):
         raise SnapshotIntegrityError("manifest resultFingerprint 与产物哈希不一致")
     for name in ("targets.csv.gz", "nav.csv.gz"):
@@ -607,6 +608,7 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
     limitations = _read_json(run_path / "limitations.json", "limitations.json")
     if quality != manifest.get("qualityRun") or limitations != manifest.get("limitations"):
         raise SnapshotIntegrityError("归档审计产物与 manifest 不一致")
+    _validate_archive_checkpoint_chain(run_path, manifest)
     return manifest, config
 
 
@@ -999,6 +1001,174 @@ def _artifact_content_hashes(artifacts: dict[str, dict[str, Any]]) -> dict[str, 
         name: str(artifact["contentSha256"])
         for name, artifact in sorted(artifacts.items())
     }
+
+
+def _validate_manifest_input_artifacts(
+    artifact_hashes: Any,
+    table_artifacts: Any,
+) -> None:
+    if (
+        not isinstance(artifact_hashes, dict)
+        or not isinstance(table_artifacts, dict)
+        or any(not isinstance(artifact, dict) for artifact in artifact_hashes.values())
+    ):
+        raise SnapshotIntegrityError("manifest 输入 artifact 元数据结构无效")
+    expected_inputs: dict[str, dict[str, Any]] = {}
+    for table_name, artifact in table_artifacts.items():
+        if not isinstance(table_name, str) or not isinstance(artifact, dict):
+            raise SnapshotIntegrityError("manifest 输入 artifact 元数据结构无效")
+        filename = artifact.get("filename")
+        if not isinstance(filename, str) or not filename:
+            raise SnapshotIntegrityError("manifest 输入 artifact 元数据缺少 filename")
+        archive_name = f"inputs/{Path(filename).name}"
+        if archive_name in expected_inputs:
+            raise SnapshotIntegrityError("manifest 输入 artifact 文件名重复")
+        expected_inputs[archive_name] = artifact
+
+    required_outputs = {
+        "quality.json",
+        "targets.csv.gz",
+        "nav.csv.gz",
+        "metrics.json",
+        "limitations.json",
+    }
+    if set(artifact_hashes) != set(expected_inputs) | required_outputs:
+        raise SnapshotIntegrityError("manifest 输入 artifact 元数据集合与冻结输入不一致")
+    actual_inputs = {
+        name: artifact_hashes[name]
+        for name in expected_inputs
+    }
+    if actual_inputs != expected_inputs:
+        raise SnapshotIntegrityError("manifest 输入 artifact 元数据与 dataSnapshot.tableArtifacts 不一致")
+
+
+def _validate_archive_checkpoint_chain(run_path: Path, manifest: dict[str, Any]) -> None:
+    try:
+        index = _read_json(run_path / "checkpoints" / "index.json", "checkpoint index")
+        if (
+            not isinstance(index, dict)
+            or index.get("schemaVersion") != CHECKPOINT_SCHEMA_VERSION
+            or index.get("runId") != manifest["runId"]
+            or not isinstance(index.get("completed"), list)
+        ):
+            raise ResumeIntegrityError("checkpoint index 身份或 schema 无效")
+        entries = index["completed"]
+        if not all(isinstance(entry, dict) for entry in entries):
+            raise ResumeIntegrityError("checkpoint index 条目无效")
+        completed_names = [entry.get("stage") for entry in entries]
+        if completed_names not in (list(STAGES[:-1]), list(STAGES)):
+            raise ResumeIntegrityError("归档 checkpoint 必须完整到 manifest 或 finalize")
+
+        checkpoints: dict[str, dict[str, Any]] = {}
+        previous_hash = None
+        for entry in entries:
+            stage = str(entry["stage"])
+            checkpoint_path = run_path / "checkpoints" / f"{stage}.json"
+            actual_hash = sha256_file(checkpoint_path)
+            if entry.get("contentSha256") != actual_hash:
+                raise ResumeIntegrityError(f"checkpoint hash 不一致：{stage}")
+            document = _read_json(checkpoint_path, f"checkpoint {stage}")
+            if (
+                not isinstance(document, dict)
+                or document.get("schemaVersion") != CHECKPOINT_SCHEMA_VERSION
+                or document.get("runId") != manifest["runId"]
+                or document.get("stage") != stage
+                or document.get("previousCheckpointSha256") != previous_hash
+                or not isinstance(document.get("inputs"), dict)
+                or not isinstance(document.get("outputs"), dict)
+                or document.get("identity") != _archive_checkpoint_identity(manifest, stage)
+            ):
+                raise ResumeIntegrityError(f"checkpoint 合同或身份无效：{stage}")
+            document["checkpointSha256"] = actual_hash
+            checkpoints[stage] = document
+            previous_hash = actual_hash
+
+        _validate_archive_checkpoint_artifacts(run_path, manifest, checkpoints)
+    except SnapshotIntegrityError:
+        raise
+    except (ArtifactIntegrityError, ResumeError, OSError, KeyError, TypeError, ValueError) as exc:
+        raise SnapshotIntegrityError(f"归档 checkpoint 链无效：{exc}") from exc
+
+
+def _archive_checkpoint_identity(manifest: dict[str, Any], stage: str) -> dict[str, Any]:
+    include_snapshot = stage != "quality_gate"
+    return {
+        "configSha256": manifest["configSha256"],
+        "codeCommit": manifest["codeCommit"],
+        "environmentSha256": manifest["environment"]["sha256"],
+        "randomSeed": manifest["randomSeed"],
+        "dataSnapshotId": manifest["dataSnapshot"]["snapshotId"] if include_snapshot else None,
+        "reproducibilityKey": manifest["reproducibilityKey"] if include_snapshot else None,
+    }
+
+
+def _validate_archive_checkpoint_artifacts(
+    run_path: Path,
+    manifest: dict[str, Any],
+    checkpoints: dict[str, dict[str, Any]],
+) -> None:
+    artifact_hashes = manifest["artifactHashes"]
+    table_artifacts = manifest["dataSnapshot"]["tableArtifacts"]
+    quality = _checkpoint_artifact(checkpoints, "quality_gate", "quality")
+    if (
+        checkpoints["quality_gate"]["inputs"].get("config")
+        != _json_file_artifact(run_path / "config.json")
+        or quality != artifact_hashes["quality.json"]
+    ):
+        raise ResumeIntegrityError("quality checkpoint 与归档不一致")
+
+    snapshot = checkpoints["input_snapshot"]
+    snapshot_outputs = snapshot["outputs"]
+    if (
+        snapshot["inputs"].get("quality") != quality
+        or snapshot_outputs.get("snapshotId") != manifest["dataSnapshot"]["snapshotId"]
+        or snapshot_outputs.get("reproducibilityKey") != manifest["reproducibilityKey"]
+        or snapshot_outputs.get("tableArtifacts") != table_artifacts
+    ):
+        raise ResumeIntegrityError("input_snapshot checkpoint 与归档冻结输入不一致")
+
+    targets = _checkpoint_artifact(checkpoints, "features_targets", "targets")
+    feature_inputs = checkpoints["features_targets"]["inputs"]
+    if (
+        feature_inputs.get("snapshotId") != manifest["dataSnapshot"]["snapshotId"]
+        or feature_inputs.get("tableContentSha256") != _table_content_hashes(table_artifacts)
+        or targets != artifact_hashes["targets.csv.gz"]
+    ):
+        raise ResumeIntegrityError("features_targets checkpoint 与归档不一致")
+
+    nav = _checkpoint_artifact(checkpoints, "simulation", "nav")
+    if (
+        checkpoints["simulation"]["inputs"].get("targets") != targets
+        or nav != artifact_hashes["nav.csv.gz"]
+    ):
+        raise ResumeIntegrityError("simulation checkpoint 与归档不一致")
+
+    metrics = _checkpoint_artifact(checkpoints, "metrics", "metrics")
+    limitations = _checkpoint_artifact(checkpoints, "metrics", "limitations")
+    if (
+        checkpoints["metrics"]["inputs"].get("nav") != nav
+        or metrics != artifact_hashes["metrics.json"]
+        or limitations != artifact_hashes["limitations.json"]
+    ):
+        raise ResumeIntegrityError("metrics checkpoint 与归档不一致")
+
+    manifest_checkpoint = checkpoints["manifest"]
+    manifest_artifact = _checkpoint_artifact(checkpoints, "manifest", "manifest")
+    if (
+        manifest_checkpoint["inputs"].get("artifactContentSha256")
+        != _artifact_content_hashes(artifact_hashes)
+        or manifest_checkpoint["outputs"].get("resultFingerprint") != manifest["resultFingerprint"]
+        or manifest_artifact != _json_file_artifact(run_path / "manifest.json")
+    ):
+        raise ResumeIntegrityError("manifest checkpoint 与归档不一致")
+
+    if "finalize" in checkpoints:
+        finalize = checkpoints["finalize"]
+        if (
+            finalize["inputs"].get("manifest") != manifest_artifact
+            or finalize["outputs"].get("resultFingerprint") != manifest["resultFingerprint"]
+        ):
+            raise ResumeIntegrityError("finalize checkpoint 与归档不一致")
 
 
 def _json_file_artifact(path: Path) -> dict[str, str]:

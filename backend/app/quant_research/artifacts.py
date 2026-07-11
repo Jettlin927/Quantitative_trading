@@ -41,7 +41,10 @@ def canonical_cell(value: Any) -> str:
         if not math.isfinite(value):
             return NULL_VALUE
         return format(value, ".17g")
-    return str(value)
+    rendered = str(value)
+    if rendered == NULL_VALUE:
+        raise ValueError(f"canonical CSV 字符串不能等于 null 哨兵 {NULL_VALUE!r}")
+    return rendered
 
 
 def write_canonical_csv_gz(

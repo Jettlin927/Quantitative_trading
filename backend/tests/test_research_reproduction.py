@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from hashlib import sha256
 from pathlib import Path
 import os
 import tempfile
@@ -11,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.models import FundDailyBar, ResearchRun
 from backend.app.quant_research.runner import reproduce_quant_research, run_quant_research
-from backend.app.quant_research.run_config import FormalRunConfigurationError
+from backend.app.quant_research.run_config import FormalRunConfigurationError, canonical_json_bytes
 from backend.app.quant_research.snapshot import SnapshotCapacityPolicy, SnapshotIntegrityError
 from backend.tests.research_test_support import create_golden_database, golden_run_config
 
@@ -107,6 +109,48 @@ class ResearchReproductionTest(unittest.TestCase):
                 path.write_bytes(payload)
                 with self.assertRaisesRegex(SnapshotIntegrityError, "归档研究产物"):
                     reproduce_quant_research(run.path)
+
+    def test_reproduce_rejects_tampered_manifest_input_metadata_before_calculation(self):
+        run = self._run()
+        manifest_path = run.path / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        input_artifact = manifest["artifactHashes"]["inputs/universe.csv.gz"]
+        input_artifact["contentSha256"] = "f" * 64
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        with (
+            patch("backend.app.quant_research.runner.build_sentinel_targets") as calculation,
+            self.assertRaisesRegex(SnapshotIntegrityError, "输入 artifact 元数据"),
+        ):
+            reproduce_quant_research(run.path)
+        calculation.assert_not_called()
+
+    def test_reproduce_rejects_tampered_checkpoint_chain_before_calculation(self):
+        run = self._run()
+        checkpoint_root = run.path / "checkpoints"
+        index_path = checkpoint_root / "index.json"
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+        previous_hash = None
+        for entry in index["completed"]:
+            checkpoint_path = checkpoint_root / f"{entry['stage']}.json"
+            checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+            checkpoint["previousCheckpointSha256"] = previous_hash
+            if entry["stage"] == "input_snapshot":
+                checkpoint["outputs"]["tableArtifacts"]["universe"]["contentSha256"] = "f" * 64
+            if entry["stage"] == "features_targets":
+                checkpoint["inputs"]["tableContentSha256"]["universe"] = "f" * 64
+            payload = canonical_json_bytes(checkpoint) + b"\n"
+            checkpoint_path.write_bytes(payload)
+            previous_hash = sha256(payload).hexdigest()
+            entry["contentSha256"] = previous_hash
+        index_path.write_bytes(canonical_json_bytes(index) + b"\n")
+
+        with (
+            patch("backend.app.quant_research.runner.build_sentinel_targets") as calculation,
+            self.assertRaisesRegex(SnapshotIntegrityError, "checkpoint"),
+        ):
+            reproduce_quant_research(run.path)
+        calculation.assert_not_called()
 
 
 if __name__ == "__main__":
