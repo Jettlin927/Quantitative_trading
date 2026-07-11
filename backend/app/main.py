@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from hashlib import sha256
@@ -17,7 +18,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .database import Base, SessionLocal, engine, get_db
+from .database import Base, SessionLocal, assert_schema_revision_at_head, engine, get_db
 from .models import (
     Asset,
     AssetDailyPrice,
@@ -77,9 +78,13 @@ from .us_research import build_us_research_import_preview, build_us_research_ove
 from .strategy_results import build_strategy_results_overview
 
 
-Base.metadata.create_all(bind=engine)
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    assert_schema_revision_at_head(engine)
+    yield
 
-app = FastAPI(title="Quant Data Workspace", version="0.3.0")
+
+app = FastAPI(title="Quant Data Workspace", version="0.3.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
