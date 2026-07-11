@@ -261,7 +261,7 @@ function App() {
 }
 
 function Sidebar({ activeView, onNavigate, readiness }) {
-  const readyCount = [readiness.stocks, readiness.etf].filter((item) => item?.status === 'ready').length
+  const inventoryCount = [readiness.stocks, readiness.etf].filter(isInventoryAvailable).length
   return (
     <aside className="sidebar">
       <div className="brand-lockup">
@@ -289,9 +289,9 @@ function Sidebar({ activeView, onNavigate, readiness }) {
 
       <div className="sidebar-foot">
         <div className="sidebar-readiness">
-          <span><ShieldCheck size={15} /> 研究门禁</span>
-          <strong>{readyCount}/2 READY</strong>
-          <div className="mini-track"><i style={{ width: `${readyCount * 50}%` }} /></div>
+          <span><ShieldCheck size={15} /> 数据库存</span>
+          <strong>{inventoryCount}/2 AVAILABLE</strong>
+          <div className="mini-track"><i style={{ width: `${inventoryCount * 50}%` }} /></div>
         </div>
         <p><i /> RESEARCH ONLY</p>
         <small>无券商连接 · 无真实交易</small>
@@ -379,32 +379,32 @@ function OverviewView({ readiness, coverageRows, auditItems, syncRuns, overview,
 }
 
 function ReadinessCard({ title, eyebrow, data, accent, onAction }) {
-  const ready = data?.status === 'ready'
+  const available = isInventoryAvailable(data)
   const required = data?.requiredTables?.length || 0
   const blockers = data?.blockers?.length || 0
   const progress = required ? Math.round(((required - blockers) / required) * 100) : 0
   const issues = [...(data?.missingTables || []), ...(data?.emptyTables || [])]
   return (
-    <article className={`readiness-card ${accent} ${ready ? 'ready' : 'blocked'}`}>
+    <article className={`readiness-card ${accent} ${available ? 'ready' : 'blocked'}`}>
       <header>
-        <div className="readiness-icon">{ready ? <CheckCircle2 size={23} /> : <AlertTriangle size={23} />}</div>
+        <div className="readiness-icon">{available ? <CheckCircle2 size={23} /> : <AlertTriangle size={23} />}</div>
         <div><span>{eyebrow}</span><h2>{title}</h2></div>
-        <Badge value={ready ? 'READY' : 'BLOCKED'} />
+        <Badge value={available ? 'INVENTORY OK' : 'INCOMPLETE'} />
       </header>
       <div className="readiness-progress">
         <div><span>数据门禁完成度</span><strong>{progress}%</strong></div>
         <div className="progress-track"><i style={{ width: `${progress}%` }} /></div>
       </div>
       <div className="readiness-detail">
-        <span>{ready ? '研究数据合同已满足' : `发现 ${issues.length} 个阻断项`}</span>
+        <span>{available ? '基础表库存可用；研究级仍需质量运行' : `发现 ${issues.length} 个库存缺口`}</span>
         <ul>
-          {(issues.length ? issues : ['复权、基准与时间轴已就绪']).slice(0, 3).map((item) => (
+          {(issues.length ? issues : ['仅证明关键表存在且非空']).slice(0, 3).map((item) => (
             <li key={item}><i /> {formatTableName(item)}</li>
           ))}
         </ul>
       </div>
       <button className="card-action" onClick={onAction}>
-        {ready ? '检查覆盖明细' : '补齐缺失数据'} <ChevronRight size={15} />
+        {available ? '检查覆盖明细' : '补齐基础数据'} <ChevronRight size={15} />
       </button>
     </article>
   )
@@ -894,8 +894,8 @@ function buildAuditItems(readiness, syncRuns) {
   const items = []
   for (const [scope, data] of [['A股横截面', readiness.stocks], ['ETF 时序', readiness.etf]]) {
     if (!data) continue
-    if (data.status === 'ready') {
-      items.push({ id: `${scope}-ready`, title: `${scope}门禁通过`, detail: '关键表存在且非空', tone: 'good' })
+    if (isInventoryAvailable(data)) {
+      items.push({ id: `${scope}-inventory`, title: `${scope}库存可用`, detail: '仅验证关键表；研究就绪需指定 quality run', tone: 'warn' })
     } else {
       for (const blocker of (data.blockers || []).slice(0, 3)) {
         items.push({ id: `${scope}-${blocker}`, title: `${scope}被阻断`, detail: blocker.replace(':', ' · '), tone: 'warn' })
@@ -910,6 +910,10 @@ function buildAuditItems(readiness, syncRuns) {
   if (failed.length) items.push({ id: 'sync-failed', title: '存在非成功同步', detail: `${failed.length} 个最近任务需要检查`, tone: 'bad' })
   if (!items.length) items.push({ id: 'waiting', title: '等待数据检查', detail: '刷新后生成审计结果', tone: 'warn' })
   return items
+}
+
+function isInventoryAvailable(data) {
+  return data?.level === 'inventory' && data?.status === 'inventory_available'
 }
 
 function buildTechnicalSeries(bars) {
