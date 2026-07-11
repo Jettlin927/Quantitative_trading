@@ -153,6 +153,11 @@ class SyncSuspendEventsRequest(BaseModel):
     max_trade_dates: int = Field(default=0, ge=0)
 
 
+class SyncJobCreate(BaseModel):
+    action: Literal["stock_listings", "trade_calendar", "market_bundle", "daily_market", "us_sample"]
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
 class StockFundamentalsOut(BaseModel):
     ts_code: str
     valuation: dict[str, Any] = Field(default_factory=dict)

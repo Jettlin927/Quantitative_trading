@@ -944,6 +944,29 @@ button:disabled {
   background: transparent;
 }
 
+.sync-action.running {
+  box-shadow: inset 3px 0 0 var(--cyan);
+  background: linear-gradient(110deg, #f5fbfd, #ffffff 70%);
+}
+
+.sync-job-state {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 24px;
+  border-top: 1px solid var(--line-soft);
+  color: #60717b;
+  font-size: 9px;
+  padding-top: 7px;
+}
+
+.sync-job-state > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sync-action button:hover {
   color: #fff;
 }
@@ -958,6 +981,25 @@ button:disabled {
 .full-coverage .table-scroll,
 .full-runs .table-scroll {
   max-height: calc(100vh - 310px);
+}
+
+.run-job-action {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.run-job-action > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 420px;
+  overflow: hidden;
+  color: #687780;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stock-lab {
@@ -1169,11 +1211,20 @@ button:disabled {
   min-height: 590px;
 }
 
-.chart-legend {
+.chart-toolbar {
   position: absolute;
   top: 8px;
   left: 12px;
+  right: 64px;
   z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.chart-legend {
   display: flex;
   gap: 12px;
   color: #6d7b84;
@@ -1195,6 +1246,35 @@ button:disabled {
 .chart-legend i.ma10 { background: var(--cyan); }
 .chart-legend i.ma20 { background: var(--amber); }
 .chart-legend i.volume { background: #7a8992; }
+
+.chart-ranges {
+  display: flex;
+  border: 1px solid #cdd9df;
+  background: rgb(248 250 251 / 92%);
+  box-shadow: 0 2px 8px rgb(26 51 65 / 6%);
+  pointer-events: auto;
+}
+
+.chart-ranges button {
+  min-height: 23px;
+  border: 0;
+  border-right: 1px solid #d9e1e5;
+  color: #65747e;
+  background: transparent;
+  font-family: "Microsoft YaHei UI", sans-serif;
+  font-size: 9px;
+  padding: 0 8px;
+}
+
+.chart-ranges button:last-child {
+  border-right: 0;
+}
+
+.chart-ranges button:hover,
+.chart-ranges button.active {
+  color: #fff;
+  background: var(--cyan);
+}
 
 .chart-pane.price {
   height: 430px;
@@ -1485,6 +1565,23 @@ button:disabled {
 
   .chart-stack {
     min-height: 490px;
+  }
+
+  .chart-toolbar {
+    right: 12px;
+  }
+
+  .chart-legend {
+    display: none;
+  }
+
+  .chart-ranges {
+    width: 100%;
+  }
+
+  .chart-ranges button {
+    flex: 1;
+    padding: 0 3px;
   }
 }
 

@@ -163,7 +163,12 @@ class FakeTushare:
         return FakeFrame([{"exchange": "SSE", "cal_date": "20260709", "is_open": 1, "pretrade_date": "20260708"}])
 
     def stk_limit(self, **_kwargs):
-        return FakeFrame([{"ts_code": "000001.SZ", "trade_date": "20260709", "pre_close": 10, "up_limit": 11, "down_limit": 9}])
+        return FakeFrame(
+            [
+                {"ts_code": "000001.SZ", "trade_date": "20260709", "pre_close": 10, "up_limit": 11, "down_limit": 9},
+                {"ts_code": "512480.SH", "trade_date": "20260709", "pre_close": 1, "up_limit": 1.1, "down_limit": 0.9},
+            ]
+        )
 
     def suspend_d(self, **_kwargs):
         return FakeFrame([{"ts_code": "000001.SZ", "trade_date": "20260709", "suspend_type": "S", "suspend_timing": None}])

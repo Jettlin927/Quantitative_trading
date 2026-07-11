@@ -49,7 +49,9 @@
   - `AssetDailyPrice`：美股 sample 快照，`asset_natural_key + trade_date` 唯一。
   - `WatchlistItem`：美股 sample 观察池，`watchlist_name + asset_natural_key` 唯一。
   - `PortfolioSnapshot`：美股 sample 持仓快照，`snapshot_id` 唯一，`holdings` 为 JSON。
-  - `DataSyncRun`：同步记录。
+  - `DataSyncRun`：单个同步接口的执行记录。
+  - `DataSyncJob`：前端和定时任务使用的持久化异步任务，`active_key` 防止同参数任务重复排队。
+  - `DataOverviewSnapshot`：千万级表精确覆盖矩阵的持久化快照，避免每次打开页面重复全表聚合。
 
 - `backend/app/schemas.py`
   - Pydantic 请求/响应模型。
@@ -66,7 +68,7 @@
 
 - `backend/app/main.py`
   - FastAPI 应用入口。
-  - 包含 A 股/指数/ETF/行业 Tushare 同步、DB overview、研究 readiness、股票池 CRUD、美股 sample import preview/import 和 DB overview。
+  - 包含 A 股/指数/ETF/行业 Tushare 同步、异步任务提交/执行/轮询、DB overview、研究 readiness、股票池 CRUD、美股 sample import preview/import 和 DB overview。
   - 文件较长，先用函数名定位，不要盲目大改。
 
 - `backend/app/quant_research/`
@@ -82,6 +84,7 @@
 
 - `GET /api/health`：健康检查。
 - `GET /api/db/overview`：A 股和美股 sample DB 覆盖概览。
+- `POST /api/sync-jobs`、`GET /api/sync-jobs...`：提交并轮询持久化异步同步任务。
 - `GET /api/stocks`：按代码、名称、简称、行业搜索股票。
 - `GET /api/stocks/screen`：返回股票基础信息加最新行情和估值；这里只是数据筛选。
 - `GET/POST/DELETE /api/stock-pools...`：自选数据池 CRUD 和成员管理。
@@ -112,14 +115,20 @@
 
 - `frontend/src/main.jsx`
   - 数据工作台主入口。
-  - 读取 `/api/health`、`/api/db/overview`、`/api/tushare/sync-progress`、`/api/stocks/screen`、`/api/us-research/db-overview`。
-  - 提供美股 sample 入库按钮，调用 `POST /api/us-research/import-sample`。
+  - 轻量状态、股票列表和任务状态先加载，千万级表覆盖矩阵渐进加载。
+  - 写入型刷新统一调用 `POST /api/sync-jobs` 并轮询；标的研究一次读取数据库中的完整日线历史，可切换近 1/3/5 年和全部历史。
 
 - `frontend/src/styles.css`
   - 工业化数据终端视觉，维护高信息密度和可扫描性。
 
 - `frontend/package.json`
   - `npm run lint`、`npm run typecheck`、`npm run build`。
+
+## 运维与回补
+
+- `scripts/ops/backfill_a_share_history.py`：默认从 2012 年开始的可续跑历史回补；具备覆盖检查、checkpoint、重试、限速、dry-run 和小批量验证参数。
+- `scripts/ops/sync_today_market_data.sh`：提交 `daily_market` 异步任务并轮询完成，再补当日财务指标。
+- `scripts/ops/install_daily_sync_cron.sh`：安装 `CRON_TZ=Asia/Shanghai` 的 20:30 日更任务。
 
 ## my_quant 地图
 

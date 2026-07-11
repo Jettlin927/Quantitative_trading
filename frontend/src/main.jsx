@@ -29,6 +29,15 @@ import './styles.css'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
+const TERMINAL_JOB_STATUSES = new Set(['ok', 'partial', 'failed'])
+const CHART_RANGES = [
+  { id: 'recent', label: '近 180 日' },
+  { id: '1y', label: '近 1 年' },
+  { id: '3y', label: '近 3 年' },
+  { id: '5y', label: '近 5 年' },
+  { id: 'all', label: '全部历史' },
+]
+
 const NAV_ITEMS = [
   { id: 'overview', label: '研究总览', eyebrow: 'OVERVIEW', icon: Gauge },
   { id: 'data', label: '数据资产', eyebrow: 'DATA ASSETS', icon: Database },
@@ -50,33 +59,43 @@ function App() {
   const [fundamentals, setFundamentals] = useState(null)
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [activeAction, setActiveAction] = useState('')
+  const [actionJobs, setActionJobs] = useState({})
   const [actionResult, setActionResult] = useState(null)
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
+  const pollingJobsRef = useRef(new Set())
 
-  async function refreshAll() {
+  async function refreshAll(refreshCoverage = false) {
     setLoading(true)
     setError('')
     try {
       const q = query.trim()
-      const [healthRes, overviewRes, progressRes, stockReadyRes, etfReadyRes, stocksRes, usDbRes] = await Promise.all([
-        fetchJson('/api/health'),
-        fetchJson('/api/db/overview'),
-        fetchJson('/api/tushare/sync-progress'),
+      const [healthRes, progressRes, stockReadyRes, etfReadyRes, stockListRes, usDbRes, jobsRes] = await Promise.all([
+        fetchJson('/api/health?include_counts=false'),
+        fetchJson('/api/tushare/sync-progress?include_coverage=false'),
         fetchJson('/api/research/readiness?scope=a_share_cross_section'),
         fetchJson('/api/research/readiness?scope=etf_time_series'),
-        fetchJson(`/api/stocks/screen?limit=120${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+        fetchJson(`/api/stocks?limit=120${q ? `&q=${encodeURIComponent(q)}` : ''}`),
         fetchJson('/api/us-research/db-overview'),
+        fetchJson('/api/sync-jobs?limit=50'),
       ])
       setHealth(healthRes)
-      setOverview(overviewRes)
       setSyncProgress(progressRes)
       setReadiness({ stocks: stockReadyRes, etf: etfReadyRes })
-      setStocks(stocksRes)
+      setStocks(stockListRes)
       setUsDb(usDbRes)
+      setActionJobs(latestJobsByAction(jobsRes))
       setLastUpdated(new Date())
-      if (!selectedCode && stocksRes[0]) setSelectedCode(stocksRes[0].ts_code)
+      if (!selectedCode && stockListRes[0]) setSelectedCode(stockListRes[0].ts_code)
+      for (const job of jobsRes) {
+        if (isActiveJob(job)) void pollSyncJob(job.action, job.id)
+      }
+      void fetchJson(`/api/db/overview${refreshCoverage ? '?refresh=true' : ''}`)
+        .then((overviewRes) => setOverview(overviewRes))
+        .catch((err) => setError(errorMessage(err)))
+      void fetchJson(`/api/stocks/screen?limit=120${q ? `&q=${encodeURIComponent(q)}` : ''}`)
+        .then((stocksRes) => setStocks(stocksRes))
+        .catch((err) => setError(errorMessage(err)))
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -100,57 +119,42 @@ function App() {
   }
 
   async function runDataAction(actionId) {
-    const endDate = todayString()
-    const startDate = dateDaysBefore(endDate, 10)
-    setActiveAction(actionId)
     setActionResult(null)
     setError('')
     try {
-      let result
-      if (actionId === 'listings') {
-        result = await fetchJson('/api/tushare/sync-stock-listings', {
-          method: 'POST',
-          body: JSON.stringify({ statuses: ['L', 'D', 'P', 'G'] }),
-        })
-      } else if (actionId === 'calendar') {
-        result = await fetchJson('/api/tushare/sync-trade-calendar', {
-          method: 'POST',
-          body: JSON.stringify({ start_date: dateMonthsBefore(endDate, 3), end_date: endDate, exchange: '' }),
-        })
-      } else if (actionId === 'market-bundle') {
-        const marketPayload = {
-          start_date: startDate,
-          end_date: endDate,
-          skip_existing: true,
-          min_existing_rows: 4000,
-          max_trade_dates: 10,
-        }
-        const [daily, limits, suspends] = await Promise.all([
-          fetchJson('/api/tushare/sync-market-daily', { method: 'POST', body: JSON.stringify(marketPayload) }),
-          fetchJson('/api/tushare/sync-market-limit-prices', { method: 'POST', body: JSON.stringify(marketPayload) }),
-          fetchJson('/api/tushare/sync-market-suspend-events', {
-            method: 'POST',
-            body: JSON.stringify({ start_date: startDate, end_date: endDate, max_trade_dates: 10 }),
-          }),
-        ])
-        result = {
-          status: [daily.status, limits.status, suspends.status].every((status) => status === 'ok') ? 'ok' : 'partial',
-          rows_upserted: [daily, limits, suspends].reduce((sum, item) => sum + Number(item.rows_upserted || 0), 0),
-        }
-      } else if (actionId === 'us-sample') {
-        result = await fetchJson('/api/us-research/import-sample', { method: 'POST' })
-      }
-      setActionResult({ id: actionId, ...result })
-      await refreshAll()
+      const request = buildSyncJobRequest(actionId)
+      const job = await fetchJson('/api/sync-jobs', { method: 'POST', body: JSON.stringify(request) })
+      setActionJobs((current) => ({ ...current, [actionId]: job }))
+      void pollSyncJob(actionId, job.id)
     } catch (err) {
       setError(errorMessage(err))
+    }
+  }
+
+  async function pollSyncJob(actionId, jobId) {
+    if (!jobId || pollingJobsRef.current.has(jobId)) return
+    pollingJobsRef.current.add(jobId)
+    try {
+      let job
+      do {
+        await delay(1500)
+        job = await fetchJson(`/api/sync-jobs/${encodeURIComponent(jobId)}`)
+        setActionJobs((current) => ({ ...current, [actionId]: job }))
+      } while (!TERMINAL_JOB_STATUSES.has(String(job.status).toLowerCase()))
+      setActionResult(job)
+      await refreshAll(true)
+    } catch (err) {
+      setActionJobs((current) => ({
+        ...current,
+        [actionId]: { ...current[actionId], status: 'poll-error', message: `任务状态读取失败：${errorMessage(err)}` },
+      }))
+      setError(errorMessage(err))
     } finally {
-      setActiveAction('')
+      pollingJobsRef.current.delete(jobId)
     }
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -161,11 +165,8 @@ function App() {
     async function loadSelectedStock() {
       setDetailLoading(true)
       try {
-        const selected = stocks.find((stock) => stock.ts_code === selectedCode)
-        const endDate = selected?.latest_date || todayString()
-        const startDate = dateMonthsBefore(endDate, 8)
         const [barsRes, fundamentalsRes] = await Promise.all([
-          fetchJson(`/api/daily-bars?ts_code=${encodeURIComponent(selectedCode)}&start_date=${startDate}&end_date=${endDate}`),
+          fetchJson(`/api/daily-bars?ts_code=${encodeURIComponent(selectedCode)}`),
           fetchJson(`/api/stocks/${encodeURIComponent(selectedCode)}/fundamentals`),
         ])
         if (!ignore) {
@@ -200,16 +201,16 @@ function App() {
           health={health}
           loading={loading}
           lastUpdated={lastUpdated}
-          onRefresh={refreshAll}
+          onRefresh={() => refreshAll(true)}
         />
 
         <main className="workspace-main">
           {error ? <Notice tone="error" title="操作未完成" text={error} /> : null}
           {actionResult ? (
             <Notice
-              tone={actionResult.status === 'ok' ? 'success' : 'warning'}
-              title={actionResult.status === 'ok' ? '同步任务已完成' : '同步任务部分完成'}
-              text={`写入 ${formatInt(actionResult.rows_upserted)} 行；覆盖与 readiness 已刷新。`}
+              tone={actionResult.status === 'ok' ? 'success' : actionResult.status === 'failed' ? 'error' : 'warning'}
+              title={actionResult.status === 'ok' ? '同步任务已完成' : actionResult.status === 'failed' ? '同步任务失败' : '同步任务部分完成'}
+              text={actionResult.message || `写入 ${formatInt(actionResult.rowsUpserted)} 行；覆盖与 readiness 已刷新。`}
             />
           ) : null}
 
@@ -229,7 +230,7 @@ function App() {
             <DataAssetsView
               coverageRows={coverageRows}
               syncRuns={syncRuns}
-              activeAction={activeAction}
+              actionJobs={actionJobs}
               onRunAction={runDataAction}
             />
           ) : null}
@@ -251,7 +252,7 @@ function App() {
           ) : null}
 
           {activeView === 'runs' ? (
-            <RunLogView syncRuns={syncRuns} usDb={usDb} activeAction={activeAction} onRunAction={runDataAction} />
+            <RunLogView syncRuns={syncRuns} usDb={usDb} actionJobs={actionJobs} onRunAction={runDataAction} />
           ) : null}
         </main>
       </div>
@@ -426,7 +427,7 @@ function AuditCard({ items }) {
   )
 }
 
-function DataAssetsView({ coverageRows, syncRuns, activeAction, onRunAction }) {
+function DataAssetsView({ coverageRows, syncRuns, actionJobs, onRunAction }) {
   return (
     <div className="view-stack enter">
       <section className="section-heading">
@@ -435,27 +436,27 @@ function DataAssetsView({ coverageRows, syncRuns, activeAction, onRunAction }) {
 
       <section className="action-grid">
         <SyncAction
-          id="calendar"
+          id="trade_calendar"
           title="刷新交易日历"
           detail="同步最近 3 个月交易日，校准所有研究时间轴。"
           icon={Clock3}
-          activeAction={activeAction}
+          job={actionJobs.trade_calendar}
           onRun={onRunAction}
         />
         <SyncAction
-          id="listings"
+          id="stock_listings"
           title="刷新历史上市状态"
           detail="同步 L / D / P / G，避免只看当前上市股票。"
           icon={ListChecks}
-          activeAction={activeAction}
+          job={actionJobs.stock_listings}
           onRun={onRunAction}
         />
         <SyncAction
-          id="market-bundle"
+          id="market_bundle"
           title="补齐近 10 日市场数据"
           detail="批量补日线、涨跌停价格和停复牌事件。"
           icon={Activity}
-          activeAction={activeAction}
+          job={actionJobs.market_bundle}
           onRun={onRunAction}
         />
       </section>
@@ -472,14 +473,20 @@ function DataAssetsView({ coverageRows, syncRuns, activeAction, onRunAction }) {
   )
 }
 
-function SyncAction({ id, title, detail, icon: Icon, activeAction, onRun }) {
-  const running = activeAction === id
+function SyncAction({ id, title, detail, icon: Icon, job, onRun }) {
+  const running = isActiveJob(job)
   return (
-    <article className="sync-action">
+    <article className={`sync-action ${running ? 'running' : ''}`}>
       <span className="sync-icon"><Icon size={20} /></span>
       <div><h3>{title}</h3><p>{detail}</p></div>
-      <button onClick={() => onRun(id)} disabled={Boolean(activeAction)}>
-        <RefreshCw size={14} className={running ? 'spin' : ''} /> {running ? '执行中' : '立即执行'}
+      {job ? (
+        <div className="sync-job-state">
+          <Badge value={job.status} />
+          <span>{job.message || (job.status === 'queued' ? '任务已进入后台队列' : `最近写入 ${formatInt(job.rowsUpserted)} 行`)}</span>
+        </div>
+      ) : null}
+      <button onClick={() => onRun(id)} disabled={running}>
+        <RefreshCw size={14} className={running ? 'spin' : ''} /> {jobButtonText(job)}
       </button>
     </article>
   )
@@ -498,6 +505,8 @@ function StockLabView({
   fundamentals,
   detailLoading,
 }) {
+  const historyStart = stockBars[0]?.trade_date
+  const historyEnd = stockBars[stockBars.length - 1]?.trade_date
   return (
     <div className="stock-lab enter">
       <aside className="security-browser">
@@ -537,7 +546,8 @@ function StockLabView({
           <div className="security-meta">
             <span>行业 <b>{selectedStock?.industry || '-'}</b></span>
             <span>市场 <b>{selectedStock?.market || '-'}</b></span>
-            <span>样本 <b>{detailLoading ? '加载中' : `${formatInt(stockBars.length)} 日`}</b></span>
+            <span>交易日 <b>{detailLoading ? '加载中' : formatInt(stockBars.length)}</b></span>
+            <span>完整区间 <b>{historyStart && historyEnd ? `${historyStart} → ${historyEnd}` : '-'}</b></span>
           </div>
         </header>
         <TechnicalChart bars={stockBars} />
@@ -568,16 +578,21 @@ function StockLabView({
   )
 }
 
-function RunLogView({ syncRuns, usDb, activeAction, onRunAction }) {
+function RunLogView({ syncRuns, usDb, actionJobs, onRunAction }) {
   const usAssets = usDb?.assets || []
   const counts = usDb?.counts || {}
+  const usJob = actionJobs.us_sample
+  const usJobRunning = isActiveJob(usJob)
   return (
     <div className="view-stack enter">
       <section className="section-heading run-heading">
         <div><span>RUN HISTORY</span><h2>同步与样本运行记录</h2><p>这里记录数据写入事实，不展示策略评级、收益承诺或真实账户。</p></div>
-        <button className="primary-action" onClick={() => onRunAction('us-sample')} disabled={Boolean(activeAction)}>
-          <DownloadCloud size={15} /> {activeAction === 'us-sample' ? '导入中' : '导入美股 sample'}
-        </button>
+        <div className="run-job-action">
+          {usJob ? <span><Badge value={usJob.status} /> {usJob.message || `最近写入 ${formatInt(usJob.rowsUpserted)} 行`}</span> : null}
+          <button className="primary-action" onClick={() => onRunAction('us_sample')} disabled={usJobRunning}>
+            <DownloadCloud size={15} /> {usJobRunning ? jobButtonText(usJob) : '导入美股 sample'}
+          </button>
+        </div>
       </section>
       <Panel title="最近 20 次同步" eyebrow="DATA SYNC RUNS"><RunTable runs={syncRuns} /></Panel>
       <Panel title="美股 Sample 资产" eyebrow={`${formatInt(counts.assets)} ASSETS · ${formatInt(counts.assetDailyPrices)} PRICES`}>
@@ -602,23 +617,33 @@ function RunLogView({ syncRuns, usDb, activeAction, onRunAction }) {
 function TechnicalChart({ bars }) {
   const priceRef = useRef(null)
   const volumeRef = useRef(null)
+  const [range, setRange] = useState('recent')
   const series = useMemo(() => buildTechnicalSeries(bars), [bars])
 
   useEffect(() => {
     if (!series.candles.length) return undefined
     const charts = [renderPriceChart(priceRef.current, series), renderVolumeChart(volumeRef.current, series)].filter(Boolean)
+    applyChartRange(charts, series.candles, range)
+    synchronizeChartRanges(charts)
     const resize = () => charts.forEach(({ chart, element }) => chart.applyOptions({ width: element.clientWidth }))
     window.addEventListener('resize', resize)
     return () => {
       window.removeEventListener('resize', resize)
       charts.forEach(({ chart }) => chart.remove())
     }
-  }, [series])
+  }, [range, series])
 
   if (!series.candles.length) return <div className="chart-empty">暂无可绘制的日线数据</div>
   return (
     <div className="chart-stack">
-      <div className="chart-legend"><span><i className="ma10" />MA10</span><span><i className="ma20" />MA20</span><span><i className="volume" />成交量</span></div>
+      <div className="chart-toolbar">
+        <div className="chart-legend"><span><i className="ma10" />MA10</span><span><i className="ma20" />MA20</span><span><i className="volume" />成交量</span></div>
+        <div className="chart-ranges" aria-label="行情显示区间">
+          {CHART_RANGES.map((item) => (
+            <button className={range === item.id ? 'active' : ''} key={item.id} onClick={() => setRange(item.id)}>{item.label}</button>
+          ))}
+        </div>
+      </div>
       <div className="chart-pane price" ref={priceRef} />
       <div className="chart-pane volume" ref={volumeRef} />
     </div>
@@ -634,7 +659,6 @@ function renderPriceChart(element, series) {
   }).setData(series.candles)
   chart.addSeries(LineSeries, { color: '#087ea4', lineWidth: 2, priceLineVisible: false }).setData(series.ma10)
   chart.addSeries(LineSeries, { color: '#d78a17', lineWidth: 2, priceLineVisible: false }).setData(series.ma20)
-  chart.timeScale().fitContent()
   return { chart, element }
 }
 
@@ -643,8 +667,41 @@ function renderVolumeChart(element, series) {
   element.replaceChildren()
   const chart = createBaseChart(element, 125)
   chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceLineVisible: false }).setData(series.volume)
-  chart.timeScale().fitContent()
   return { chart, element }
+}
+
+function applyChartRange(charts, candles, range) {
+  if (!candles.length) return
+  if (range === 'all') {
+    charts.forEach(({ chart }) => chart.timeScale().fitContent())
+    return
+  }
+  const years = { '1y': 1, '3y': 3, '5y': 5 }[range]
+  let from = Math.max(0, candles.length - 180)
+  if (years) {
+    const cutoff = new Date(`${candles[candles.length - 1].time}T00:00:00`)
+    cutoff.setFullYear(cutoff.getFullYear() - years)
+    const cutoffText = cutoff.toISOString().slice(0, 10)
+    const firstVisible = candles.findIndex((bar) => bar.time >= cutoffText)
+    from = firstVisible < 0 ? 0 : firstVisible
+  }
+  const visibleRange = { from: Math.max(-0.5, from - 0.5), to: candles.length - 0.5 }
+  charts.forEach(({ chart }) => chart.timeScale().setVisibleLogicalRange(visibleRange))
+}
+
+function synchronizeChartRanges(charts) {
+  if (charts.length < 2) return
+  let syncing = false
+  for (const source of charts) {
+    source.chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+      if (!range || syncing) return
+      syncing = true
+      for (const target of charts) {
+        if (target !== source) target.chart.timeScale().setVisibleLogicalRange(range)
+      }
+      syncing = false
+    })
+  }
 }
 
 function createBaseChart(element, height) {
@@ -677,7 +734,7 @@ function CoverageMatrix({ rows, detailed = false }) {
       <table className="data-table coverage-table">
         <thead><tr><th>数据集</th><th>状态</th><th>记录</th><th>标的</th><th>日期范围</th>{detailed ? <th>研究用途</th> : null}</tr></thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.length ? rows.map((row) => (
             <tr key={row.name}>
               <td><span className="dataset-name"><Table2 size={14} /><b>{row.label}</b><small>{row.name}</small></span></td>
               <td><Badge value={row.status} /></td>
@@ -686,7 +743,7 @@ function CoverageMatrix({ rows, detailed = false }) {
               <td className="mono date-cell">{row.range}</td>
               {detailed ? <td>{row.purpose}</td> : null}
             </tr>
-          ))}
+          )) : <tr><td className="empty-cell" colSpan={detailed ? 6 : 5}>正在读取 PostgreSQL 精确覆盖统计…</td></tr>}
         </tbody>
       </table>
     </div>
@@ -753,7 +810,56 @@ async function fetchJson(path, options = {}) {
   return response.json()
 }
 
+function buildSyncJobRequest(action) {
+  const endDate = todayString()
+  if (action === 'stock_listings') {
+    return { action, payload: { statuses: ['L', 'D', 'P', 'G'] } }
+  }
+  if (action === 'trade_calendar') {
+    return { action, payload: { start_date: dateMonthsBefore(endDate, 3), end_date: endDate, exchange: '' } }
+  }
+  if (action === 'market_bundle') {
+    return {
+      action,
+      payload: {
+        start_date: dateDaysBefore(endDate, 10),
+        end_date: endDate,
+        skip_existing: true,
+        min_existing_rows: 4000,
+        max_trade_dates: 10,
+      },
+    }
+  }
+  if (action === 'us_sample') return { action, payload: {} }
+  throw new Error(`未知同步动作：${action}`)
+}
+
+function latestJobsByAction(jobs) {
+  const latest = {}
+  for (const job of jobs || []) {
+    const current = latest[job.action]
+    if (!current || String(job.createdAt || '') > String(current.createdAt || '')) latest[job.action] = job
+  }
+  return latest
+}
+
+function isActiveJob(job) {
+  return ['queued', 'running'].includes(String(job?.status || '').toLowerCase())
+}
+
+function jobButtonText(job) {
+  const status = String(job?.status || '').toLowerCase()
+  if (status === 'queued') return '已排队'
+  if (status === 'running') return '后台同步中'
+  return '立即执行'
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds))
+}
+
 function buildCoverageRows(overview) {
+  if (!overview) return []
   const a = overview?.aShare || {}
   return [
     coverage('stock_daily_bars', 'A股日线', a.dailyBars, '收益、波动与成交基础'),
