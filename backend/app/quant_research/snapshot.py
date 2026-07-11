@@ -14,6 +14,7 @@ from sqlalchemy import Select, func, select, text
 from sqlalchemy.orm import Session
 
 from ..models import (
+    DataQualityResult,
     DataQualityRun,
     DataSnapshot,
     Fund,
@@ -155,6 +156,7 @@ def freeze_input_snapshot(
             "endDate": normalized["endDate"],
             "benchmark": normalized["benchmark"],
             "universeHash": normalized["universe"]["universeHash"],
+            "transaction": transaction_contract,
             "tableArtifacts": {
                 name: {
                     "contentSha256": artifact["contentSha256"],
@@ -276,6 +278,7 @@ def verify_snapshot_identity(manifest: dict[str, Any]) -> None:
         "endDate",
         "benchmark",
         "universeHash",
+        "transaction",
         "tableArtifacts",
     }
     missing = sorted(required - set(manifest))
@@ -286,6 +289,7 @@ def verify_snapshot_identity(manifest: dict[str, Any]) -> None:
         raise SnapshotIntegrityError("snapshot tableArtifacts 不是完整 ETF 输入集")
     for name, artifact in artifacts.items():
         _validate_table_artifact(name, artifact)
+    _validate_transaction_contract(manifest["transaction"])
     if "rowCounts" in manifest:
         expected_counts = {name: artifact["rowCount"] for name, artifact in artifacts.items()}
         if manifest["rowCounts"] != expected_counts:
@@ -297,6 +301,7 @@ def verify_snapshot_identity(manifest: dict[str, Any]) -> None:
         "endDate": manifest["endDate"],
         "benchmark": manifest["benchmark"],
         "universeHash": manifest["universeHash"],
+        "transaction": manifest["transaction"],
         "tableArtifacts": {
             name: {
                 "contentSha256": artifact["contentSha256"],
@@ -342,14 +347,18 @@ def validate_quality_gate(registry_db: Session, config: dict[str, Any]) -> DataQ
     run = registry_db.get(DataQualityRun, config["qualityRunId"])
     if run is None:
         raise SnapshotError("qualityRunId 不存在")
-    if run.status not in {"ready", "ready_with_warnings"}:
-        raise SnapshotError(f"质量门禁未通过：{run.status}")
     if run.finished_at is None:
         raise SnapshotError("质量运行尚未完成")
-    if (run.summary or {}).get("status") != run.status:
-        raise SnapshotError("质量运行 summary.status 与 registry status 不一致")
-    if (run.summary or {}).get("blockers") or (run.summary or {}).get("failedRules"):
-        raise SnapshotError("质量运行仍包含 blocker 或 failed rule")
+    results = list(
+        registry_db.scalars(
+            select(DataQualityResult)
+            .where(DataQualityResult.run_id == run.id)
+            .order_by(DataQualityResult.rule_id, DataQualityResult.table_name)
+        ).all()
+    )
+    _validate_quality_result_summary(run, results)
+    if run.status not in {"ready", "ready_with_warnings"}:
+        raise SnapshotError(f"质量门禁未通过：{run.status}")
     if run.scope != config["scope"]:
         raise SnapshotError("质量运行 scope 与研究配置不一致")
     if run.start_date > date.fromisoformat(config["warmupStart"]) or run.end_date < date.fromisoformat(config["endDate"]):
@@ -392,6 +401,90 @@ def validate_quality_gate(registry_db: Session, config: dict[str, Any]) -> DataQ
     return run
 
 
+def _validate_quality_result_summary(
+    run: DataQualityRun,
+    results: list[DataQualityResult],
+) -> None:
+    if not results:
+        raise SnapshotError("质量运行缺少持久化明细，拒绝打开 snapshot gate")
+    counts = {
+        status: sum(result.status == status for result in results)
+        for status in ("passed", "warning", "blocked", "failed")
+    }
+    derived_status = (
+        "failed"
+        if counts["failed"]
+        else "blocked"
+        if counts["blocked"]
+        else "ready_with_warnings"
+        if counts["warning"]
+        else "ready"
+    )
+    summary = run.summary or {}
+    if not isinstance(summary, dict):
+        raise SnapshotError("质量运行 summary 不是 JSON object")
+    expected_counts = {
+        "resultCount": len(results),
+        "passedCount": counts["passed"],
+        "warningCount": counts["warning"],
+        "blockerCount": counts["blocked"],
+        "failedCount": counts["failed"],
+    }
+    expected_references = {
+        "warnings": sorted(
+            f"{result.rule_id}:{result.table_name}"
+            for result in results
+            if result.status == "warning"
+        ),
+        "blockers": sorted(
+            f"{result.rule_id}:{result.table_name}"
+            for result in results
+            if result.status == "blocked"
+        ),
+        "failedRules": sorted(
+            f"{result.rule_id}:{result.table_name}"
+            for result in results
+            if result.status == "failed"
+        ),
+    }
+    references_match = all(
+        isinstance(summary.get(name), list)
+        and all(isinstance(item, str) for item in summary[name])
+        and sorted(summary[name]) == expected
+        for name, expected in expected_references.items()
+    )
+    if (
+        run.status != derived_status
+        or summary.get("status") != derived_status
+        or any(
+            type(summary.get(name)) is not int or summary[name] != value
+            for name, value in expected_counts.items()
+        )
+        or not references_match
+    ):
+        raise SnapshotError("质量运行 registry/summary 与持久化明细不一致")
+    if counts["blocked"] or counts["failed"]:
+        raise SnapshotError("质量运行持久化明细仍包含 blocked 或 failed")
+
+
+def _validate_transaction_contract(transaction: Any) -> None:
+    if not isinstance(transaction, dict) or set(transaction) != {
+        "dialect",
+        "isolation",
+        "readOnly",
+    }:
+        raise SnapshotIntegrityError("snapshot transaction 合同字段无效")
+    dialect = transaction["dialect"]
+    if dialect == "postgresql":
+        valid = transaction["isolation"] == "REPEATABLE READ" and transaction["readOnly"] is True
+    elif dialect == "sqlite":
+        valid = transaction["isolation"] == "test" and transaction["readOnly"] is False
+    else:
+        valid = False
+    if not valid:
+        raise SnapshotIntegrityError("snapshot transaction dialect/isolation/readOnly 无效")
+
+
 def _validate_table_artifact(name: str, artifact: Any) -> None:
     if not isinstance(artifact, dict):
         raise SnapshotIntegrityError(f"snapshot artifact 无效：{name}")
@@ -421,6 +514,7 @@ def _validate_table_artifact(name: str, artifact: Any) -> None:
 
 def _verify_registry_snapshot(row: DataSnapshot, manifest: dict[str, Any], final_path: Path) -> None:
     expected = {
+        "snapshotId": row.snapshot_id,
         "qualityRunId": row.quality_run_id,
         "scope": row.scope,
         "warmupStart": row.start_date.isoformat(),

@@ -9,7 +9,7 @@ from unittest.mock import patch
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.app.models import DataQualityRun, DataSnapshot, FundDailyBar
+from backend.app.models import DataQualityResult, DataQualityRun, DataSnapshot, FundDailyBar
 from backend.app.quant_research.snapshot import (
     SnapshotCapacityPolicy,
     SnapshotCapacityError,
@@ -20,6 +20,7 @@ from backend.app.quant_research.snapshot import (
 )
 from backend.app.quant_research.artifacts import write_canonical_csv_gz
 from backend.app.quant_research.artifacts import read_canonical_csv_gz
+from backend.app.quant_research.run_config import canonical_sha256
 from backend.tests.research_test_support import create_golden_database, golden_run_config
 
 
@@ -159,6 +160,140 @@ class ResearchSnapshotTest(unittest.TestCase):
             row.summary = original_summary
             row.finished_at = original_finished_at
             db.commit()
+
+    def test_forged_ready_run_cannot_hide_blocked_or_failed_persisted_result(self):
+        with Session(self.engine) as db:
+            result = db.scalar(
+                select(DataQualityResult).where(
+                    DataQualityResult.run_id == self.config["qualityRunId"]
+                )
+            )
+            for status in ("blocked", "failed"):
+                with self.subTest(status=status):
+                    result.status = status
+                    db.commit()
+                    with self.assertRaisesRegex(SnapshotError, "质量.*明细|质量.*一致"):
+                        freeze_input_snapshot(
+                            db,
+                            self.config,
+                            self.snapshot_root,
+                            capacity_policy=self.capacity,
+                        )
+                    result.status = "passed"
+                    db.commit()
+
+    def test_quality_gate_rejects_missing_results_or_summary_count_drift(self):
+        with Session(self.engine) as db:
+            run = db.get(DataQualityRun, self.config["qualityRunId"])
+            original_summary = dict(run.summary)
+            run.summary = {**original_summary, "resultCount": 2}
+            db.commit()
+            with self.assertRaisesRegex(SnapshotError, "质量.*明细|质量.*一致"):
+                freeze_input_snapshot(
+                    db,
+                    self.config,
+                    self.snapshot_root,
+                    capacity_policy=self.capacity,
+                )
+
+            run.summary = original_summary
+            result = db.scalar(
+                select(DataQualityResult).where(DataQualityResult.run_id == run.id)
+            )
+            db.delete(result)
+            db.commit()
+            with self.assertRaisesRegex(SnapshotError, "质量.*明细"):
+                freeze_input_snapshot(
+                    db,
+                    self.config,
+                    self.snapshot_root,
+                    capacity_policy=self.capacity,
+                )
+
+    def test_snapshot_transaction_contract_is_validated_and_bound_to_identity(self):
+        with Session(self.engine) as db:
+            snapshot = freeze_input_snapshot(
+                db,
+                self.config,
+                self.snapshot_root,
+                capacity_policy=self.capacity,
+            )
+            row = db.get(DataSnapshot, snapshot.snapshot_id)
+            manifest_path = snapshot.path / "snapshot.json"
+            original = manifest_path.read_bytes()
+            mutations = (
+                ("dialect", "forged"),
+                ("isolation", "READ COMMITTED"),
+                ("readOnly", True),
+            )
+            for field, value in mutations:
+                with self.subTest(field=field):
+                    manifest = json.loads(original.decode("utf-8"))
+                    manifest["transaction"][field] = value
+                    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                    with self.assertRaisesRegex(SnapshotIntegrityError, "transaction|snapshotId"):
+                        freeze_input_snapshot(
+                            db,
+                            self.config,
+                            self.snapshot_root,
+                            capacity_policy=self.capacity,
+                        )
+                    db.refresh(row)
+                    self.assertEqual(row.status, "failed")
+                    manifest_path.write_bytes(original)
+                    row.status = "complete"
+                    db.commit()
+
+    def test_reuse_rejects_valid_but_different_transaction_identity_from_registry(self):
+        with Session(self.engine) as db:
+            snapshot = freeze_input_snapshot(
+                db,
+                self.config,
+                self.snapshot_root,
+                capacity_policy=self.capacity,
+            )
+            row = db.get(DataSnapshot, snapshot.snapshot_id)
+            manifest = json.loads((snapshot.path / "snapshot.json").read_text(encoding="utf-8"))
+            manifest["transaction"] = {
+                "dialect": "postgresql",
+                "isolation": "REPEATABLE READ",
+                "readOnly": True,
+            }
+            forged_identity = {
+                "scope": manifest["scope"],
+                "warmupStart": manifest["warmupStart"],
+                "startDate": manifest["startDate"],
+                "endDate": manifest["endDate"],
+                "benchmark": manifest["benchmark"],
+                "universeHash": manifest["universeHash"],
+                "transaction": manifest["transaction"],
+                "tableArtifacts": {
+                    name: {
+                        "contentSha256": artifact["contentSha256"],
+                        "columns": artifact["columns"],
+                        "naturalKey": artifact["naturalKey"],
+                        "rowCount": artifact["rowCount"],
+                    }
+                    for name, artifact in sorted(manifest["tableArtifacts"].items())
+                },
+            }
+            forged_id = canonical_sha256(forged_identity)
+            forged_path = snapshot.path.with_name(forged_id)
+            snapshot.path.rename(forged_path)
+            manifest["snapshotId"] = forged_id
+            (forged_path / "snapshot.json").write_text(json.dumps(manifest), encoding="utf-8")
+            row.artifact_root = str(forged_path)
+            db.commit()
+
+            with self.assertRaisesRegex(SnapshotIntegrityError, "registry"):
+                freeze_input_snapshot(
+                    db,
+                    self.config,
+                    self.snapshot_root,
+                    capacity_policy=self.capacity,
+                )
+            db.refresh(row)
+            self.assertEqual(row.status, "failed")
 
     def test_finalize_failure_leaves_registry_failed_not_complete(self):
         with Session(self.engine) as db:
