@@ -34,6 +34,16 @@ python scripts/research/run_quant_research.py --quality-run-id <QUALITY_RUN_ID>
 
 正式镜像必须注入真实 `APP_GIT_COMMIT`。运行顺序固定为 quality gate → input snapshot → features/targets → simulation → metrics → manifest → finalize，产物保存于 `outputs/research-runs/` 的独立持久卷。输入 CSV 使用稳定列、writer 强制的自然键单调去重、固定 null 语义和 `gzip mtime=0`；文件登记 complete 前会 fsync 并原子 rename。universe 路径只作相对审计元数据，不进入 config/snapshot 身份；身份绑定实际来源 SHA、成员工件 SHA 和 `universeHash`。
 
+每个阶段完成后会原子写入 checkpoint、输入/输出 hash 和前一 checkpoint hash，并同步 `stage` 与 `heartbeat_at`。真实进程中断不会被伪装成业务失败：运行记录与 `.RUN_ID.tmp` 保持 `running`，下一次 CLI 启动按阈值把陈旧运行转为 `interrupted`，并在 `checkpoints/recovery.json` 保留审计事件。之后只能显式续跑：
+
+```bash
+python scripts/research/run_quant_research.py \
+  --resume <RUN_ID> \
+  --stale-after-seconds 300
+```
+
+`--resume` 与 `--quality-run-id` 互斥。续跑会先校验 config/code/environment/snapshot/reproducibility key、完整 checkpoint 哈希链和已完成阶段的归档文件；校验通过后只执行最后有效 checkpoint 之后的阶段。身份变化要求新建 run，checkpoint 或归档损坏则直接停止，不能静默跳过或覆盖。
+
 离线复现只读取运行目录内的冻结输入，不访问在线行情表：
 
 ```bash

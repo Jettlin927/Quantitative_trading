@@ -670,16 +670,16 @@ data_snapshots：
 
 **实施**
 
-- [ ] runner 每完成一个阶段更新 heartbeat、stage 和 checkpoint hash。
-- [ ] 进程重启后 stale running 转为 interrupted，而不是永远 running。
-- [ ] --resume RUN_ID 逐阶段校验 checkpoint，已完成且 hash 正确的阶段不重复计算。
-- [ ] 任何输入或代码指纹不一致时拒绝原 run 续跑，只能新建 run。
-- [ ] 不要求本阶段自动重启所有研究；要求安全恢复、显式续跑且不产生半成品成功记录。
+- [x] runner 每完成一个阶段更新 heartbeat、stage 和 checkpoint hash。
+- [x] 进程重启后 stale running 转为 interrupted，而不是永远 running。
+- [x] --resume RUN_ID 逐阶段校验 checkpoint，已完成且 hash 正确的阶段不重复计算。
+- [x] 任何输入或代码指纹不一致时拒绝原 run 续跑，只能新建 run。
+- [x] 不要求本阶段自动重启所有研究；要求安全恢复、显式续跑且不产生半成品成功记录。
 
 **验收**
 
-- [ ] 在 snapshot、simulation 和 finalize 三个阶段分别模拟中断，均可从最后有效 checkpoint 继续。
-- [ ] 损坏 checkpoint 时停止，不静默跳过。
+- [x] 在 snapshot、simulation 和 finalize 三个阶段分别模拟中断，均可从最后有效 checkpoint 继续。
+- [x] 损坏 checkpoint 时停止，不静默跳过。
 
 ### Task 4.4：修复日更并发和刷新顺序
 
