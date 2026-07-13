@@ -125,6 +125,25 @@ class AShareB1TrendPullbackTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "无停牌沿用证据"):
             calculate_b1_feature_frame(bars, self.config)
 
+    def test_flat_kdj_window_stays_numeric_and_ineligible(self) -> None:
+        dates = pd.bdate_range("2024-01-02", periods=120)
+        bars = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": "SYN001.SZ",
+                "adj_high": 10.0,
+                "adj_low": 10.0,
+                "adj_close": 10.0,
+                "vol": 1000.0,
+                "is_valuation_carried": False,
+            }
+        )
+
+        features = calculate_b1_feature_frame(bars, self.config)
+
+        self.assertTrue(features["kdj_j"].isna().all())
+        self.assertFalse(features["entry_signal"].any())
+
     def test_next_open_t3_exit_and_declared_t3_off_are_distinct(self) -> None:
         dates = pd.bdate_range("2025-01-02", periods=6)
         calendar = _calendar(dates, self.addCleanup)

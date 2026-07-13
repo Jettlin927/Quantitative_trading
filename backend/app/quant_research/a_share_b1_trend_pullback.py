@@ -196,7 +196,7 @@ def calculate_b1_feature_frame(
         ).mean()
         low_min = item["adj_low"].rolling(kdj_window, min_periods=kdj_window).min()
         high_max = item["adj_high"].rolling(kdj_window, min_periods=kdj_window).max()
-        denominator = (high_max - low_min).replace(0, pd.NA)
+        denominator = (high_max - low_min).replace(0, float("nan"))
         rsv = ((close - low_min) / denominator * 100.0).clip(lower=0.0, upper=100.0)
         item["kdj_k"] = rsv.ewm(alpha=1 / 3, adjust=False, min_periods=1).mean()
         item["kdj_d"] = item["kdj_k"].ewm(alpha=1 / 3, adjust=False, min_periods=1).mean()
