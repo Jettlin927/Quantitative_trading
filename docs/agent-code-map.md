@@ -94,11 +94,12 @@
   - 信任边界以 `docs/research/quant-foundation-trust-contract.md` 为准；新 loader、特征、模拟器和 runner 必须先满足其 quality scope、宇宙血缘和时点可得合同。
   - `dataset.py`：严格复权、公告日 point-in-time 关联、历史成员筛选。
   - `repository.py`：从 DB 加载显式历史股票池和基准；缺历史上市、复权或涨跌停数据时失败。
-  - `strategy_registry.py`：五条源码静态登记策略的身份、scope、必需冻结表、示例配置和函数分发；禁止动态 import。
+  - `strategy_registry.py`：六条源码静态登记策略的身份、scope、必需冻结表、示例配置和函数分发；禁止动态 import。
   - `features.py`：baseline 实际使用的因果时序/横截面特征；warmup 保持 null。
   - `etf_trend_baseline.py`：固定 120 日均线、月末 1/0 目标的 ETF baseline。
   - `etf_volatility_managed.py`：预登记的月度倒数方差/倒数波动率 ETF 暴露，以及校准期中位数固定门槛的低波动 0/100% 准入探索。
   - `a_share_price_baseline.py`：固定 120–20 动量、60 日波动和历史行业成员的 A 股价格 baseline。
+  - `a_share_b1_trend_pullback.py`：公开 B1 趋势回调描述的事前固定近似复现；含 BBI/双重 EMA/KDJ、沪深300市场门、Top2 代理排序、分档止盈和现实成交账本。
   - `portfolio.py`：下一交易日开盘目标权重模拟，一次产生 NAV、请求、模拟执行和逐日持仓；含现金、成本及开盘可买卖硬约束。
   - `metrics.py`：绝对/基准相对、回撤持续期、成本、换手、持仓和集中度指标。
   - `validation.py`：固定参数 anchored/rolling walk-forward，仅输出 test/OOS 指标。
@@ -114,6 +115,10 @@
 - `scripts/research/render_etf_trend_120d_report.py`
   - 只接受固定120日趋势的基础、零、双倍成本三个 canonical 运行，重建同一ETF被动基准与同平均暴露静态组合，并生成长历史 HTML/JSON 报告。
   - 报告首屏明确完整周期与年度子区间，避免把逐年稳定性表误读为总回测只有一年。
+
+- `scripts/research/render_a_share_b1_report.py`
+  - 只接受五个事前登记 B1 场景和固定断网复现身份，重新计算来源对照、长历史、执行、风险、环境、压力期和 walk-forward 摘要。
+  - 生成以 100,000 元为统一展示本金的 HTML/JSON 报告，并把“近似复现”与“原网页数值复现”明确分开。
 
 - `backend/tests/fixtures/quant_research_golden/`
   - 完全合成的 2 股票 + 1 ETF + 1 指数、15 交易日黄金夹具。
