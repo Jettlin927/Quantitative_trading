@@ -32,11 +32,18 @@ from .manifest import (
     build_result_fingerprint,
 )
 from .metrics import summarize_execution_metrics
+from .risk import (
+    RISK_CONTRIBUTION_COLUMNS,
+    RISK_EXPOSURE_COLUMNS,
+    calculate_frozen_risk_frames,
+    validate_risk_artifacts,
+)
 from .run_config import (
     FormalRunConfigurationError,
     build_reproducibility_key,
     canonical_sha256,
     canonical_run_config_sha256,
+    validate_risk_policy,
     validate_run_config,
 )
 from .snapshot import (
@@ -508,6 +515,7 @@ def _execute_pipeline(
         positions = read_canonical_csv_gz(working / "positions.csv.gz")
         metrics.update(summarize_execution_metrics(nav, requests, executions, positions))
         walk_forward_artifacts: dict[str, dict[str, Any]] = {}
+        risk_artifacts: dict[str, dict[str, Any]] = {}
         metric_outputs: dict[str, Any] = {}
         if _walk_forward_enabled(normalized):
             windows, window_metrics, walk_forward_summary = _evaluate_walk_forward(
@@ -533,11 +541,44 @@ def _execute_pipeline(
                 "walk_forward_windows.csv.gz": windows_artifact,
                 "walk_forward_metrics.csv.gz": window_metrics_artifact,
             }
-            metric_outputs = {
-                "walkForwardWindows": windows_artifact,
-                "walkForwardMetrics": window_metrics_artifact,
-            }
+            metric_outputs.update(
+                {
+                    "walkForwardWindows": windows_artifact,
+                    "walkForwardMetrics": window_metrics_artifact,
+                }
+            )
             metrics["walkForward"] = walk_forward_summary
+        if _risk_enabled(normalized):
+            risk = calculate_frozen_risk_frames(
+                working / "inputs",
+                normalized,
+                nav,
+                positions,
+                compressed=True,
+                table_artifacts=table_artifacts,
+            )
+            exposures_artifact = write_dataframe_csv_gz(
+                working / "risk_exposures.csv.gz",
+                risk.exposures,
+                columns=RISK_EXPOSURE_COLUMNS,
+                natural_key=("trade_date",),
+            )
+            contributions_artifact = write_dataframe_csv_gz(
+                working / "risk_contributions.csv.gz",
+                risk.contributions,
+                columns=RISK_CONTRIBUTION_COLUMNS,
+                natural_key=("trade_date", "ts_code"),
+            )
+            risk_artifacts = {
+                "risk_exposures.csv.gz": exposures_artifact,
+                "risk_contributions.csv.gz": contributions_artifact,
+            }
+            metric_outputs.update(
+                {
+                    "riskExposures": exposures_artifact,
+                    "riskContributions": contributions_artifact,
+                }
+            )
         limitations = sorted(set(strategy.limitations()))
         metrics_artifact = atomic_write_json(working / "metrics.json", metrics)
         limitations_artifact = atomic_write_json(working / "limitations.json", limitations)
@@ -575,6 +616,16 @@ def _execute_pipeline(
                     checkpoints, "metrics", "walkForwardMetrics"
                 ),
             }
+        risk_artifacts = {}
+        if _risk_enabled(normalized):
+            risk_artifacts = {
+                "risk_exposures.csv.gz": _checkpoint_artifact(
+                    checkpoints, "metrics", "riskExposures"
+                ),
+                "risk_contributions.csv.gz": _checkpoint_artifact(
+                    checkpoints, "metrics", "riskContributions"
+                ),
+            }
 
     if "manifest" not in checkpoints:
         artifact_hashes = {
@@ -591,6 +642,7 @@ def _execute_pipeline(
             "metrics.json": metrics_artifact,
             "limitations.json": limitations_artifact,
             **walk_forward_artifacts,
+            **risk_artifacts,
         }
         manifest = build_research_manifest(
             run_id=run.run_id,
@@ -716,6 +768,9 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
     walk_forward_enabled = _walk_forward_enabled(config)
     if walk_forward_enabled and artifact_schema_version != 2:
         raise SnapshotIntegrityError("walk-forward 工件只允许归档 schema v2")
+    risk_enabled = _risk_enabled(config)
+    if risk_enabled and artifact_schema_version != 2:
+        raise SnapshotIntegrityError("风险工件只允许归档 schema v2")
 
     expected = manifest["artifactHashes"]
     _validate_manifest_input_artifacts(
@@ -723,6 +778,7 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
         table_artifacts,
         artifact_schema_version,
         walk_forward_enabled=walk_forward_enabled,
+        risk_enabled=risk_enabled,
     )
     if build_result_fingerprint(expected) != manifest.get("resultFingerprint"):
         raise SnapshotIntegrityError("manifest resultFingerprint 与产物哈希不一致")
@@ -754,6 +810,19 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
                 "walk_forward_metrics.csv.gz": (
                     WALK_FORWARD_METRIC_COLUMNS,
                     ("window_id",),
+                ),
+            }
+        )
+    if risk_enabled:
+        csv_contracts.update(
+            {
+                "risk_exposures.csv.gz": (
+                    RISK_EXPOSURE_COLUMNS,
+                    ("trade_date",),
+                ),
+                "risk_contributions.csv.gz": (
+                    RISK_CONTRIBUTION_COLUMNS,
+                    ("trade_date", "ts_code"),
                 ),
             }
         )
@@ -801,6 +870,15 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
                 raise SnapshotIntegrityError("归档 walk-forward 汇总与 OOS 工件不一致")
         elif "walkForward" in persisted_metrics:
             raise SnapshotIntegrityError("未启用 walk-forward 的归档包含额外汇总")
+        if risk_enabled:
+            try:
+                validate_risk_artifacts(
+                    frames["risk_exposures.csv.gz"],
+                    frames["risk_contributions.csv.gz"],
+                    config["riskPolicy"],
+                )
+            except ValueError as exc:
+                raise SnapshotIntegrityError("归档风险工件无法对账") from exc
     _validate_archive_checkpoint_chain(run_path, manifest)
     return manifest, config
 
@@ -909,6 +987,27 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
                 natural_key=("window_id",),
             )
             metrics["walkForward"] = walk_forward_summary
+        if _risk_enabled(config):
+            risk = calculate_frozen_risk_frames(
+                run_path / "inputs",
+                config,
+                persisted_nav,
+                metrics_simulation.positions,
+                compressed=True,
+                table_artifacts=table_artifacts,
+            )
+            actual["risk_exposures.csv.gz"] = write_dataframe_csv_gz(
+                temporary / "risk_exposures.csv.gz",
+                risk.exposures,
+                columns=RISK_EXPOSURE_COLUMNS,
+                natural_key=("trade_date",),
+            )
+            actual["risk_contributions.csv.gz"] = write_dataframe_csv_gz(
+                temporary / "risk_contributions.csv.gz",
+                risk.contributions,
+                columns=RISK_CONTRIBUTION_COLUMNS,
+                natural_key=("trade_date", "ts_code"),
+            )
         actual["metrics.json"] = atomic_write_json(temporary / "metrics.json", metrics)
     mismatches = [
         name
@@ -979,6 +1078,10 @@ def _summarize_reproduction_metrics(
 
 def _walk_forward_enabled(config: dict[str, Any]) -> bool:
     return validate_validation_policy(config.get("validationPolicy"))["mode"] != "none"
+
+
+def _risk_enabled(config: dict[str, Any]) -> bool:
+    return validate_risk_policy(config.get("riskPolicy"))["mode"] != "none"
 
 
 def _evaluate_walk_forward(
@@ -1221,6 +1324,16 @@ def _verify_completed_stage_artifacts(
                 )
                 expected_metric_outputs[artifact_name] = artifact
                 verify_csv_artifact(working / filename, artifact)
+        if _risk_enabled(dict(run.config or {})):
+            for filename, artifact_name in (
+                ("risk_exposures.csv.gz", "riskExposures"),
+                ("risk_contributions.csv.gz", "riskContributions"),
+            ):
+                artifact = _checkpoint_artifact(
+                    checkpoints, "metrics", artifact_name
+                )
+                expected_metric_outputs[artifact_name] = artifact
+                verify_csv_artifact(working / filename, artifact)
         if checkpoints["metrics"]["outputs"] != expected_metric_outputs:
             raise ResumeIntegrityError("metrics checkpoint 输出集合不一致")
     if "manifest" in checkpoints:
@@ -1376,6 +1489,7 @@ def _validate_manifest_input_artifacts(
     artifact_schema_version: int,
     *,
     walk_forward_enabled: bool,
+    risk_enabled: bool,
 ) -> None:
     if (
         not isinstance(artifact_hashes, dict)
@@ -1415,6 +1529,13 @@ def _validate_manifest_input_artifacts(
             {
                 "walk_forward_windows.csv.gz",
                 "walk_forward_metrics.csv.gz",
+            }
+        )
+    if risk_enabled:
+        required_outputs.update(
+            {
+                "risk_exposures.csv.gz",
+                "risk_contributions.csv.gz",
             }
         )
     if set(artifact_hashes) != set(expected_inputs) | required_outputs:
@@ -1590,6 +1711,15 @@ def _validate_archive_checkpoint_artifacts(
                 ],
             }
         )
+    if _risk_enabled(manifest["config"]):
+        expected_metric_outputs.update(
+            {
+                "riskExposures": artifact_hashes["risk_exposures.csv.gz"],
+                "riskContributions": artifact_hashes[
+                    "risk_contributions.csv.gz"
+                ],
+            }
+        )
     expected_metric_inputs = {"nav": nav}
     if manifest.get("artifactSchemaVersion", 1) == 2:
         expected_metric_inputs.update(
@@ -1722,11 +1852,11 @@ def _cleanup_uncommitted_stage_files(
 ) -> None:
     completed_count = len(checkpoints)
     stage_outputs = {
-        0: ("quality.json", "inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        1: ("inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        2: ("targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        3: ("nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        4: ("walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        0: ("quality.json", "inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        1: ("inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        2: ("targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        3: ("nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        4: ("walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
         5: ("manifest.json",),
         6: (),
         7: (),

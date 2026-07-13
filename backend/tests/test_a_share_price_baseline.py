@@ -200,6 +200,14 @@ class ASharePriceBaselineTest(unittest.TestCase):
                 "walk_forward_metrics.csv.gz",
                 result.manifest["artifactHashes"],
             )
+            self.assertIn(
+                "risk_exposures.csv.gz",
+                result.manifest["artifactHashes"],
+            )
+            self.assertIn(
+                "risk_contributions.csv.gz",
+                result.manifest["artifactHashes"],
+            )
             self.assertTrue(reproduce_quant_research(result.path)["matches"])
         finally:
             engine.dispose()
@@ -243,6 +251,11 @@ def _config(quality_run_id: str, dates: pd.DatetimeIndex) -> dict[str, object]:
             "trainPeriods": 20,
             "testPeriods": 10,
             "stepPeriods": 10,
+        },
+        "riskPolicy": {
+            "mode": "rolling_covariance",
+            "lookbackPeriods": 60,
+            "minPeriods": 20,
         },
     }
 

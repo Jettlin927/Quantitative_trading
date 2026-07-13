@@ -39,6 +39,36 @@ class FormalRunConfigurationError(ValueError):
     pass
 
 
+def validate_risk_policy(policy: Any) -> dict[str, Any]:
+    if policy is None:
+        return {"mode": "none"}
+    if not isinstance(policy, dict):
+        raise ValueError("riskPolicy 必须是 JSON object")
+    if policy == {"mode": "none"}:
+        return {"mode": "none"}
+    required = {"mode", "lookbackPeriods", "minPeriods"}
+    if set(policy) != required or policy.get("mode") != "rolling_covariance":
+        raise ValueError(
+            "riskPolicy 只允许 none 或固定 rolling_covariance/lookbackPeriods/minPeriods"
+        )
+    lookback = policy["lookbackPeriods"]
+    minimum = policy["minPeriods"]
+    if (
+        isinstance(lookback, bool)
+        or not isinstance(lookback, int)
+        or isinstance(minimum, bool)
+        or not isinstance(minimum, int)
+        or minimum < 2
+        or lookback < minimum
+    ):
+        raise ValueError("riskPolicy 必须满足 2 <= minPeriods <= lookbackPeriods")
+    return {
+        "mode": "rolling_covariance",
+        "lookbackPeriods": lookback,
+        "minPeriods": minimum,
+    }
+
+
 def canonical_json_bytes(value: Any) -> bytes:
     normalized = _normalize_value(value)
     return json.dumps(
@@ -104,6 +134,10 @@ def validate_run_config(
         )
     else:
         validate_validation_policy(None)
+    if "riskPolicy" in normalized:
+        normalized["riskPolicy"] = validate_risk_policy(normalized["riskPolicy"])
+    else:
+        validate_risk_policy(None)
 
     warmup_start = _parse_date(normalized["warmupStart"], "warmupStart")
     start_date = _parse_date(normalized["startDate"], "startDate")

@@ -81,10 +81,18 @@ def build_result_fingerprint(artifact_hashes: Mapping[str, Mapping[str, Any]]) -
     present_walk_forward = walk_forward_names & set(artifact_hashes)
     if present_walk_forward and present_walk_forward != walk_forward_names:
         raise ValueError("结果指纹的 walk-forward 工件必须完整")
+    risk_names = {
+        "risk_exposures.csv.gz",
+        "risk_contributions.csv.gz",
+    }
+    present_risk = risk_names & set(artifact_hashes)
+    if present_risk and present_risk != risk_names:
+        raise ValueError("结果指纹的风险工件必须完整")
     deterministic_names = (
         base_names
         | (ledger_names if present_ledgers else set())
         | (walk_forward_names if present_walk_forward else set())
+        | (risk_names if present_risk else set())
     )
     deterministic = {
         name: artifact["contentSha256"]

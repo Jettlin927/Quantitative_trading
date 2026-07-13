@@ -172,6 +172,11 @@ class ResearchWalkForwardTest(unittest.TestCase):
             "walk_forward_windows.csv.gz",
             result.manifest["artifactHashes"],
         )
+        self.assertNotIn("riskPolicy", result.manifest["config"])
+        self.assertNotIn(
+            "risk_exposures.csv.gz",
+            result.manifest["artifactHashes"],
+        )
         self.assertTrue(reproduce_quant_research(result.path)["matches"])
 
 
