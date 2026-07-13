@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from backend.app import main
 from backend.app.database import Base
 from backend.app.models import DataOverviewSnapshot, Stock, StockDailyBar
+from backend.app.schemas import DataQualityRunRequest
 
 
 class DataApiContractTest(unittest.TestCase):
@@ -100,6 +101,38 @@ class DataApiContractTest(unittest.TestCase):
         self.assertNotIn("/api/strategy-evaluations", paths)
         self.assertNotIn("/api/strategies/executable/cross-section-strength-risk8", paths)
         self.assertNotIn("/api/backtests/run", paths)
+
+    def test_industry_membership_quality_request_uses_source_key_without_inline_members(self):
+        request = DataQualityRunRequest(
+            scope="a_share_cross_section",
+            start_date=date(2026, 1, 2),
+            end_date=date(2026, 1, 5),
+            universe_type="industry_membership",
+            universe_source="industry_members",
+            universe_source_key="synind.si",
+            benchmark="synidx.sh",
+        )
+
+        self.assertEqual(request.universe, [])
+        self.assertEqual(request.universe_source_key, "SYNIND.SI")
+        self.assertEqual(request.benchmark, "SYNIDX.SH")
+        for override in (
+            {"universe": ["SYN001.SZ"]},
+            {"universe_source": "local/path.txt"},
+            {"universe_source_key": None},
+            {"universe_as_of_date": date(2026, 1, 2)},
+        ):
+            values = {
+                "scope": "a_share_cross_section",
+                "start_date": date(2026, 1, 2),
+                "end_date": date(2026, 1, 5),
+                "universe_type": "industry_membership",
+                "universe_source": "industry_members",
+                "universe_source_key": "SYNIND.SI",
+                **override,
+            }
+            with self.subTest(override=override), self.assertRaises(ValueError):
+                DataQualityRunRequest(**values)
 
     def test_p0_table_contracts_and_mappers_exist(self):
         for table_name in [

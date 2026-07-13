@@ -11,7 +11,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from backend.app.database import Base
-from backend.app.models import StockAdjustFactor, StockDailyBar, StockLimitPrice, StockListing, StockSuspendEvent
+from backend.app.models import (
+    IndustryClassification,
+    IndustryMember,
+    StockAdjustFactor,
+    StockDailyBar,
+    StockLimitPrice,
+    StockListing,
+    StockSuspendEvent,
+    TradeCalendar,
+)
 from backend.app.quant_research.calendar import (
     build_open_trade_calendar,
     canonical_trade_calendar_bytes,
@@ -26,7 +35,7 @@ from backend.app.quant_research.repository import load_stock_research_panel
 from backend.app.quant_research.universe import (
     build_explicit_universe,
     build_historical_membership_panel,
-    build_historical_universe,
+    build_industry_membership_universe,
     evaluate_universe_provenance,
 )
 from backend.app.quant_research.validation import build_walk_forward_windows
@@ -39,7 +48,6 @@ def formal_targets(rows: list[dict[str, object]]) -> pd.DataFrame:
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 UNIVERSE_ONE = FIXTURE_DIR / "universe-000001.txt"
 UNIVERSE_TWO = FIXTURE_DIR / "universe-000001-000002.txt"
-HISTORICAL_SOURCE = FIXTURE_DIR / "quant_research_golden" / "industry_members.csv"
 TEST_CALENDAR_DIR = tempfile.TemporaryDirectory(prefix="quant-trade-calendar-")
 
 
@@ -402,6 +410,29 @@ class QuantResearchDatasetTest(unittest.TestCase):
         Base.metadata.create_all(engine)
         dates = [pd.Timestamp("2026-01-05").date(), pd.Timestamp("2026-01-06").date()]
         with Session(engine) as db:
+            db.add(
+                IndustryClassification(
+                    index_code="SYN.SI",
+                    industry_name="合成行业",
+                )
+            )
+            db.add_all(
+                [
+                    IndustryMember(
+                        index_code="SYN.SI",
+                        con_code="A.SZ",
+                        in_date=dates[0],
+                        out_date=dates[0],
+                    ),
+                    IndustryMember(
+                        index_code="SYN.SI",
+                        con_code="B.SZ",
+                        in_date=dates[1],
+                    ),
+                ]
+            )
+            for day in dates:
+                db.add(TradeCalendar(exchange="SSE", cal_date=day, is_open=True))
             for code in ("A.SZ", "B.SZ"):
                 db.add(
                     StockListing(
@@ -417,25 +448,7 @@ class QuantResearchDatasetTest(unittest.TestCase):
                     db.add(StockAdjustFactor(ts_code=code, trade_date=day, adj_factor=1))
                     db.add(StockLimitPrice(ts_code=code, trade_date=day, pre_close=10, up_limit=11, down_limit=9))
             db.commit()
-        memberships = pd.DataFrame(
-            [
-                {"index_code": "SYN.SI", "con_code": "A.SZ", "in_date": "2020-01-01", "out_date": "2026-01-05"},
-                {"index_code": "SYN.SI", "con_code": "B.SZ", "in_date": "2026-01-06", "out_date": None},
-            ]
-        )
-        listings = pd.DataFrame(
-            [
-                {"ts_code": "A.SZ", "list_date": "2020-01-01", "delist_date": None},
-                {"ts_code": "B.SZ", "list_date": "2020-01-01", "delist_date": None},
-            ]
-        )
-        universe = build_historical_universe(
-            memberships,
-            listings,
-            dates,
-            "SYN.SI",
-            source=str(HISTORICAL_SOURCE),
-        )
+        universe = build_industry_membership_universe("SYN.SI")
 
         panel = load_stock_research_panel(engine, universe, dates[0], dates[-1])
 
@@ -487,7 +500,7 @@ class QuantResearchUniverseTest(unittest.TestCase):
         self.assertIn("static_universe", historical_result["warnings"])
         self.assertTrue(historical_result["survivorshipRisk"])
 
-        forged = {"mode": "historical_membership", "source": "x"}
+        forged = {"mode": "industry_membership", "source": "x"}
         self.assertEqual(evaluate_universe_provenance(forged, "a_share_cross_section", "2026-01-01")["status"], "blocked")
 
         with self.assertRaisesRegex(ValueError, "source 文件不存在"):
@@ -529,15 +542,9 @@ class QuantResearchUniverseTest(unittest.TestCase):
             {"trade_date": pd.Timestamp("2026-01-07"), "ts_code": "B"},
         ])
 
-        universe = build_historical_universe(
-            memberships,
-            listings,
-            ["2026-01-05", "2026-01-06", "2026-01-07"],
-            "801080.SI",
-            source=str(HISTORICAL_SOURCE),
-        )
+        universe = build_industry_membership_universe("801080.SI")
         self.assertEqual(evaluate_universe_provenance(universe, "a_share_cross_section", "2026-01-05")["status"], "ready")
-        tampered = {**universe, "memberArtifact": {**universe["memberArtifact"], "count": 99}}
+        tampered = {**universe, "members": ["A"]}
         self.assertEqual(evaluate_universe_provenance(tampered, "a_share_cross_section", "2026-01-05")["status"], "blocked")
 
 

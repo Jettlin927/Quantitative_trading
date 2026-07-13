@@ -57,9 +57,10 @@ def canonical_run_config_sha256(config: dict[str, Any]) -> str:
     identity = _normalize_value(config)
     universe = dict(identity.get("universe") or {})
     universe.pop("source", None)
-    source_artifact = dict(universe.get("sourceArtifact") or {})
-    source_artifact.pop("path", None)
-    universe["sourceArtifact"] = source_artifact
+    if "sourceArtifact" in universe:
+        source_artifact = dict(universe.get("sourceArtifact") or {})
+        source_artifact.pop("path", None)
+        universe["sourceArtifact"] = source_artifact
     identity["universe"] = universe
     return canonical_sha256(identity)
 
@@ -175,6 +176,20 @@ def _validate_universe(
 ) -> None:
     if not isinstance(universe, dict):
         raise ValueError("universe 必须是 JSON object")
+    if universe.get("mode") == "industry_membership":
+        if set(universe) != {"mode", "source", "sourceKey"}:
+            raise ValueError("industry_membership universe 只允许 mode/source/sourceKey")
+        if scope != "a_share_cross_section":
+            raise ValueError("industry_membership 只允许 A 股横截面研究")
+        if universe.get("source") != "industry_members":
+            raise ValueError("industry_membership source 必须为 industry_members")
+        source_key = str(universe.get("sourceKey") or "").strip().upper()
+        if not source_key or source_key != universe.get("sourceKey") or len(source_key) > 32:
+            raise ValueError("industry_membership sourceKey 必须是规范化行业代码")
+        result = evaluate_universe_provenance(universe, scope, start_date)
+        if result["status"] == "blocked":
+            raise ValueError(f"universe 来源门禁未通过：{', '.join(result['blockers'])}")
+        return
     required = {
         "mode",
         "source",
@@ -188,7 +203,7 @@ def _validate_universe(
     if missing:
         raise ValueError(f"universe 缺少字段：{', '.join(missing)}")
     if universe["mode"] != "explicit_snapshot":
-        raise ValueError("Phase 3 sentinel 只接受 explicit_snapshot universe")
+        raise ValueError("universe mode 不受支持")
     source = str(universe["source"]).strip()
     source_artifact = universe["sourceArtifact"]
     if not source or Path(source).is_absolute():

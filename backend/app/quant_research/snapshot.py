@@ -10,7 +10,7 @@ import shutil
 from typing import Any, Iterable
 from uuid import uuid4
 
-from sqlalchemy import Select, func, select, text
+from sqlalchemy import Select, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from ..models import (
@@ -22,6 +22,12 @@ from ..models import (
     FundDailyBar,
     Index,
     IndexDailyBar,
+    IndustryMember,
+    StockAdjustFactor,
+    StockDailyBar,
+    StockLimitPrice,
+    StockListing,
+    StockSuspendEvent,
     TradeCalendar,
 )
 from .artifacts import (
@@ -31,6 +37,7 @@ from .artifacts import (
     write_canonical_csv_gz,
 )
 from .run_config import canonical_sha256, validate_run_config
+from .universe import IndustryMembershipResolution, resolve_industry_membership
 
 
 GIB = 1024**3
@@ -41,6 +48,18 @@ ETF_SNAPSHOT_TABLES = {
     "funds",
     "fund_daily_bars",
     "fund_adjust_factors",
+    "indices",
+    "index_daily_bars",
+}
+A_SHARE_SNAPSHOT_TABLES = {
+    "universe",
+    "trade_calendars",
+    "stock_listings",
+    "stock_daily_bars",
+    "stock_adjust_factors",
+    "stock_limit_prices",
+    "stock_suspend_events",
+    "industry_members",
     "indices",
     "index_daily_bars",
 }
@@ -62,6 +81,8 @@ class SnapshotIntegrityError(SnapshotError):
 class SnapshotCapacityPolicy:
     min_remaining_bytes: int = 5 * GIB
     estimate_multiplier: int = 2
+    max_universe_date_pairs: int = 5_000_000
+    max_total_rows: int = 20_000_000
 
 
 @dataclass(frozen=True)
@@ -78,6 +99,7 @@ class TableSlice:
     columns: tuple[str, ...]
     natural_key: tuple[str, ...]
     statement: Select[Any]
+    allow_empty: bool = False
 
 
 def freeze_input_snapshot(
@@ -104,7 +126,42 @@ def freeze_input_snapshot(
         with Session(bind=registry_db.get_bind(), autoflush=False, expire_on_commit=False) as source_db:
             with source_db.begin():
                 _configure_snapshot_transaction(source_db, statement_timeout_ms)
-                slices = _build_etf_slices(normalized)
+                membership: IndustryMembershipResolution | None = None
+                if normalized["scope"] == "a_share_cross_section":
+                    membership = resolve_industry_membership(
+                        source_db,
+                        normalized["universe"]["sourceKey"],
+                        date.fromisoformat(normalized["warmupStart"]),
+                        date.fromisoformat(normalized["endDate"]),
+                    )
+                    _validate_snapshot_membership_identity(quality_run, membership)
+                    universe_hash = membership.universe_hash
+                    universe_columns = ("trade_date", "ts_code")
+                    universe_key = ("trade_date", "ts_code")
+                    universe_rows: Iterable[dict[str, object]] = membership.rows()
+                    universe_pair_count = len(membership.records)
+                    universe_source_artifact = {
+                        "format": "database_industry_membership_v1",
+                        "source": "industry_members",
+                        "sourceKey": membership.source_key,
+                        "memberSha256": membership.member_sha256,
+                        "memberCount": len(membership.records),
+                        "uniqueMemberCount": len(membership.symbols),
+                    }
+                else:
+                    universe_hash = normalized["universe"]["universeHash"]
+                    universe_columns = ("ts_code",)
+                    universe_key = ("ts_code",)
+                    universe_rows = (
+                        {"ts_code": code}
+                        for code in normalized["universe"]["members"]
+                    )
+                    universe_pair_count = len(normalized["universe"]["members"])
+                    universe_source_artifact = {
+                        "format": normalized["universe"]["sourceArtifact"]["format"],
+                        "sha256": normalized["universe"]["sourceArtifact"]["sha256"],
+                    }
+                slices = _build_snapshot_slices(normalized, membership)
                 estimates = {
                     item.name: int(
                         source_db.scalar(
@@ -114,15 +171,20 @@ def freeze_input_snapshot(
                     )
                     for item in slices
                 }
-                estimates["universe"] = len(normalized["universe"]["members"])
-                _enforce_capacity(snapshot_root, slices, estimates, capacity)
+                estimates["universe"] = universe_pair_count
+                _enforce_capacity(
+                    snapshot_root,
+                    slices,
+                    estimates,
+                    capacity,
+                    universe_pair_count=universe_pair_count,
+                )
 
-                universe_rows = ({"ts_code": code} for code in normalized["universe"]["members"])
                 universe_artifact = write_canonical_csv_gz(
                     inputs_dir / "universe.csv.gz",
-                    columns=("ts_code",),
+                    columns=universe_columns,
                     rows=universe_rows,
-                    natural_key=("ts_code",),
+                    natural_key=universe_key,
                 )
                 universe_artifact["filename"] = "inputs/universe.csv.gz"
                 table_artifacts["universe"] = universe_artifact
@@ -136,7 +198,7 @@ def freeze_input_snapshot(
                         rows=result.mappings(),
                         natural_key=item.natural_key,
                     )
-                    if artifact["rowCount"] == 0:
+                    if artifact["rowCount"] == 0 and not item.allow_empty:
                         raise SnapshotError(f"冻结切片缺少必需数据：{item.name}")
                     artifact["filename"] = f"inputs/{item.name}.csv.gz"
                     table_artifacts[item.name] = artifact
@@ -155,7 +217,7 @@ def freeze_input_snapshot(
             "startDate": normalized["startDate"],
             "endDate": normalized["endDate"],
             "benchmark": normalized["benchmark"],
-            "universeHash": normalized["universe"]["universeHash"],
+            "universeHash": universe_hash,
             "transaction": transaction_contract,
             "tableArtifacts": {
                 name: {
@@ -179,11 +241,8 @@ def freeze_input_snapshot(
             "startDate": normalized["startDate"],
             "endDate": normalized["endDate"],
             "benchmark": normalized["benchmark"],
-            "universeHash": normalized["universe"]["universeHash"],
-            "universeSourceArtifact": {
-                "format": normalized["universe"]["sourceArtifact"]["format"],
-                "sha256": normalized["universe"]["sourceArtifact"]["sha256"],
-            },
+            "universeHash": universe_hash,
+            "universeSourceArtifact": universe_source_artifact,
             "transaction": transaction_contract,
             "tableArtifacts": table_artifacts,
             "rowCounts": row_counts,
@@ -222,7 +281,7 @@ def freeze_input_snapshot(
                 scope=normalized["scope"],
                 start_date=date.fromisoformat(normalized["warmupStart"]),
                 end_date=date.fromisoformat(normalized["endDate"]),
-                universe_hash=normalized["universe"]["universeHash"],
+                universe_hash=universe_hash,
                 artifact_root=str(final_path),
                 table_artifacts=table_artifacts,
                 row_counts=row_counts,
@@ -285,8 +344,16 @@ def verify_snapshot_identity(manifest: dict[str, Any]) -> None:
     if missing:
         raise SnapshotIntegrityError(f"snapshot identity 缺少字段：{', '.join(missing)}")
     artifacts = manifest["tableArtifacts"]
-    if not isinstance(artifacts, dict) or set(artifacts) != ETF_SNAPSHOT_TABLES:
-        raise SnapshotIntegrityError("snapshot tableArtifacts 不是完整 ETF 输入集")
+    expected_tables = {
+        "etf_time_series": ETF_SNAPSHOT_TABLES,
+        "a_share_cross_section": A_SHARE_SNAPSHOT_TABLES,
+    }.get(manifest.get("scope"))
+    if (
+        expected_tables is None
+        or not isinstance(artifacts, dict)
+        or set(artifacts) != expected_tables
+    ):
+        raise SnapshotIntegrityError("snapshot tableArtifacts 与 scope 必需输入集不一致")
     for name, artifact in artifacts.items():
         _validate_table_artifact(name, artifact)
     _validate_transaction_contract(manifest["transaction"])
@@ -334,7 +401,10 @@ def verify_materialized_inputs(
     table_artifacts: dict[str, dict[str, Any]],
 ) -> None:
     try:
-        if set(table_artifacts) != ETF_SNAPSHOT_TABLES:
+        if frozenset(table_artifacts) not in {
+            frozenset(ETF_SNAPSHOT_TABLES),
+            frozenset(A_SHARE_SNAPSHOT_TABLES),
+        }:
             raise SnapshotIntegrityError("冻结输入表集不完整")
         for name, artifact in table_artifacts.items():
             _validate_table_artifact(name, artifact)
@@ -361,7 +431,12 @@ def validate_quality_gate(registry_db: Session, config: dict[str, Any]) -> DataQ
         raise SnapshotError(f"质量门禁未通过：{run.status}")
     if run.scope != config["scope"]:
         raise SnapshotError("质量运行 scope 与研究配置不一致")
-    if run.start_date > date.fromisoformat(config["warmupStart"]) or run.end_date < date.fromisoformat(config["endDate"]):
+    warmup_start = date.fromisoformat(config["warmupStart"])
+    end_date = date.fromisoformat(config["endDate"])
+    if config["universe"]["mode"] == "industry_membership":
+        if run.start_date != warmup_start or run.end_date != end_date:
+            raise SnapshotError("A 股质量运行日期必须精确等于 warmupStart 到 endDate")
+    elif run.start_date > warmup_start or run.end_date < end_date:
         raise SnapshotError("质量运行日期未覆盖 warmupStart 到 endDate")
     quality_config = run.config or {}
     if quality_config.get("universeHash") != run.universe_hash:
@@ -370,24 +445,39 @@ def validate_quality_gate(registry_db: Session, config: dict[str, Any]) -> DataQ
         raise SnapshotError("质量运行 universe 来源未验证")
     if quality_config.get("universeSourceIssue") not in {None, ""}:
         raise SnapshotError("质量运行 universe 来源存在未解决问题")
-    if (
-        quality_config.get("universeSourceSha256")
-        != config["universe"]["sourceArtifact"]["sha256"]
-    ):
-        raise SnapshotError("质量运行 universe 来源 SHA 与研究来源工件不一致")
-    quality_members = sorted(
-        {
-            str(value).strip().upper()
-            for value in quality_config.get("universe", [])
-            if str(value).strip()
-        }
-    )
-    if quality_members != config["universe"]["members"]:
-        raise SnapshotError("质量运行 universe 成员与研究来源工件不一致")
     if quality_config.get("universeType") != config["universe"]["mode"]:
         raise SnapshotError("质量运行 universe 类型与研究来源工件不一致")
-    if quality_config.get("universeAsOfDate") != config["universe"]["asOfDate"]:
-        raise SnapshotError("质量运行 universe 日期与研究来源工件不一致")
+    if config["universe"]["mode"] == "industry_membership":
+        if (
+            quality_config.get("universeSource") != "industry_members"
+            or quality_config.get("universeSourceKey") != config["universe"]["sourceKey"]
+            or quality_config.get("universeAsOfDate") is not None
+            or quality_config.get("universeSourceSha256")
+            != quality_config.get("universeMemberSha256")
+            or not SHA256_PATTERN.fullmatch(
+                str(quality_config.get("universeMemberSha256") or "")
+            )
+            or int(quality_config.get("universeMemberCount") or 0) <= 0
+            or int(quality_config.get("universeUniqueMemberCount") or 0) <= 0
+        ):
+            raise SnapshotError("质量运行 industry_membership 身份不完整")
+    else:
+        if (
+            quality_config.get("universeSourceSha256")
+            != config["universe"]["sourceArtifact"]["sha256"]
+        ):
+            raise SnapshotError("质量运行 universe 来源 SHA 与研究来源工件不一致")
+        quality_members = sorted(
+            {
+                str(value).strip().upper()
+                for value in quality_config.get("universe", [])
+                if str(value).strip()
+            }
+        )
+        if quality_members != config["universe"]["members"]:
+            raise SnapshotError("质量运行 universe 成员与研究来源工件不一致")
+        if quality_config.get("universeAsOfDate") != config["universe"]["asOfDate"]:
+            raise SnapshotError("质量运行 universe 日期与研究来源工件不一致")
     benchmark = (run.summary or {}).get("benchmark") or (run.config or {}).get("benchmark")
     if benchmark != config["benchmark"]:
         raise SnapshotError("质量运行 benchmark 与研究配置不一致")
@@ -542,6 +632,38 @@ def _configure_snapshot_transaction(db: Session, statement_timeout_ms: int) -> N
     db.execute(text(f"SET LOCAL statement_timeout = '{timeout}ms'"))
 
 
+def _validate_snapshot_membership_identity(
+    quality_run: DataQualityRun,
+    membership: IndustryMembershipResolution,
+) -> None:
+    quality_config = quality_run.config or {}
+    expected = {
+        "universeSource": "industry_members",
+        "universeSourceKey": membership.source_key,
+        "universeSourceSha256": membership.member_sha256,
+        "universeMemberSha256": membership.member_sha256,
+        "universeMemberCount": len(membership.records),
+        "universeUniqueMemberCount": len(membership.symbols),
+        "universeHash": membership.universe_hash,
+    }
+    actual = {key: quality_config.get(key) for key in expected}
+    if actual != expected or quality_run.universe_hash != membership.universe_hash:
+        raise SnapshotError("历史成员已变化，旧质量运行 universe 身份不可用于 snapshot")
+
+
+def _build_snapshot_slices(
+    config: dict[str, Any],
+    membership: IndustryMembershipResolution | None,
+) -> tuple[TableSlice, ...]:
+    if config["scope"] == "etf_time_series":
+        if membership is not None:
+            raise SnapshotError("ETF snapshot 不接受行业成员解析结果")
+        return _build_etf_slices(config)
+    if config["scope"] == "a_share_cross_section" and membership is not None:
+        return _build_a_share_slices(config, membership)
+    raise SnapshotError("snapshot scope 或 universe 解析结果无效")
+
+
 def _build_etf_slices(config: dict[str, Any]) -> tuple[TableSlice, ...]:
     if config["scope"] != "etf_time_series":
         raise SnapshotError("Phase 3 正式快照仅开放 etf_time_series")
@@ -570,7 +692,15 @@ def _build_etf_slices(config: dict[str, Any]) -> tuple[TableSlice, ...]:
         "amount",
     )
     factor_columns = ("ts_code", "trade_date", "adj_factor")
-    index_columns = ("ts_code", "name", "market", "publisher", "category", "base_date", "list_date")
+    index_columns = (
+        "ts_code",
+        "name",
+        "market",
+        "publisher",
+        "category",
+        "base_date",
+        "list_date",
+    )
     return (
         TableSlice(
             "trade_calendars",
@@ -639,12 +769,195 @@ def _build_etf_slices(config: dict[str, Any]) -> tuple[TableSlice, ...]:
     )
 
 
+def _build_a_share_slices(
+    config: dict[str, Any],
+    membership: IndustryMembershipResolution,
+) -> tuple[TableSlice, ...]:
+    members = membership.symbols
+    benchmark = config["benchmark"]
+    start = date.fromisoformat(config["warmupStart"])
+    end = date.fromisoformat(config["endDate"])
+    exchange = str(config["executionPolicy"].get("calendarExchange", "SSE")).upper()
+
+    def columns(model: Any, names: tuple[str, ...]) -> list[Any]:
+        return [getattr(model, name).label(name) for name in names]
+
+    calendar_columns = ("exchange", "cal_date", "is_open")
+    listing_columns = (
+        "ts_code",
+        "symbol",
+        "name",
+        "exchange",
+        "list_status",
+        "list_date",
+        "delist_date",
+    )
+    bar_columns = (
+        "ts_code",
+        "trade_date",
+        "open",
+        "high",
+        "low",
+        "close",
+        "pre_close",
+        "change_amount",
+        "pct_chg",
+        "vol",
+        "amount",
+    )
+    factor_columns = ("ts_code", "trade_date", "adj_factor")
+    limit_columns = ("ts_code", "trade_date", "pre_close", "up_limit", "down_limit")
+    suspend_columns = ("ts_code", "trade_date", "suspend_type", "suspend_timing")
+    membership_columns = (
+        "index_code",
+        "con_code",
+        "con_name",
+        "in_date",
+        "out_date",
+        "is_new",
+    )
+    index_columns = (
+        "ts_code",
+        "name",
+        "market",
+        "publisher",
+        "category",
+        "base_date",
+        "list_date",
+    )
+    return (
+        TableSlice(
+            "trade_calendars",
+            calendar_columns,
+            ("exchange", "cal_date"),
+            select(*columns(TradeCalendar, calendar_columns))
+            .where(
+                TradeCalendar.exchange == exchange,
+                TradeCalendar.cal_date >= start,
+                TradeCalendar.cal_date <= end,
+            )
+            .order_by(TradeCalendar.exchange, TradeCalendar.cal_date),
+        ),
+        TableSlice(
+            "stock_listings",
+            listing_columns,
+            ("ts_code",),
+            select(*columns(StockListing, listing_columns))
+            .where(StockListing.ts_code.in_(members))
+            .order_by(StockListing.ts_code),
+        ),
+        TableSlice(
+            "stock_daily_bars",
+            bar_columns,
+            ("ts_code", "trade_date"),
+            select(*columns(StockDailyBar, bar_columns))
+            .where(
+                StockDailyBar.ts_code.in_(members),
+                StockDailyBar.trade_date >= start,
+                StockDailyBar.trade_date <= end,
+            )
+            .order_by(StockDailyBar.ts_code, StockDailyBar.trade_date),
+        ),
+        TableSlice(
+            "stock_adjust_factors",
+            factor_columns,
+            ("ts_code", "trade_date"),
+            select(*columns(StockAdjustFactor, factor_columns))
+            .where(
+                StockAdjustFactor.ts_code.in_(members),
+                StockAdjustFactor.trade_date >= start,
+                StockAdjustFactor.trade_date <= end,
+            )
+            .order_by(StockAdjustFactor.ts_code, StockAdjustFactor.trade_date),
+        ),
+        TableSlice(
+            "stock_limit_prices",
+            limit_columns,
+            ("ts_code", "trade_date"),
+            select(*columns(StockLimitPrice, limit_columns))
+            .where(
+                StockLimitPrice.ts_code.in_(members),
+                StockLimitPrice.trade_date >= start,
+                StockLimitPrice.trade_date <= end,
+            )
+            .order_by(StockLimitPrice.ts_code, StockLimitPrice.trade_date),
+        ),
+        TableSlice(
+            "stock_suspend_events",
+            suspend_columns,
+            ("ts_code", "trade_date", "suspend_type", "suspend_timing"),
+            select(*columns(StockSuspendEvent, suspend_columns))
+            .where(
+                StockSuspendEvent.ts_code.in_(members),
+                StockSuspendEvent.trade_date >= start,
+                StockSuspendEvent.trade_date <= end,
+            )
+            .order_by(
+                StockSuspendEvent.ts_code,
+                StockSuspendEvent.trade_date,
+                StockSuspendEvent.suspend_type,
+                StockSuspendEvent.suspend_timing,
+            ),
+            allow_empty=True,
+        ),
+        TableSlice(
+            "industry_members",
+            membership_columns,
+            ("index_code", "con_code", "in_date"),
+            select(*columns(IndustryMember, membership_columns))
+            .where(
+                IndustryMember.index_code == membership.source_key,
+                IndustryMember.in_date <= end,
+                or_(IndustryMember.out_date.is_(None), IndustryMember.out_date >= start),
+            )
+            .order_by(
+                IndustryMember.index_code,
+                IndustryMember.con_code,
+                IndustryMember.in_date,
+            ),
+        ),
+        TableSlice(
+            "indices",
+            index_columns,
+            ("ts_code",),
+            select(*columns(Index, index_columns))
+            .where(Index.ts_code == benchmark)
+            .order_by(Index.ts_code),
+        ),
+        TableSlice(
+            "index_daily_bars",
+            bar_columns,
+            ("ts_code", "trade_date"),
+            select(*columns(IndexDailyBar, bar_columns))
+            .where(
+                IndexDailyBar.ts_code == benchmark,
+                IndexDailyBar.trade_date >= start,
+                IndexDailyBar.trade_date <= end,
+            )
+            .order_by(IndexDailyBar.ts_code, IndexDailyBar.trade_date),
+        ),
+    )
 def _enforce_capacity(
     root: Path,
     slices: Iterable[TableSlice],
     counts: dict[str, int],
     policy: SnapshotCapacityPolicy,
+    *,
+    universe_pair_count: int,
 ) -> None:
+    total_rows = sum(counts.values())
+    if universe_pair_count > policy.max_universe_date_pairs:
+        raise SnapshotCapacityError(
+            "快照容量门禁 blocked："
+            f"universe_date_pairs={universe_pair_count} 超过上限 "
+            f"{policy.max_universe_date_pairs}；不会写文件或自动删除。"
+        )
+    if total_rows > policy.max_total_rows:
+        raise SnapshotCapacityError(
+            "快照容量门禁 blocked："
+            f"estimated_rows={total_rows} 超过上限 {policy.max_total_rows}；"
+            "不会写文件或自动删除。"
+        )
     column_counts = {item.name: len(item.columns) for item in slices}
     column_counts["universe"] = 1
     estimated_bytes = sum(

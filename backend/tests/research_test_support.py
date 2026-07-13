@@ -20,9 +20,18 @@ from backend.app.models import (
     FundDailyBar,
     Index,
     IndexDailyBar,
+    IndustryClassification,
+    IndustryMember,
+    StockAdjustFactor,
+    StockDailyBar,
+    StockLimitPrice,
+    StockListing,
     TradeCalendar,
 )
-from backend.app.quant_research.universe import build_explicit_universe
+from backend.app.quant_research.universe import (
+    build_explicit_universe,
+    build_industry_membership_universe,
+)
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "quant_research_golden"
@@ -182,6 +191,155 @@ def golden_run_config(quality_run_id: str, _quality_universe_hash: str) -> dict[
         "targetWeightParameters": {
             "signalDate": "2026-01-09",
             "targetWeight": "1",
+        },
+        "executionPolicy": {
+            "signalPrice": "close",
+            "executionPrice": "next_trade_open",
+        },
+        "costModel": {
+            "buyRate": "0",
+            "sellRate": "0",
+            "slippageRate": "0",
+        },
+        "randomSeed": 7,
+        "timezone": "Asia/Shanghai",
+        "qualityRunId": quality_run_id,
+        "allowedWarnings": [],
+    }
+
+
+def seed_a_share_snapshot_database(db: Session) -> QualityCheckContract:
+    trade_dates = (date(2026, 1, 2), date(2026, 1, 5))
+    db.add_all(
+        [
+            IndustryClassification(
+                index_code="SYNIND.SI",
+                industry_name="合成行业",
+                level="L1",
+                src="test",
+            ),
+            IndustryMember(
+                index_code="SYNIND.SI",
+                con_code="SYN001.SZ",
+                con_name="合成一号",
+                in_date=date(2020, 1, 1),
+            ),
+            IndustryMember(
+                index_code="SYNIND.SI",
+                con_code="SYN002.SH",
+                con_name="合成二号",
+                in_date=date(2020, 1, 1),
+            ),
+            StockListing(
+                ts_code="SYN001.SZ",
+                symbol="SYN001",
+                name="合成一号",
+                exchange="SZSE",
+                list_status="L",
+                list_date=date(2020, 1, 1),
+            ),
+            StockListing(
+                ts_code="SYN002.SH",
+                symbol="SYN002",
+                name="合成二号",
+                exchange="SSE",
+                list_status="L",
+                list_date=date(2020, 1, 1),
+            ),
+            Index(
+                ts_code="SYNIDX.SH",
+                name="合成基准",
+                market="CSI",
+                publisher="test",
+                category="综合",
+                base_date=date(2020, 1, 1),
+                list_date=date(2020, 1, 1),
+            ),
+        ]
+    )
+    for offset, trade_date in enumerate(trade_dates):
+        db.add(
+            TradeCalendar(
+                exchange="SSE",
+                cal_date=trade_date,
+                is_open=True,
+            )
+        )
+        db.add(
+            IndexDailyBar(
+                ts_code="SYNIDX.SH",
+                trade_date=trade_date,
+                open=100 + offset,
+                high=101 + offset,
+                low=99 + offset,
+                close=100 + offset,
+                vol=1000,
+                amount=10000,
+            )
+        )
+        for symbol, base in (("SYN001.SZ", 10), ("SYN002.SH", 20)):
+            close = base + offset
+            db.add(
+                StockDailyBar(
+                    ts_code=symbol,
+                    trade_date=trade_date,
+                    open=close,
+                    high=close + 1,
+                    low=close - 1,
+                    close=close,
+                    pre_close=close,
+                    vol=100,
+                    amount=1000,
+                )
+            )
+            db.add(
+                StockAdjustFactor(
+                    ts_code=symbol,
+                    trade_date=trade_date,
+                    adj_factor=1,
+                )
+            )
+            db.add(
+                StockLimitPrice(
+                    ts_code=symbol,
+                    trade_date=trade_date,
+                    pre_close=close,
+                    up_limit=close * 1.1,
+                    down_limit=close * 0.9,
+                )
+            )
+    db.commit()
+    return QualityCheckContract.create(
+        scope="a_share_cross_section",
+        start_date=trade_dates[0],
+        end_date=trade_dates[-1],
+        universe=[],
+        benchmark="SYNIDX.SH",
+        universe_type="industry_membership",
+        universe_source="industry_members",
+        universe_source_key="SYNIND.SI",
+    )
+
+
+def a_share_snapshot_config(quality_run_id: str) -> dict[str, Any]:
+    return {
+        "strategyId": "a_share_price_baseline",
+        "strategyVersion": "1",
+        "scope": "a_share_cross_section",
+        "universe": build_industry_membership_universe("SYNIND.SI"),
+        "warmupStart": "2026-01-02",
+        "startDate": "2026-01-02",
+        "endDate": "2026-01-05",
+        "benchmark": "SYNIDX.SH",
+        "featureParameters": {
+            "momentumLongWindow": 120,
+            "momentumSkipWindow": 20,
+            "volatilityWindow": 60,
+        },
+        "targetWeightParameters": {
+            "rebalanceFrequency": "month_end",
+            "topN": 2,
+            "maxWeight": "0.5",
         },
         "executionPolicy": {
             "signalPrice": "close",

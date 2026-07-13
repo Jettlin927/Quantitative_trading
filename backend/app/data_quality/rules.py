@@ -15,6 +15,7 @@ from ..models import (
     FundDailyBar,
     Index as MarketIndex,
     IndexDailyBar,
+    IndustryMember,
     StockAdjustFactor,
     StockDailyBar,
     StockDailyBasic,
@@ -40,6 +41,7 @@ TABLE_SPECS: dict[str, TableSpec] = {
     "stock_adjust_factors": TableSpec(StockAdjustFactor, ("ts_code", "trade_date")),
     "stock_limit_prices": TableSpec(StockLimitPrice, ("ts_code", "trade_date")),
     "stock_suspend_events": TableSpec(StockSuspendEvent, ("ts_code", "trade_date", "suspend_type", "suspend_timing")),
+    "industry_members": TableSpec(IndustryMember, ("index_code", "con_code", "in_date")),
     "stock_daily_basic": TableSpec(StockDailyBasic, ("ts_code", "trade_date")),
     "stock_financial_indicators": TableSpec(StockFinancialIndicator, ("ts_code", "end_date", "ann_date")),
     "funds": TableSpec(Fund, ("ts_code",)),
@@ -492,13 +494,27 @@ def check_universe_provenance(contract: QualityCheckContract) -> QualityRuleResu
             samples=issues,
         )
     if contract.universe_type == "industry_membership":
-        issue = "industry_membership_source_required" if not contract.universe_source else "historical_membership_not_verified_in_quality_slice"
-        return QualityRuleResult.blocked(
-            "universe.provenance",
-            "industry_members",
-            checked_rows=len(contract.universe),
-            failed_rows=1,
-            sample_issues=[{"issue": issue}],
+        issues: list[dict[str, Any]] = []
+        if contract.universe_source != "industry_members":
+            issues.append({"issue": "industry_membership_source_invalid"})
+        if not contract.universe_source_key:
+            issues.append({"issue": "industry_membership_source_key_required"})
+        if not contract.universe_source_verified or contract.universe_source_issue:
+            issues.append({"issue": contract.universe_source_issue or "industry_membership_unverified"})
+        if (
+            not contract.universe_member_sha256
+            or contract.universe_source_sha256 != contract.universe_member_sha256
+            or contract.universe_member_count != len(contract.universe_membership_records)
+            or contract.universe_unique_member_count != len(contract.universe)
+        ):
+            issues.append({"issue": "industry_membership_audit_identity_invalid"})
+        return _quality_result(
+            rule_id="universe.provenance",
+            table_name="industry_members",
+            severity="blocker",
+            checked_rows=contract.universe_member_count,
+            failed_rows=len(issues),
+            samples=issues,
         )
     if contract.scope == "a_share_cross_section" and contract.universe_type == "static_current":
         return QualityRuleResult.blocked(
@@ -1001,6 +1017,18 @@ def _scope_filters(model: type[Any], contract: QualityCheckContract) -> tuple[An
             filters.append(MarketIndex.ts_code == contract.benchmark)
         else:
             filters.append(MarketIndex.ts_code == "__benchmark_required__")
+        return tuple(filters)
+    if model is IndustryMember:
+        filters.extend(
+            [
+                IndustryMember.index_code == contract.universe_source_key,
+                IndustryMember.in_date <= contract.end_date,
+                or_(
+                    IndustryMember.out_date.is_(None),
+                    IndustryMember.out_date >= contract.start_date,
+                ),
+            ]
+        )
         return tuple(filters)
     if model is IndexDailyBar:
         if contract.benchmark:

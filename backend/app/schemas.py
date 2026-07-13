@@ -185,9 +185,10 @@ class DataQualityRunRequest(BaseModel):
     scope: Literal["a_share_cross_section", "etf_time_series"]
     start_date: date
     end_date: date
-    universe: list[str] = Field(min_length=1, max_length=5000)
+    universe: list[str] = Field(default_factory=list, max_length=5000)
     universe_type: Literal["explicit_snapshot", "static_current", "industry_membership"] = "explicit_snapshot"
     universe_source: str | None = Field(default=None, max_length=200)
+    universe_source_key: str | None = Field(default=None, max_length=32)
     universe_as_of_date: date | None = None
     required_datasets: list[str] = Field(default_factory=list, max_length=20)
     benchmark: str | None = None
@@ -198,8 +199,6 @@ class DataQualityRunRequest(BaseModel):
     @classmethod
     def normalize_universe(cls, value: list[str]) -> list[str]:
         normalized = sorted({item.strip().upper() for item in value if item.strip()})
-        if not normalized:
-            raise ValueError("universe 必须包含至少一个有效代码")
         return normalized
 
     @field_validator("required_datasets")
@@ -216,6 +215,23 @@ class DataQualityRunRequest(BaseModel):
     def validate_date_range(self) -> "DataQualityRunRequest":
         if self.start_date > self.end_date:
             raise ValueError("start_date 不能晚于 end_date")
+        if self.universe_type == "industry_membership":
+            if self.scope != "a_share_cross_section":
+                raise ValueError("industry_membership 只允许 A 股横截面")
+            if self.universe:
+                raise ValueError("industry_membership 禁止 inline 当前成员列表")
+            if self.universe_source != "industry_members":
+                raise ValueError("industry_membership universe_source 必须为 industry_members")
+            if not self.universe_source_key or not self.universe_source_key.strip():
+                raise ValueError("industry_membership 必须提供 universe_source_key")
+            if self.universe_as_of_date is not None:
+                raise ValueError("industry_membership 禁止 universe_as_of_date")
+            self.universe_source_key = self.universe_source_key.strip().upper()
+        else:
+            if not self.universe:
+                raise ValueError("universe 必须包含至少一个有效代码")
+            if self.universe_source_key is not None:
+                raise ValueError("非 industry_membership 不接受 universe_source_key")
         return self
 
 
