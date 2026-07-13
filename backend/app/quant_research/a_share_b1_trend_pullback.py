@@ -549,7 +549,8 @@ def _prepare_execution_prices(prices: pd.DataFrame) -> pd.DataFrame:
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
         filled = frame.groupby("ts_code", sort=False)[column].ffill()
         frame.loc[carried, column] = filled[carried]
-    if frame[["open", "close", "adj_open", "adj_close"]].isna().any().any():
+    missing_execution_price = frame[["open", "close", "adj_open", "adj_close"]].isna().any(axis=1)
+    if (missing_execution_price & ~carried).any():
         raise ValueError("B1 执行行情存在无停牌证据的缺失价格")
     for column in ("is_buyable_at_open", "is_sellable_at_open"):
         frame[column] = frame[column].fillna(False).astype(bool)
