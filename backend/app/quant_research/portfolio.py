@@ -20,6 +20,14 @@ class CostModel:
             raise ValueError("交易成本参数不能为负数")
 
 
+@dataclass(frozen=True)
+class SimulationResult:
+    nav: pd.DataFrame
+    rebalance_requests: pd.DataFrame
+    rebalance_executions: pd.DataFrame
+    positions: pd.DataFrame
+
+
 def simulate_target_weights(
     prices: pd.DataFrame,
     targets: pd.DataFrame,
@@ -28,6 +36,23 @@ def simulate_target_weights(
     initial_nav: float = 1.0,
     cost: CostModel | None = None,
 ) -> pd.DataFrame:
+    return simulate_target_weights_with_ledger(
+        prices,
+        targets,
+        trade_calendar=trade_calendar,
+        initial_nav=initial_nav,
+        cost=cost,
+    ).nav
+
+
+def simulate_target_weights_with_ledger(
+    prices: pd.DataFrame,
+    targets: pd.DataFrame,
+    *,
+    trade_calendar: OpenTradeCalendar,
+    initial_nav: float = 1.0,
+    cost: CostModel | None = None,
+) -> SimulationResult:
     """Simulate full target portfolios that execute at the next trade-date open.
 
     This is a research return-space simulator. Missing prices remain hard data
@@ -49,6 +74,9 @@ def simulate_target_weights(
     cash_weight = 1.0
     previous_close: dict[str, float] = {}
     rows: list[dict[str, object]] = []
+    request_rows: list[dict[str, object]] = []
+    execution_rows: list[dict[str, object]] = []
+    position_rows: list[dict[str, object]] = []
 
     for trade_date in trade_dates:
         day = price_frame[price_frame["trade_date"] == trade_date].set_index("ts_code")
@@ -93,6 +121,15 @@ def simulate_target_weights(
             executable_buys = plan["buys"]
             blocked_buys = plan["blocked_buys"]
             blocked_sells = plan["blocked_sells"]
+            _append_rebalance_ledger(
+                request_rows,
+                execution_rows,
+                execution_date=trade_date,
+                signal_date=executed_signal_date,
+                plan=plan,
+                day=day,
+                cost=cost_model,
+            )
             sells = sum(executable_sells.values())
             buys = sum(executable_buys.values())
             transaction_cost = plan["transaction_cost"]
@@ -147,9 +184,42 @@ def simulate_target_weights(
                 "carried_valuation_count": carried_valuation_count,
             }
         )
+        position_rows.extend(
+            {
+                "trade_date": trade_date,
+                "ts_code": symbol,
+                "close_weight": float(weight),
+            }
+            for symbol, weight in sorted(weights.items())
+            if weight > 1e-12
+        )
         previous_close = close_prices
 
-    return pd.DataFrame(rows)
+    return SimulationResult(
+        nav=pd.DataFrame(rows),
+        rebalance_requests=pd.DataFrame(
+            request_rows,
+            columns=["execution_date", "signal_date", "ts_code", "requested_change", "side"],
+        ).sort_values(["execution_date", "ts_code"], kind="stable").reset_index(drop=True),
+        rebalance_executions=pd.DataFrame(
+            execution_rows,
+            columns=[
+                "execution_date",
+                "signal_date",
+                "ts_code",
+                "requested_change",
+                "executed_change",
+                "blocked_change",
+                "status",
+                "reason",
+                "transaction_cost_rate",
+            ],
+        ).sort_values(["execution_date", "ts_code"], kind="stable").reset_index(drop=True),
+        positions=pd.DataFrame(
+            position_rows,
+            columns=["trade_date", "ts_code", "close_weight"],
+        ).sort_values(["trade_date", "ts_code"], kind="stable").reset_index(drop=True),
+    )
 
 
 def _schedule_targets(targets: pd.DataFrame, trade_dates: list[pd.Timestamp]) -> dict[pd.Timestamp, tuple[pd.Timestamp, dict[str, float]]]:
@@ -224,6 +294,8 @@ def _plan_rebalance(
         if next_remaining_nav <= 0:
             raise ValueError("交易成本超过组合净值")
         plan = {
+            "requested_sells": requested_sells,
+            "requested_buys": requested_buys,
             "sells": executable_sells,
             "buys": executable_buys,
             "blocked_sells": blocked_sells,
@@ -238,6 +310,91 @@ def _plan_rebalance(
     if plan is None:
         raise AssertionError("调仓计划未生成")
     return plan
+
+
+def _append_rebalance_ledger(
+    requests: list[dict[str, object]],
+    executions: list[dict[str, object]],
+    *,
+    execution_date: pd.Timestamp,
+    signal_date: pd.Timestamp,
+    plan: dict[str, object],
+    day: pd.DataFrame,
+    cost: CostModel,
+) -> None:
+    requested_by_side = {
+        "buy": plan["requested_buys"],
+        "sell": plan["requested_sells"],
+    }
+    executed_by_side = {
+        "buy": plan["buys"],
+        "sell": plan["sells"],
+    }
+    rates = {
+        "buy": cost.buy_rate + cost.slippage_rate,
+        "sell": cost.sell_rate + cost.slippage_rate,
+    }
+    for side in ("buy", "sell"):
+        requested_changes = requested_by_side[side]
+        executed_changes = executed_by_side[side]
+        if not isinstance(requested_changes, dict) or not isinstance(executed_changes, dict):
+            raise AssertionError("调仓账本输入无效")
+        for symbol in sorted(requested_changes):
+            requested = float(requested_changes[symbol])
+            if requested <= 1e-14:
+                continue
+            executed = min(float(executed_changes.get(symbol, 0.0)), requested)
+            blocked = max(requested - executed, 0.0)
+            if blocked <= 1e-12:
+                blocked = 0.0
+                status = "filled"
+                reason = ""
+            elif executed > 1e-12:
+                status = "partial"
+                reason = _blocked_reason(day, symbol, side, market_blocked=False)
+            else:
+                status = "blocked"
+                market_blocked = symbol in plan[f"blocked_{side}s"]
+                reason = _blocked_reason(day, symbol, side, market_blocked=market_blocked)
+            requests.append(
+                {
+                    "execution_date": execution_date,
+                    "signal_date": signal_date,
+                    "ts_code": symbol,
+                    "requested_change": requested,
+                    "side": side,
+                }
+            )
+            executions.append(
+                {
+                    "execution_date": execution_date,
+                    "signal_date": signal_date,
+                    "ts_code": symbol,
+                    "requested_change": requested,
+                    "executed_change": executed,
+                    "blocked_change": blocked,
+                    "status": status,
+                    "reason": reason,
+                    "transaction_cost_rate": executed * rates[side],
+                }
+            )
+
+
+def _blocked_reason(
+    day: pd.DataFrame,
+    symbol: str,
+    side: str,
+    *,
+    market_blocked: bool,
+) -> str:
+    if not market_blocked:
+        return "cash_capacity"
+    row = day.loc[symbol]
+    if "is_valuation_carried" in day.columns and bool(row.get("is_valuation_carried", False)):
+        return "valuation_carried"
+    if "is_suspended_at_open" in day.columns and bool(row.get("is_suspended_at_open", False)):
+        return "suspended_at_open"
+    return "limit_up" if side == "buy" else "limit_down"
 
 
 def _validate_open_trade_calendar(

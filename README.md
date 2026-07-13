@@ -108,6 +108,8 @@ python scripts/research/run_quant_research.py \
 
 续跑前会核对配置、代码提交、环境、数据快照、可复现键、checkpoint 哈希链及所有已完成阶段产物；任何漂移或损坏都会停止，不能通过重算覆盖。普通业务异常仍登记为 `failed`。该机制只用于离线研究，不启动 worker，也不连接交易或生产执行系统。
 
+新研究运行使用 `artifactSchemaVersion=2`，除 targets、NAV 和 metrics 外，还固定输出 `rebalance_requests.csv.gz`、`rebalance_executions.csv.gz` 与 `positions.csv.gz`。三个模拟账本进入结果指纹并逐日核对请求、执行、阻断、成本、现金和持仓；已完成的 v1 归档仍按原合同验证和断库复现，未完成的 v1 临时运行不能跨 schema 续跑。
+
 ## 主要 API
 
 - `GET /api/health`：默认只做轻量 DB 连通检查；排障时可用 `include_counts=true` 读取全表行数。

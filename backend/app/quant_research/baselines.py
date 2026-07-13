@@ -11,7 +11,7 @@ from .artifacts import read_canonical_csv_gz
 from .calendar import OpenTradeCalendar, build_open_trade_calendar, trade_calendar_content_sha256
 from .dataset import build_adjusted_price_panel
 from .metrics import summarize_performance
-from .portfolio import CostModel, simulate_target_weights
+from .portfolio import CostModel, SimulationResult, simulate_target_weights_with_ledger
 from .snapshot import verify_materialized_inputs
 
 
@@ -23,6 +23,7 @@ SENTINEL_LIMITATIONS = (
     "daily_data_only_no_minute_or_options",
     "no_financial_cross_section",
     "warmup_excluded_from_metrics",
+    "risk_free_rate_assumed_zero",
 )
 
 
@@ -77,7 +78,26 @@ def simulate_sentinel_targets(
     table_artifacts: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[pd.DataFrame, OpenTradeCalendar]:
     validate_sentinel_config(config)
-    return simulate_etf_targets(
+    simulation, calendar = simulate_etf_targets_with_ledger(
+        input_root,
+        config,
+        targets,
+        compressed=compressed,
+        table_artifacts=table_artifacts,
+    )
+    return simulation.nav, calendar
+
+
+def simulate_sentinel_targets_with_ledger(
+    input_root: Path,
+    config: dict[str, Any],
+    targets: pd.DataFrame,
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None = None,
+) -> tuple[SimulationResult, OpenTradeCalendar]:
+    validate_sentinel_config(config)
+    return simulate_etf_targets_with_ledger(
         input_root,
         config,
         targets,
@@ -94,6 +114,24 @@ def simulate_etf_targets(
     compressed: bool,
     table_artifacts: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[pd.DataFrame, OpenTradeCalendar]:
+    simulation, calendar = simulate_etf_targets_with_ledger(
+        input_root,
+        config,
+        targets,
+        compressed=compressed,
+        table_artifacts=table_artifacts,
+    )
+    return simulation.nav, calendar
+
+
+def simulate_etf_targets_with_ledger(
+    input_root: Path,
+    config: dict[str, Any],
+    targets: pd.DataFrame,
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None = None,
+) -> tuple[SimulationResult, OpenTradeCalendar]:
     root, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
     calendar = load_frozen_calendar(root, reader, config, compressed, table_artifacts)
     members = set(validate_explicit_universe(reader, config, compressed))
@@ -117,7 +155,7 @@ def simulate_etf_targets(
     prices["is_buyable_at_open"] = True
     prices["is_sellable_at_open"] = True
     cost_config = config["costModel"]
-    nav = simulate_target_weights(
+    simulation = simulate_target_weights_with_ledger(
         prices,
         targets,
         trade_calendar=calendar,
@@ -127,7 +165,7 @@ def simulate_etf_targets(
             slippage_rate=float(cost_config["slippageRate"]),
         ),
     )
-    return nav, calendar
+    return simulation, calendar
 
 
 def summarize_sentinel_metrics(
@@ -145,6 +183,26 @@ def summarize_sentinel_metrics(
         nav,
         compressed=compressed,
         table_artifacts=table_artifacts,
+        include_extended=False,
+    )
+
+
+def summarize_sentinel_metrics_v2(
+    input_root: Path,
+    config: dict[str, Any],
+    nav: pd.DataFrame,
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    validate_sentinel_config(config)
+    return summarize_etf_metrics(
+        input_root,
+        config,
+        nav,
+        compressed=compressed,
+        table_artifacts=table_artifacts,
+        include_extended=True,
     )
 
 
@@ -155,6 +213,7 @@ def summarize_etf_metrics(
     *,
     compressed: bool,
     table_artifacts: dict[str, dict[str, Any]] | None = None,
+    include_extended: bool = True,
 ) -> dict[str, Any]:
     _, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
     benchmark_bars = reader("index_daily_bars")
@@ -178,6 +237,7 @@ def summarize_etf_metrics(
     return summarize_performance(
         evaluation_nav[["trade_date", "nav"]],
         evaluation_benchmark[["trade_date", "nav"]],
+        include_extended=include_extended,
     )
 
 
