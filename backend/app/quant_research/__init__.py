@@ -8,6 +8,7 @@ from .portfolio import CostModel, simulate_target_weights
 from .readiness import evaluate_quality_run_readiness, evaluate_research_readiness
 from .repository import load_index_benchmark, load_stock_research_panel
 from .universe import build_explicit_universe, build_historical_membership_panel, build_historical_universe, evaluate_universe_provenance
+from .strategy_registry import list_strategy_definitions, resolve_strategy_definition
 from .validation import WalkForwardWindow, build_walk_forward_windows
 
 __all__ = [
@@ -20,6 +21,8 @@ __all__ = [
     "build_open_trade_calendar",
     "build_explicit_universe",
     "build_historical_membership_panel",
+    "list_strategy_definitions",
+    "resolve_strategy_definition",
     "build_historical_universe",
     "build_run_manifest",
     "build_walk_forward_windows",

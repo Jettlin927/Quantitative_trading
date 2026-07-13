@@ -119,7 +119,7 @@ class ResearchReproductionTest(unittest.TestCase):
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
         with (
-            patch("backend.app.quant_research.runner.build_sentinel_targets") as calculation,
+            patch("backend.app.quant_research.runner._build_strategy_targets") as calculation,
             self.assertRaisesRegex(SnapshotIntegrityError, "输入 artifact 元数据"),
         ):
             reproduce_quant_research(run.path)
@@ -146,7 +146,7 @@ class ResearchReproductionTest(unittest.TestCase):
         index_path.write_bytes(canonical_json_bytes(index) + b"\n")
 
         with (
-            patch("backend.app.quant_research.runner.build_sentinel_targets") as calculation,
+            patch("backend.app.quant_research.runner._build_strategy_targets") as calculation,
             self.assertRaisesRegex(SnapshotIntegrityError, "checkpoint"),
         ):
             reproduce_quant_research(run.path)

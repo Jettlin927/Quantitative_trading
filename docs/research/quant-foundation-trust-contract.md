@@ -142,6 +142,20 @@ canonical 序列化不得包含 `run_id`、生成时间、临时目录、本机�
 
 归档校验和离线复现必须在任何重新计算前，将 `manifest.artifactHashes` 的全部 `inputs/*` 元数据与 `dataSnapshot.tableArtifacts` 逐项严格比对，并验证 checkpoint index、前向 hash 链、冻结输入和各阶段输入/输出 artifact 的交叉引用。只改 manifest 或重签一条内部自洽但与冻结 snapshot 不一致的 checkpoint 链，都必须失败。
 
+## 策略分发与研究产物合同
+
+正式 runner 只接受源码中静态登记的 `strategy_id + strategy_version + scope`。策略 ID 只能包含小写字母、数字和下划线；禁止模块路径、文件路径、entry point、动态目录扫描、表达式求值和用户上传代码。未知策略、版本漂移、scope 不匹配或未知参数必须在 quality gate 和 snapshot 之前失败。
+
+每个登记项只声明必需冻结表、参数校验、目标权重生成、公共模拟入口、指标入口和固定 limitations。策略不得自行连接数据库或网络；数据只允许来自当前 run 的冻结输入。公共 runner 继续统一负责 checkpoint、manifest、archive 校验、离线复现和结果指纹。
+
+特征函数必须明确 availability、window、`min_periods`、排序和空值语义。warmup 不足保留 null，不 backfill、不使用中心窗口、不静默删除标的或日期。给截止日之后追加数据时，旧日期的 feature、target 和模拟账本前缀必须逐字段不变。
+
+模拟执行产物必须与真实交易隔离，使用 `rebalance_requests`、`rebalance_executions` 和 `positions` 等研究语义，不使用或暗示真实订单/成交。请求、执行、阻断、成本、现金、持仓和 NAV 必须能逐日对账；blocked/partial 动作不能消失或被算作已成交。
+
+walk-forward 只允许固定参数的 rolling/anchored 窗口。汇总结论只使用 test/OOS 区间，训练区间不得混入 OOS 收益，也不得触发自动调参、自动挑选或自动发布。风险和分配工件只能读取冻结收益、持仓和行业成员；不可行约束、非有限数或数据不足必须显式失败/null，不能静默放宽或填零。
+
+归档 schema 升级必须显式记录版本。新运行可以增加 canonical 工件，但已完成旧版本归档仍按原工件集合验证和 reproduce；未完成临时运行不得跨 schema 版本续跑。
+
 ## 输入合同示例
 
 ### ETF 时序研究

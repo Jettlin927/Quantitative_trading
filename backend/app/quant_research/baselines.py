@@ -42,7 +42,7 @@ def build_sentinel_targets(
     compressed: bool,
     table_artifacts: dict[str, dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
-    target_parameters = _validate_sentinel_config(config)
+    target_parameters = validate_sentinel_config(config)
     root, reader = _input_reader(input_root, compressed, table_artifacts)
     calendar = _load_calendar(root, reader, config, compressed, table_artifacts)
     members = _validate_universe(reader, config, compressed)
@@ -76,7 +76,7 @@ def simulate_sentinel_targets(
     compressed: bool,
     table_artifacts: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[pd.DataFrame, OpenTradeCalendar]:
-    _validate_sentinel_config(config)
+    validate_sentinel_config(config)
     root, reader = _input_reader(input_root, compressed, table_artifacts)
     calendar = _load_calendar(root, reader, config, compressed, table_artifacts)
     members = set(config["universe"]["members"])
@@ -121,7 +121,7 @@ def summarize_sentinel_metrics(
     compressed: bool,
     table_artifacts: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    _validate_sentinel_config(config)
+    validate_sentinel_config(config)
     _, reader = _input_reader(input_root, compressed, table_artifacts)
     benchmark_bars = reader("index_daily_bars")
     warmup_start = pd.Timestamp(config["warmupStart"])
@@ -187,13 +187,13 @@ def run_sentinel_etf_baseline(
     )
 
 
-def _validate_sentinel_config(config: dict[str, Any]) -> dict[str, Any]:
+def validate_sentinel_config(config: dict[str, Any]) -> dict[str, Any]:
     if config.get("strategyId") != "sentinel_etf_baseline":
         raise ValueError("Phase 3 runner 只允许 sentinel_etf_baseline")
     if config.get("scope") != "etf_time_series":
         raise ValueError("sentinel baseline 仅允许 ETF 时序范围")
     if config.get("featureParameters") != {}:
-        raise ValueError("sentinel baseline 禁止参数搜索或特征网格")
+        raise ValueError("sentinel featureParameters 必须为空，禁止参数搜索或特征网格")
     target_parameters = config.get("targetWeightParameters") or {}
     if set(target_parameters) != {"signalDate", "targetWeight"}:
         raise ValueError("sentinel baseline 只接受固定 signalDate 与 targetWeight")

@@ -41,6 +41,12 @@ class QuantTrustContractDocumentationTest(unittest.TestCase):
             "execution_date",
             "data_snapshot_id",
             "reproducibility_key",
+            "strategy_id",
+            "strategy_version",
+            "rebalance_requests",
+            "rebalance_executions",
+            "walk-forward",
+            "test/OOS",
         )
         required_tables = (
             "stock_daily_bars",

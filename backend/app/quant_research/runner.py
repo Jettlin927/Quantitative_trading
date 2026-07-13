@@ -25,12 +25,6 @@ from .artifacts import (
     verify_file_artifact,
     write_dataframe_csv_gz,
 )
-from .baselines import (
-    build_sentinel_targets,
-    sentinel_limitations,
-    simulate_sentinel_targets,
-    summarize_sentinel_metrics,
-)
 from .manifest import (
     build_environment_fingerprint,
     build_research_manifest,
@@ -54,6 +48,7 @@ from .snapshot import (
     verify_snapshot,
     verify_snapshot_identity,
 )
+from .strategy_registry import StrategyDefinition, resolve_strategy_definition
 
 
 TARGET_COLUMNS = ("signal_date", "available_date", "ts_code", "target_weight")
@@ -120,6 +115,7 @@ def run_quant_research(
 ) -> ResearchRunResult:
     _validate_interrupt_stage(interrupt_after_stage)
     normalized = validate_run_config(config)
+    strategy = resolve_strategy_definition(normalized)
     resolved_commit = _resolve_code_commit(code_commit, test_mode)
     resolved_revision = schema_revision or _read_schema_revision(registry_db)
     environment = build_environment_fingerprint(
@@ -169,6 +165,7 @@ def run_quant_research(
             final_path,
             snapshots_root,
             environment,
+            strategy,
             {},
             capacity_policy=capacity_policy,
             interrupt_after_stage=interrupt_after_stage,
@@ -207,6 +204,10 @@ def resume_quant_research(
         normalized = validate_run_config(dict(run.config), verify_universe_source=False)
     except Exception as exc:
         raise ResumeIdentityError("registry 中的研究配置已不再满足冻结合同") from exc
+    try:
+        strategy = resolve_strategy_definition(normalized)
+    except ValueError as exc:
+        raise ResumeIdentityError("registry 中的策略身份已不再满足静态登记合同") from exc
     resolved_commit = _resolve_code_commit(code_commit, test_mode)
     resolved_revision = schema_revision or _read_schema_revision(registry_db)
     environment = build_environment_fingerprint(
@@ -247,6 +248,7 @@ def resume_quant_research(
             final_path,
             snapshots_root,
             environment,
+            strategy,
             checkpoints,
             capacity_policy=capacity_policy,
             interrupt_after_stage=interrupt_after_stage,
@@ -312,6 +314,7 @@ def _execute_pipeline(
     final_path: Path,
     snapshots_root: Path,
     environment: dict[str, Any],
+    strategy: StrategyDefinition,
     checkpoints: dict[str, dict[str, Any]],
     *,
     capacity_policy: SnapshotCapacityPolicy | None,
@@ -377,7 +380,8 @@ def _execute_pipeline(
         reproducibility_key = str(run.reproducibility_key)
 
     if "features_targets" not in checkpoints:
-        targets = build_sentinel_targets(
+        targets = _build_strategy_targets(
+            strategy,
             working / "inputs",
             normalized,
             compressed=True,
@@ -407,7 +411,8 @@ def _execute_pipeline(
 
     if "simulation" not in checkpoints:
         targets = read_canonical_csv_gz(working / "targets.csv.gz")
-        nav, _calendar = simulate_sentinel_targets(
+        nav, _calendar = _simulate_strategy_targets(
+            strategy,
             working / "inputs",
             normalized,
             targets,
@@ -435,14 +440,15 @@ def _execute_pipeline(
 
     if "metrics" not in checkpoints:
         nav = read_canonical_csv_gz(working / "nav.csv.gz")
-        metrics = summarize_sentinel_metrics(
+        metrics = _summarize_strategy_metrics(
+            strategy,
             working / "inputs",
             normalized,
             nav,
             compressed=True,
             table_artifacts=table_artifacts,
         )
-        limitations = sorted(set(sentinel_limitations()))
+        limitations = sorted(set(strategy.limitations()))
         metrics_artifact = atomic_write_json(working / "metrics.json", metrics)
         limitations_artifact = atomic_write_json(working / "limitations.json", limitations)
         _write_checkpoint(
@@ -561,6 +567,10 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
         )
     except Exception as exc:
         raise SnapshotIntegrityError("归档 config.json 无效") from exc
+    try:
+        resolve_strategy_definition(config)
+    except ValueError as exc:
+        raise SnapshotIntegrityError("归档策略身份无效") from exc
     if manifest.get("runId") != run_path.name and not run_path.name.startswith(f".{manifest.get('runId')}."):
         raise SnapshotIntegrityError("运行目录与 manifest runId 不一致")
     if canonical_run_config_sha256(config) != manifest.get("configSha256"):
@@ -615,11 +625,13 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
 def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
     run_path = Path(run_path)
     manifest, config = validate_research_archive(run_path)
+    strategy = resolve_strategy_definition(config)
     table_artifacts = manifest["dataSnapshot"]["tableArtifacts"]
     expected = manifest["artifactHashes"]
     with tempfile.TemporaryDirectory(prefix="quant-reproduce-") as temporary_name:
         temporary = Path(temporary_name)
-        targets = build_sentinel_targets(
+        targets = _build_strategy_targets(
+            strategy,
             run_path / "inputs",
             config,
             compressed=True,
@@ -632,7 +644,8 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
             natural_key=("signal_date", "ts_code"),
         )
         persisted_targets = read_canonical_csv_gz(temporary / "targets.csv.gz")
-        nav, _calendar = simulate_sentinel_targets(
+        nav, _calendar = _simulate_strategy_targets(
+            strategy,
             run_path / "inputs",
             config,
             persisted_targets,
@@ -646,7 +659,8 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
             natural_key=("trade_date",),
         )
         persisted_nav = read_canonical_csv_gz(temporary / "nav.csv.gz")
-        metrics = summarize_sentinel_metrics(
+        metrics = _summarize_strategy_metrics(
+            strategy,
             run_path / "inputs",
             config,
             persisted_nav,
@@ -674,6 +688,18 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
         "expectedResultFingerprint": manifest["resultFingerprint"],
         "actualResultFingerprint": actual_fingerprint,
     }
+
+
+def _build_strategy_targets(strategy: StrategyDefinition, *args: Any, **kwargs: Any) -> Any:
+    return strategy.build_targets(*args, **kwargs)
+
+
+def _simulate_strategy_targets(strategy: StrategyDefinition, *args: Any, **kwargs: Any) -> Any:
+    return strategy.simulate(*args, **kwargs)
+
+
+def _summarize_strategy_metrics(strategy: StrategyDefinition, *args: Any, **kwargs: Any) -> Any:
+    return strategy.summarize_metrics(*args, **kwargs)
 
 
 def _initialize_checkpoint_index(working: Path, run_id: str) -> None:
@@ -908,6 +934,8 @@ def _verify_checkpoint_identity(run: ResearchRun, stage: str, identity: Any) -> 
     if not isinstance(identity, dict):
         raise ResumeIntegrityError(f"checkpoint identity 无效：{stage}")
     expected_static = {
+        "strategyId": run.strategy_id,
+        "strategyVersion": (run.config or {}).get("strategyVersion"),
         "configSha256": run.config_sha256,
         "codeCommit": run.code_commit,
         "environmentSha256": run.environment_sha256,
@@ -969,6 +997,8 @@ def _load_registered_snapshot(
 
 def _checkpoint_identity(run: ResearchRun, *, include_snapshot: bool) -> dict[str, Any]:
     return {
+        "strategyId": run.strategy_id,
+        "strategyVersion": (run.config or {}).get("strategyVersion"),
         "configSha256": run.config_sha256,
         "codeCommit": run.code_commit,
         "environmentSha256": run.environment_sha256,
@@ -1093,6 +1123,8 @@ def _validate_archive_checkpoint_chain(run_path: Path, manifest: dict[str, Any])
 def _archive_checkpoint_identity(manifest: dict[str, Any], stage: str) -> dict[str, Any]:
     include_snapshot = stage != "quality_gate"
     return {
+        "strategyId": manifest["strategyId"],
+        "strategyVersion": manifest["config"]["strategyVersion"],
         "configSha256": manifest["configSha256"],
         "codeCommit": manifest["codeCommit"],
         "environmentSha256": manifest["environment"]["sha256"],
