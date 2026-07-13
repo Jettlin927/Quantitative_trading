@@ -7,7 +7,13 @@ from .metrics import summarize_performance
 from .portfolio import CostModel, SimulationResult, simulate_target_weights, simulate_target_weights_with_ledger
 from .readiness import evaluate_quality_run_readiness, evaluate_research_readiness
 from .repository import load_index_benchmark, load_stock_research_panel
-from .universe import build_explicit_universe, build_historical_membership_panel, build_historical_universe, evaluate_universe_provenance
+from .universe import (
+    build_explicit_universe,
+    build_historical_membership_panel,
+    build_industry_membership_universe,
+    evaluate_universe_provenance,
+    resolve_industry_membership,
+)
 from .strategy_registry import list_strategy_definitions, resolve_strategy_definition
 from .features import (
     cross_section_percentile_rank,
@@ -38,7 +44,8 @@ __all__ = [
     "interval_returns",
     "list_strategy_definitions",
     "resolve_strategy_definition",
-    "build_historical_universe",
+    "resolve_industry_membership",
+    "build_industry_membership_universe",
     "build_run_manifest",
     "build_walk_forward_windows",
     "evaluate_research_readiness",

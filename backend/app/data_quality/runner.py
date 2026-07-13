@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Any, Callable
 from uuid import uuid4
@@ -8,6 +9,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from ..models import DataQualityResult, DataQualityRun
+from ..quant_research.universe import resolve_industry_membership
 from .contracts import QualityCheckContract, QualityRuleResult, result_reference, summarize_quality_status
 from .rules import evaluate_quality_rules
 
@@ -46,17 +48,52 @@ def run_data_quality_check(
     registry_db.add(run)
     registry_db.commit()
 
+    resolved_contract = contract
     try:
         with Session(bind=registry_db.get_bind(), autoflush=False, expire_on_commit=False) as inspection_db:
             with inspection_db.begin():
                 configure_quality_read_transaction(inspection_db, contract.statement_timeout_ms)
-                results = evaluator(inspection_db, contract)
+                if contract.universe_type == "industry_membership":
+                    try:
+                        resolution = resolve_industry_membership(
+                            inspection_db,
+                            contract.universe_source_key or "",
+                            contract.start_date,
+                            contract.end_date,
+                        )
+                    except ValueError as exc:
+                        results = [
+                            QualityRuleResult.blocked(
+                                "universe.membership_resolution",
+                                "industry_members",
+                                failed_rows=1,
+                                sample_issues=[{"issue": str(exc)}],
+                            )
+                        ]
+                    else:
+                        resolved_contract = replace(
+                            contract,
+                            universe=resolution.symbols,
+                            universe_source_sha256=resolution.member_sha256,
+                            universe_source_verified=True,
+                            universe_source_issue=None,
+                            universe_member_sha256=resolution.member_sha256,
+                            universe_member_count=len(resolution.records),
+                            universe_unique_member_count=len(resolution.symbols),
+                            universe_membership_records=resolution.records,
+                            universe_hash=resolution.universe_hash,
+                        )
+                        results = evaluator(inspection_db, resolved_contract)
+                else:
+                    results = evaluator(inspection_db, contract)
     except Exception as exc:  # noqa: BLE001
         results = [QualityRuleResult.failed("engine.execution", "data_quality_runs", f"{type(exc).__name__}: {exc}")]
 
+    run.universe_hash = resolved_contract.universe_hash
+    run.config = resolved_contract.to_config()
     run.status = summarize_quality_status(results)
     run.finished_at = datetime.now(timezone.utc)
-    run.summary = build_quality_summary(results, contract)
+    run.summary = build_quality_summary(results, resolved_contract)
     for result in results:
         registry_db.add(
             DataQualityResult(
@@ -106,6 +143,11 @@ def build_quality_summary(results: list[QualityRuleResult], contract: QualityChe
         "limitations": limitations,
         "requiredDatasets": list(contract.required_datasets),
         "benchmark": contract.benchmark,
+        "universeHash": contract.universe_hash,
+        "universeSourceKey": contract.universe_source_key,
+        "universeMemberSha256": contract.universe_member_sha256,
+        "universeMemberCount": contract.universe_member_count,
+        "universeUniqueMemberCount": contract.universe_unique_member_count,
     }
 
 

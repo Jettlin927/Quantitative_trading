@@ -1177,6 +1177,7 @@ def create_data_quality_run(payload: DataQualityRunRequest, db: Session = Depend
             universe=payload.universe,
             universe_type=payload.universe_type,
             universe_source=payload.universe_source,
+            universe_source_key=payload.universe_source_key,
             universe_as_of_date=payload.universe_as_of_date,
             required_datasets=payload.required_datasets,
             benchmark=payload.benchmark,

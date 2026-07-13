@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import date
 import hashlib
 import json
 from numbers import Real
@@ -7,6 +9,27 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import pandas as pd
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session
+
+from ..models import IndustryMember, StockListing, TradeCalendar
+
+
+@dataclass(frozen=True)
+class IndustryMembershipResolution:
+    source_key: str
+    start_date: date
+    end_date: date
+    records: tuple[tuple[date, str], ...]
+    symbols: tuple[str, ...]
+    member_sha256: str
+    universe_hash: str
+
+    def rows(self) -> list[dict[str, object]]:
+        return [
+            {"trade_date": trade_date, "ts_code": ts_code}
+            for trade_date, ts_code in self.records
+        ]
 
 
 def build_explicit_universe(
@@ -36,6 +59,108 @@ def build_explicit_universe(
     return payload
 
 
+def build_industry_membership_universe(source_key: str) -> dict[str, str]:
+    normalized = str(source_key or "").strip().upper()
+    if not normalized or len(normalized) > 32:
+        raise ValueError("industry_membership sourceKey 必须是非空行业代码")
+    return {
+        "mode": "industry_membership",
+        "source": "industry_members",
+        "sourceKey": normalized,
+    }
+
+
+def resolve_industry_membership(
+    db: Session,
+    source_key: str,
+    start_date: date,
+    end_date: date,
+) -> IndustryMembershipResolution:
+    universe = build_industry_membership_universe(source_key)
+    if start_date > end_date:
+        raise ValueError("industry_membership start_date 不能晚于 end_date")
+    trade_dates = list(
+        db.scalars(
+            select(TradeCalendar.cal_date)
+            .where(
+                TradeCalendar.exchange == "SSE",
+                TradeCalendar.is_open.is_(True),
+                TradeCalendar.cal_date >= start_date,
+                TradeCalendar.cal_date <= end_date,
+            )
+            .distinct()
+            .order_by(TradeCalendar.cal_date)
+        ).all()
+    )
+    if not trade_dates:
+        raise ValueError("industry_membership 区间内没有官方开市日")
+    membership_rows = db.execute(
+        select(
+            IndustryMember.index_code,
+            IndustryMember.con_code,
+            IndustryMember.in_date,
+            IndustryMember.out_date,
+        )
+        .where(
+            IndustryMember.index_code == universe["sourceKey"],
+            IndustryMember.in_date <= end_date,
+            or_(IndustryMember.out_date.is_(None), IndustryMember.out_date >= start_date),
+        )
+        .order_by(IndustryMember.con_code, IndustryMember.in_date)
+    ).mappings().all()
+    if not membership_rows:
+        raise ValueError("industry_membership 行业在研究区间内没有历史成员")
+    symbols = sorted({str(row["con_code"]).strip().upper() for row in membership_rows})
+    listing_rows = db.execute(
+        select(
+            StockListing.ts_code,
+            StockListing.list_status,
+            StockListing.list_date,
+            StockListing.delist_date,
+        )
+        .where(StockListing.ts_code.in_(symbols))
+        .order_by(StockListing.ts_code)
+    ).mappings().all()
+    panel = build_historical_membership_panel(
+        pd.DataFrame(membership_rows),
+        pd.DataFrame(listing_rows),
+        trade_dates,
+        universe["sourceKey"],
+    )
+    missing_dates = sorted(set(pd.DatetimeIndex(trade_dates)) - set(panel["trade_date"]))
+    if missing_dates:
+        sample = ", ".join(value.date().isoformat() for value in missing_dates[:5])
+        raise ValueError(f"industry_membership 逐日成员存在空档：{sample}")
+    records = tuple(
+        (row.trade_date.date(), str(row.ts_code))
+        for row in panel.itertuples(index=False)
+    )
+    record_payload = [
+        {"tradeDate": trade_date.isoformat(), "tsCode": ts_code}
+        for trade_date, ts_code in records
+    ]
+    member_sha256 = _canonical_hash(record_payload)
+    universe_hash = _canonical_hash(
+        {
+            "mode": universe["mode"],
+            "source": universe["source"],
+            "sourceKey": universe["sourceKey"],
+            "startDate": start_date.isoformat(),
+            "endDate": end_date.isoformat(),
+            "memberSha256": member_sha256,
+        }
+    )
+    return IndustryMembershipResolution(
+        source_key=universe["sourceKey"],
+        start_date=start_date,
+        end_date=end_date,
+        records=records,
+        symbols=tuple(sorted({ts_code for _, ts_code in records})),
+        member_sha256=member_sha256,
+        universe_hash=universe_hash,
+    )
+
+
 def build_historical_membership_panel(
     memberships: pd.DataFrame,
     listings: pd.DataFrame,
@@ -52,20 +177,50 @@ def build_historical_membership_panel(
         raise ValueError(f"上市边界缺少字段：{', '.join(missing_listing)}")
 
     dates = _normalize_dates(trade_dates, "历史 universe 交易日历")
-    frame = memberships[memberships["index_code"] == index_code].copy()
+    normalized_index_code = str(index_code or "").strip().upper()
+    frame = memberships[
+        memberships["index_code"].astype(str).str.strip().str.upper()
+        == normalized_index_code
+    ].copy()
+    if frame.empty:
+        return pd.DataFrame(columns=["trade_date", "ts_code"])
+    frame["index_code"] = normalized_index_code
     frame["con_code"] = frame["con_code"].astype(str).str.upper()
-    frame["in_date"] = pd.to_datetime(frame["in_date"])
-    frame["out_date"] = pd.to_datetime(frame["out_date"])
+    frame["in_date"] = pd.to_datetime(frame["in_date"], errors="raise")
+    frame["out_date"] = pd.to_datetime(frame["out_date"], errors="coerce")
+    if frame["con_code"].eq("").any() or frame["in_date"].isna().any():
+        raise ValueError("历史成员 con_code 和 in_date 不能为空")
+    if frame.duplicated(["index_code", "con_code", "in_date"]).any():
+        raise ValueError("历史成员存在重复自然键")
+    if (frame["out_date"].notna() & (frame["out_date"] < frame["in_date"])).any():
+        raise ValueError("历史成员 out_date 不能早于 in_date")
+    for con_code, periods in frame.sort_values(["con_code", "in_date"]).groupby("con_code"):
+        previous_end: pd.Timestamp | None = None
+        previous_open_ended = False
+        for period in periods.itertuples(index=False):
+            if previous_open_ended or (
+                previous_end is not None and period.in_date <= previous_end
+            ):
+                raise ValueError(f"历史成员区间重复或重叠：{con_code}")
+            previous_open_ended = pd.isna(period.out_date)
+            previous_end = None if previous_open_ended else period.out_date
     listing_frame = listings.copy()
     listing_frame["ts_code"] = listing_frame["ts_code"].astype(str).str.upper()
-    listing_frame["list_date"] = pd.to_datetime(listing_frame["list_date"])
-    listing_frame["delist_date"] = pd.to_datetime(listing_frame["delist_date"])
+    listing_frame["list_date"] = pd.to_datetime(listing_frame["list_date"], errors="coerce")
+    listing_frame["delist_date"] = pd.to_datetime(listing_frame["delist_date"], errors="coerce")
     if listing_frame["ts_code"].duplicated().any():
         raise ValueError("上市边界存在重复 ts_code")
     listing_by_code = listing_frame.set_index("ts_code")
     missing_codes = sorted(set(frame["con_code"]) - set(listing_by_code.index))
     if missing_codes:
         raise ValueError(f"历史成员缺少上市/退市边界：{', '.join(missing_codes[:10])}")
+    member_listings = listing_frame[listing_frame["ts_code"].isin(set(frame["con_code"]))]
+    if member_listings["list_date"].isna().any():
+        raise ValueError("历史成员缺少 list_date 上市边界")
+    if "list_status" in member_listings.columns:
+        missing_delist = member_listings["list_status"].eq("D") & member_listings["delist_date"].isna()
+        if missing_delist.any():
+            raise ValueError("退市历史成员缺少 delist_date 边界")
 
     rows: list[dict[str, object]] = []
     for member in frame.itertuples(index=False):
@@ -78,47 +233,10 @@ def build_historical_membership_panel(
         rows.extend({"trade_date": trade_date, "ts_code": member.con_code} for trade_date in active)
     if not rows:
         return pd.DataFrame(columns=["trade_date", "ts_code"])
-    return (
-        pd.DataFrame(rows)
-        .drop_duplicates(["trade_date", "ts_code"])
-        .sort_values(["trade_date", "ts_code"])
-        .reset_index(drop=True)
-    )
-
-
-def build_historical_universe(
-    memberships: pd.DataFrame,
-    listings: pd.DataFrame,
-    trade_dates: Iterable[object],
-    index_code: str,
-    source: str,
-) -> dict[str, Any]:
-    source_artifact = _verify_existing_source(source, "历史 universe")
-    dates = _normalize_dates(trade_dates, "历史 universe 交易日历")
-    panel = build_historical_membership_panel(memberships, listings, dates, index_code)
-    if panel.empty:
-        raise ValueError("历史 universe 成员工件为空")
-    records = [
-        {"tradeDate": row.trade_date.date().isoformat(), "tsCode": str(row.ts_code)}
-        for row in panel.itertuples(index=False)
-    ]
-    member_artifact = {
-        "format": "inline_daily_membership",
-        "count": len(records),
-        "sha256": _canonical_hash(records),
-        "records": records,
-    }
-    payload = {
-        "mode": "historical_membership",
-        "source": source_artifact["path"],
-        "sourceArtifact": source_artifact,
-        "indexCode": str(index_code),
-        "startDate": dates[0].date().isoformat(),
-        "endDate": dates[-1].date().isoformat(),
-        "memberArtifact": member_artifact,
-    }
-    payload["universeHash"] = _canonical_hash(_hashable_universe(payload))
-    return payload
+    panel = pd.DataFrame(rows)
+    if panel.duplicated(["trade_date", "ts_code"]).any():
+        raise ValueError("历史成员区间解析后存在重复逐日成员")
+    return panel.sort_values(["trade_date", "ts_code"]).reset_index(drop=True)
 
 
 def evaluate_universe_provenance(
@@ -140,18 +258,17 @@ def evaluate_universe_provenance(
     mode = universe.get("mode")
     source = str(universe.get("source") or "").strip()
     source_artifact = universe.get("sourceArtifact")
-    if not source:
-        blockers.append("missing_universe_source")
-    if not _source_artifact_matches(source, source_artifact):
-        blockers.append("invalid_universe_source_artifact")
-    expected_universe_hash = _canonical_hash(_hashable_universe(universe))
-    if universe.get("universeHash") != expected_universe_hash:
-        blockers.append("invalid_universe_hash")
-
     artifact = universe.get("memberArtifact")
-    if not isinstance(artifact, dict):
-        blockers.append("missing_member_artifact")
     if mode == "explicit_snapshot":
+        if not source:
+            blockers.append("missing_universe_source")
+        if not _source_artifact_matches(source, source_artifact):
+            blockers.append("invalid_universe_source_artifact")
+        expected_universe_hash = _canonical_hash(_hashable_universe(universe))
+        if universe.get("universeHash") != expected_universe_hash:
+            blockers.append("invalid_universe_hash")
+        if not isinstance(artifact, dict):
+            blockers.append("missing_member_artifact")
         members = universe.get("members")
         normalized_members = sorted({str(code).strip().upper() for code in members or [] if str(code).strip()})
         if not normalized_members or normalized_members != members:
@@ -172,28 +289,14 @@ def evaluate_universe_provenance(
                 blockers.append("survivorship_risk")
             else:
                 warnings.append("static_universe")
-    elif mode == "historical_membership":
-        records = artifact.get("records") if isinstance(artifact, dict) else None
-        if not isinstance(records, list) or not records:
-            blockers.append("missing_historical_members")
-        elif not _artifact_matches(artifact, records, "inline_daily_membership"):
-            blockers.append("invalid_member_artifact")
-        else:
-            try:
-                normalized_records = sorted(
-                    (
-                        {"tradeDate": pd.Timestamp(item["tradeDate"]).date().isoformat(), "tsCode": str(item["tsCode"]).upper()}
-                        for item in records
-                    ),
-                    key=lambda item: (item["tradeDate"], item["tsCode"]),
-                )
-            except (KeyError, TypeError, ValueError):
-                blockers.append("invalid_historical_members")
-            else:
-                if normalized_records != records:
-                    blockers.append("unsorted_historical_members")
-        if not universe.get("indexCode"):
-            blockers.append("missing_membership_definition")
+    elif mode == "industry_membership":
+        if set(universe) != {"mode", "source", "sourceKey"}:
+            blockers.append("invalid_industry_membership_fields")
+        if source != "industry_members":
+            blockers.append("invalid_industry_membership_source")
+        source_key = str(universe.get("sourceKey") or "").strip().upper()
+        if not source_key or source_key != universe.get("sourceKey"):
+            blockers.append("invalid_industry_membership_source_key")
     else:
         blockers.append("unsupported_universe_mode")
         survivorship_risk = True
@@ -218,17 +321,7 @@ def resolve_universe_members(
         raise ValueError(f"universe 来源门禁未通过：{', '.join(result['blockers'])}")
     if universe["mode"] == "explicit_snapshot":
         return list(universe["members"]), None, result
-
-    records = pd.DataFrame(universe["memberArtifact"]["records"])
-    records["trade_date"] = pd.to_datetime(records.pop("tradeDate"))
-    records["ts_code"] = records.pop("tsCode").astype(str).str.upper()
-    start = pd.Timestamp(research_start)
-    end = pd.Timestamp(research_end)
-    records = records[(records["trade_date"] >= start) & (records["trade_date"] <= end)]
-    records = records[["trade_date", "ts_code"]].drop_duplicates().sort_values(["trade_date", "ts_code"])
-    if records.empty:
-        raise ValueError("universe 成员工件在研究区间内为空")
-    return sorted(records["ts_code"].unique()), records.reset_index(drop=True), result
+    raise ValueError("industry_membership 必须在同一数据库事务内解析逐日成员")
 
 
 def _artifact_matches(artifact: object, content: object, expected_format: str) -> bool:

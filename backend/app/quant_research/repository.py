@@ -4,10 +4,15 @@ from datetime import date
 import pandas as pd
 from sqlalchemy import and_, or_, select
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
 from ..models import IndexDailyBar, StockAdjustFactor, StockDailyBar, StockLimitPrice, StockListing, StockSuspendEvent
 from .dataset import build_adjusted_price_panel
-from .universe import resolve_universe_members
+from .universe import (
+    evaluate_universe_provenance,
+    resolve_industry_membership,
+    resolve_universe_members,
+)
 
 
 def load_stock_research_panel(
@@ -19,7 +24,32 @@ def load_stock_research_panel(
     """Load a source-bound A-share panel from a validated universe artifact."""
     if start_date > end_date:
         raise ValueError("start_date 不能晚于 end_date")
-    symbols, historical_members, provenance = resolve_universe_members(universe, start_date, end_date)
+    if not isinstance(universe, dict):
+        raise ValueError("universe 必须是已验证的来源定义")
+    if universe.get("mode") == "industry_membership":
+        with Session(engine) as db:
+            resolution = resolve_industry_membership(
+                db,
+                str(universe.get("sourceKey") or ""),
+                start_date,
+                end_date,
+            )
+        symbols = list(resolution.symbols)
+        historical_members = pd.DataFrame(resolution.rows())
+        historical_members["trade_date"] = pd.to_datetime(
+            historical_members["trade_date"]
+        )
+        provenance = {
+            **evaluate_universe_provenance(universe, "a_share_cross_section", start_date),
+            "universeHash": resolution.universe_hash,
+            "memberArtifactHash": resolution.member_sha256,
+        }
+    else:
+        symbols, historical_members, provenance = resolve_universe_members(
+            universe,
+            start_date,
+            end_date,
+        )
 
     suspended = (
         select(StockSuspendEvent.id)
