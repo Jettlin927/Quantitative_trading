@@ -23,7 +23,9 @@ from backend.app.models import (
     TradeCalendar,
 )
 from backend.app.quant_research.etf_volatility_managed import (
+    build_etf_low_volatility_gate_targets,
     build_etf_volatility_managed_targets,
+    validate_etf_low_volatility_gate_config,
     validate_etf_volatility_managed_config,
 )
 from backend.app.quant_research.runner import reproduce_quant_research, run_quant_research
@@ -105,6 +107,61 @@ class EtfVolatilityManagedTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "calibrationEnd < startDate"):
             validate_etf_volatility_managed_config(config)
 
+    def test_low_volatility_gate_uses_fixed_median_and_binary_weights(self):
+        config = _low_volatility_gate_config(self.config)
+        targets = build_etf_low_volatility_gate_targets(
+            self.root,
+            config,
+            compressed=False,
+        )
+
+        self.assertEqual(targets.iloc[0]["signal_date"], pd.Timestamp("2017-12-29"))
+        self.assertEqual(set(targets["target_weight"]), {0.0, 1.0})
+        self.assertTrue(targets["signal_date"].eq(targets["available_date"]).all())
+        self.assertFalse(targets["signal_date"].dt.to_period("M").duplicated().any())
+
+    def test_low_volatility_gate_rejects_threshold_or_weight_search(self):
+        config = _low_volatility_gate_config(self.config)
+        validate_etf_low_volatility_gate_config(config)
+
+        invalid_threshold = dict(config)
+        invalid_threshold["featureParameters"] = {
+            **config["featureParameters"],
+            "thresholdMethod": "calibration_60th_percentile",
+        }
+        with self.assertRaisesRegex(ValueError, "中位数门槛"):
+            validate_etf_low_volatility_gate_config(invalid_threshold)
+
+        invalid_weight = dict(config)
+        invalid_weight["targetWeightParameters"] = {
+            **config["targetWeightParameters"],
+            "riskOffWeight": "0.2",
+        }
+        with self.assertRaisesRegex(ValueError, "0/100%"):
+            validate_etf_low_volatility_gate_config(invalid_weight)
+
+    def test_low_volatility_gate_ignores_appended_future_prices(self):
+        config = _low_volatility_gate_config(self.config)
+        expected = build_etf_low_volatility_gate_targets(
+            self.root,
+            config,
+            compressed=False,
+        )
+        bars = pd.read_csv(self.root / "fund_daily_bars.csv")
+        future = bars.iloc[-1].copy()
+        future["trade_date"] = "2027-01-04"
+        future["close"] = 1
+        pd.concat([bars, pd.DataFrame([future])], ignore_index=True).to_csv(
+            self.root / "fund_daily_bars.csv",
+            index=False,
+        )
+        actual = build_etf_low_volatility_gate_targets(
+            self.root,
+            config,
+            compressed=False,
+        )
+        pd.testing.assert_frame_equal(expected, actual)
+
     def test_formal_pipeline_reproduces_with_walk_forward_and_risk(self):
         engine = create_engine(f"sqlite+pysqlite:///{self.root / 'volatility.sqlite'}")
         Base.metadata.create_all(engine)
@@ -163,25 +220,30 @@ class EtfVolatilityManagedTest(unittest.TestCase):
             )
             db.commit()
 
-        config = dict(self.config)
-        config["qualityRunId"] = quality_id
         output_root = self.root / "formal-runs"
-        with Session(engine) as db:
-            result = run_quant_research(
-                db,
-                config,
-                output_root,
-                code_commit="volatility-test",
-                schema_revision="test-schema",
-                test_mode=True,
-                capacity_policy=SnapshotCapacityPolicy(min_remaining_bytes=0),
-            )
+        configs = (
+            ("etf_volatility_managed", dict(self.config)),
+            ("etf_low_volatility_gate", _low_volatility_gate_config(self.config)),
+        )
+        for strategy_id, config in configs:
+            with self.subTest(strategy_id=strategy_id):
+                config["qualityRunId"] = quality_id
+                with Session(engine) as db:
+                    result = run_quant_research(
+                        db,
+                        config,
+                        output_root,
+                        code_commit="volatility-test",
+                        schema_revision="test-schema",
+                        test_mode=True,
+                        capacity_policy=SnapshotCapacityPolicy(min_remaining_bytes=0),
+                    )
+                reproduction = reproduce_quant_research(result.path)
+                self.assertTrue(reproduction["matches"])
+                self.assertEqual(result.manifest["strategyId"], strategy_id)
+                self.assertIn("walk_forward_metrics.csv.gz", result.manifest["artifactHashes"])
+                self.assertIn("risk_exposures.csv.gz", result.manifest["artifactHashes"])
         engine.dispose()
-        reproduction = reproduce_quant_research(result.path)
-        self.assertTrue(reproduction["matches"])
-        self.assertEqual(result.manifest["strategyId"], "etf_volatility_managed")
-        self.assertIn("walk_forward_metrics.csv.gz", result.manifest["artifactHashes"])
-        self.assertIn("risk_exposures.csv.gz", result.manifest["artifactHashes"])
 
 
 def _synthetic_history() -> tuple[pd.DatetimeIndex, pd.Series]:
@@ -258,6 +320,23 @@ def _trial_config(
     config["targetWeightParameters"] = {
         **source["targetWeightParameters"],
         "rebalanceBand": band,
+    }
+    return config
+
+
+def _low_volatility_gate_config(source: dict[str, object]) -> dict[str, object]:
+    config = dict(source)
+    config["strategyId"] = "etf_low_volatility_gate"
+    config["featureParameters"] = {
+        "calibrationStartDate": source["featureParameters"]["calibrationStartDate"],
+        "calibrationEndDate": source["featureParameters"]["calibrationEndDate"],
+        "realizedVarianceEstimator": "previous_month",
+        "thresholdMethod": "calibration_median",
+    }
+    config["targetWeightParameters"] = {
+        "rebalanceFrequency": "month_end",
+        "riskOnWeight": "1",
+        "riskOffWeight": "0",
     }
     return config
 

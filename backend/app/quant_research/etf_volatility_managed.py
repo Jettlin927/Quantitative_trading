@@ -27,6 +27,19 @@ ETF_VOLATILITY_MANAGED_LIMITATIONS = (
     "passive_adjusted_etf_is_primary_benchmark",
 )
 
+ETF_LOW_VOLATILITY_GATE_LIMITATIONS = (
+    "research_only",
+    "not_investment_advice",
+    "post_hoc_exploratory_hypothesis",
+    "single_etf_binary_low_volatility_admission",
+    "fixed_calibration_median_threshold_no_search",
+    "monthly_close_signal_next_trade_open_execution",
+    "no_leverage_or_shorting",
+    "cash_return_assumed_zero",
+    "daily_data_only_no_intraday_volatility",
+    "passive_and_static_half_etf_are_benchmarks",
+)
+
 _ALLOWED_TRIALS = {
     ("previous_month", "1", "0"),
     ("previous_month", "0.5", "0"),
@@ -173,6 +186,164 @@ def etf_volatility_managed_limitations() -> list[str]:
     return list(ETF_VOLATILITY_MANAGED_LIMITATIONS)
 
 
+def validate_etf_low_volatility_gate_config(config: dict[str, Any]) -> None:
+    if config.get("strategyId") != "etf_low_volatility_gate":
+        raise ValueError("ETF 低波动准入策略 ID 必须是 etf_low_volatility_gate")
+    if config.get("scope") != "etf_time_series":
+        raise ValueError("ETF 低波动准入策略只允许 etf_time_series scope")
+    universe = config.get("universe") or {}
+    members = universe.get("members") or []
+    if universe.get("mode") != "explicit_snapshot" or len(set(members)) != 1:
+        raise ValueError("ETF 低波动准入策略只允许一只显式 ETF")
+
+    features = config.get("featureParameters") or {}
+    expected_features = {
+        "calibrationStartDate",
+        "calibrationEndDate",
+        "realizedVarianceEstimator",
+        "thresholdMethod",
+    }
+    if set(features) != expected_features:
+        raise ValueError("ETF 低波动准入 featureParameters 字段无效")
+    if features.get("realizedVarianceEstimator") != "previous_month":
+        raise ValueError("ETF 低波动准入只允许上一自然月实现方差")
+    if features.get("thresholdMethod") != "calibration_median":
+        raise ValueError("ETF 低波动准入只允许固定校准期中位数门槛")
+    calibration_start = _date(features.get("calibrationStartDate"), "calibrationStartDate")
+    calibration_end = _date(features.get("calibrationEndDate"), "calibrationEndDate")
+    warmup_start = _date(config.get("warmupStart"), "warmupStart")
+    research_start = _date(config.get("startDate"), "startDate")
+    if not warmup_start <= calibration_start <= calibration_end < research_start:
+        raise ValueError("ETF 低波动准入日期必须满足 warmup <= calibration <= calibrationEnd < startDate")
+
+    expected_targets = {
+        "rebalanceFrequency": "month_end",
+        "riskOnWeight": "1",
+        "riskOffWeight": "0",
+    }
+    if config.get("targetWeightParameters") != expected_targets:
+        raise ValueError("ETF 低波动准入只允许月末 0/100% 固定仓位")
+    expected_execution = {
+        "calendarExchange": "SSE",
+        "executionPrice": "next_trade_open",
+        "signalPrice": "close",
+    }
+    if config.get("executionPolicy") != expected_execution:
+        raise ValueError("ETF 低波动准入只允许月末收盘信号和下一开市日开盘执行")
+
+
+def build_etf_low_volatility_gate_targets(
+    input_root: Path,
+    config: dict[str, Any],
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None = None,
+) -> pd.DataFrame:
+    validate_etf_low_volatility_gate_config(config)
+    root, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
+    calendar = load_frozen_calendar(root, reader, config, compressed, table_artifacts)
+    members = validate_explicit_universe(reader, config, compressed)
+    prices = _load_adjusted_prices(reader, config, members)
+    monthly = _monthly_statistics(prices, config)
+    threshold, _ = _calibrate_gate_threshold(monthly, config)
+    return _gate_targets_from_monthly(monthly, calendar, config, threshold)
+
+
+def simulate_etf_low_volatility_gate_targets(
+    input_root: Path,
+    config: dict[str, Any],
+    targets: pd.DataFrame,
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None = None,
+) -> tuple[Any, Any]:
+    validate_etf_low_volatility_gate_config(config)
+    return simulate_etf_targets_with_ledger(
+        input_root,
+        config,
+        targets,
+        compressed=compressed,
+        table_artifacts=table_artifacts,
+    )
+
+
+def summarize_etf_low_volatility_gate_metrics(
+    input_root: Path,
+    config: dict[str, Any],
+    nav: pd.DataFrame,
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    validate_etf_low_volatility_gate_config(config)
+    _, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
+    members = tuple(sorted(set(config["universe"]["members"])))
+    prices = _load_adjusted_prices(reader, config, members)
+    monthly = _monthly_statistics(prices, config)
+    threshold, calibration_observations = _calibrate_gate_threshold(monthly, config)
+    targets = _gate_targets_from_monthly(monthly, _CalendarProxy(prices), config, threshold)
+
+    research_start = pd.Timestamp(config["startDate"])
+    end = pd.Timestamp(config["endDate"])
+    strategy_nav = nav.copy()
+    strategy_nav["trade_date"] = pd.to_datetime(strategy_nav["trade_date"])
+    strategy_nav = strategy_nav[strategy_nav["trade_date"].between(research_start, end)]
+    passive = prices[prices["trade_date"].between(research_start, end)][
+        ["trade_date", "adj_close"]
+    ].copy()
+    if strategy_nav.empty or passive.empty:
+        raise ValueError("ETF 低波动准入 OOS 策略或被动基准为空")
+    passive["nav"] = passive["adj_close"] / passive["adj_close"].iloc[0]
+    static_half = passive[["trade_date"]].copy()
+    static_half["nav"] = 0.5 + 0.5 * passive["nav"]
+    passive_metrics = summarize_performance(
+        passive[["trade_date", "nav"]],
+        include_extended=True,
+    )
+    metrics = summarize_performance(
+        strategy_nav[["trade_date", "nav"]],
+        passive[["trade_date", "nav"]],
+        include_extended=True,
+    )
+    static_half_metrics = summarize_performance(
+        static_half[["trade_date", "nav"]],
+        include_extended=True,
+    )
+    weights = targets["target_weight"].astype(float)
+    metrics.update(
+        {
+            "researchClassification": "post_hoc_exploratory",
+            "maximumEligibleConclusion": "conditional_candidate",
+            "primaryBenchmarkType": "passive_adjusted_etf",
+            "primaryBenchmarkCode": members[0],
+            "marketReferenceCode": config["benchmark"],
+            "admissionVarianceThreshold": float(threshold),
+            "thresholdMethod": "calibration_median",
+            "calibrationObservations": int(calibration_observations),
+            "riskOnMonthCount": int(weights.eq(1.0).sum()),
+            "riskOffMonthCount": int(weights.eq(0.0).sum()),
+            "riskOnRate": float(weights.mean()),
+            "averageTargetWeight": float(weights.mean()),
+            "staticHalfBenchmarkType": "50pct_initial_etf_50pct_zero_return_cash_no_cost",
+            "staticHalfBenchmarkMetrics": static_half_metrics,
+            "sharpeImprovementVsStaticHalf": float(
+                metrics["sharpe"] - static_half_metrics["sharpe"]
+            ),
+            "maxDrawdownRatioVsPassive": float(
+                abs(metrics["maxDrawdown"]) / abs(passive_metrics["maxDrawdown"])
+            ),
+            "maxDrawdownRatioVsStaticHalf": float(
+                abs(metrics["maxDrawdown"]) / abs(static_half_metrics["maxDrawdown"])
+            ),
+        }
+    )
+    return metrics
+
+
+def etf_low_volatility_gate_limitations() -> list[str]:
+    return list(ETF_LOW_VOLATILITY_GATE_LIMITATIONS)
+
+
 def _load_adjusted_prices(
     reader: Any,
     config: dict[str, Any],
@@ -258,6 +429,47 @@ def _calibrate_scale(
     if not base_volatility > 0 or not raw_volatility > 0:
         raise ValueError("ETF 波动率管理校准波动率必须为正")
     return base_volatility / raw_volatility, len(frame)
+
+
+def _calibrate_gate_threshold(
+    monthly: pd.DataFrame,
+    config: dict[str, Any],
+) -> tuple[float, int]:
+    features = config["featureParameters"]
+    calibration_start = pd.Timestamp(features["calibrationStartDate"])
+    calibration_end = pd.Timestamp(features["calibrationEndDate"])
+    frame = monthly[
+        monthly["signal_date"].between(calibration_start, calibration_end)
+    ].dropna(subset=["variance_estimate"])
+    frame = frame[frame["variance_estimate"] > 0]
+    if len(frame) < 24:
+        raise ValueError("ETF 低波动准入校准期有效月数不足 24")
+    threshold = float(frame["variance_estimate"].median())
+    if not threshold > 0:
+        raise ValueError("ETF 低波动准入校准期中位数门槛必须为正")
+    return threshold, len(frame)
+
+
+def _gate_targets_from_monthly(
+    monthly: pd.DataFrame,
+    calendar: Any,
+    config: dict[str, Any],
+    threshold: float,
+) -> pd.DataFrame:
+    research_start = pd.Timestamp(config["startDate"])
+    end = pd.Timestamp(config["endDate"])
+    signal_dates = _month_end_signal_dates(calendar, research_start, end)
+    selected = monthly[monthly["signal_date"].isin(signal_dates)].copy()
+    if len(selected) != len(signal_dates) or selected["variance_estimate"].isna().any():
+        raise ValueError("ETF 低波动准入月末缺少完整已实现方差")
+    selected["target_weight"] = (
+        selected["variance_estimate"].astype(float) <= threshold
+    ).astype(float)
+    selected["available_date"] = selected["signal_date"]
+    selected["ts_code"] = config["universe"]["members"][0]
+    return selected[
+        ["signal_date", "available_date", "ts_code", "target_weight"]
+    ].sort_values(["signal_date", "ts_code"], kind="stable").reset_index(drop=True)
 
 
 def _targets_from_monthly(

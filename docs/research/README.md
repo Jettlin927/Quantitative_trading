@@ -16,13 +16,14 @@
 
 ## 静态策略与统一入口
 
-正式 runner 只允许源码静态登记的四条研究策略；不能动态安装、按模块路径导入或上传策略代码：
+正式 runner 只允许源码静态登记的五条研究策略；不能动态安装、按模块路径导入或上传策略代码：
 
 | strategy ID | 版本 | scope | 示例配置 | 用途 |
 | --- | --- | --- | --- | --- |
 | `sentinel_etf_baseline` | `1` | `etf_time_series` | `configs/research/sentinel_etf_baseline.json` | 验证质量门禁、冻结快照和离线复现 |
 | `etf_trend_120d` | `1` | `etf_time_series` | `configs/research/etf_trend_baseline.json` | 固定 120 日均线、月末 1/0 目标的时序 baseline |
 | `etf_volatility_managed` | `1` | `etf_time_series` | `configs/research/etf_volatility_managed_baseline.json` | Moreira–Muir 倒数已实现方差、月末无杠杆 ETF 暴露复现 |
+| `etf_low_volatility_gate` | `1` | `etf_time_series` | `configs/research/etf_low_volatility_gate.json` | 校准期中位数固定门槛、月末低波动满仓/高波动空仓的事后探索 |
 | `a_share_price_baseline` | `1` | `a_share_cross_section` | `configs/research/a_share_price_baseline.json` | 固定 120–20 动量、60 日波动、历史行业成员的价格型横截面 baseline |
 
 `etf_volatility_managed@1` 的 2026-07-13 预登记真实数据复现已完成，强制状态为 `不通过`；完整门禁、分行情、压力期、DSR/PBO、优化方向和六个复现身份见 [`strategy-results/etf-volatility-managed-20260713/index.html`](strategy-results/etf-volatility-managed-20260713/index.html)。
@@ -33,7 +34,7 @@
 python scripts/research/run_quant_research.py --list-strategies
 ```
 
-四条策略都固定 `researchOnly=true`、`notInvestmentAdvice=true`、`executionEnabled=false`、`realBrokerConnected=false`。它们是研究协议示例，不是推荐、评级、收益承诺或真实交易入口。
+五条策略都固定 `researchOnly=true`、`notInvestmentAdvice=true`、`executionEnabled=false`、`realBrokerConnected=false`。它们是研究协议示例，不是推荐、评级、收益承诺或真实交易入口。
 
 新运行使用 artifact schema v2，公共产物包括 `targets.csv.gz`、`nav.csv.gz`、`rebalance_requests.csv.gz`、`rebalance_executions.csv.gz`、`positions.csv.gz`、`metrics.json`、`limitations.json`、`manifest.json` 和 hash-chain checkpoints。显式启用验证或风险策略时，还会成对写入：
 
