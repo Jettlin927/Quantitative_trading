@@ -28,6 +28,8 @@
 
 `etf_volatility_managed@1` 的 2026-07-13 预登记真实数据复现已完成，强制状态为 `不通过`；完整门禁、分行情、压力期、DSR/PBO、优化方向和六个复现身份见 [`strategy-results/etf-volatility-managed-20260713/index.html`](strategy-results/etf-volatility-managed-20260713/index.html)。
 
+`etf_low_volatility_gate@1` 随后按独立预登记规则复用同一冻结数据验证，状态同样为 `不通过`。以统一初始本金 100,000 元计，基础成本期末资产约 127,647 元，但最大回撤为 -52.82%，差于 100% 被动持有的 -42.16% 和 50% ETF / 50% 现金基准的 -25.21%；结果、逐年归因、账户资产曲线和复现身份已并入同一份 HTML 报告。
+
 不用连接数据库即可查看登记身份、必需冻结输入和示例配置：
 
 ```bash
