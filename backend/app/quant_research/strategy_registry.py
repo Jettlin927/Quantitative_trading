@@ -18,6 +18,13 @@ from .etf_trend_baseline import (
     etf_trend_limitations,
     validate_etf_trend_config,
 )
+from .etf_volatility_managed import (
+    build_etf_volatility_managed_targets,
+    etf_volatility_managed_limitations,
+    simulate_etf_volatility_managed_targets,
+    summarize_etf_volatility_managed_metrics,
+    validate_etf_volatility_managed_config,
+)
 from .a_share_price_baseline import (
     a_share_price_limitations,
     build_a_share_price_targets,
@@ -85,6 +92,26 @@ _STRATEGIES = {
         simulate=simulate_etf_targets_with_ledger,
         summarize_metrics=summarize_etf_metrics,
         limitations=etf_trend_limitations,
+    ),
+    "etf_volatility_managed": StrategyDefinition(
+        strategy_id="etf_volatility_managed",
+        strategy_version="1",
+        scope="etf_time_series",
+        example_config="configs/research/etf_volatility_managed_baseline.json",
+        required_tables=(
+            "trade_calendars",
+            "funds",
+            "fund_daily_bars",
+            "fund_adjust_factors",
+            "indices",
+            "index_daily_bars",
+            "universe",
+        ),
+        validate_config=validate_etf_volatility_managed_config,
+        build_targets=build_etf_volatility_managed_targets,
+        simulate=simulate_etf_volatility_managed_targets,
+        summarize_metrics=summarize_etf_volatility_managed_metrics,
+        limitations=etf_volatility_managed_limitations,
     ),
     "a_share_price_baseline": StrategyDefinition(
         strategy_id="a_share_price_baseline",
