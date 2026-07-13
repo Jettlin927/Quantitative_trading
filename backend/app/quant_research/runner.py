@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass, replace
+from datetime import date, datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
@@ -25,7 +25,7 @@ from .artifacts import (
     verify_file_artifact,
     write_dataframe_csv_gz,
 )
-from .baselines import summarize_sentinel_metrics
+from .baselines import open_strategy_inputs, summarize_sentinel_metrics
 from .manifest import (
     build_environment_fingerprint,
     build_research_manifest,
@@ -51,6 +51,12 @@ from .snapshot import (
     verify_snapshot_identity,
 )
 from .strategy_registry import StrategyDefinition, resolve_strategy_definition
+from .validation import (
+    WALK_FORWARD_METRIC_COLUMNS,
+    WALK_FORWARD_WINDOW_COLUMNS,
+    evaluate_walk_forward,
+    validate_validation_policy,
+)
 
 
 TARGET_COLUMNS = ("signal_date", "available_date", "ts_code", "target_weight")
@@ -501,6 +507,37 @@ def _execute_pipeline(
         executions = read_canonical_csv_gz(working / "rebalance_executions.csv.gz")
         positions = read_canonical_csv_gz(working / "positions.csv.gz")
         metrics.update(summarize_execution_metrics(nav, requests, executions, positions))
+        walk_forward_artifacts: dict[str, dict[str, Any]] = {}
+        metric_outputs: dict[str, Any] = {}
+        if _walk_forward_enabled(normalized):
+            windows, window_metrics, walk_forward_summary = _evaluate_walk_forward(
+                working / "inputs",
+                normalized,
+                nav,
+                compressed=True,
+                table_artifacts=table_artifacts,
+            )
+            windows_artifact = write_dataframe_csv_gz(
+                working / "walk_forward_windows.csv.gz",
+                windows,
+                columns=WALK_FORWARD_WINDOW_COLUMNS,
+                natural_key=("window_id",),
+            )
+            window_metrics_artifact = write_dataframe_csv_gz(
+                working / "walk_forward_metrics.csv.gz",
+                window_metrics,
+                columns=WALK_FORWARD_METRIC_COLUMNS,
+                natural_key=("window_id",),
+            )
+            walk_forward_artifacts = {
+                "walk_forward_windows.csv.gz": windows_artifact,
+                "walk_forward_metrics.csv.gz": window_metrics_artifact,
+            }
+            metric_outputs = {
+                "walkForwardWindows": windows_artifact,
+                "walkForwardMetrics": window_metrics_artifact,
+            }
+            metrics["walkForward"] = walk_forward_summary
         limitations = sorted(set(strategy.limitations()))
         metrics_artifact = atomic_write_json(working / "metrics.json", metrics)
         limitations_artifact = atomic_write_json(working / "limitations.json", limitations)
@@ -518,6 +555,7 @@ def _execute_pipeline(
             outputs={
                 "metrics": metrics_artifact,
                 "limitations": limitations_artifact,
+                **metric_outputs,
             },
             checkpoints=checkpoints,
         )
@@ -527,6 +565,16 @@ def _execute_pipeline(
         limitations = _read_json(working / "limitations.json", "limitations.json")
         metrics_artifact = _checkpoint_artifact(checkpoints, "metrics", "metrics")
         limitations_artifact = _checkpoint_artifact(checkpoints, "metrics", "limitations")
+        walk_forward_artifacts = {}
+        if _walk_forward_enabled(normalized):
+            walk_forward_artifacts = {
+                "walk_forward_windows.csv.gz": _checkpoint_artifact(
+                    checkpoints, "metrics", "walkForwardWindows"
+                ),
+                "walk_forward_metrics.csv.gz": _checkpoint_artifact(
+                    checkpoints, "metrics", "walkForwardMetrics"
+                ),
+            }
 
     if "manifest" not in checkpoints:
         artifact_hashes = {
@@ -542,6 +590,7 @@ def _execute_pipeline(
             "positions.csv.gz": positions_artifact,
             "metrics.json": metrics_artifact,
             "limitations.json": limitations_artifact,
+            **walk_forward_artifacts,
         }
         manifest = build_research_manifest(
             run_id=run.run_id,
@@ -664,9 +713,17 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
     artifact_schema_version = manifest.get("artifactSchemaVersion", 1)
     if artifact_schema_version not in {1, 2}:
         raise SnapshotIntegrityError("manifest artifactSchemaVersion 不受支持")
+    walk_forward_enabled = _walk_forward_enabled(config)
+    if walk_forward_enabled and artifact_schema_version != 2:
+        raise SnapshotIntegrityError("walk-forward 工件只允许归档 schema v2")
 
     expected = manifest["artifactHashes"]
-    _validate_manifest_input_artifacts(expected, table_artifacts, artifact_schema_version)
+    _validate_manifest_input_artifacts(
+        expected,
+        table_artifacts,
+        artifact_schema_version,
+        walk_forward_enabled=walk_forward_enabled,
+    )
     if build_result_fingerprint(expected) != manifest.get("resultFingerprint"):
         raise SnapshotIntegrityError("manifest resultFingerprint 与产物哈希不一致")
     csv_contracts = {
@@ -685,6 +742,19 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
                     ("execution_date", "ts_code"),
                 ),
                 "positions.csv.gz": (POSITION_COLUMNS, ("trade_date", "ts_code")),
+            }
+        )
+    if walk_forward_enabled:
+        csv_contracts.update(
+            {
+                "walk_forward_windows.csv.gz": (
+                    WALK_FORWARD_WINDOW_COLUMNS,
+                    ("window_id",),
+                ),
+                "walk_forward_metrics.csv.gz": (
+                    WALK_FORWARD_METRIC_COLUMNS,
+                    ("window_id",),
+                ),
             }
         )
     frames: dict[str, Any] = {}
@@ -721,6 +791,16 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
             raise SnapshotIntegrityError("归档模拟账本无法对账") from exc
         if any(persisted_metrics.get(key) != value for key, value in recalculated_execution_metrics.items()):
             raise SnapshotIntegrityError("归档执行指标与模拟账本不一致")
+        if walk_forward_enabled:
+            expected_summary = _validate_walk_forward_frames(
+                frames["walk_forward_windows.csv.gz"],
+                frames["walk_forward_metrics.csv.gz"],
+                config,
+            )
+            if persisted_metrics.get("walkForward") != expected_summary:
+                raise SnapshotIntegrityError("归档 walk-forward 汇总与 OOS 工件不一致")
+        elif "walkForward" in persisted_metrics:
+            raise SnapshotIntegrityError("未启用 walk-forward 的归档包含额外汇总")
     _validate_archive_checkpoint_chain(run_path, manifest)
     return manifest, config
 
@@ -768,6 +848,7 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
             "targets.csv.gz": targets_artifact,
             "nav.csv.gz": nav_artifact,
         }
+        metrics_simulation = replace(simulation, nav=persisted_nav)
         if artifact_schema_version == 2:
             actual["rebalance_requests.csv.gz"] = write_dataframe_csv_gz(
                 temporary / "rebalance_requests.csv.gz",
@@ -787,15 +868,47 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
                 columns=POSITION_COLUMNS,
                 natural_key=("trade_date", "ts_code"),
             )
+            metrics_simulation = replace(
+                simulation,
+                nav=persisted_nav,
+                rebalance_requests=read_canonical_csv_gz(
+                    temporary / "rebalance_requests.csv.gz"
+                ),
+                rebalance_executions=read_canonical_csv_gz(
+                    temporary / "rebalance_executions.csv.gz"
+                ),
+                positions=read_canonical_csv_gz(temporary / "positions.csv.gz"),
+            )
         metrics = _summarize_reproduction_metrics(
             strategy,
             artifact_schema_version,
             run_path / "inputs",
             config,
             persisted_nav,
-            simulation,
+            metrics_simulation,
             table_artifacts,
         )
+        if _walk_forward_enabled(config):
+            windows, window_metrics, walk_forward_summary = _evaluate_walk_forward(
+                run_path / "inputs",
+                config,
+                persisted_nav,
+                compressed=True,
+                table_artifacts=table_artifacts,
+            )
+            actual["walk_forward_windows.csv.gz"] = write_dataframe_csv_gz(
+                temporary / "walk_forward_windows.csv.gz",
+                windows,
+                columns=WALK_FORWARD_WINDOW_COLUMNS,
+                natural_key=("window_id",),
+            )
+            actual["walk_forward_metrics.csv.gz"] = write_dataframe_csv_gz(
+                temporary / "walk_forward_metrics.csv.gz",
+                window_metrics,
+                columns=WALK_FORWARD_METRIC_COLUMNS,
+                natural_key=("window_id",),
+            )
+            metrics["walkForward"] = walk_forward_summary
         actual["metrics.json"] = atomic_write_json(temporary / "metrics.json", metrics)
     mismatches = [
         name
@@ -862,6 +975,29 @@ def _summarize_reproduction_metrics(
             )
         )
     return metrics
+
+
+def _walk_forward_enabled(config: dict[str, Any]) -> bool:
+    return validate_validation_policy(config.get("validationPolicy"))["mode"] != "none"
+
+
+def _evaluate_walk_forward(
+    input_root: Path,
+    config: dict[str, Any],
+    nav: Any,
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]],
+) -> tuple[Any, Any, dict[str, Any]]:
+    _, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
+    return evaluate_walk_forward(
+        nav,
+        reader("index_daily_bars"),
+        benchmark=config["benchmark"],
+        research_start=config["startDate"],
+        research_end=config["endDate"],
+        policy=config.get("validationPolicy"),
+    )
 
 
 def _initialize_checkpoint_index(working: Path, run_id: str) -> None:
@@ -1061,14 +1197,32 @@ def _verify_completed_stage_artifacts(
         }
         if checkpoints["metrics"]["inputs"] != expected_metric_inputs:
             raise ResumeIntegrityError("metrics checkpoint 输入 hash 不一致")
+        expected_metric_outputs = {
+            "metrics": _checkpoint_artifact(checkpoints, "metrics", "metrics"),
+            "limitations": _checkpoint_artifact(
+                checkpoints, "metrics", "limitations"
+            ),
+        }
         verify_file_artifact(
             working / "metrics.json",
-            _checkpoint_artifact(checkpoints, "metrics", "metrics"),
+            expected_metric_outputs["metrics"],
         )
         verify_file_artifact(
             working / "limitations.json",
-            _checkpoint_artifact(checkpoints, "metrics", "limitations"),
+            expected_metric_outputs["limitations"],
         )
+        if _walk_forward_enabled(dict(run.config or {})):
+            for filename, artifact_name in (
+                ("walk_forward_windows.csv.gz", "walkForwardWindows"),
+                ("walk_forward_metrics.csv.gz", "walkForwardMetrics"),
+            ):
+                artifact = _checkpoint_artifact(
+                    checkpoints, "metrics", artifact_name
+                )
+                expected_metric_outputs[artifact_name] = artifact
+                verify_csv_artifact(working / filename, artifact)
+        if checkpoints["metrics"]["outputs"] != expected_metric_outputs:
+            raise ResumeIntegrityError("metrics checkpoint 输出集合不一致")
     if "manifest" in checkpoints:
         verify_file_artifact(
             working / "manifest.json",
@@ -1220,6 +1374,8 @@ def _validate_manifest_input_artifacts(
     artifact_hashes: Any,
     table_artifacts: Any,
     artifact_schema_version: int,
+    *,
+    walk_forward_enabled: bool,
 ) -> None:
     if (
         not isinstance(artifact_hashes, dict)
@@ -1252,6 +1408,13 @@ def _validate_manifest_input_artifacts(
                 "rebalance_requests.csv.gz",
                 "rebalance_executions.csv.gz",
                 "positions.csv.gz",
+            }
+        )
+    if walk_forward_enabled:
+        required_outputs.update(
+            {
+                "walk_forward_windows.csv.gz",
+                "walk_forward_metrics.csv.gz",
             }
         )
     if set(artifact_hashes) != set(expected_inputs) | required_outputs:
@@ -1412,6 +1575,21 @@ def _validate_archive_checkpoint_artifacts(
 
     metrics = _checkpoint_artifact(checkpoints, "metrics", "metrics")
     limitations = _checkpoint_artifact(checkpoints, "metrics", "limitations")
+    expected_metric_outputs = {
+        "metrics": artifact_hashes["metrics.json"],
+        "limitations": artifact_hashes["limitations.json"],
+    }
+    if _walk_forward_enabled(manifest["config"]):
+        expected_metric_outputs.update(
+            {
+                "walkForwardWindows": artifact_hashes[
+                    "walk_forward_windows.csv.gz"
+                ],
+                "walkForwardMetrics": artifact_hashes[
+                    "walk_forward_metrics.csv.gz"
+                ],
+            }
+        )
     expected_metric_inputs = {"nav": nav}
     if manifest.get("artifactSchemaVersion", 1) == 2:
         expected_metric_inputs.update(
@@ -1425,6 +1603,7 @@ def _validate_archive_checkpoint_artifacts(
         checkpoints["metrics"]["inputs"] != expected_metric_inputs
         or metrics != artifact_hashes["metrics.json"]
         or limitations != artifact_hashes["limitations.json"]
+        or checkpoints["metrics"]["outputs"] != expected_metric_outputs
     ):
         raise ResumeIntegrityError("metrics checkpoint 与归档不一致")
 
@@ -1486,17 +1665,68 @@ def _read_and_validate_output_csv(
     return frame
 
 
+def _validate_walk_forward_frames(
+    windows: Any,
+    metrics: Any,
+    config: dict[str, Any],
+) -> dict[str, Any]:
+    if windows.empty or metrics.empty:
+        raise SnapshotIntegrityError("归档 walk-forward 工件不能为空")
+    if list(windows["window_id"]) != list(metrics["window_id"]):
+        raise SnapshotIntegrityError("walk-forward 窗口与指标身份不一致")
+    policy = validate_validation_policy(config.get("validationPolicy"))
+    if (
+        set(windows["mode"]) != {policy["mode"]}
+        or set(metrics["sample_role"]) != {"test_oos"}
+    ):
+        raise SnapshotIntegrityError("walk-forward mode 或 sample_role 无效")
+    test_observations = 0
+    previous_test_end: date | None = None
+    for window, metric in zip(
+        windows.itertuples(index=False),
+        metrics.itertuples(index=False),
+        strict=True,
+    ):
+        train_end = datetime.fromisoformat(str(window.train_end)).date()
+        test_start = datetime.fromisoformat(str(window.test_start)).date()
+        test_end = datetime.fromisoformat(str(window.test_end)).date()
+        metric_start = datetime.fromisoformat(str(metric.start_date)).date()
+        metric_end = datetime.fromisoformat(str(metric.end_date)).date()
+        train_periods = int(window.train_periods)
+        test_periods = int(window.test_periods)
+        observations = int(metric.observations)
+        if (
+            train_end >= test_start
+            or test_start > test_end
+            or metric_start != test_start
+            or metric_end != test_end
+            or train_periods != policy["trainPeriods"]
+            or test_periods != policy["testPeriods"]
+            or observations != test_periods
+            or (previous_test_end is not None and test_start <= previous_test_end)
+        ):
+            raise SnapshotIntegrityError("walk-forward 训练/test 边界或 OOS 观测数无效")
+        previous_test_end = test_end
+        test_observations += observations
+    return {
+        "mode": policy["mode"],
+        "oosOnly": True,
+        "testObservationCount": test_observations,
+        "windowCount": len(windows),
+    }
+
+
 def _cleanup_uncommitted_stage_files(
     working: Path,
     checkpoints: dict[str, dict[str, Any]],
 ) -> None:
     completed_count = len(checkpoints)
     stage_outputs = {
-        0: ("quality.json", "inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        1: ("inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        2: ("targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        3: ("nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        4: ("metrics.json", "limitations.json", "manifest.json"),
+        0: ("quality.json", "inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        1: ("inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        2: ("targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        3: ("nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        4: ("walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
         5: ("manifest.json",),
         6: (),
         7: (),

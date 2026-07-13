@@ -18,6 +18,13 @@ from .etf_trend_baseline import (
     etf_trend_limitations,
     validate_etf_trend_config,
 )
+from .a_share_price_baseline import (
+    a_share_price_limitations,
+    build_a_share_price_targets,
+    simulate_a_share_price_targets,
+    summarize_a_share_price_metrics,
+    validate_a_share_price_config,
+)
 
 
 StrategyCallable = Callable[..., Any]
@@ -75,6 +82,28 @@ _STRATEGIES = {
         simulate=simulate_etf_targets_with_ledger,
         summarize_metrics=summarize_etf_metrics,
         limitations=etf_trend_limitations,
+    ),
+    "a_share_price_baseline": StrategyDefinition(
+        strategy_id="a_share_price_baseline",
+        strategy_version="1",
+        scope="a_share_cross_section",
+        required_tables=(
+            "trade_calendars",
+            "stock_listings",
+            "stock_daily_bars",
+            "stock_adjust_factors",
+            "stock_limit_prices",
+            "stock_suspend_events",
+            "industry_members",
+            "indices",
+            "index_daily_bars",
+            "universe",
+        ),
+        validate_config=validate_a_share_price_config,
+        build_targets=build_a_share_price_targets,
+        simulate=simulate_a_share_price_targets,
+        summarize_metrics=summarize_a_share_price_metrics,
+        limitations=a_share_price_limitations,
     ),
 }
 
