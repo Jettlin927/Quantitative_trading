@@ -953,12 +953,14 @@ def _condition_result(
     filters = tuple(filters)
     checked_rows = _count_rows(db, model, filters)
     failed_rows = int(db.scalar(select(func.count()).select_from(model).where(*filters, failure_condition)) or 0)
-    rows = db.execute(
-        select(*sample_columns)
-        .where(*filters, failure_condition)
-        .order_by(*sample_columns)
-        .limit(MAX_SAMPLE_ISSUES)
-    ).all()
+    rows = []
+    if failed_rows:
+        rows = db.execute(
+            select(*sample_columns)
+            .where(*filters, failure_condition)
+            .order_by(*sample_columns)
+            .limit(MAX_SAMPLE_ISSUES)
+        ).all()
     samples = [
         {_camel_key(column.key): _json_value(value) for column, value in zip(sample_columns, row)}
         for row in rows

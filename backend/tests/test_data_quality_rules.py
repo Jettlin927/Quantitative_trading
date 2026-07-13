@@ -5,7 +5,7 @@ from datetime import date
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pandas as pd
 from sqlalchemy import create_engine, select
@@ -15,7 +15,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.app.database import Base
 from backend.app.data_quality.contracts import QualityCheckContract, QualityRuleResult, summarize_quality_status
-from backend.app.data_quality.rules import evaluate_quality_rules
+from backend.app.data_quality.rules import _condition_result, evaluate_quality_rules
 from backend.app.data_quality.runner import run_data_quality_check
 from backend.app import main
 from backend.app.models import (
@@ -299,6 +299,24 @@ class DataQualityRulesTest(unittest.TestCase):
         self.assertEqual(first_value.status, "blocked")
         self.assertEqual(first_value.failed_rows, second_value.failed_rows)
         self.assertEqual(first_value.sample_issues, second_value.sample_issues)
+
+    def test_zero_failures_skip_redundant_sample_scan(self):
+        db = Mock()
+        db.scalar.side_effect = [100, 0]
+
+        result = _condition_result(
+            db,
+            rule_id="value.ohlcv_sanity",
+            table_name="stock_daily_bars",
+            model=StockDailyBar,
+            filters=(),
+            failure_condition=StockDailyBar.close <= 0,
+            sample_columns=(StockDailyBar.ts_code, StockDailyBar.trade_date),
+        )
+
+        self.assertEqual(result.status, "passed")
+        self.assertEqual(result.checked_rows, 100)
+        db.execute.assert_not_called()
 
     def test_intraday_suspend_does_not_hide_missing_daily_bar(self):
         with Session(self.engine) as db:
