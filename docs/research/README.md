@@ -16,12 +16,13 @@
 
 ## 静态策略与统一入口
 
-正式 runner 只允许源码静态登记的三条研究策略；不能动态安装、按模块路径导入或上传策略代码：
+正式 runner 只允许源码静态登记的四条研究策略；不能动态安装、按模块路径导入或上传策略代码：
 
 | strategy ID | 版本 | scope | 示例配置 | 用途 |
 | --- | --- | --- | --- | --- |
 | `sentinel_etf_baseline` | `1` | `etf_time_series` | `configs/research/sentinel_etf_baseline.json` | 验证质量门禁、冻结快照和离线复现 |
 | `etf_trend_120d` | `1` | `etf_time_series` | `configs/research/etf_trend_baseline.json` | 固定 120 日均线、月末 1/0 目标的时序 baseline |
+| `etf_volatility_managed` | `1` | `etf_time_series` | `configs/research/etf_volatility_managed_baseline.json` | Moreira–Muir 倒数已实现方差、月末无杠杆 ETF 暴露复现 |
 | `a_share_price_baseline` | `1` | `a_share_cross_section` | `configs/research/a_share_price_baseline.json` | 固定 120–20 动量、60 日波动、历史行业成员的价格型横截面 baseline |
 
 不用连接数据库即可查看登记身份、必需冻结输入和示例配置：
@@ -30,7 +31,7 @@
 python scripts/research/run_quant_research.py --list-strategies
 ```
 
-三条策略都固定 `researchOnly=true`、`notInvestmentAdvice=true`、`executionEnabled=false`、`realBrokerConnected=false`。它们是研究协议示例，不是推荐、评级、收益承诺或真实交易入口。
+四条策略都固定 `researchOnly=true`、`notInvestmentAdvice=true`、`executionEnabled=false`、`realBrokerConnected=false`。它们是研究协议示例，不是推荐、评级、收益承诺或真实交易入口。
 
 新运行使用 artifact schema v2，公共产物包括 `targets.csv.gz`、`nav.csv.gz`、`rebalance_requests.csv.gz`、`rebalance_executions.csv.gz`、`positions.csv.gz`、`metrics.json`、`limitations.json`、`manifest.json` 和 hash-chain checkpoints。显式启用验证或风险策略时，还会成对写入：
 

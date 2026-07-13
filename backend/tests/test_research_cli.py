@@ -22,6 +22,7 @@ class ResearchCliTest(unittest.TestCase):
             [
                 "a_share_price_baseline",
                 "etf_trend_120d",
+                "etf_volatility_managed",
                 "sentinel_etf_baseline",
             ],
         )
@@ -42,7 +43,7 @@ class ResearchCliTest(unittest.TestCase):
         payload = json.loads(output.getvalue())
         self.assertEqual(exit_code, 0)
         self.assertEqual(payload["status"], "ok")
-        self.assertEqual(len(payload["strategies"]), 3)
+        self.assertEqual(len(payload["strategies"]), 4)
         self.assertEqual(
             set(payload["strategies"][0]),
             {

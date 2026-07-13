@@ -5,7 +5,7 @@
 ## 当前接手状态
 
 - 本地仓库：`/Users/jettlin/code/Quantitative_trading`；用户常用 Windows 副本路径仍可能是 `E:\coding_things\Quantitative_trading`。接手必须现场运行 `git status -sb`、`git log -10 --oneline` 和 `git rev-list --left-right --count origin/main...HEAD`，不要从本文猜当前分支或远端提交。
-- 2026-07-13 的量化研究能力补齐已实现静态三策略分发、因果特征、可审计模拟账本、A 股历史行业成员 baseline、OOS-only walk-forward、透明风险工件、确定性约束分配和风险数据 readiness。该轮只授权验证后合并/推送代码，不包含生产部署、生产研究运行或数据库迁移；生产运行时代码仍须与仓库最新 `main` 分开核对。
+- 2026-07-13 的量化研究能力补齐已实现静态策略分发、因果特征、可审计模拟账本、A 股历史行业成员 baseline、OOS-only walk-forward、透明风险工件、确定性约束分配和风险数据 readiness。该轮只授权验证后合并/推送代码，不包含生产部署、生产研究运行或数据库迁移；生产运行时代码仍须与仓库最新 `main` 分开核对。
 - 新增能力已在精确代码提交 `891b2825b62c8e91576ee54d04fbafc738c95f69` 完成最终验收：本地隔离 PostgreSQL 16.14 全量 219/219、0 跳过，固定黑盒审计 12/12；远端 `/tmp` 隔离源码复用现有 API 镜像完成 SQLite 全量 219 项、10 项 PG-only 按设计跳过，未连接生产数据库或重启服务。黄金 A 股合成运行结果指纹为 `ca9243de1c5fb8599cc589710f63c8358e9f6c9e1c5e1e0b261a0e200df71806`，连续两次断库 reproduce 匹配。
 - 上述实现与验收记录已 fast-forward 合并并推送至 `main@e51bbf37f528b4a9ea3df5ba2ae394d228ab2b6b`；GitHub CI run `29232720679` 的后端 SQLite、前端、PostgreSQL 16、Compose/Shell 四个 job 全部成功。该动作不代表生产服务器已部署新代码。
 - 可信工程的既有生产运行时代码为 `c24ade495492f64ea82aa229827858cdef52cdf6`。GitHub `main` 后续已有文档提交；接手不能把“仓库最新提交”写成“生产已部署”。
@@ -16,7 +16,7 @@
 
 ## 2026-07-13 新增研究能力
 
-- `scripts/research/run_quant_research.py --list-strategies` 不连接数据库，列出 `sentinel_etf_baseline@1`、`etf_trend_120d@1`、`a_share_price_baseline@1` 的 scope、必需冻结输入和示例配置。
+- `scripts/research/run_quant_research.py --list-strategies` 不连接数据库，列出 `sentinel_etf_baseline@1`、`etf_trend_120d@1`、`etf_volatility_managed@1`、`a_share_price_baseline@1` 的 scope、必需冻结输入和示例配置。
 - artifact schema v2 的公共 runner 同时生成 `targets/nav`、调仓请求、模拟执行和 positions；walk-forward 与风险工件按配置成对出现并进入 checkpoint、manifest 和结果指纹。已完成 v1 归档保持兼容，未完成 v1 不跨版本续跑。
 - A 股价格 baseline 只使用逐日 `industry_members`、上市/退市、日线、复权、涨跌停、停牌和基准；固定 120–20 动量、60 日波动、月末 topN 等权和下一开市日开盘执行，不读取财务指标或当前成员列表。
 - `risk.py` 从冻结输入计算 gross/net/cash、集中度、历史行业暴露、benchmark beta 和边际/总风险贡献；贡献之和必须等于组合波动。`allocation.py` 只输出受单票、行业、现金和换手约束的研究目标权重，不生成订单。

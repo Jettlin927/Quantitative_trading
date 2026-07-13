@@ -1,0 +1,64 @@
+{
+  "allowedWarnings": [],
+  "benchmark": "000300.SH",
+  "costModel": {
+    "buyRate": "0.00035",
+    "sellRate": "0.00085",
+    "slippageRate": "0.001"
+  },
+  "endDate": "2026-06-29",
+  "executionPolicy": {
+    "calendarExchange": "SSE",
+    "executionPrice": "next_trade_open",
+    "signalPrice": "close"
+  },
+  "featureParameters": {
+    "calibrationEndDate": "2017-12-29",
+    "calibrationStartDate": "2012-06-01",
+    "exposurePower": "0.5",
+    "realizedVarianceEstimator": "previous_month"
+  },
+  "qualityRunId": "__REQUIRED_BY_CLI__",
+  "randomSeed": 7,
+  "riskPolicy": {
+    "lookbackPeriods": 60,
+    "minPeriods": 20,
+    "mode": "rolling_covariance"
+  },
+  "scope": "etf_time_series",
+  "startDate": "2018-01-01",
+  "strategyId": "etf_volatility_managed",
+  "strategyVersion": "1",
+  "targetWeightParameters": {
+    "maxWeight": "1",
+    "rebalanceBand": "0",
+    "rebalanceFrequency": "month_end"
+  },
+  "timezone": "Asia/Shanghai",
+  "universe": {
+    "asOfDate": "2012-05-28",
+    "memberArtifact": {
+      "count": 1,
+      "format": "inline_sorted_symbols",
+      "sha256": "eb2a09141693d8ffa619fab66a698c210e3bb425bb9605e7996ed273428e99cc"
+    },
+    "members": [
+      "510300.SH"
+    ],
+    "mode": "explicit_snapshot",
+    "source": "configs/research/etf_volatility_managed_universe.txt",
+    "sourceArtifact": {
+      "format": "sorted_symbols_v1",
+      "path": "configs/research/etf_volatility_managed_universe.txt",
+      "sha256": "d86f1b223389fc723847e44b7a9af356576c0563e60396f44f9e97f401c18611"
+    },
+    "universeHash": "875ee1990106825520a73d0927cf578aa0a62fba2a85ab3d664673bdbced7f6a"
+  },
+  "validationPolicy": {
+    "mode": "anchored",
+    "stepPeriods": 252,
+    "testPeriods": 252,
+    "trainPeriods": 504
+  },
+  "warmupStart": "2012-05-28"
+}

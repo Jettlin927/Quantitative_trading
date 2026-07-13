@@ -94,9 +94,10 @@
   - 信任边界以 `docs/research/quant-foundation-trust-contract.md` 为准；新 loader、特征、模拟器和 runner 必须先满足其 quality scope、宇宙血缘和时点可得合同。
   - `dataset.py`：严格复权、公告日 point-in-time 关联、历史成员筛选。
   - `repository.py`：从 DB 加载显式历史股票池和基准；缺历史上市、复权或涨跌停数据时失败。
-  - `strategy_registry.py`：三条源码静态登记策略的身份、scope、必需冻结表、示例配置和函数分发；禁止动态 import。
+  - `strategy_registry.py`：四条源码静态登记策略的身份、scope、必需冻结表、示例配置和函数分发；禁止动态 import。
   - `features.py`：baseline 实际使用的因果时序/横截面特征；warmup 保持 null。
   - `etf_trend_baseline.py`：固定 120 日均线、月末 1/0 目标的 ETF baseline。
+  - `etf_volatility_managed.py`：预登记的月度倒数方差/倒数波动率 ETF 暴露、校准期隔离与无杠杆目标。
   - `a_share_price_baseline.py`：固定 120–20 动量、60 日波动和历史行业成员的 A 股价格 baseline。
   - `portfolio.py`：下一交易日开盘目标权重模拟，一次产生 NAV、请求、模拟执行和逐日持仓；含现金、成本及开盘可买卖硬约束。
   - `metrics.py`：绝对/基准相对、回撤持续期、成本、换手、持仓和集中度指标。
