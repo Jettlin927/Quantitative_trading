@@ -10,6 +10,13 @@ from .baselines import (
     simulate_sentinel_targets,
     summarize_sentinel_metrics,
     validate_sentinel_config,
+    simulate_etf_targets,
+    summarize_etf_metrics,
+)
+from .etf_trend_baseline import (
+    build_etf_trend_targets,
+    etf_trend_limitations,
+    validate_etf_trend_config,
 )
 
 
@@ -49,6 +56,25 @@ _STRATEGIES = {
         simulate=simulate_sentinel_targets,
         summarize_metrics=summarize_sentinel_metrics,
         limitations=sentinel_limitations,
+    ),
+    "etf_trend_120d": StrategyDefinition(
+        strategy_id="etf_trend_120d",
+        strategy_version="1",
+        scope="etf_time_series",
+        required_tables=(
+            "trade_calendars",
+            "funds",
+            "fund_daily_bars",
+            "fund_adjust_factors",
+            "indices",
+            "index_daily_bars",
+            "universe",
+        ),
+        validate_config=validate_etf_trend_config,
+        build_targets=build_etf_trend_targets,
+        simulate=simulate_etf_targets,
+        summarize_metrics=summarize_etf_metrics,
+        limitations=etf_trend_limitations,
     ),
 }
 

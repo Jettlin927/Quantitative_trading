@@ -24,11 +24,12 @@ from backend.app.quant_research.runner import (
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="执行质量门禁、冻结输入并运行可复现 ETF sentinel。")
+    parser = argparse.ArgumentParser(description="执行质量门禁、冻结输入并运行已登记的可复现量化研究。")
     parser.add_argument(
         "--config",
         type=Path,
         default=REPO_ROOT / "configs" / "research" / "sentinel_etf_baseline.json",
+        help="已提交且策略 ID 在静态登记表中的研究配置。",
     )
     identity = parser.add_mutually_exclusive_group(required=True)
     identity.add_argument("--quality-run-id")

@@ -9,6 +9,16 @@ from .readiness import evaluate_quality_run_readiness, evaluate_research_readine
 from .repository import load_index_benchmark, load_stock_research_panel
 from .universe import build_explicit_universe, build_historical_membership_panel, build_historical_universe, evaluate_universe_provenance
 from .strategy_registry import list_strategy_definitions, resolve_strategy_definition
+from .features import (
+    cross_section_percentile_rank,
+    cross_section_winsorize,
+    equal_weight_targets,
+    interval_returns,
+    moving_average,
+    rolling_volatility,
+    rolling_zscore,
+    simple_returns,
+)
 from .validation import WalkForwardWindow, build_walk_forward_windows
 
 __all__ = [
@@ -21,6 +31,10 @@ __all__ = [
     "build_open_trade_calendar",
     "build_explicit_universe",
     "build_historical_membership_panel",
+    "cross_section_percentile_rank",
+    "cross_section_winsorize",
+    "equal_weight_targets",
+    "interval_returns",
     "list_strategy_definitions",
     "resolve_strategy_definition",
     "build_historical_universe",
@@ -31,9 +45,13 @@ __all__ = [
     "evaluate_quality_run_readiness",
     "load_index_benchmark",
     "load_stock_research_panel",
+    "moving_average",
     "reproduce_quant_research",
     "run_quant_research",
     "simulate_target_weights",
+    "simple_returns",
+    "rolling_volatility",
+    "rolling_zscore",
     "summarize_performance",
     "trade_calendar_content_sha256",
 ]
