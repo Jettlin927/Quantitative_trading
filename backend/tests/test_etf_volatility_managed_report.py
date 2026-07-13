@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 
 from scripts.research.render_etf_volatility_managed_report import (
+    TRIAL_DISPLAY_NAMES,
+    TRIAL_GLOSSARY,
     _deflated_sharpe,
     _probability_backtest_overfitting,
     classify_run,
@@ -19,6 +21,27 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class EtfVolatilityManagedReportTest(unittest.TestCase):
+    def test_report_explains_internal_trial_ids_before_results(self):
+        report_path = (
+            REPO_ROOT
+            / "docs"
+            / "research"
+            / "strategy-results"
+            / "etf-volatility-managed-20260713"
+            / "index.html"
+        )
+        html = report_path.read_text(encoding="utf-8")
+
+        glossary_position = html.index("先看懂报告中的四个试验")
+        self.assertLess(glossary_position, html.index("0. 结论门禁"))
+        self.assertLess(glossary_position, html.index("1. 样本外总体指标"))
+        self.assertLess(glossary_position, html.index("T0"))
+        self.assertEqual([item["id"] for item in TRIAL_GLOSSARY], ["T0", "T1", "T2", "T3"])
+        for label in ("T0", "T1", "T2", "T3"):
+            self.assertIn(TRIAL_DISPLAY_NAMES[label], html)
+        for bare_label in (">T0 累计净收益<", ">T0<", ">T1<", ">T2<", ">T3<"):
+            self.assertNotIn(bare_label, html[:glossary_position])
+
     def test_classifies_only_preregistered_trials_and_cost_scenarios(self):
         configs = {
             "T0": "etf_volatility_managed_baseline.json",
