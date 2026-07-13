@@ -1,5 +1,8 @@
 {
-  "allowedWarnings": [],
+  "allowedWarnings": [
+    "adjustment.factor_jump:stock_adjust_factors",
+    "domain.unlisted_codes:stock_limit_prices"
+  ],
   "benchmark": "000300.SH",
   "costModel": {
     "buyRate": "0",
@@ -56,7 +59,7 @@
   "universe": {
     "mode": "industry_membership",
     "source": "industry_members",
-    "sourceKey": "801030.SI"
+    "sourceKey": "801180.SI"
   },
   "validationPolicy": {"mode": "none"},
   "warmupStart": "2024-06-03"
