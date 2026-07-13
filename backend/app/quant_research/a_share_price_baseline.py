@@ -222,6 +222,7 @@ def _load_frozen_prices(reader: Any, config: dict[str, Any], calendar: Any) -> p
     factors = reader("stock_adjust_factors")
     limits = reader("stock_limit_prices")
     suspensions = reader("stock_suspend_events")
+    universe = reader("universe")
     start = pd.Timestamp(config["warmupStart"])
     end = pd.Timestamp(config["endDate"])
     for frame in (bars, factors, limits, suspensions):
@@ -243,8 +244,21 @@ def _load_frozen_prices(reader: Any, config: dict[str, Any], calendar: Any) -> p
         how="left",
         validate="one_to_one",
     )
-    if prices[["up_limit", "down_limit"]].isna().any().any():
-        raise ValueError("冻结 A 股日线缺少涨跌停价格")
+    universe["trade_date"] = pd.to_datetime(universe["trade_date"], errors="raise")
+    universe["ts_code"] = universe["ts_code"].astype(str).str.strip().str.upper()
+    first_membership = universe.groupby("ts_code", sort=False)["trade_date"].min()
+    required_from = prices["ts_code"].map(first_membership)
+    if required_from.isna().any():
+        raise ValueError("冻结 A 股行情包含不在历史 universe 的代码")
+    missing_limit = prices[["up_limit", "down_limit"]].isna().any(axis=1)
+    missing_required_limit = missing_limit & (prices["trade_date"] >= required_from)
+    if missing_required_limit.any():
+        sample = prices.loc[
+            missing_required_limit,
+            ["ts_code", "trade_date"],
+        ].head(5).to_dict("records")
+        raise ValueError(f"冻结 A 股入选后日线缺少涨跌停价格：{sample}")
+    prices["has_limit_price"] = ~missing_limit
 
     suspension_keys = set()
     open_suspension_keys = set()
@@ -262,10 +276,14 @@ def _load_frozen_prices(reader: Any, config: dict[str, Any], calendar: Any) -> p
     prices["is_suspended"] = [key in suspension_keys for key in keys]
     prices["is_suspended_at_open"] = [key in open_suspension_keys for key in keys]
     prices["is_buyable_at_open"] = (
-        ~prices["is_suspended_at_open"] & (prices["open"] < prices["up_limit"])
+        prices["has_limit_price"]
+        & ~prices["is_suspended_at_open"]
+        & (prices["open"] < prices["up_limit"])
     )
     prices["is_sellable_at_open"] = (
-        ~prices["is_suspended_at_open"] & (prices["open"] > prices["down_limit"])
+        prices["has_limit_price"]
+        & ~prices["is_suspended_at_open"]
+        & (prices["open"] > prices["down_limit"])
     )
     prices["is_valuation_carried"] = False
     prices["valuation_carry_reason"] = ""
@@ -283,6 +301,7 @@ def _load_frozen_prices(reader: Any, config: dict[str, Any], calendar: Any) -> p
                 "trade_date": trade_date,
                 "is_suspended": True,
                 "is_suspended_at_open": True,
+                "has_limit_price": False,
                 "is_buyable_at_open": False,
                 "is_sellable_at_open": False,
                 "is_valuation_carried": True,

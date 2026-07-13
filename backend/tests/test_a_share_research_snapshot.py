@@ -13,6 +13,9 @@ from backend.app.data_quality.runner import run_data_quality_check
 from backend.app.database import Base
 from backend.app.models import (
     IndustryMember,
+    StockAdjustFactor,
+    StockDailyBar,
+    StockLimitPrice,
     StockListing,
     TradeCalendar,
 )
@@ -52,6 +55,46 @@ class AShareResearchSnapshotTest(unittest.TestCase):
         self.assertEqual(report["config"]["universeUniqueMemberCount"], 2)
         self.assertRegex(report["config"]["universeMemberSha256"], r"^[0-9a-f]{64}$")
         self.assertEqual(report["universeHash"], report["config"]["universeHash"])
+
+    def test_quality_uses_membership_dates_and_excludes_administrative_delist_date(self):
+        with Session(self.engine) as db:
+            second_member = db.scalar(
+                select(IndustryMember).where(IndustryMember.con_code == "SYN002.SH")
+            )
+            second_member.in_date = date(2026, 1, 5)
+            first_listing = db.get(StockListing, "SYN001.SZ")
+            first_listing.list_status = "D"
+            first_listing.delist_date = date(2026, 1, 5)
+            for model, code, trade_date in (
+                (StockDailyBar, "SYN002.SH", date(2026, 1, 2)),
+                (StockAdjustFactor, "SYN002.SH", date(2026, 1, 2)),
+                (StockLimitPrice, "SYN002.SH", date(2026, 1, 2)),
+                (StockDailyBar, "SYN001.SZ", date(2026, 1, 5)),
+                (StockAdjustFactor, "SYN001.SZ", date(2026, 1, 5)),
+                (StockLimitPrice, "SYN001.SZ", date(2026, 1, 5)),
+            ):
+                row = db.scalar(
+                    select(model).where(
+                        model.ts_code == code,
+                        model.trade_date == trade_date,
+                    )
+                )
+                db.delete(row)
+            db.commit()
+
+            report = run_data_quality_check(
+                db,
+                self._contract(),
+                code_commit="a-share-test",
+            )
+
+        self.assertEqual(report["status"], "ready")
+        coverage = next(
+            item
+            for item in report["results"]
+            if item["ruleId"] == "calendar.daily_bar_coverage"
+        )
+        self.assertEqual(coverage["failedRows"], 0)
 
     def test_snapshot_re_resolves_membership_and_rejects_old_quality_after_change(self):
         with Session(self.engine) as db:
