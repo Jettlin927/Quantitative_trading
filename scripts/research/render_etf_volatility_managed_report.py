@@ -32,6 +32,13 @@ DEFAULT_RUN_ROOT = (
     / "volatility-managed-2026-07-13"
     / "canonical-runs"
 )
+DEFAULT_GATE_RUN_ROOT = (
+    REPO_ROOT
+    / "outputs"
+    / "research-runs"
+    / "low-volatility-gate-2026-07-13"
+    / "canonical-runs"
+)
 DEFAULT_OUTPUT_DIR = (
     REPO_ROOT
     / "docs"
@@ -40,7 +47,9 @@ DEFAULT_OUTPUT_DIR = (
     / "etf-volatility-managed-20260713"
 )
 TRIAL_ORDER = ("T0", "T1", "T2", "T3", "zero_cost", "double_cost")
+GATE_RUN_ORDER = ("base_cost", "double_cost")
 BASE_COST = (0.00035, 0.00085, 0.001)
+INITIAL_CAPITAL = 100_000.0
 TRIAL_DISPLAY_NAMES = {
     "T0": "逆方差强力降风险版（T0）",
     "T1": "逆波动温和降风险版（T1）",
@@ -84,11 +93,13 @@ def main(argv: list[str] | None = None) -> int:
         description="从六个 canonical 运行生成 ETF 波动率管理研究报告。"
     )
     parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
+    parser.add_argument("--gate-run-root", type=Path, default=DEFAULT_GATE_RUN_ROOT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     args = parser.parse_args(argv)
 
     runs = load_runs(args.run_root)
-    summary, charts = build_summary(runs)
+    gate_runs = load_gate_runs(args.gate_run_root)
+    summary, charts = build_summary(runs, gate_runs)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     summary_path = args.output_dir / "summary.json"
     report_path = args.output_dir / "index.html"
@@ -153,6 +164,61 @@ def load_runs(run_root: Path) -> dict[str, dict[str, Any]]:
     return runs
 
 
+def load_gate_runs(run_root: Path) -> dict[str, dict[str, Any]]:
+    root = Path(run_root).expanduser().resolve()
+    if not root.is_dir():
+        raise ValueError(f"低波动准入 canonical run 根目录不存在：{root}")
+    runs: dict[str, dict[str, Any]] = {}
+    for path in sorted(item for item in root.iterdir() if item.is_dir()):
+        config_path = path / "config.json"
+        manifest_path = path / "manifest.json"
+        metrics_path = path / "metrics.json"
+        if not all(item.is_file() for item in (config_path, manifest_path, metrics_path)):
+            continue
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        if config.get("strategyId") != "etf_low_volatility_gate":
+            continue
+        label = classify_gate_run(config)
+        if label in runs:
+            raise ValueError(f"低波动准入 canonical run 标签重复：{label}")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("runId") != path.name:
+            raise ValueError(f"低波动准入 run 目录与 manifest 身份不一致：{path}")
+        runs[label] = {
+            "path": path,
+            "config": config,
+            "manifest": manifest,
+            "metrics": json.loads(metrics_path.read_text(encoding="utf-8")),
+        }
+    missing = sorted(set(GATE_RUN_ORDER) - set(runs))
+    extra = sorted(set(runs) - set(GATE_RUN_ORDER))
+    if missing or extra:
+        raise ValueError(f"低波动准入 canonical run 集合无效：missing={missing}, extra={extra}")
+    identities = {
+        (
+            item["manifest"]["codeCommit"],
+            item["manifest"]["dataSnapshot"]["snapshotId"],
+            item["manifest"]["qualityRun"]["qualityRunId"],
+        )
+        for item in runs.values()
+    }
+    if len(identities) != 1:
+        raise ValueError("低波动准入两个运行没有绑定同一代码、数据快照和质量运行")
+    return runs
+
+
+def classify_gate_run(config: dict[str, Any]) -> str:
+    cost = tuple(
+        float(config["costModel"][field])
+        for field in ("buyRate", "sellRate", "slippageRate")
+    )
+    if cost == BASE_COST:
+        return "base_cost"
+    if cost == tuple(value * 2 for value in BASE_COST):
+        return "double_cost"
+    raise ValueError(f"低波动准入未登记的成本场景：{cost}")
+
+
 def classify_run(config: dict[str, Any]) -> str:
     features = config["featureParameters"]
     targets = config["targetWeightParameters"]
@@ -185,6 +251,7 @@ def classify_run(config: dict[str, Any]) -> str:
 
 def build_summary(
     runs: dict[str, dict[str, Any]],
+    gate_runs: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, pd.Series]]:
     t0 = runs["T0"]
     config = t0["config"]
@@ -264,7 +331,7 @@ def build_summary(
         ),
         _gate(
             "最大回撤",
-            f"|{TRIAL_DISPLAY_NAMES['T0']} MDD| / |被动 MDD| <= 85%",
+            f"|{TRIAL_DISPLAY_NAMES['T0']} 最大回撤| / |被动最大回撤| <= 85%",
             abs(t0_metrics["maxDrawdown"]) / abs(passive_metrics["maxDrawdown"]),
             0.85,
             "le",
@@ -278,7 +345,7 @@ def build_summary(
         ),
         _gate(
             "CAGR 保留",
-            f"{TRIAL_DISPLAY_NAMES['T0']} - 被动 >= -2pp",
+            f"{TRIAL_DISPLAY_NAMES['T0']} - 被动 >= -2 个百分点",
             t0_metrics["annualizedReturn"] - passive_metrics["annualizedReturn"],
             -0.02,
             "ge",
@@ -334,6 +401,7 @@ def build_summary(
     }
     summary = {
         "status": status,
+        "initialCapital": INITIAL_CAPITAL,
         "reportGeneratedAt": datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(
             timespec="seconds"
         ),
@@ -467,7 +535,7 @@ def build_summary(
                 "priority": 1,
                 "direction": "把逆波动温和降风险版（T1）作为唯一下一轮候选，在新时间段或另一只事前指定宽基 ETF 上独立验证。",
                 "evidence": (
-                    f"逆波动温和降风险版 CAGR {runs['T1']['metrics']['annualizedReturn']:.2%}、MDD {runs['T1']['metrics']['maxDrawdown']:.2%}，"
+                    f"逆波动温和降风险版 CAGR {runs['T1']['metrics']['annualizedReturn']:.2%}、最大回撤 {runs['T1']['metrics']['maxDrawdown']:.2%}，"
                     f"成本约为基准逆方差版的 {runs['T1']['metrics']['cumulativeTransactionCostRate'] / t0_metrics['cumulativeTransactionCostRate']:.1%}；"
                     "但 Sharpe 低于基准逆方差版，当前只能是有条件候选。"
                 ),
@@ -536,7 +604,310 @@ def build_summary(
         "gross": t0_nav.set_index("trade_date")["gross_exposure"],
         "cash": t0_nav.set_index("trade_date")["cash_weight"],
     }
+    if gate_runs is not None:
+        followup, followup_charts = _build_low_volatility_gate_followup(
+            gate_runs,
+            passive,
+            manifest,
+        )
+        summary["lowVolatilityGateFollowup"] = followup
+        charts.update(followup_charts)
     return summary, charts
+
+
+def _build_low_volatility_gate_followup(
+    runs: dict[str, dict[str, Any]],
+    passive: pd.DataFrame,
+    original_manifest: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, pd.Series]]:
+    base = runs["base_cost"]
+    double = runs["double_cost"]
+    manifest = base["manifest"]
+    if (
+        manifest["dataSnapshot"]["snapshotId"]
+        != original_manifest["dataSnapshot"]["snapshotId"]
+        or manifest["qualityRun"]["qualityRunId"]
+        != original_manifest["qualityRun"]["qualityRunId"]
+    ):
+        raise ValueError("低波动准入复现没有复用原报告的数据快照与质量运行")
+
+    config = base["config"]
+    start = pd.Timestamp(config["startDate"])
+    end = pd.Timestamp(config["endDate"])
+    nav = _read_frame(
+        base["path"] / "nav.csv.gz",
+        dates=("trade_date", "executed_signal_date"),
+        numeric=(
+            "nav",
+            "cash_weight",
+            "gross_exposure",
+            "one_way_turnover",
+            "transaction_cost_rate",
+        ),
+    )
+    nav = nav[nav["trade_date"].between(start, end)].copy()
+    double_nav = _read_frame(
+        double["path"] / "nav.csv.gz",
+        dates=("trade_date", "executed_signal_date"),
+        numeric=("nav",),
+    )
+    double_nav = double_nav[double_nav["trade_date"].between(start, end)].copy()
+    executions = _read_frame(
+        base["path"] / "rebalance_executions.csv.gz",
+        dates=("signal_date", "execution_date"),
+        numeric=(
+            "requested_change",
+            "executed_change",
+            "blocked_change",
+            "transaction_cost_rate",
+        ),
+    )
+    returns = _aligned_returns({"T0": nav}, passive)
+    double_returns = _aligned_returns({"T0": double_nav}, passive)
+    passive_metrics = summarize_performance(
+        passive[["trade_date", "nav"]],
+        include_extended=True,
+    )
+    static_half = passive[["trade_date"]].copy()
+    static_half["nav"] = 0.5 + 0.5 * passive["nav"]
+    static_half_returns = static_half["nav"].pct_change(fill_method=None).dropna()
+    static_metrics = base["metrics"]["staticHalfBenchmarkMetrics"]
+    base_metrics = base["metrics"]
+    double_metrics = double["metrics"]
+
+    yearly = _year_rows(returns, nav, executions)
+    regimes, regime_threshold = _regime_rows(
+        base["path"], returns, nav, executions, config
+    )
+    stress = _stress_rows(returns, nav, executions)
+    walk_forward = _walk_forward_rows(base, nav, passive)
+    total_active_log = math.log1p(base_metrics["totalReturn"]) - math.log1p(
+        passive_metrics["totalReturn"]
+    )
+    largest_year = max(yearly, key=lambda row: row["activeLogWealth"])
+    stability_pass = largest_year["activeLogWealth"] <= total_active_log
+    gates = [
+        _gate(
+            "相对满仓被动回撤",
+            "|低波动准入最大回撤| / |被动最大回撤| <= 85%",
+            base_metrics["maxDrawdownRatioVsPassive"],
+            0.85,
+            "le",
+        ),
+        _gate(
+            "相对半仓基准回撤",
+            "|低波动准入最大回撤| / |50% ETF + 50% 现金最大回撤| <= 100%",
+            base_metrics["maxDrawdownRatioVsStaticHalf"],
+            1.0,
+            "le",
+        ),
+        _gate(
+            "相对半仓基准 Sharpe",
+            "低波动准入 - 半仓基准 >= 0.05",
+            base_metrics["sharpeImprovementVsStaticHalf"],
+            0.05,
+            "ge",
+        ),
+        _gate(
+            "相对半仓基准 CAGR",
+            "低波动准入 - 半仓基准 >= -1 个百分点",
+            base_metrics["annualizedReturn"] - static_metrics["annualizedReturn"],
+            -0.01,
+            "ge",
+        ),
+        _gate(
+            "双倍成本",
+            "双倍成本 Sharpe - 半仓基准 >= 0",
+            double_metrics["sharpe"] - static_metrics["sharpe"],
+            0.0,
+            "ge",
+        ),
+        {
+            "name": "环境覆盖",
+            "rule": "至少 6 个完整年度且方向 x 波动率 6 格都有样本",
+            "actual": {
+                "completeYears": sum(row["observations"] >= 240 for row in yearly),
+                "regimeCells": len(regimes),
+            },
+            "threshold": {"completeYears": 6, "regimeCells": 6},
+            "passed": sum(row["observations"] >= 240 for row in yearly) >= 6
+            and len(regimes) == 6,
+        },
+        {
+            "name": "单年不主导",
+            "rule": "最大单年主动对数财富贡献不超过整段净主动对数财富",
+            "actual": {
+                "year": largest_year["year"],
+                "largestContribution": largest_year["activeLogWealth"],
+                "wholePeriod": total_active_log,
+            },
+            "threshold": "largestContribution <= wholePeriod",
+            "passed": stability_pass,
+        },
+    ]
+    status = "有条件候选" if all(row["passed"] for row in gates) else "不通过"
+
+    drawdown = nav[["trade_date", "nav"]].copy()
+    drawdown["peak_nav"] = drawdown["nav"].cummax()
+    drawdown["drawdown"] = drawdown["nav"] / drawdown["peak_nav"] - 1
+    trough = drawdown.loc[drawdown["drawdown"].idxmin()]
+    before_trough = drawdown[drawdown["trade_date"].le(trough["trade_date"])]
+    peak = before_trough.loc[before_trough["nav"].idxmax()]
+    recovered = drawdown[
+        drawdown["trade_date"].gt(trough["trade_date"])
+        & drawdown["nav"].ge(peak["nav"])
+    ]
+    recovery_date = (
+        None if recovered.empty else recovered.iloc[0]["trade_date"].date().isoformat()
+    )
+
+    comparison = [
+        _followup_comparison_row(
+            "100% 被动持有 ETF",
+            passive_metrics,
+            returns["passive"],
+            passive_metrics,
+            average_exposure=1.0,
+        ),
+        _followup_comparison_row(
+            "50% ETF + 50% 现金持有基准",
+            static_metrics,
+            static_half_returns,
+            passive_metrics,
+            average_exposure=0.5,
+        ),
+        _followup_comparison_row(
+            "沪深300 ETF 低波动准入策略",
+            base_metrics,
+            returns["T0"],
+            passive_metrics,
+            average_exposure=base_metrics["averageTargetWeight"],
+        ),
+        _followup_comparison_row(
+            "低波动准入策略·双倍成本",
+            double_metrics,
+            double_returns["T0"],
+            passive_metrics,
+            average_exposure=double_metrics["averageTargetWeight"],
+        ),
+    ]
+    followup = {
+        "status": status,
+        "initialCapital": INITIAL_CAPITAL,
+        "researchClassification": "事后探索；同一 OOS 结论上限为有条件候选",
+        "strategyName": "沪深300 ETF 低波动准入策略",
+        "rule": (
+            "月末 ETF 实现方差不高于 2012-06..2017-12 校准期中位数时，"
+            "下月 100% 持有 ETF；高于门槛时 100% 现金；下一开市日开盘执行。"
+        ),
+        "oneLine": (
+            "低波动准入没有改善回撤：基础成本最大回撤 -52.82%，"
+            "比 100% 被动持有的 -42.16% 和 50% ETF / 50% 现金的 -25.21% 都更差。"
+        ),
+        "interpretation": (
+            "该门槛确实在 2018 年高波动下跌中减少损失，但在 2022 年低波慢跌中继续持仓，"
+            "2023 年更是全年 100% 暴露；它筛选的是上一月波动，不是下一月下跌方向。"
+        ),
+        "admissionVarianceThreshold": base_metrics["admissionVarianceThreshold"],
+        "riskOnMonths": base_metrics["riskOnMonthCount"],
+        "riskOffMonths": base_metrics["riskOffMonthCount"],
+        "riskOnRate": base_metrics["riskOnRate"],
+        "cumulativeTransactionCostRate": base_metrics[
+            "cumulativeTransactionCostRate"
+        ],
+        "doubleCostRate": double_metrics["cumulativeTransactionCostRate"],
+        "gates": gates,
+        "comparison": comparison,
+        "yearly": yearly,
+        "regimes": regimes,
+        "regimeVarianceThreshold": regime_threshold,
+        "stressWindows": stress,
+        "walkForward": {
+            "windows": walk_forward,
+            "positiveStrategySharpeWindows": sum(
+                row["strategySharpe"] > 0 for row in walk_forward
+            ),
+            "strategyBeatsPassiveSharpeWindows": sum(
+                row["strategySharpe"] > row["passiveSharpe"]
+                for row in walk_forward
+            ),
+        },
+        "drawdownEpisode": {
+            "peakDate": peak["trade_date"].date().isoformat(),
+            "troughDate": trough["trade_date"].date().isoformat(),
+            "recoveryDate": recovery_date,
+            "maxDrawdown": float(trough["drawdown"]),
+            "peakCapital": float(peak["nav"] * INITIAL_CAPITAL),
+            "troughCapital": float(trough["nav"] * INITIAL_CAPITAL),
+            "drawdownLoss": float((peak["nav"] - trough["nav"]) * INITIAL_CAPITAL),
+        },
+        "reproduction": {
+            label: {
+                "name": (
+                    "基础成本" if label == "base_cost" else "双倍成本压力场景"
+                ),
+                "runId": item["manifest"]["runId"],
+                "codeCommit": item["manifest"]["codeCommit"],
+                "dataSnapshotId": item["manifest"]["dataSnapshot"]["snapshotId"],
+                "reproducibilityKey": item["manifest"]["reproducibilityKey"],
+                "resultFingerprint": item["manifest"]["resultFingerprint"],
+            }
+            for label, item in runs.items()
+        },
+    }
+    charts = {
+        "gate_nav": nav.set_index("trade_date")["nav"],
+        "gate_static_half_nav": static_half.set_index("trade_date")["nav"],
+        "gate_passive_nav": passive.set_index("trade_date")["nav"],
+        "gate_drawdown": drawdown.set_index("trade_date")["drawdown"],
+        "gate_static_half_drawdown": (
+            static_half.set_index("trade_date")["nav"]
+            / static_half.set_index("trade_date")["nav"].cummax()
+            - 1
+        ),
+        "gate_passive_drawdown": (
+            passive.set_index("trade_date")["nav"]
+            / passive.set_index("trade_date")["nav"].cummax()
+            - 1
+        ),
+        "gate_exposure": nav.set_index("trade_date")["gross_exposure"],
+    }
+    return followup, charts
+
+
+def _followup_comparison_row(
+    label: str,
+    metrics: dict[str, Any],
+    returns: pd.Series,
+    passive_metrics: dict[str, Any],
+    *,
+    average_exposure: float,
+) -> dict[str, Any]:
+    tail = _tail_metrics(returns)
+    return {
+        "label": label,
+        "initialCapital": INITIAL_CAPITAL,
+        "finalCapital": INITIAL_CAPITAL * (1 + metrics["totalReturn"]),
+        "profitAndLoss": INITIAL_CAPITAL * metrics["totalReturn"],
+        "totalReturn": metrics["totalReturn"],
+        "relativeWealth": (
+            (1 + metrics["totalReturn"]) / (1 + passive_metrics["totalReturn"]) - 1
+        ),
+        "cagr": metrics["annualizedReturn"],
+        "volatility": metrics["annualizedVolatility"],
+        "sharpe": metrics["sharpe"],
+        "downsideVolatility": metrics["downsideVolatility"],
+        "sortino": metrics["sortino"],
+        "maxDrawdown": metrics["maxDrawdown"],
+        "maxDrawdownDuration": metrics["maxDrawdownDuration"],
+        "calmar": metrics["calmar"],
+        "es95": tail["es95"],
+        "trackingError": metrics.get("trackingError"),
+        "informationRatio": metrics.get("informationRatio"),
+        "beta": metrics.get("beta"),
+        "cost": metrics.get("cumulativeTransactionCostRate"),
+        "averageExposure": average_exposure,
+    }
 
 
 def _comparison_rows(
@@ -555,6 +926,9 @@ def _comparison_rows(
         rows.append(
             {
                 "label": labels[label],
+                "initialCapital": INITIAL_CAPITAL,
+                "finalCapital": INITIAL_CAPITAL * (1 + metrics["totalReturn"]),
+                "profitAndLoss": INITIAL_CAPITAL * metrics["totalReturn"],
                 "totalReturn": metrics["totalReturn"],
                 "relativeWealth": (
                     (1 + metrics["totalReturn"])
@@ -1008,8 +1382,188 @@ def _read_frame(
     return frame
 
 
+def _comparison_table(rows: list[dict[str, Any]]) -> str:
+    return _html_table(
+        rows,
+        (
+            ("label", "方案", "text"),
+            ("initialCapital", "初始本金", "money"),
+            ("finalCapital", "期末资产", "money"),
+            ("profitAndLoss", "累计盈亏", "money"),
+            ("totalReturn", "累计收益", "pct"),
+            ("relativeWealth", "相对被动财富", "pct"),
+            ("cagr", "CAGR", "pct"),
+            ("volatility", "年化波动", "pct"),
+            ("sharpe", "Sharpe", "num"),
+            ("downsideVolatility", "下行波动", "pct"),
+            ("sortino", "Sortino", "num"),
+            ("maxDrawdown", "最大回撤", "pct"),
+            ("maxDrawdownDuration", "回撤持续日", "int"),
+            ("calmar", "Calmar", "num"),
+            ("es95", "ES95(日)", "pct"),
+            ("trackingError", "TE", "pct"),
+            ("informationRatio", "IR", "num"),
+            ("beta", "Beta", "num"),
+            ("cost", "累计成本率", "pct"),
+            ("averageExposure", "平均风险资产暴露", "pct"),
+        ),
+    )
+
+
+def _render_low_volatility_gate_followup(
+    followup: dict[str, Any],
+    charts: dict[str, pd.Series],
+) -> str:
+    status_class = "fail" if followup["status"] == "不通过" else "pass"
+    strategy_row = next(
+        row
+        for row in followup["comparison"]
+        if row["label"] == "沪深300 ETF 低波动准入策略"
+    )
+    gate_chart = _line_svg(
+        {
+            "低波动准入策略": charts["gate_nav"] * followup["initialCapital"],
+            "50% ETF + 50% 现金": charts["gate_static_half_nav"]
+            * followup["initialCapital"],
+            "100% 被动持有 ETF": charts["gate_passive_nav"]
+            * followup["initialCapital"],
+        },
+        {
+            "低波动准入策略": "#0f6a53",
+            "50% ETF + 50% 现金": "#a26a16",
+            "100% 被动持有 ETF": "#65706b",
+        },
+    )
+    gate_drawdown_chart = _line_svg(
+        {
+            "低波动准入策略": charts["gate_drawdown"],
+            "50% ETF + 50% 现金": charts["gate_static_half_drawdown"],
+            "100% 被动持有 ETF": charts["gate_passive_drawdown"],
+        },
+        {
+            "低波动准入策略": "#a7372d",
+            "50% ETF + 50% 现金": "#a26a16",
+            "100% 被动持有 ETF": "#65706b",
+        },
+    )
+    exposure_chart = _line_svg(
+        {
+            "ETF 风险资产": charts["gate_exposure"],
+            "现金": 1 - charts["gate_exposure"],
+        },
+        {"ETF 风险资产": "#0f6a53", "现金": "#a26a16"},
+    )
+    gates = _html_table(
+        followup["gates"],
+        (
+            ("name", "验证门禁", "text"),
+            ("rule", "事前规则", "text"),
+            ("actual", "实际值", "object"),
+            ("passed", "结果", "bool"),
+        ),
+    )
+    yearly = _html_table(
+        followup["yearly"],
+        (
+            ("year", "年份", "int"),
+            ("observations", "交易日", "int"),
+            ("strategyReturn", "低波动准入策略", "pct"),
+            ("passiveReturn", "被动持有 ETF", "pct"),
+            ("activeReturn", "相对被动", "pct"),
+            ("maxDrawdown", "策略回撤", "pct"),
+            ("cost", "成本率", "pct"),
+            ("averageExposure", "平均风险资产暴露", "pct"),
+        ),
+    )
+    regimes = _html_table(
+        followup["regimes"],
+        (
+            ("direction", "行情方向", "text"),
+            ("volatility", "波动环境", "text"),
+            ("months", "月数", "int"),
+            ("strategyReturn", "低波动准入策略", "pct"),
+            ("passiveReturn", "被动持有 ETF", "pct"),
+            ("activeReturn", "相对被动", "pct"),
+            ("maxDrawdown", "策略回撤", "pct"),
+            ("cost", "成本率", "pct"),
+            ("averageExposure", "平均风险资产暴露", "pct"),
+        ),
+    )
+    stress = _html_table(
+        followup["stressWindows"],
+        (
+            ("name", "压力阶段", "text"),
+            ("startDate", "开始", "text"),
+            ("endDate", "结束", "text"),
+            ("strategyReturn", "低波动准入策略", "pct"),
+            ("passiveReturn", "被动持有 ETF", "pct"),
+            ("activeReturn", "相对被动", "pct"),
+            ("maxDrawdown", "策略回撤", "pct"),
+            ("averageExposure", "平均风险资产暴露", "pct"),
+        ),
+    )
+    walk_forward = _html_table(
+        followup["walkForward"]["windows"],
+        (
+            ("windowId", "窗口", "text"),
+            ("testStart", "开始", "text"),
+            ("testEnd", "结束", "text"),
+            ("strategyReturn", "低波动准入策略", "pct"),
+            ("passiveReturn", "被动持有 ETF", "pct"),
+            ("strategySharpe", "策略 Sharpe", "num"),
+            ("passiveSharpe", "被动 Sharpe", "num"),
+            ("strategyMaxDrawdown", "策略回撤", "pct"),
+        ),
+    )
+    reproduction = _html_table(
+        list(followup["reproduction"].values()),
+        (
+            ("name", "运行场景", "text"),
+            ("runId", "运行 ID", "code"),
+            ("reproducibilityKey", "复现键", "code"),
+            ("resultFingerprint", "结果指纹", "code"),
+        ),
+    )
+    episode = followup["drawdownEpisode"]
+    recovery = episode["recoveryDate"] or "截至样本结束仍未修复"
+    return f"""
+  <section class="hero">
+    <div class="eyebrow">本次追加验证 / 统一基准本金 {_fmt(followup["initialCapital"], "money")}</div>
+    <h1>{escape(followup["strategyName"])}</h1>
+    <div class="status {status_class}">{escape(followup["status"])}</div>
+    <div class="lead">{escape(followup["oneLine"])}</div>
+    <p><b>具体规则：</b>{escape(followup["rule"])}</p>
+    <p><b>为什么结果与直觉不同：</b>{escape(followup["interpretation"])}</p>
+    <div class="kpis">
+      <div class="kpi"><span>基准本金</span><b>{_fmt(followup["initialCapital"], "money")}</b></div>
+      <div class="kpi"><span>策略期末资产</span><b>{_fmt(strategy_row["finalCapital"], "money")}</b></div>
+      <div class="kpi"><span>累计盈亏</span><b>{_fmt(strategy_row["profitAndLoss"], "money")}</b></div>
+      <div class="kpi"><span>最大回撤</span><b>{_fmt(strategy_row["maxDrawdown"], "pct")}</b></div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="panel"><h2>策略规则与结论边界</h2><p>低波动不是“不会下跌”的同义词。这个规则只观察上一自然月的已实现方差，再决定下月持有 ETF 还是现金；它不能提前知道下月方向。门槛固定来自校准期，没有在样本外反复挑选。</p><ul><li>低波动月份：下一月持有 100% 沪深300 ETF。</li><li>高波动月份：下一月持有 100% 现金，现金收益按 0。</li><li>研究分类：{escape(followup["researchClassification"])}。</li><li>样本外风险开启 {followup["riskOnMonths"]} 个月、风险关闭 {followup["riskOffMonths"]} 个月；风险开启比例 {_fmt(followup["riskOnRate"], "pct")}。</li></ul></section>
+    <section class="panel"><h2>统一按 100,000 元起步的总体对比</h2>{_comparison_table(followup["comparison"])}<p class="note">金额由同一条净值路径按 100,000 元同比例换算；收益率、波动率和回撤比例不会因本金改变。现金收益按 0，已计入预登记交易成本。</p></section>
+    <section class="panel half"><h2>账户资产曲线（初始本金 100,000 元）</h2><div class="legend"><span><i class="dot" style="background:#0f6a53"></i>低波动准入策略</span><span><i class="dot" style="background:#a26a16"></i>50% ETF + 50% 现金</span><span><i class="dot" style="background:#65706b"></i>100% 被动持有 ETF</span></div>{gate_chart}</section>
+    <section class="panel half"><h2>回撤曲线</h2><div class="legend"><span><i class="dot" style="background:#a7372d"></i>低波动准入策略</span><span><i class="dot" style="background:#a26a16"></i>50% ETF + 50% 现金</span><span><i class="dot" style="background:#65706b"></i>100% 被动持有 ETF</span></div>{gate_drawdown_chart}</section>
+    <section class="panel half"><h2>风险资产与现金仓位</h2>{exposure_chart}</section>
+    <section class="panel half"><h2>最深回撤发生了什么</h2><ul><li>回撤前高点：{escape(episode["peakDate"])}，账户资产 {_fmt(episode["peakCapital"], "money")}。</li><li>谷底：{escape(episode["troughDate"])}，账户资产 {_fmt(episode["troughCapital"], "money")}。</li><li>高点到谷底损失：{_fmt(-episode["drawdownLoss"], "money")}，即 {_fmt(episode["maxDrawdown"], "pct")}。</li><li>修复日期：{escape(recovery)}。</li></ul><p>核心失效机制是低波慢跌：2022 年策略亏损比被动更多，2023 年策略又保持全年 100% 风险资产暴露；月频滞后还可能在冲击后离场、错过随后的反弹。</p></section>
+    <section class="panel"><h2>事前验证门禁</h2>{gates}<p class="note">门禁以最大回撤、同风险量级基准、双倍成本和环境稳定性为主；只要关键门禁失败，就不能因为某些年份表现好而判为有效。</p></section>
+    <section class="panel"><h2>逐年表现</h2>{yearly}</section>
+    <section class="panel"><h2>不同方向与波动环境</h2><p class="note">行情方向由沪深300指数当月收益划分；波动环境门槛固定为校准期月实现方差中位数 {followup["regimeVarianceThreshold"]:.8f}。</p>{regimes}</section>
+    <section class="panel"><h2>压力阶段</h2>{stress}</section>
+    <section class="panel"><h2>滚动样本外窗口</h2>{walk_forward}</section>
+    <section class="panel"><h2>如何继续优化</h2><ol><li>不能在同一段样本外继续搜索波动阈值，否则会把这次失败变成参数拟合。</li><li>若核心目标是压回撤，下一轮只预登记一个“低波慢跌保护”机制，并在新时间段或另一只事先指定的宽基 ETF 上验证。</li><li>月度 0% / 100% 切换累计成本率 {_fmt(followup["cumulativeTransactionCostRate"], "pct")}；可单独验证渐进仓位是否降低换手，但不得同时改门槛和信号。</li><li>任何新版本仍必须与固定比例 ETF / 现金基准比较，不能只和 100% 满仓相比。</li></ol></section>
+    <section class="panel"><h2>复现身份</h2>{reproduction}<p class="note">基础成本与双倍成本运行均绑定同一数据快照，并已在断网容器中复现匹配结果指纹。</p></section>
+  </div>
+"""
+
+
 def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
     status_class = "fail" if summary["status"] == "不通过" else "pass"
+    followup = summary["lowVolatilityGateFollowup"]
+    followup_section = _render_low_volatility_gate_followup(followup, charts)
     baseline_name = TRIAL_DISPLAY_NAMES["T0"]
     candidate_name = TRIAL_DISPLAY_NAMES["T1"]
     trial_glossary = _html_table(
@@ -1022,9 +1576,9 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
     )
     nav_chart = _line_svg(
         {
-            baseline_name: charts["T0"],
-            candidate_name: charts["T1"],
-            "被动持有 ETF": charts["passive"],
+            baseline_name: charts["T0"] * summary["initialCapital"],
+            candidate_name: charts["T1"] * summary["initialCapital"],
+            "被动持有 ETF": charts["passive"] * summary["initialCapital"],
         },
         {
             baseline_name: "#0f6a53",
@@ -1039,28 +1593,7 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
         },
         {baseline_name: "#a7372d", "被动持有 ETF": "#65706b"},
     )
-    comparison = _html_table(
-        summary["comparison"],
-        (
-            ("label", "方案", "text"),
-            ("totalReturn", "累计收益", "pct"),
-            ("relativeWealth", "相对财富", "pct"),
-            ("cagr", "CAGR", "pct"),
-            ("volatility", "年化波动", "pct"),
-            ("sharpe", "Sharpe", "num"),
-            ("downsideVolatility", "下行波动", "pct"),
-            ("sortino", "Sortino", "num"),
-            ("maxDrawdown", "最大回撤", "pct"),
-            ("maxDrawdownDuration", "回撤持续日", "int"),
-            ("calmar", "Calmar", "num"),
-            ("es95", "ES95(日)", "pct"),
-            ("trackingError", "TE", "pct"),
-            ("informationRatio", "IR", "num"),
-            ("beta", "Beta", "num"),
-            ("cost", "累计成本率", "pct"),
-            ("averageExposure", "平均目标暴露", "pct"),
-        ),
-    )
+    comparison = _comparison_table(summary["comparison"])
     gates = _html_table(
         summary["gates"],
         (
@@ -1150,7 +1683,7 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
         for item in summary["sources"]
     )
     optimization = "".join(
-        f'<article class="action"><b>P{item["priority"]} · {escape(item["direction"])}</b><p>{escape(item["evidence"])}</p></article>'
+        f'<article class="action"><b>优先级 {item["priority"]} · {escape(item["direction"])}</b><p>{escape(item["evidence"])}</p></article>'
         for item in summary["optimizationDirections"]
     )
     reproduction = _html_table(
@@ -1175,7 +1708,7 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ETF 波动率管理策略复现</title>
+  <title>沪深300 ETF 低波动准入策略复验</title>
   <style>
     :root {{ --ink:#18201e; --muted:#65706b; --paper:#f2f1eb; --panel:#fbfaf5; --line:#c8cbc3; --green:#0f6a53; --red:#a7372d; --gold:#a26a16; --blue:#315c8a; }}
     * {{ box-sizing:border-box; }}
@@ -1211,24 +1744,26 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
   </style>
 </head>
 <body><main>
-  <section class="hero">
+{followup_section}
+
+  <section class="hero appendix-hero">
     <div class="eyebrow">Research protocol / 2026-07-13 / OOS only</div>
-    <h1>ETF 波动率管理策略复现</h1>
+    <h1>附录：原始 ETF 波动率管理策略复现</h1>
     <div class="status {status_class}">{escape(summary["status"])}</div>
     <div class="lead">{escape(summary["conclusion"]["oneLine"])}</div>
     <div class="kpis">
-      <div class="kpi"><span>基准逆方差版累计净收益</span><b>{_fmt(summary["comparison"][1]["totalReturn"], "pct")}</b></div>
+      <div class="kpi"><span>统一基准本金</span><b>{_fmt(summary["initialCapital"], "money")}</b></div>
+      <div class="kpi"><span>基准逆方差版期末资产</span><b>{_fmt(summary["comparison"][1]["finalCapital"], "money")}</b></div>
       <div class="kpi"><span>基准逆方差版 / 被动年化波动</span><b>{_fmt(summary["gates"][0]["actual"], "pct")}</b></div>
       <div class="kpi"><span>基准逆方差版最大回撤</span><b>{_fmt(summary["comparison"][1]["maxDrawdown"], "pct")}</b></div>
-      <div class="kpi"><span>PBO</span><b>{_fmt(summary["multipleTesting"]["pbo"]["probability"], "pct")}</b></div>
     </div>
   </section>
 
   <div class="grid">
     <section class="panel"><h2>先看懂报告中的四个试验</h2><p>报告中的 <code>T0</code>–<code>T3</code> 只是连接配置、运行记录和复现身份的内部编号，不是策略名称。正文始终优先使用下面的中文名称。</p>{trial_glossary}</section>
-    <section class="panel"><h2>0. 结论门禁</h2>{gates}<p class="note">状态严格来自事前门槛；研究结论不是投资建议、评级、收益承诺或真实交易授权。</p></section>
-    <section class="panel"><h2>1. 样本外总体指标</h2>{comparison}</section>
-    <section class="panel half"><h2>净值：强力降风险版 / 温和降风险版 / 被动持有</h2><div class="legend"><span><i class="dot" style="background:#0f6a53"></i>{escape(baseline_name)}</span><span><i class="dot" style="background:#a26a16"></i>{escape(candidate_name)}</span><span><i class="dot" style="background:#65706b"></i>被动持有 ETF</span></div>{nav_chart}</section>
+    <section class="panel"><h2>原始策略结论门禁</h2>{gates}<p class="note">状态严格来自事前门槛；研究结论不是投资建议、评级、收益承诺或真实交易授权。</p></section>
+    <section class="panel"><h2>原始策略样本外总体指标</h2>{comparison}</section>
+    <section class="panel half"><h2>账户资产：强力降风险版 / 温和降风险版 / 被动持有（初始本金 100,000 元）</h2><div class="legend"><span><i class="dot" style="background:#0f6a53"></i>{escape(baseline_name)}</span><span><i class="dot" style="background:#a26a16"></i>{escape(candidate_name)}</span><span><i class="dot" style="background:#65706b"></i>被动持有 ETF</span></div>{nav_chart}</section>
     <section class="panel half"><h2>回撤：逆方差强力降风险版 / 被动持有</h2><div class="legend"><span><i class="dot" style="background:#a7372d"></i>{escape(baseline_name)}</span><span><i class="dot" style="background:#65706b"></i>被动持有 ETF</span></div>{drawdown_chart}</section>
     <section class="panel third"><h2>累计单边换手</h2>{_line_svg({"换手": charts["turnover"]}, {"换手":"#315c8a"})}</section>
     <section class="panel third"><h2>累计成本率</h2>{_line_svg({"成本": charts["cost"]}, {"成本":"#a7372d"})}</section>
@@ -1275,6 +1810,8 @@ def _line_svg(series: dict[str, pd.Series], colors: dict[str, str]) -> str:
     low = float(all_values.min())
     high = float(all_values.max())
     span = high - low or 1.0
+    high_label = f"{high:,.0f}" if abs(high) >= 1_000 else f"{high:.3f}"
+    low_label = f"{low:,.0f}" if abs(low) >= 1_000 else f"{low:.3f}"
     width, height, pad = 760.0, 260.0, 28.0
     polylines = []
     for label, values in normalized.items():
@@ -1293,8 +1830,8 @@ def _line_svg(series: dict[str, pd.Series], colors: dict[str, str]) -> str:
         f'<svg viewBox="0 0 {int(width)} {int(height)}" role="img">'
         f'<line x1="{pad}" y1="{pad}" x2="{pad}" y2="{height-pad}" stroke="#c8cbc3" />'
         f'<line x1="{pad}" y1="{height-pad}" x2="{width-pad}" y2="{height-pad}" stroke="#c8cbc3" />'
-        f'<text x="34" y="18" fill="#65706b" font-size="11">{high:.3f}</text>'
-        f'<text x="34" y="250" fill="#65706b" font-size="11">{low:.3f}</text>'
+        f'<text x="34" y="18" fill="#65706b" font-size="11">{high_label}</text>'
+        f'<text x="34" y="250" fill="#65706b" font-size="11">{low_label}</text>'
         + "".join(polylines)
         + "</svg>"
     )
@@ -1329,6 +1866,10 @@ def _fmt(value: Any, kind: str) -> str:
         return f"{float(value):.2%}"
     if kind == "num":
         return f"{float(value):.3f}"
+    if kind == "money":
+        numeric = float(value)
+        sign = "-" if numeric < 0 else ""
+        return f"{sign}¥{abs(numeric):,.0f}"
     if kind == "int":
         return str(int(value))
     if kind == "bool":
