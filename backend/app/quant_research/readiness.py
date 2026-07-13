@@ -23,6 +23,23 @@ SCOPES = {
     },
 }
 
+RISK_CAPABILITIES = {
+    "basic_industry_exposure": {
+        "required": {"industry_members"},
+        "limitations": [
+            "historical_industry_exposure_only_not_full_index_attribution"
+        ],
+    },
+    "full_index_constituent_attribution": {
+        "required": {"index_weights"},
+        "limitations": ["no_current_constituent_or_index_daily_bar_fallback"],
+    },
+    "industry_benchmark_comparison": {
+        "required": {"industry_proxy_daily"},
+        "limitations": ["no_index_daily_bar_or_unfrozen_proxy_fallback"],
+    },
+}
+
 
 def evaluate_research_readiness(
     scope: str,
@@ -69,6 +86,43 @@ def evaluate_research_readiness(
         "warnings": warnings,
         "tableCounts": {table: int(table_counts.get(table, 0)) for table in sorted(required)},
         "limitations": ["inventory_only_requires_quality_run_for_research_readiness", *limitations],
+        "boundaries": {
+            "researchOnly": True,
+            "executionEnabled": False,
+            "brokerConnected": False,
+        },
+    }
+
+
+def evaluate_risk_capability_readiness(
+    capability: str,
+    available_tables: Iterable[str],
+    table_counts: dict[str, int],
+) -> dict[str, Any]:
+    definition = RISK_CAPABILITIES.get(capability)
+    if definition is None:
+        raise ValueError(f"未知风险能力：{capability}")
+    available = set(available_tables)
+    required = set(definition["required"])
+    missing = sorted(required - available)
+    empty = sorted(
+        table
+        for table in required & available
+        if int(table_counts.get(table, 0)) <= 0
+    )
+    blockers = [f"missing_table:{table}" for table in missing] + [
+        f"empty_table:{table}" for table in empty
+    ]
+    return {
+        "level": "risk_capability",
+        "capability": capability,
+        "status": "blocked" if blockers else "ready",
+        "capabilityReady": not blockers,
+        "requiredTables": sorted(required),
+        "missingTables": missing,
+        "emptyTables": empty,
+        "blockers": blockers,
+        "limitations": list(definition["limitations"]),
         "boundaries": {
             "researchOnly": True,
             "executionEnabled": False,
