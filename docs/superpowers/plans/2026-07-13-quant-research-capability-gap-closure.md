@@ -1,6 +1,6 @@
 # 离线量化研究能力短板补齐计划
 
-> 状态：Phase 0–5 实现与最终验收已完成；精确代码验收提交为 `891b2825b62c8e91576ee54d04fbafc738c95f69`，等待合并 `main` 与推送。实施基线为 `main@ca8495fccdecad53f10748eb9f0d408ed3b26d4e`。参考对象为 `goldmansachs/gs-quant@release-2.0.14`，只吸收适合本仓库的通用研究、组合模拟和风险分析概念，不复制其 Marquee、衍生品、实时定价或交易体系。
+> 状态：Phase 0–5 实现、最终验收、`main` fast-forward 合并与远端推送均已完成。精确代码验收提交为 `891b2825b62c8e91576ee54d04fbafc738c95f69`，实现及验收记录已推送至 `main@e51bbf37f528b4a9ea3df5ba2ae394d228ab2b6b`，对应 GitHub CI run `29232720679` 四个 job 全部通过。实施基线为 `main@ca8495fccdecad53f10748eb9f0d408ed3b26d4e`。参考对象为 `goldmansachs/gs-quant@release-2.0.14`，只吸收适合本仓库的通用研究、组合模拟和风险分析概念，不复制其 Marquee、衍生品、实时定价或交易体系。
 
 ## 目标
 
