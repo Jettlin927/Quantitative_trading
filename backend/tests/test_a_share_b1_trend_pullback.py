@@ -8,6 +8,7 @@ import unittest
 import pandas as pd
 
 from backend.app.quant_research.a_share_b1_trend_pullback import (
+    _prepare_execution_prices,
     calculate_b1_feature_frame,
     simulate_b1_portfolio,
     validate_a_share_b1_config,
@@ -143,6 +144,31 @@ class AShareB1TrendPullbackTest(unittest.TestCase):
 
         self.assertTrue(features["kdj_j"].isna().all())
         self.assertFalse(features["entry_signal"].any())
+
+    def test_leading_suspension_is_not_fabricated_for_execution(self) -> None:
+        dates = pd.bdate_range("2024-01-02", periods=2)
+        prices = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": "SYN001.SZ",
+                "open": [float("nan"), 10.0],
+                "close": [float("nan"), 10.0],
+                "adj_open": [float("nan"), 10.0],
+                "adj_close": [float("nan"), 10.0],
+                "is_buyable_at_open": [False, True],
+                "is_sellable_at_open": [False, True],
+                "is_valuation_carried": [True, False],
+            }
+        )
+
+        prepared = _prepare_execution_prices(prices)
+
+        self.assertTrue(pd.isna(prepared.iloc[0]["adj_close"]))
+        self.assertFalse(prepared.iloc[0]["is_buyable_at_open"])
+
+        prices.loc[0, "is_valuation_carried"] = False
+        with self.assertRaisesRegex(ValueError, "无停牌证据"):
+            _prepare_execution_prices(prices)
 
     def test_next_open_t3_exit_and_declared_t3_off_are_distinct(self) -> None:
         dates = pd.bdate_range("2025-01-02", periods=6)
