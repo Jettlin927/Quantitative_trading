@@ -13,7 +13,11 @@ from backend.app.quant_research.portfolio import CostModel, simulate_target_weig
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "quant_research_golden"
-CONTRACT_PATH = Path(__file__).parents[2] / "docs" / "research" / "quant-foundation-trust-contract.md"
+REPO_ROOT = Path(__file__).parents[2]
+CONTRACT_PATH = REPO_ROOT / "docs" / "research" / "quant-foundation-trust-contract.md"
+STRATEGY_STANDARD_PATH = REPO_ROOT / "docs" / "research" / "strategy-evaluation-standard.md"
+AGENTS_PATH = REPO_ROOT / "AGENTS.md"
+RESEARCH_README_PATH = REPO_ROOT / "docs" / "research" / "README.md"
 
 
 def read_fixture(name: str) -> pd.DataFrame:
@@ -69,6 +73,44 @@ class QuantTrustContractDocumentationTest(unittest.TestCase):
         self.assertIn("ETF 时序研究", contract)
         self.assertIn("A 股横截面研究", contract)
         self.assertIn("旧策略 archive 边界", contract)
+
+    def test_strategy_research_is_routed_to_complete_evaluation_standard(self):
+        agents = AGENTS_PATH.read_text(encoding="utf-8")
+        research_readme = RESEARCH_README_PATH.read_text(encoding="utf-8")
+        standard = STRATEGY_STANDARD_PATH.read_text(encoding="utf-8")
+
+        standard_relative_path = "docs/research/strategy-evaluation-standard.md"
+        self.assertIn(standard_relative_path, agents)
+        self.assertIn("不得只凭累计收益、年化收益或 Sharpe", agents)
+        self.assertIn("strategy-evaluation-standard.md", research_readme)
+
+        required_sections = (
+            "## 强制结论状态",
+            "## 硬门禁",
+            "## 标准交付顺序",
+            "## 策略画像",
+            "## 数据证据",
+            "## 市场环境拆分",
+            "## 强制图表",
+            "## 指标字典",
+            "## 稳健性与过拟合证据",
+            "## 结论门禁",
+            "## 可复用报告模板",
+        )
+        required_terms = (
+            "point-in-time",
+            "test/OOS",
+            "walk-forward",
+            "Expected Shortfall",
+            "Deflated Sharpe Ratio",
+            "PBO",
+            "result_fingerprint",
+            "支持证据",
+            "反对证据",
+            "尚缺证据",
+        )
+        for value in (*required_sections, *required_terms):
+            self.assertIn(value, standard)
 
 
 class QuantTrustGoldenFixtureTest(unittest.TestCase):
