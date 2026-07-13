@@ -74,7 +74,18 @@ def build_result_fingerprint(artifact_hashes: Mapping[str, Mapping[str, Any]]) -
     present_ledgers = ledger_names & set(artifact_hashes)
     if present_ledgers and present_ledgers != ledger_names:
         raise ValueError("结果指纹的模拟账本工件必须完整")
-    deterministic_names = base_names | (ledger_names if present_ledgers else set())
+    walk_forward_names = {
+        "walk_forward_windows.csv.gz",
+        "walk_forward_metrics.csv.gz",
+    }
+    present_walk_forward = walk_forward_names & set(artifact_hashes)
+    if present_walk_forward and present_walk_forward != walk_forward_names:
+        raise ValueError("结果指纹的 walk-forward 工件必须完整")
+    deterministic_names = (
+        base_names
+        | (ledger_names if present_ledgers else set())
+        | (walk_forward_names if present_walk_forward else set())
+    )
     deterministic = {
         name: artifact["contentSha256"]
         for name, artifact in sorted(artifact_hashes.items())

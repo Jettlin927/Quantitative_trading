@@ -10,6 +10,7 @@ import re
 from typing import Any
 
 from .universe import evaluate_universe_provenance
+from .validation import validate_validation_policy
 
 
 REQUIRED_CONFIG_FIELDS = (
@@ -97,6 +98,12 @@ def validate_run_config(
     normalized["allowedWarnings"] = sorted(
         {str(value).strip() for value in normalized["allowedWarnings"] if str(value).strip()}
     )
+    if "validationPolicy" in normalized:
+        normalized["validationPolicy"] = validate_validation_policy(
+            normalized["validationPolicy"]
+        )
+    else:
+        validate_validation_policy(None)
 
     warmup_start = _parse_date(normalized["warmupStart"], "warmupStart")
     start_date = _parse_date(normalized["startDate"], "startDate")
