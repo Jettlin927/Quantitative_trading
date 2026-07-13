@@ -309,8 +309,11 @@ def _load_frozen_prices(reader: Any, config: dict[str, Any], calendar: Any) -> p
             }
         )
         carried_rows.append(row)
-    for row in carried_rows:
-        prices.loc[len(prices)] = row
+    if carried_rows:
+        prices = pd.concat(
+            [prices, pd.DataFrame.from_records(carried_rows, columns=columns)],
+            ignore_index=True,
+        )
     open_dates = set(pd.DatetimeIndex(pd.to_datetime(calendar.open_dates)))
     outside = sorted(set(prices["trade_date"]) - open_dates)
     if outside:
