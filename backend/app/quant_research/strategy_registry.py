@@ -37,6 +37,13 @@ from .a_share_price_baseline import (
     summarize_a_share_price_metrics,
     validate_a_share_price_config,
 )
+from .a_share_b1_trend_pullback import (
+    a_share_b1_limitations,
+    build_a_share_b1_targets,
+    simulate_a_share_b1_targets,
+    summarize_a_share_b1_metrics,
+    validate_a_share_b1_config,
+)
 
 
 StrategyCallable = Callable[..., Any]
@@ -160,6 +167,29 @@ _STRATEGIES = {
         simulate=simulate_a_share_price_targets,
         summarize_metrics=summarize_a_share_price_metrics,
         limitations=a_share_price_limitations,
+    ),
+    "a_share_b1_trend_pullback": StrategyDefinition(
+        strategy_id="a_share_b1_trend_pullback",
+        strategy_version="1",
+        scope="a_share_cross_section",
+        example_config="configs/research/a_share_b1_long_history.json",
+        required_tables=(
+            "trade_calendars",
+            "stock_listings",
+            "stock_daily_bars",
+            "stock_adjust_factors",
+            "stock_limit_prices",
+            "stock_suspend_events",
+            "industry_members",
+            "indices",
+            "index_daily_bars",
+            "universe",
+        ),
+        validate_config=validate_a_share_b1_config,
+        build_targets=build_a_share_b1_targets,
+        simulate=simulate_a_share_b1_targets,
+        summarize_metrics=summarize_a_share_b1_metrics,
+        limitations=a_share_b1_limitations,
     ),
 }
 
