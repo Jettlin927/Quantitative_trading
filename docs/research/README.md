@@ -7,6 +7,7 @@
 ## 当前研究底座
 
 - `quant-foundation-trust-contract.md`：新研究链路的统一可信合同，定义 quality scope、宇宙血缘、信息可得时点、下一交易日执行、输入快照和可复现键。
+- `strategy-evaluation-standard.md`：所有具体策略研究的强制画像与评价规范，固定结论状态、数据/执行/成本证据、指标字典、市场环境矩阵、稳健性门禁和复用报告模板。
 - `quant-research-foundation-plan-2026-07-10.md`：专业研究底座能力矩阵、缺口、实施顺序和验收标准。
 - `../superpowers/plans/2026-07-13-quant-research-capability-gap-closure.md`：基于当前可信底座补齐多策略分发、特征、模拟账本、A 股横截面、walk-forward 和基础风险层的分阶段计划。
 - `backend/tests/fixtures/quant_research_golden/`：完全合成的最小黄金数据集，用于锁定周末、停牌、涨跌停、复权、公告可用日和退市边界。

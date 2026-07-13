@@ -222,11 +222,12 @@
 
 新增离线研究能力：
 
-1. 先阅读 `docs/research/quant-foundation-trust-contract.md`，再在 `docs/research/` 写明数据、时点、成交、成本、基准和失败口径。
-2. 共用协议放入 `backend/app/quant_research/`，不得复制旧探索脚本逻辑。
-3. 先用黄金夹具表达新语义，并验证追加未来数据不改变历史前缀。
-4. 数据不完整时严格失败或让 readiness 返回 `blocked`，不允许静默回退。
-5. 新增单元测试，并让每次运行记录 manifest；大型结果只写入被忽略的 `outputs/research-runs/`。
+1. 研究、分析、评估、回测或比较具体策略时，先阅读 `docs/research/strategy-evaluation-standard.md`，按其中的策略画像、指标和市场环境矩阵交付。
+2. 实现新的研究协议前阅读 `docs/research/quant-foundation-trust-contract.md`，再在 `docs/research/` 写明数据、时点、成交、成本、基准和失败口径。
+3. 共用协议放入 `backend/app/quant_research/`，不得复制旧探索脚本逻辑。
+4. 先用黄金夹具表达新语义，并验证追加未来数据不改变历史前缀。
+5. 数据不完整时严格失败或让 readiness 返回 `blocked`，不允许静默回退。
+6. 新增单元测试，并让每次运行记录 manifest；大型结果只写入被忽略的 `outputs/research-runs/`。
 
 ## 验证命令
 
