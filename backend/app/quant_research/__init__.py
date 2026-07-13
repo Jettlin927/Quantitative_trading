@@ -4,7 +4,7 @@ from .dataset import active_members_as_of, attach_fundamentals_asof, build_adjus
 from .calendar import OpenTradeCalendar, build_open_trade_calendar, trade_calendar_content_sha256
 from .manifest import build_run_manifest
 from .metrics import summarize_performance
-from .portfolio import CostModel, simulate_target_weights
+from .portfolio import CostModel, SimulationResult, simulate_target_weights, simulate_target_weights_with_ledger
 from .readiness import evaluate_quality_run_readiness, evaluate_research_readiness
 from .repository import load_index_benchmark, load_stock_research_panel
 from .universe import build_explicit_universe, build_historical_membership_panel, build_historical_universe, evaluate_universe_provenance
@@ -24,6 +24,7 @@ from .validation import WalkForwardWindow, build_walk_forward_windows
 __all__ = [
     "CostModel",
     "OpenTradeCalendar",
+    "SimulationResult",
     "WalkForwardWindow",
     "active_members_as_of",
     "attach_fundamentals_asof",
@@ -49,6 +50,7 @@ __all__ = [
     "reproduce_quant_research",
     "run_quant_research",
     "simulate_target_weights",
+    "simulate_target_weights_with_ledger",
     "simple_returns",
     "rolling_volatility",
     "rolling_zscore",

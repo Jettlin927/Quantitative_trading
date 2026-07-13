@@ -7,10 +7,10 @@ from typing import Any, Callable
 from .baselines import (
     build_sentinel_targets,
     sentinel_limitations,
-    simulate_sentinel_targets,
-    summarize_sentinel_metrics,
+    simulate_sentinel_targets_with_ledger,
+    summarize_sentinel_metrics_v2,
     validate_sentinel_config,
-    simulate_etf_targets,
+    simulate_etf_targets_with_ledger,
     summarize_etf_metrics,
 )
 from .etf_trend_baseline import (
@@ -53,8 +53,8 @@ _STRATEGIES = {
         ),
         validate_config=validate_sentinel_config,
         build_targets=build_sentinel_targets,
-        simulate=simulate_sentinel_targets,
-        summarize_metrics=summarize_sentinel_metrics,
+        simulate=simulate_sentinel_targets_with_ledger,
+        summarize_metrics=summarize_sentinel_metrics_v2,
         limitations=sentinel_limitations,
     ),
     "etf_trend_120d": StrategyDefinition(
@@ -72,7 +72,7 @@ _STRATEGIES = {
         ),
         validate_config=validate_etf_trend_config,
         build_targets=build_etf_trend_targets,
-        simulate=simulate_etf_targets,
+        simulate=simulate_etf_targets_with_ledger,
         summarize_metrics=summarize_etf_metrics,
         limitations=etf_trend_limitations,
     ),

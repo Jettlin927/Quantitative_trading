@@ -68,6 +68,23 @@ class ResearchManifestTest(unittest.TestCase):
         self.assertTrue(first["boundaries"]["notInvestmentAdvice"])
         self.assertFalse(first["boundaries"]["executionEnabled"])
 
+    def test_v2_result_fingerprint_requires_all_three_ledger_artifacts(self):
+        artifacts = {
+            "targets.csv.gz": {"contentSha256": "a" * 64},
+            "nav.csv.gz": {"contentSha256": "b" * 64},
+            "metrics.json": {"contentSha256": "c" * 64},
+            "rebalance_requests.csv.gz": {"contentSha256": "d" * 64},
+            "rebalance_executions.csv.gz": {"contentSha256": "e" * 64},
+            "positions.csv.gz": {"contentSha256": "f" * 64},
+        }
+        fingerprint = build_result_fingerprint(artifacts)
+        changed = {name: dict(value) for name, value in artifacts.items()}
+        changed["positions.csv.gz"]["contentSha256"] = "0" * 64
+        self.assertNotEqual(fingerprint, build_result_fingerprint(changed))
+        del changed["rebalance_executions.csv.gz"]
+        with self.assertRaisesRegex(ValueError, "账本"):
+            build_result_fingerprint(changed)
+
     def test_deployment_injects_commit_and_uses_cross_release_artifact_volume(self):
         repo_root = Path(__file__).resolve().parents[2]
         dockerfile = (repo_root / "backend" / "Dockerfile").read_text(encoding="utf-8")

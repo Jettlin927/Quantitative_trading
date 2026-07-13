@@ -65,12 +65,22 @@ def build_environment_fingerprint(
 
 
 def build_result_fingerprint(artifact_hashes: Mapping[str, Mapping[str, Any]]) -> str:
+    base_names = {"targets.csv.gz", "nav.csv.gz", "metrics.json"}
+    ledger_names = {
+        "rebalance_requests.csv.gz",
+        "rebalance_executions.csv.gz",
+        "positions.csv.gz",
+    }
+    present_ledgers = ledger_names & set(artifact_hashes)
+    if present_ledgers and present_ledgers != ledger_names:
+        raise ValueError("结果指纹的模拟账本工件必须完整")
+    deterministic_names = base_names | (ledger_names if present_ledgers else set())
     deterministic = {
         name: artifact["contentSha256"]
         for name, artifact in sorted(artifact_hashes.items())
-        if name in {"targets.csv.gz", "nav.csv.gz", "metrics.json"}
+        if name in deterministic_names
     }
-    if set(deterministic) != {"targets.csv.gz", "nav.csv.gz", "metrics.json"}:
+    if set(deterministic) != deterministic_names:
         raise ValueError("结果指纹缺少 targets、nav 或 metrics 的 canonical hash")
     return canonical_sha256(deterministic)
 
@@ -89,12 +99,16 @@ def build_research_manifest(
     environment: dict[str, Any],
     limitations: list[str],
     artifact_hashes: dict[str, dict[str, Any]],
+    artifact_schema_version: int = 1,
     generated_at: datetime | None = None,
 ) -> dict[str, Any]:
+    if artifact_schema_version not in {1, 2}:
+        raise ValueError("artifact_schema_version 只允许 1 或 2")
     generated = generated_at or datetime.now(timezone.utc)
     result_fingerprint = build_result_fingerprint(artifact_hashes)
     return {
         "schemaVersion": 2,
+        "artifactSchemaVersion": artifact_schema_version,
         "runId": run_id,
         "reproducibilityKey": reproducibility_key,
         "strategyId": strategy_id,

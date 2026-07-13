@@ -25,11 +25,13 @@ from .artifacts import (
     verify_file_artifact,
     write_dataframe_csv_gz,
 )
+from .baselines import summarize_sentinel_metrics
 from .manifest import (
     build_environment_fingerprint,
     build_research_manifest,
     build_result_fingerprint,
 )
+from .metrics import summarize_execution_metrics
 from .run_config import (
     FormalRunConfigurationError,
     build_reproducibility_key,
@@ -66,6 +68,25 @@ NAV_COLUMNS = (
     "unfilled_target_weight",
     "carried_valuation_count",
 )
+REBALANCE_REQUEST_COLUMNS = (
+    "execution_date",
+    "signal_date",
+    "ts_code",
+    "requested_change",
+    "side",
+)
+REBALANCE_EXECUTION_COLUMNS = (
+    "execution_date",
+    "signal_date",
+    "ts_code",
+    "requested_change",
+    "executed_change",
+    "blocked_change",
+    "status",
+    "reason",
+    "transaction_cost_rate",
+)
+POSITION_COLUMNS = ("trade_date", "ts_code", "close_weight")
 STAGES = (
     "quality_gate",
     "input_snapshot",
@@ -77,6 +98,7 @@ STAGES = (
 )
 INTERRUPTIBLE_STAGES = {"input_snapshot", "simulation", "finalize"}
 CHECKPOINT_SCHEMA_VERSION = 1
+ARTIFACT_SCHEMA_VERSION = 2
 
 
 class ResumeError(RuntimeError):
@@ -411,7 +433,7 @@ def _execute_pipeline(
 
     if "simulation" not in checkpoints:
         targets = read_canonical_csv_gz(working / "targets.csv.gz")
-        nav, _calendar = _simulate_strategy_targets(
+        simulation, _calendar = _simulate_strategy_targets(
             strategy,
             working / "inputs",
             normalized,
@@ -419,11 +441,30 @@ def _execute_pipeline(
             compressed=True,
             table_artifacts=table_artifacts,
         )
+        nav = simulation.nav
         nav_artifact = write_dataframe_csv_gz(
             working / "nav.csv.gz",
             nav,
             columns=NAV_COLUMNS,
             natural_key=("trade_date",),
+        )
+        requests_artifact = write_dataframe_csv_gz(
+            working / "rebalance_requests.csv.gz",
+            simulation.rebalance_requests,
+            columns=REBALANCE_REQUEST_COLUMNS,
+            natural_key=("execution_date", "ts_code"),
+        )
+        executions_artifact = write_dataframe_csv_gz(
+            working / "rebalance_executions.csv.gz",
+            simulation.rebalance_executions,
+            columns=REBALANCE_EXECUTION_COLUMNS,
+            natural_key=("execution_date", "ts_code"),
+        )
+        positions_artifact = write_dataframe_csv_gz(
+            working / "positions.csv.gz",
+            simulation.positions,
+            columns=POSITION_COLUMNS,
+            natural_key=("trade_date", "ts_code"),
         )
         _write_checkpoint(
             registry_db,
@@ -431,12 +472,20 @@ def _execute_pipeline(
             working,
             "simulation",
             inputs={"targets": targets_artifact},
-            outputs={"nav": nav_artifact},
+            outputs={
+                "nav": nav_artifact,
+                "rebalanceRequests": requests_artifact,
+                "rebalanceExecutions": executions_artifact,
+                "positions": positions_artifact,
+            },
             checkpoints=checkpoints,
         )
         _maybe_interrupt(interrupt_after_stage, "simulation")
     else:
         nav_artifact = _checkpoint_artifact(checkpoints, "simulation", "nav")
+        requests_artifact = _checkpoint_artifact(checkpoints, "simulation", "rebalanceRequests")
+        executions_artifact = _checkpoint_artifact(checkpoints, "simulation", "rebalanceExecutions")
+        positions_artifact = _checkpoint_artifact(checkpoints, "simulation", "positions")
 
     if "metrics" not in checkpoints:
         nav = read_canonical_csv_gz(working / "nav.csv.gz")
@@ -448,6 +497,10 @@ def _execute_pipeline(
             compressed=True,
             table_artifacts=table_artifacts,
         )
+        requests = read_canonical_csv_gz(working / "rebalance_requests.csv.gz")
+        executions = read_canonical_csv_gz(working / "rebalance_executions.csv.gz")
+        positions = read_canonical_csv_gz(working / "positions.csv.gz")
+        metrics.update(summarize_execution_metrics(nav, requests, executions, positions))
         limitations = sorted(set(strategy.limitations()))
         metrics_artifact = atomic_write_json(working / "metrics.json", metrics)
         limitations_artifact = atomic_write_json(working / "limitations.json", limitations)
@@ -456,7 +509,12 @@ def _execute_pipeline(
             run,
             working,
             "metrics",
-            inputs={"nav": nav_artifact},
+            inputs={
+                "nav": nav_artifact,
+                "rebalanceRequests": requests_artifact,
+                "rebalanceExecutions": executions_artifact,
+                "positions": positions_artifact,
+            },
             outputs={
                 "metrics": metrics_artifact,
                 "limitations": limitations_artifact,
@@ -479,6 +537,9 @@ def _execute_pipeline(
             "quality.json": quality_artifact,
             "targets.csv.gz": targets_artifact,
             "nav.csv.gz": nav_artifact,
+            "rebalance_requests.csv.gz": requests_artifact,
+            "rebalance_executions.csv.gz": executions_artifact,
+            "positions.csv.gz": positions_artifact,
             "metrics.json": metrics_artifact,
             "limitations.json": limitations_artifact,
         }
@@ -510,6 +571,7 @@ def _execute_pipeline(
             environment=environment,
             limitations=limitations,
             artifact_hashes=artifact_hashes,
+            artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
         )
         manifest_artifact = atomic_write_json(working / "manifest.json", manifest)
         _write_checkpoint(
@@ -599,14 +661,42 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
         raise SnapshotIntegrityError("manifest codeCommit 与 environment 不一致")
     if manifest.get("randomSeed") != config["randomSeed"]:
         raise SnapshotIntegrityError("manifest randomSeed 与 config 不一致")
+    artifact_schema_version = manifest.get("artifactSchemaVersion", 1)
+    if artifact_schema_version not in {1, 2}:
+        raise SnapshotIntegrityError("manifest artifactSchemaVersion 不受支持")
 
     expected = manifest["artifactHashes"]
-    _validate_manifest_input_artifacts(expected, table_artifacts)
+    _validate_manifest_input_artifacts(expected, table_artifacts, artifact_schema_version)
     if build_result_fingerprint(expected) != manifest.get("resultFingerprint"):
         raise SnapshotIntegrityError("manifest resultFingerprint 与产物哈希不一致")
-    for name in ("targets.csv.gz", "nav.csv.gz"):
+    csv_contracts = {
+        "targets.csv.gz": (TARGET_COLUMNS, ("signal_date", "ts_code")),
+        "nav.csv.gz": (NAV_COLUMNS, ("trade_date",)),
+    }
+    if artifact_schema_version == 2:
+        csv_contracts.update(
+            {
+                "rebalance_requests.csv.gz": (
+                    REBALANCE_REQUEST_COLUMNS,
+                    ("execution_date", "ts_code"),
+                ),
+                "rebalance_executions.csv.gz": (
+                    REBALANCE_EXECUTION_COLUMNS,
+                    ("execution_date", "ts_code"),
+                ),
+                "positions.csv.gz": (POSITION_COLUMNS, ("trade_date", "ts_code")),
+            }
+        )
+    frames: dict[str, Any] = {}
+    for name, (columns, natural_key) in csv_contracts.items():
         try:
             verify_csv_artifact(run_path / name, expected[name])
+            frames[name] = _read_and_validate_output_csv(
+                run_path / name,
+                expected[name],
+                columns,
+                natural_key,
+            )
         except (ArtifactIntegrityError, KeyError) as exc:
             raise SnapshotIntegrityError(f"归档研究产物无效：{name}") from exc
     for name in ("quality.json", "metrics.json", "limitations.json"):
@@ -618,6 +708,19 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
     limitations = _read_json(run_path / "limitations.json", "limitations.json")
     if quality != manifest.get("qualityRun") or limitations != manifest.get("limitations"):
         raise SnapshotIntegrityError("归档审计产物与 manifest 不一致")
+    if artifact_schema_version == 2:
+        persisted_metrics = _read_json(run_path / "metrics.json", "metrics.json")
+        try:
+            recalculated_execution_metrics = summarize_execution_metrics(
+                frames["nav.csv.gz"],
+                frames["rebalance_requests.csv.gz"],
+                frames["rebalance_executions.csv.gz"],
+                frames["positions.csv.gz"],
+            )
+        except ValueError as exc:
+            raise SnapshotIntegrityError("归档模拟账本无法对账") from exc
+        if any(persisted_metrics.get(key) != value for key, value in recalculated_execution_metrics.items()):
+            raise SnapshotIntegrityError("归档执行指标与模拟账本不一致")
     _validate_archive_checkpoint_chain(run_path, manifest)
     return manifest, config
 
@@ -628,6 +731,7 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
     strategy = resolve_strategy_definition(config)
     table_artifacts = manifest["dataSnapshot"]["tableArtifacts"]
     expected = manifest["artifactHashes"]
+    artifact_schema_version = manifest.get("artifactSchemaVersion", 1)
     with tempfile.TemporaryDirectory(prefix="quant-reproduce-") as temporary_name:
         temporary = Path(temporary_name)
         targets = _build_strategy_targets(
@@ -644,7 +748,7 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
             natural_key=("signal_date", "ts_code"),
         )
         persisted_targets = read_canonical_csv_gz(temporary / "targets.csv.gz")
-        nav, _calendar = _simulate_strategy_targets(
+        simulation, _calendar = _simulate_strategy_targets(
             strategy,
             run_path / "inputs",
             config,
@@ -652,6 +756,7 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
             compressed=True,
             table_artifacts=table_artifacts,
         )
+        nav = simulation.nav
         nav_artifact = write_dataframe_csv_gz(
             temporary / "nav.csv.gz",
             nav,
@@ -659,19 +764,39 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
             natural_key=("trade_date",),
         )
         persisted_nav = read_canonical_csv_gz(temporary / "nav.csv.gz")
-        metrics = _summarize_strategy_metrics(
-            strategy,
-            run_path / "inputs",
-            config,
-            persisted_nav,
-            compressed=True,
-            table_artifacts=table_artifacts,
-        )
         actual = {
             "targets.csv.gz": targets_artifact,
             "nav.csv.gz": nav_artifact,
-            "metrics.json": atomic_write_json(temporary / "metrics.json", metrics),
         }
+        if artifact_schema_version == 2:
+            actual["rebalance_requests.csv.gz"] = write_dataframe_csv_gz(
+                temporary / "rebalance_requests.csv.gz",
+                simulation.rebalance_requests,
+                columns=REBALANCE_REQUEST_COLUMNS,
+                natural_key=("execution_date", "ts_code"),
+            )
+            actual["rebalance_executions.csv.gz"] = write_dataframe_csv_gz(
+                temporary / "rebalance_executions.csv.gz",
+                simulation.rebalance_executions,
+                columns=REBALANCE_EXECUTION_COLUMNS,
+                natural_key=("execution_date", "ts_code"),
+            )
+            actual["positions.csv.gz"] = write_dataframe_csv_gz(
+                temporary / "positions.csv.gz",
+                simulation.positions,
+                columns=POSITION_COLUMNS,
+                natural_key=("trade_date", "ts_code"),
+            )
+        metrics = _summarize_reproduction_metrics(
+            strategy,
+            artifact_schema_version,
+            run_path / "inputs",
+            config,
+            persisted_nav,
+            simulation,
+            table_artifacts,
+        )
+        actual["metrics.json"] = atomic_write_json(temporary / "metrics.json", metrics)
     mismatches = [
         name
         for name, artifact in actual.items()
@@ -702,10 +827,52 @@ def _summarize_strategy_metrics(strategy: StrategyDefinition, *args: Any, **kwar
     return strategy.summarize_metrics(*args, **kwargs)
 
 
+def _summarize_reproduction_metrics(
+    strategy: StrategyDefinition,
+    artifact_schema_version: int,
+    input_root: Path,
+    config: dict[str, Any],
+    nav: Any,
+    simulation: Any,
+    table_artifacts: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    if artifact_schema_version == 1 and config["strategyId"] == "sentinel_etf_baseline":
+        return summarize_sentinel_metrics(
+            input_root,
+            config,
+            nav,
+            compressed=True,
+            table_artifacts=table_artifacts,
+        )
+    metrics = _summarize_strategy_metrics(
+        strategy,
+        input_root,
+        config,
+        nav,
+        compressed=True,
+        table_artifacts=table_artifacts,
+    )
+    if artifact_schema_version == 2:
+        metrics.update(
+            summarize_execution_metrics(
+                nav,
+                simulation.rebalance_requests,
+                simulation.rebalance_executions,
+                simulation.positions,
+            )
+        )
+    return metrics
+
+
 def _initialize_checkpoint_index(working: Path, run_id: str) -> None:
     atomic_write_json(
         working / "checkpoints" / "index.json",
-        {"schemaVersion": CHECKPOINT_SCHEMA_VERSION, "runId": run_id, "completed": []},
+        {
+            "schemaVersion": CHECKPOINT_SCHEMA_VERSION,
+            "artifactSchemaVersion": ARTIFACT_SCHEMA_VERSION,
+            "runId": run_id,
+            "completed": [],
+        },
     )
 
 
@@ -765,8 +932,11 @@ def _load_and_verify_checkpoints(
 ) -> dict[str, dict[str, Any]]:
     try:
         index = _read_json(working / "checkpoints" / "index.json", "checkpoint index")
+        if isinstance(index, dict) and "artifactSchemaVersion" not in index:
+            raise ResumeIdentityError("v1 未完成研究运行不能跨 artifact schema 续跑；请新建 run")
         if (
             index.get("schemaVersion") != CHECKPOINT_SCHEMA_VERSION
+            or index.get("artifactSchemaVersion") != ARTIFACT_SCHEMA_VERSION
             or index.get("runId") != run.run_id
             or not isinstance(index.get("completed"), list)
         ):
@@ -873,10 +1043,23 @@ def _verify_completed_stage_artifacts(
             working / "nav.csv.gz",
             _checkpoint_artifact(checkpoints, "simulation", "nav"),
         )
-    if "metrics" in checkpoints:
-        if checkpoints["metrics"]["inputs"].get("nav") != _checkpoint_artifact(
-            checkpoints, "simulation", "nav"
+        for filename, artifact_name in (
+            ("rebalance_requests.csv.gz", "rebalanceRequests"),
+            ("rebalance_executions.csv.gz", "rebalanceExecutions"),
+            ("positions.csv.gz", "positions"),
         ):
+            verify_csv_artifact(
+                working / filename,
+                _checkpoint_artifact(checkpoints, "simulation", artifact_name),
+            )
+    if "metrics" in checkpoints:
+        expected_metric_inputs = {
+            "nav": _checkpoint_artifact(checkpoints, "simulation", "nav"),
+            "rebalanceRequests": _checkpoint_artifact(checkpoints, "simulation", "rebalanceRequests"),
+            "rebalanceExecutions": _checkpoint_artifact(checkpoints, "simulation", "rebalanceExecutions"),
+            "positions": _checkpoint_artifact(checkpoints, "simulation", "positions"),
+        }
+        if checkpoints["metrics"]["inputs"] != expected_metric_inputs:
             raise ResumeIntegrityError("metrics checkpoint 输入 hash 不一致")
         verify_file_artifact(
             working / "metrics.json",
@@ -1036,6 +1219,7 @@ def _artifact_content_hashes(artifacts: dict[str, dict[str, Any]]) -> dict[str, 
 def _validate_manifest_input_artifacts(
     artifact_hashes: Any,
     table_artifacts: Any,
+    artifact_schema_version: int,
 ) -> None:
     if (
         not isinstance(artifact_hashes, dict)
@@ -1062,6 +1246,14 @@ def _validate_manifest_input_artifacts(
         "metrics.json",
         "limitations.json",
     }
+    if artifact_schema_version == 2:
+        required_outputs.update(
+            {
+                "rebalance_requests.csv.gz",
+                "rebalance_executions.csv.gz",
+                "positions.csv.gz",
+            }
+        )
     if set(artifact_hashes) != set(expected_inputs) | required_outputs:
         raise SnapshotIntegrityError("manifest 输入 artifact 元数据集合与冻结输入不一致")
     actual_inputs = {
@@ -1075,9 +1267,12 @@ def _validate_manifest_input_artifacts(
 def _validate_archive_checkpoint_chain(run_path: Path, manifest: dict[str, Any]) -> None:
     try:
         index = _read_json(run_path / "checkpoints" / "index.json", "checkpoint index")
+        artifact_schema_version = manifest.get("artifactSchemaVersion", 1)
+        index_artifact_version = index.get("artifactSchemaVersion", 1) if isinstance(index, dict) else None
         if (
             not isinstance(index, dict)
             or index.get("schemaVersion") != CHECKPOINT_SCHEMA_VERSION
+            or index_artifact_version != artifact_schema_version
             or index.get("runId") != manifest["runId"]
             or not isinstance(index.get("completed"), list)
         ):
@@ -1106,7 +1301,7 @@ def _validate_archive_checkpoint_chain(run_path: Path, manifest: dict[str, Any])
                 or document.get("previousCheckpointSha256") != previous_hash
                 or not isinstance(document.get("inputs"), dict)
                 or not isinstance(document.get("outputs"), dict)
-                or document.get("identity") != _archive_checkpoint_identity(manifest, stage)
+                or not _archive_checkpoint_identity_matches(manifest, stage, document.get("identity"))
             ):
                 raise ResumeIntegrityError(f"checkpoint 合同或身份无效：{stage}")
             document["checkpointSha256"] = actual_hash
@@ -1122,15 +1317,37 @@ def _validate_archive_checkpoint_chain(run_path: Path, manifest: dict[str, Any])
 
 def _archive_checkpoint_identity(manifest: dict[str, Any], stage: str) -> dict[str, Any]:
     include_snapshot = stage != "quality_gate"
-    return {
-        "strategyId": manifest["strategyId"],
-        "strategyVersion": manifest["config"]["strategyVersion"],
+    identity = {
         "configSha256": manifest["configSha256"],
         "codeCommit": manifest["codeCommit"],
         "environmentSha256": manifest["environment"]["sha256"],
         "randomSeed": manifest["randomSeed"],
         "dataSnapshotId": manifest["dataSnapshot"]["snapshotId"] if include_snapshot else None,
         "reproducibilityKey": manifest["reproducibilityKey"] if include_snapshot else None,
+    }
+    if manifest.get("artifactSchemaVersion", 1) == 2:
+        identity = {
+            "strategyId": manifest["strategyId"],
+            "strategyVersion": manifest["config"]["strategyVersion"],
+            **identity,
+        }
+    return identity
+
+
+def _archive_checkpoint_identity_matches(
+    manifest: dict[str, Any],
+    stage: str,
+    actual: Any,
+) -> bool:
+    expected = _archive_checkpoint_identity(manifest, stage)
+    if actual == expected:
+        return True
+    if manifest.get("artifactSchemaVersion", 1) != 1 or not isinstance(actual, dict):
+        return False
+    return actual == {
+        "strategyId": manifest["strategyId"],
+        "strategyVersion": manifest["config"]["strategyVersion"],
+        **expected,
     }
 
 
@@ -1169,16 +1386,43 @@ def _validate_archive_checkpoint_artifacts(
         raise ResumeIntegrityError("features_targets checkpoint 与归档不一致")
 
     nav = _checkpoint_artifact(checkpoints, "simulation", "nav")
+    simulation_outputs = {"nav": nav}
+    if manifest.get("artifactSchemaVersion", 1) == 2:
+        simulation_outputs.update(
+            {
+                "rebalanceRequests": _checkpoint_artifact(checkpoints, "simulation", "rebalanceRequests"),
+                "rebalanceExecutions": _checkpoint_artifact(checkpoints, "simulation", "rebalanceExecutions"),
+                "positions": _checkpoint_artifact(checkpoints, "simulation", "positions"),
+            }
+        )
+    expected_simulation_outputs = {"nav": artifact_hashes["nav.csv.gz"]}
+    if manifest.get("artifactSchemaVersion", 1) == 2:
+        expected_simulation_outputs.update(
+            {
+                "rebalanceRequests": artifact_hashes["rebalance_requests.csv.gz"],
+                "rebalanceExecutions": artifact_hashes["rebalance_executions.csv.gz"],
+                "positions": artifact_hashes["positions.csv.gz"],
+            }
+        )
     if (
         checkpoints["simulation"]["inputs"].get("targets") != targets
-        or nav != artifact_hashes["nav.csv.gz"]
+        or simulation_outputs != expected_simulation_outputs
     ):
         raise ResumeIntegrityError("simulation checkpoint 与归档不一致")
 
     metrics = _checkpoint_artifact(checkpoints, "metrics", "metrics")
     limitations = _checkpoint_artifact(checkpoints, "metrics", "limitations")
+    expected_metric_inputs = {"nav": nav}
+    if manifest.get("artifactSchemaVersion", 1) == 2:
+        expected_metric_inputs.update(
+            {
+                "rebalanceRequests": simulation_outputs["rebalanceRequests"],
+                "rebalanceExecutions": simulation_outputs["rebalanceExecutions"],
+                "positions": simulation_outputs["positions"],
+            }
+        )
     if (
-        checkpoints["metrics"]["inputs"].get("nav") != nav
+        checkpoints["metrics"]["inputs"] != expected_metric_inputs
         or metrics != artifact_hashes["metrics.json"]
         or limitations != artifact_hashes["limitations.json"]
     ):
@@ -1215,16 +1459,43 @@ def _read_json(path: Path, label: str) -> Any:
         raise ResumeIntegrityError(f"{label} 无法读取或不是有效 JSON") from exc
 
 
+def _read_and_validate_output_csv(
+    path: Path,
+    artifact: dict[str, Any],
+    columns: tuple[str, ...],
+    natural_key: tuple[str, ...],
+) -> Any:
+    expected_contract = {
+        "filename": path.name,
+        "columns": list(columns),
+        "naturalKey": list(natural_key),
+        "nullValue": r"\N",
+        "compression": "gzip",
+        "gzipMtime": 0,
+    }
+    if any(artifact.get(key) != value for key, value in expected_contract.items()):
+        raise SnapshotIntegrityError(f"归档研究产物合同无效：{path.name}")
+    frame = read_canonical_csv_gz(path)
+    if list(frame.columns) != list(columns) or artifact.get("rowCount") != len(frame):
+        raise SnapshotIntegrityError(f"归档研究产物列或行数无效：{path.name}")
+    if frame[list(natural_key)].isna().any().any() or frame.duplicated(list(natural_key)).any():
+        raise SnapshotIntegrityError(f"归档研究产物自然键无效：{path.name}")
+    keys = list(frame.loc[:, list(natural_key)].itertuples(index=False, name=None))
+    if keys != sorted(keys):
+        raise SnapshotIntegrityError(f"归档研究产物未按自然键排序：{path.name}")
+    return frame
+
+
 def _cleanup_uncommitted_stage_files(
     working: Path,
     checkpoints: dict[str, dict[str, Any]],
 ) -> None:
     completed_count = len(checkpoints)
     stage_outputs = {
-        0: ("quality.json", "inputs", "targets.csv.gz", "nav.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        1: ("inputs", "targets.csv.gz", "nav.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        2: ("targets.csv.gz", "nav.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        3: ("nav.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        0: ("quality.json", "inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        1: ("inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        2: ("targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        3: ("nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
         4: ("metrics.json", "limitations.json", "manifest.json"),
         5: ("manifest.json",),
         6: (),

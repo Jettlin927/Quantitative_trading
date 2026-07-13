@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import json
 import os
 import tempfile
 import unittest
@@ -23,6 +24,7 @@ from backend.app.quant_research.runner import (
     resume_quant_research,
     run_quant_research,
 )
+from backend.app.quant_research.artifacts import atomic_write_json
 from backend.app.quant_research.snapshot import SnapshotCapacityPolicy
 from backend.tests.research_test_support import (
     create_golden_database,
@@ -138,6 +140,16 @@ class ResearchResumeTest(unittest.TestCase):
             row.reproducibility_key = original_repro
             db.commit()
             self.assertEqual(row.status, "interrupted")
+
+    def test_incomplete_v1_archive_cannot_cross_artifact_schema_on_resume(self):
+        run_id = self._interrupt_and_mark("simulation")
+        index_path = self._temporary_path(run_id) / "checkpoints" / "index.json"
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+        index.pop("artifactSchemaVersion")
+        atomic_write_json(index_path, index)
+        with self.assertRaisesRegex(ResumeIdentityError, "v1"):
+            self._resume(run_id)
+        self._assert_still_interrupted(run_id)
 
     def test_corrupted_checkpoint_stops_without_recalculation(self):
         run_id = self._interrupt_and_mark("simulation")
