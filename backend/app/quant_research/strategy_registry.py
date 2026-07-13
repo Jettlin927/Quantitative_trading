@@ -19,10 +19,15 @@ from .etf_trend_baseline import (
     validate_etf_trend_config,
 )
 from .etf_volatility_managed import (
+    build_etf_low_volatility_gate_targets,
     build_etf_volatility_managed_targets,
+    etf_low_volatility_gate_limitations,
     etf_volatility_managed_limitations,
+    simulate_etf_low_volatility_gate_targets,
     simulate_etf_volatility_managed_targets,
+    summarize_etf_low_volatility_gate_metrics,
     summarize_etf_volatility_managed_metrics,
+    validate_etf_low_volatility_gate_config,
     validate_etf_volatility_managed_config,
 )
 from .a_share_price_baseline import (
@@ -112,6 +117,26 @@ _STRATEGIES = {
         simulate=simulate_etf_volatility_managed_targets,
         summarize_metrics=summarize_etf_volatility_managed_metrics,
         limitations=etf_volatility_managed_limitations,
+    ),
+    "etf_low_volatility_gate": StrategyDefinition(
+        strategy_id="etf_low_volatility_gate",
+        strategy_version="1",
+        scope="etf_time_series",
+        example_config="configs/research/etf_low_volatility_gate.json",
+        required_tables=(
+            "trade_calendars",
+            "funds",
+            "fund_daily_bars",
+            "fund_adjust_factors",
+            "indices",
+            "index_daily_bars",
+            "universe",
+        ),
+        validate_config=validate_etf_low_volatility_gate_config,
+        build_targets=build_etf_low_volatility_gate_targets,
+        simulate=simulate_etf_low_volatility_gate_targets,
+        summarize_metrics=summarize_etf_low_volatility_gate_metrics,
+        limitations=etf_low_volatility_gate_limitations,
     ),
     "a_share_price_baseline": StrategyDefinition(
         strategy_id="a_share_price_baseline",

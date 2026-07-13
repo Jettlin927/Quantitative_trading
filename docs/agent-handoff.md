@@ -16,7 +16,7 @@
 
 ## 2026-07-13 新增研究能力
 
-- `scripts/research/run_quant_research.py --list-strategies` 不连接数据库，列出 `sentinel_etf_baseline@1`、`etf_trend_120d@1`、`etf_volatility_managed@1`、`a_share_price_baseline@1` 的 scope、必需冻结输入和示例配置。
+- `scripts/research/run_quant_research.py --list-strategies` 不连接数据库，列出 `sentinel_etf_baseline@1`、`etf_trend_120d@1`、`etf_volatility_managed@1`、`etf_low_volatility_gate@1`、`a_share_price_baseline@1` 的 scope、必需冻结输入和示例配置。
 - artifact schema v2 的公共 runner 同时生成 `targets/nav`、调仓请求、模拟执行和 positions；walk-forward 与风险工件按配置成对出现并进入 checkpoint、manifest 和结果指纹。已完成 v1 归档保持兼容，未完成 v1 不跨版本续跑。
 - A 股价格 baseline 只使用逐日 `industry_members`、上市/退市、日线、复权、涨跌停、停牌和基准；固定 120–20 动量、60 日波动、月末 topN 等权和下一开市日开盘执行，不读取财务指标或当前成员列表。
 - `risk.py` 从冻结输入计算 gross/net/cash、集中度、历史行业暴露、benchmark beta 和边际/总风险贡献；贡献之和必须等于组合波动。`allocation.py` 只输出受单票、行业、现金和换手约束的研究目标权重，不生成订单。
