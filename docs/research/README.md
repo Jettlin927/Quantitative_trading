@@ -25,6 +25,8 @@
 | `etf_volatility_managed` | `1` | `etf_time_series` | `configs/research/etf_volatility_managed_baseline.json` | Moreira–Muir 倒数已实现方差、月末无杠杆 ETF 暴露复现 |
 | `a_share_price_baseline` | `1` | `a_share_cross_section` | `configs/research/a_share_price_baseline.json` | 固定 120–20 动量、60 日波动、历史行业成员的价格型横截面 baseline |
 
+`etf_volatility_managed@1` 的 2026-07-13 预登记真实数据复现已完成，强制状态为 `不通过`；完整门禁、分行情、压力期、DSR/PBO、优化方向和六个复现身份见 [`strategy-results/etf-volatility-managed-20260713/index.html`](strategy-results/etf-volatility-managed-20260713/index.html)。
+
 不用连接数据库即可查看登记身份、必需冻结输入和示例配置：
 
 ```bash

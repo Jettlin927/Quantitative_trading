@@ -1,6 +1,8 @@
 # ETF 波动率管理策略复现预登记
 
-状态：2026-07-13 预登记；尚未查看 2018-01-01 之后的策略结果
+状态：2026-07-13 预登记时尚未查看 2018-01-01 之后的策略结果；同日按原登记完成运行，结论为 `不通过`
+
+最终报告：[`strategy-results/etf-volatility-managed-20260713/index.html`](strategy-results/etf-volatility-managed-20260713/index.html)
 
 ## 研究问题
 
