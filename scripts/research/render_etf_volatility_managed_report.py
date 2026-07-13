@@ -41,6 +41,42 @@ DEFAULT_OUTPUT_DIR = (
 )
 TRIAL_ORDER = ("T0", "T1", "T2", "T3", "zero_cost", "double_cost")
 BASE_COST = (0.00035, 0.00085, 0.001)
+TRIAL_DISPLAY_NAMES = {
+    "T0": "逆方差强力降风险版（T0）",
+    "T1": "逆波动温和降风险版（T1）",
+    "T2": "三个月方差平滑版（T2）",
+    "T3": "10 个百分点调仓缓冲版（T3）",
+    "zero_cost": "逆方差强力降风险版（T0）·零成本压力场景",
+    "double_cost": "逆方差强力降风险版（T0）·双倍成本压力场景",
+}
+TRIAL_GLOSSARY = (
+    {
+        "id": "T0",
+        "name": "逆方差强力降风险版",
+        "meaning": (
+            "基准试验：下月仓位与上月实现方差成反比；波动率翻倍时，"
+            "未受仓位上限影响的仓位约降至四分之一。"
+        ),
+    },
+    {
+        "id": "T1",
+        "name": "逆波动温和降风险版",
+        "meaning": (
+            "温和变体：下月仓位与上月实现波动率成反比；波动率翻倍时，"
+            "未受仓位上限影响的仓位约降至二分之一。"
+        ),
+    },
+    {
+        "id": "T2",
+        "name": "三个月方差平滑版",
+        "meaning": "用最近三个月实现方差的均值决定仓位，减少单月波动噪声。",
+    },
+    {
+        "id": "T3",
+        "name": "10 个百分点调仓缓冲版",
+        "meaning": "沿用逆方差规则，但新旧目标仓位相差不足 10 个百分点时不调仓。",
+    },
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -221,28 +257,28 @@ def build_summary(
     gates = [
         _gate(
             "年化波动",
-            "T0 / 被动 <= 90%",
+            f"{TRIAL_DISPLAY_NAMES['T0']} / 被动 <= 90%",
             t0_metrics["annualizedVolatility"] / passive_metrics["annualizedVolatility"],
             0.9,
             "le",
         ),
         _gate(
             "最大回撤",
-            "|T0 MDD| / |被动 MDD| <= 85%",
+            f"|{TRIAL_DISPLAY_NAMES['T0']} MDD| / |被动 MDD| <= 85%",
             abs(t0_metrics["maxDrawdown"]) / abs(passive_metrics["maxDrawdown"]),
             0.85,
             "le",
         ),
         _gate(
             "Sharpe 改善",
-            "T0 - 被动 >= 0.10",
+            f"{TRIAL_DISPLAY_NAMES['T0']} - 被动 >= 0.10",
             t0_metrics["sharpe"] - passive_metrics["sharpe"],
             0.1,
             "ge",
         ),
         _gate(
             "CAGR 保留",
-            "T0 - 被动 >= -2pp",
+            f"{TRIAL_DISPLAY_NAMES['T0']} - 被动 >= -2pp",
             t0_metrics["annualizedReturn"] - passive_metrics["annualizedReturn"],
             -0.02,
             "ge",
@@ -303,7 +339,7 @@ def build_summary(
         ),
         "conclusion": {
             "oneLine": (
-                "T0 明显降低波动并提高净 CAGR，但最大回撤和 Sharpe 改善未达到事前门槛，"
+                "基准逆方差强力降风险版明显降低波动并提高净 CAGR，但最大回撤和 Sharpe 改善未达到事前门槛，"
                 "且主动收益被少数年份主导，因此不能认定为好策略。"
             ),
             "strongestSupport": (
@@ -318,6 +354,7 @@ def build_summary(
             "failureEnvironment": "波动突然上升或持续熊市；上一月方差反应偏慢，不能阻止深回撤。",
             "researchOnly": True,
         },
+        "trialGlossary": [dict(item) for item in TRIAL_GLOSSARY],
         "strategyProfile": {
             "name": "Moreira–Muir ETF 波动率管理（无杠杆复现）",
             "strategyId": "etf_volatility_managed",
@@ -352,7 +389,10 @@ def build_summary(
             "endDate": passive_metrics["endDate"],
             "observations": passive_metrics["observations"],
             "pointInTime": True,
-            "offlineReproduction": "六个运行全部在 --network none 下匹配 result fingerprint；T0 重复两次。",
+            "offlineReproduction": (
+                "六个运行全部在 --network none 下匹配 result fingerprint；"
+                "基准逆方差强力降风险版重复两次。"
+            ),
         },
         "executionAndCost": execution_summary,
         "riskAndCapacity": {
@@ -395,6 +435,7 @@ def build_summary(
         "multipleTesting": {
             "registeredTrials": 4,
             "winnerByNetSharpe": dsr["winner"],
+            "winnerDisplayName": TRIAL_DISPLAY_NAMES[dsr["winner"]],
             "deflatedSharpeRatio": dsr,
             "pbo": pbo,
             "interpretation": (
@@ -404,13 +445,13 @@ def build_summary(
         },
         "supportingEvidence": [
             "30/30 数据质量规则通过，canonical 快照、执行账本和离线复现完整。",
-            f"T0 年化波动 {t0_metrics['annualizedVolatility']:.2%}，低于被动 {passive_metrics['annualizedVolatility']:.2%}。",
-            f"T0 净 CAGR {t0_metrics['annualizedReturn']:.2%}，高于被动 {passive_metrics['annualizedReturn']:.2%}。",
+            f"逆方差强力降风险版年化波动 {t0_metrics['annualizedVolatility']:.2%}，低于被动 {passive_metrics['annualizedVolatility']:.2%}。",
+            f"逆方差强力降风险版净 CAGR {t0_metrics['annualizedReturn']:.2%}，高于被动 {passive_metrics['annualizedReturn']:.2%}。",
             f"双倍成本 Sharpe {double_metrics['sharpe']:.3f}，仍高于被动 {passive_metrics['sharpe']:.3f}。",
         ],
         "opposingEvidence": [
-            f"T0 最大回撤 {t0_metrics['maxDrawdown']:.2%}，远未达到相对被动缩减 15% 的门槛。",
-            f"T0 Sharpe 改善 {t0_metrics['sharpe'] - passive_metrics['sharpe']:.3f}，低于 0.10 门槛。",
+            f"逆方差强力降风险版最大回撤 {t0_metrics['maxDrawdown']:.2%}，远未达到相对被动缩减 15% 的门槛。",
+            f"逆方差强力降风险版 Sharpe 改善 {t0_metrics['sharpe'] - passive_metrics['sharpe']:.3f}，低于 0.10 门槛。",
             f"HAC 年化 alpha {hac['annualizedAlpha']:.2%}，95% 区间 {hac['ci95Low']:.2%}..{hac['ci95High']:.2%}，不能排除 0。",
             f"PBO {pbo['probability']:.1%}，四个变体中的样本内赢家经常在对应样本外落到后半区。",
             f"{largest_year['year']} 单年主动对数财富贡献超过整段净主动对数财富，稳定性门禁失败。",
@@ -419,22 +460,22 @@ def build_summary(
             "未绑定可投资现金收益率，现金收益按 0。",
             "未绑定目标资金规模、ETF 申赎/买卖冲击和 ADV 参与率，容量为 not_available。",
             "流动性环境阈值未在看 OOS 前预登记，本轮不做事后分组。",
-            "只验证一只中国宽基 ETF；T1–T3 与 T0 共用 OOS，没有新的独立验证集。",
+            "只验证一只中国宽基 ETF；三个变体与基准逆方差版共用 OOS，没有新的独立验证集。",
         ],
         "optimizationDirections": [
             {
                 "priority": 1,
-                "direction": "把 T1 倒数波动率作为唯一下一轮候选，在新时间段或另一只事前指定宽基 ETF 上独立验证。",
+                "direction": "把逆波动温和降风险版（T1）作为唯一下一轮候选，在新时间段或另一只事前指定宽基 ETF 上独立验证。",
                 "evidence": (
-                    f"T1 CAGR {runs['T1']['metrics']['annualizedReturn']:.2%}、MDD {runs['T1']['metrics']['maxDrawdown']:.2%}，"
-                    f"成本约为 T0 的 {runs['T1']['metrics']['cumulativeTransactionCostRate'] / t0_metrics['cumulativeTransactionCostRate']:.1%}；"
-                    "但 Sharpe 低于 T0，当前只能是有条件候选。"
+                    f"逆波动温和降风险版 CAGR {runs['T1']['metrics']['annualizedReturn']:.2%}、MDD {runs['T1']['metrics']['maxDrawdown']:.2%}，"
+                    f"成本约为基准逆方差版的 {runs['T1']['metrics']['cumulativeTransactionCostRate'] / t0_metrics['cumulativeTransactionCostRate']:.1%}；"
+                    "但 Sharpe 低于基准逆方差版，当前只能是有条件候选。"
                 ),
             },
             {
                 "priority": 2,
                 "direction": "若目标优先压回撤，下一轮只测试一个更低风险预算或更低最大暴露，不与预测器改动同时搜索。",
-                "evidence": "T0 中位目标权重约 93%，46% 的月份触及 100% 上限；当前回撤改善不足。",
+                "evidence": "基准逆方差版中位目标权重约 93%，46% 的月份触及 100% 上限；当前回撤改善不足。",
             },
             {
                 "priority": 3,
@@ -443,8 +484,8 @@ def build_summary(
             },
             {
                 "priority": 4,
-                "direction": "拒绝 T2 三月平滑和 T3 10pp 调仓带作为当前优化方向。",
-                "evidence": "T2 回撤更差；T3 成本仅小幅下降却损失收益，二者都没有改善核心门槛。",
+                "direction": "拒绝三个月方差平滑版（T2）和 10 个百分点调仓缓冲版（T3）作为当前优化方向。",
+                "evidence": "三个月方差平滑版回撤更差；调仓缓冲版成本仅小幅下降却损失收益，二者都没有改善核心门槛。",
             },
         ],
         "reproduction": {
@@ -505,12 +546,7 @@ def _comparison_rows(
 ) -> list[dict[str, Any]]:
     labels = {
         "passive": "被动 ETF",
-        "T0": "T0 倒数方差",
-        "T1": "T1 倒数波动率",
-        "T2": "T2 三月方差",
-        "T3": "T3 10pp 调仓带",
-        "zero_cost": "T0 零成本",
-        "double_cost": "T0 双倍成本",
+        **TRIAL_DISPLAY_NAMES,
     }
     rows: list[dict[str, Any]] = []
     for label in ("passive", *TRIAL_ORDER):
@@ -729,10 +765,7 @@ def _walk_forward_rows(
 def _tail_rows(returns: pd.DataFrame) -> list[dict[str, Any]]:
     labels = {
         "passive": "被动 ETF",
-        "T0": "T0",
-        "T1": "T1",
-        "T2": "T2",
-        "T3": "T3",
+        **{label: TRIAL_DISPLAY_NAMES[label] for label in ("T0", "T1", "T2", "T3")},
     }
     return [
         {"label": labels[label], **_tail_metrics(returns[label])}
@@ -977,6 +1010,35 @@ def _read_frame(
 
 def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
     status_class = "fail" if summary["status"] == "不通过" else "pass"
+    baseline_name = TRIAL_DISPLAY_NAMES["T0"]
+    candidate_name = TRIAL_DISPLAY_NAMES["T1"]
+    trial_glossary = _html_table(
+        summary["trialGlossary"],
+        (
+            ("name", "方案名称", "text"),
+            ("id", "内部编号", "code"),
+            ("meaning", "具体规则", "text"),
+        ),
+    )
+    nav_chart = _line_svg(
+        {
+            baseline_name: charts["T0"],
+            candidate_name: charts["T1"],
+            "被动持有 ETF": charts["passive"],
+        },
+        {
+            baseline_name: "#0f6a53",
+            candidate_name: "#a26a16",
+            "被动持有 ETF": "#65706b",
+        },
+    )
+    drawdown_chart = _line_svg(
+        {
+            baseline_name: charts["T0_drawdown"],
+            "被动持有 ETF": charts["passive_drawdown"],
+        },
+        {baseline_name: "#a7372d", "被动持有 ETF": "#65706b"},
+    )
     comparison = _html_table(
         summary["comparison"],
         (
@@ -1013,10 +1075,10 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
         (
             ("year", "年份", "int"),
             ("observations", "日数", "int"),
-            ("strategyReturn", "T0", "pct"),
+            ("strategyReturn", "逆方差强力降风险版", "pct"),
             ("passiveReturn", "被动", "pct"),
             ("activeReturn", "主动", "pct"),
-            ("maxDrawdown", "T0 回撤", "pct"),
+            ("maxDrawdown", "逆方差版回撤", "pct"),
             ("turnover", "换手", "num"),
             ("cost", "成本率", "pct"),
             ("averageExposure", "平均暴露", "pct"),
@@ -1031,7 +1093,7 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
             ("endDate", "最晚", "text"),
             ("months", "月数", "int"),
             ("observations", "日数", "int"),
-            ("strategyReturn", "T0", "pct"),
+            ("strategyReturn", "逆方差强力降风险版", "pct"),
             ("passiveReturn", "被动", "pct"),
             ("activeReturn", "主动", "pct"),
             ("maxDrawdown", "回撤", "pct"),
@@ -1049,7 +1111,7 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
             ("startDate", "开始", "text"),
             ("endDate", "结束", "text"),
             ("observations", "日数", "int"),
-            ("strategyReturn", "T0", "pct"),
+            ("strategyReturn", "逆方差强力降风险版", "pct"),
             ("passiveReturn", "被动", "pct"),
             ("activeReturn", "主动", "pct"),
             ("maxDrawdown", "回撤", "pct"),
@@ -1066,11 +1128,11 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
             ("windowId", "窗口", "text"),
             ("testStart", "开始", "text"),
             ("testEnd", "结束", "text"),
-            ("strategyReturn", "T0", "pct"),
+            ("strategyReturn", "逆方差强力降风险版", "pct"),
             ("passiveReturn", "被动", "pct"),
-            ("strategySharpe", "T0 Sharpe", "num"),
+            ("strategySharpe", "逆方差版 Sharpe", "num"),
             ("passiveSharpe", "被动 Sharpe", "num"),
-            ("strategyMaxDrawdown", "T0 回撤", "pct"),
+            ("strategyMaxDrawdown", "逆方差版回撤", "pct"),
         ),
     )
     tail = _html_table(
@@ -1093,11 +1155,16 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
     )
     reproduction = _html_table(
         [
-            {"label": label, **identity}
+            {
+                "name": TRIAL_DISPLAY_NAMES[label],
+                "internalId": label,
+                **identity,
+            }
             for label, identity in summary["reproduction"].items()
         ],
         (
-            ("label", "运行", "text"),
+            ("name", "方案名称", "text"),
+            ("internalId", "内部运行编号", "code"),
             ("runId", "run_id", "code"),
             ("reproducibilityKey", "reproducibility_key", "code"),
             ("resultFingerprint", "result_fingerprint", "code"),
@@ -1150,18 +1217,19 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
     <div class="status {status_class}">{escape(summary["status"])}</div>
     <div class="lead">{escape(summary["conclusion"]["oneLine"])}</div>
     <div class="kpis">
-      <div class="kpi"><span>T0 累计净收益</span><b>{_fmt(summary["comparison"][1]["totalReturn"], "pct")}</b></div>
-      <div class="kpi"><span>T0 / 被动年化波动</span><b>{_fmt(summary["gates"][0]["actual"], "pct")}</b></div>
-      <div class="kpi"><span>T0 最大回撤</span><b>{_fmt(summary["comparison"][1]["maxDrawdown"], "pct")}</b></div>
+      <div class="kpi"><span>基准逆方差版累计净收益</span><b>{_fmt(summary["comparison"][1]["totalReturn"], "pct")}</b></div>
+      <div class="kpi"><span>基准逆方差版 / 被动年化波动</span><b>{_fmt(summary["gates"][0]["actual"], "pct")}</b></div>
+      <div class="kpi"><span>基准逆方差版最大回撤</span><b>{_fmt(summary["comparison"][1]["maxDrawdown"], "pct")}</b></div>
       <div class="kpi"><span>PBO</span><b>{_fmt(summary["multipleTesting"]["pbo"]["probability"], "pct")}</b></div>
     </div>
   </section>
 
   <div class="grid">
+    <section class="panel"><h2>先看懂报告中的四个试验</h2><p>报告中的 <code>T0</code>–<code>T3</code> 只是连接配置、运行记录和复现身份的内部编号，不是策略名称。正文始终优先使用下面的中文名称。</p>{trial_glossary}</section>
     <section class="panel"><h2>0. 结论门禁</h2>{gates}<p class="note">状态严格来自事前门槛；研究结论不是投资建议、评级、收益承诺或真实交易授权。</p></section>
     <section class="panel"><h2>1. 样本外总体指标</h2>{comparison}</section>
-    <section class="panel half"><h2>净值：T0 / T1 / 被动</h2><div class="legend"><span><i class="dot" style="background:#0f6a53"></i>T0</span><span><i class="dot" style="background:#a26a16"></i>T1</span><span><i class="dot" style="background:#65706b"></i>被动</span></div>{_line_svg({"T0": charts["T0"], "T1": charts["T1"], "被动": charts["passive"]}, {"T0":"#0f6a53","T1":"#a26a16","被动":"#65706b"})}</section>
-    <section class="panel half"><h2>回撤：T0 / 被动</h2><div class="legend"><span><i class="dot" style="background:#a7372d"></i>T0</span><span><i class="dot" style="background:#65706b"></i>被动</span></div>{_line_svg({"T0": charts["T0_drawdown"], "被动": charts["passive_drawdown"]}, {"T0":"#a7372d","被动":"#65706b"})}</section>
+    <section class="panel half"><h2>净值：强力降风险版 / 温和降风险版 / 被动持有</h2><div class="legend"><span><i class="dot" style="background:#0f6a53"></i>{escape(baseline_name)}</span><span><i class="dot" style="background:#a26a16"></i>{escape(candidate_name)}</span><span><i class="dot" style="background:#65706b"></i>被动持有 ETF</span></div>{nav_chart}</section>
+    <section class="panel half"><h2>回撤：逆方差强力降风险版 / 被动持有</h2><div class="legend"><span><i class="dot" style="background:#a7372d"></i>{escape(baseline_name)}</span><span><i class="dot" style="background:#65706b"></i>被动持有 ETF</span></div>{drawdown_chart}</section>
     <section class="panel third"><h2>累计单边换手</h2>{_line_svg({"换手": charts["turnover"]}, {"换手":"#315c8a"})}</section>
     <section class="panel third"><h2>累计成本率</h2>{_line_svg({"成本": charts["cost"]}, {"成本":"#a7372d"})}</section>
     <section class="panel third"><h2>风险资产 / 现金</h2>{_line_svg({"风险资产": charts["gross"], "现金": charts["cash"]}, {"风险资产":"#0f6a53","现金":"#a26a16"})}</section>
@@ -1176,7 +1244,7 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
     <section class="panel half"><h2>7. 统计与过拟合</h2>
       <ul>
         <li>HAC 年化 alpha：{_fmt(summary["alphaHac"]["annualizedAlpha"], "pct")}；95% CI {_fmt(summary["alphaHac"]["ci95Low"], "pct")} .. {_fmt(summary["alphaHac"]["ci95High"], "pct")}；t={summary["alphaHac"]["alphaTStatistic"]:.2f}。</li>
-        <li>DSR：{_fmt(summary["multipleTesting"]["deflatedSharpeRatio"]["probability"], "pct")}；四试验净 Sharpe 冠军为 {summary["multipleTesting"]["winnerByNetSharpe"]}。</li>
+        <li>DSR：{_fmt(summary["multipleTesting"]["deflatedSharpeRatio"]["probability"], "pct")}；四试验净 Sharpe 冠军为 {escape(summary["multipleTesting"]["winnerDisplayName"])}。</li>
         <li>PBO：{_fmt(summary["multipleTesting"]["pbo"]["probability"], "pct")}；8 个连续月度块、{summary["multipleTesting"]["pbo"]["combinations"]} 个 CSCV 组合。</li>
       </ul>
       <p>{escape(summary["multipleTesting"]["interpretation"])}</p>
