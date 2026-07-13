@@ -1,6 +1,6 @@
 # 离线量化研究能力短板补齐计划
 
-> 状态：Phase 0–5 实现与文档已完成，等待精确提交上的最终 PostgreSQL/仓库门禁、合并与推送。实施基线为 `main@ca8495fccdecad53f10748eb9f0d408ed3b26d4e`。参考对象为 `goldmansachs/gs-quant@release-2.0.14`，只吸收适合本仓库的通用研究、组合模拟和风险分析概念，不复制其 Marquee、衍生品、实时定价或交易体系。
+> 状态：Phase 0–5 实现与最终验收已完成；精确代码验收提交为 `891b2825b62c8e91576ee54d04fbafc738c95f69`，等待合并 `main` 与推送。实施基线为 `main@ca8495fccdecad53f10748eb9f0d408ed3b26d4e`。参考对象为 `goldmansachs/gs-quant@release-2.0.14`，只吸收适合本仓库的通用研究、组合模拟和风险分析概念，不复制其 Marquee、衍生品、实时定价或交易体系。
 
 ## 目标
 
@@ -488,8 +488,18 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 ### Task 5.2：最终独立反例审计
 
 - [x] 通过独立黑盒审计入口重放未来数据、篡改 snapshot、篡改账本/风险、历史成员漂移、不可成交、约束不可行、OOS-only 和断库 reproduce；当前任务未启用第二实现者，不虚构人员独立性。
-- [ ] 在精确 commit 上记录测试数、PG 版本、结果指纹和残留限制。
-- [ ] 只有黑盒审计与最终矩阵通过后，才更新计划状态为完成。
+- [x] 在精确 commit 上记录测试数、PG 版本、结果指纹和残留限制。
+- [x] 只有黑盒审计与最终矩阵通过后，才更新计划状态为完成。
+
+### 最终验收记录
+
+- 精确代码提交：`891b2825b62c8e91576ee54d04fbafc738c95f69`。
+- 本地仓库门禁：全部已跟踪 Python 文件 `py_compile`、两份 Compose config、`scripts/ops/*.sh` 语法和 `git diff --check` 通过；固定黑盒审计 12/12 通过。
+- 本地数据库门禁：隔离 tmpfs PostgreSQL `16.14` 全量运行 219 项，全部通过、0 跳过，退出码为 0。
+- 黄金运行证据：合成 A 股正式运行的 `resultFingerprint=ca9243de1c5fb8599cc589710f63c8358e9f6c9e1c5e1e0b261a0e200df71806`，`reproducibilityKey=ba779af6f6aac548c31aa18146dd5498f2fc9cd685abe3eeeaf82e0ad6423f23`；断开数据库依赖后连续两次 reproduce 均匹配。
+- 远端隔离复核：当前源码只同步到 `/tmp`，复用现有生产 API 镜像但不连接生产 PostgreSQL、不重启生产服务；Compose、Shell、Python 编译、黑盒 12/12 和 SQLite 全量 219 项均通过，其中 10 项 PostgreSQL 专用用例按设计跳过。临时目录已删除。
+- 服务器磁盘：根盘约 40 GiB、已用 29 GiB、可用 9.0 GiB、77%；当前不需要扩容，5 GiB 继续作为停止构建并通知用户的安全门槛。
+- 残留限制：完整指数成分归因仍因缺 `index_weights` blocked，行业基准比较仍因缺 `industry_proxy_daily` blocked；本轮未引入财务修订历史、实时数据、券商、实盘、生产部署或数据库迁移。
 
 ## 每阶段统一验证
 
