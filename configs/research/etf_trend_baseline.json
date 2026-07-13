@@ -1,0 +1,50 @@
+{
+  "allowedWarnings": [],
+  "benchmark": "000300.SH",
+  "costModel": {
+    "buyRate": "0.00035",
+    "sellRate": "0.00085",
+    "slippageRate": "0.001"
+  },
+  "endDate": "2026-06-29",
+  "executionPolicy": {
+    "calendarExchange": "SSE",
+    "executionPrice": "next_trade_open",
+    "signalPrice": "close"
+  },
+  "featureParameters": {
+    "movingAverageWindow": 120
+  },
+  "qualityRunId": "__REQUIRED_BY_CLI__",
+  "randomSeed": 7,
+  "scope": "etf_time_series",
+  "startDate": "2025-12-01",
+  "strategyId": "etf_trend_120d",
+  "strategyVersion": "1",
+  "targetWeightParameters": {
+    "rebalanceFrequency": "month_end",
+    "riskOffWeight": "0",
+    "riskOnWeight": "1"
+  },
+  "timezone": "Asia/Shanghai",
+  "universe": {
+    "asOfDate": "2025-06-02",
+    "memberArtifact": {
+      "count": 1,
+      "format": "inline_sorted_symbols",
+      "sha256": "eb2a09141693d8ffa619fab66a698c210e3bb425bb9605e7996ed273428e99cc"
+    },
+    "members": [
+      "510300.SH"
+    ],
+    "mode": "explicit_snapshot",
+    "source": "configs/research/etf_trend_universe.txt",
+    "sourceArtifact": {
+      "format": "sorted_symbols_v1",
+      "path": "configs/research/etf_trend_universe.txt",
+      "sha256": "d86f1b223389fc723847e44b7a9af356576c0563e60396f44f9e97f401c18611"
+    },
+    "universeHash": "4cd2b0a2aec8c1787d45d7b717b6932aa9ae8158087382ef9c5031d4a1f79b79"
+  },
+  "warmupStart": "2025-06-02"
+}

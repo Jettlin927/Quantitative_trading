@@ -43,9 +43,9 @@ def build_sentinel_targets(
     table_artifacts: dict[str, dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
     target_parameters = validate_sentinel_config(config)
-    root, reader = _input_reader(input_root, compressed, table_artifacts)
-    calendar = _load_calendar(root, reader, config, compressed, table_artifacts)
-    members = _validate_universe(reader, config, compressed)
+    root, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
+    calendar = load_frozen_calendar(root, reader, config, compressed, table_artifacts)
+    members = validate_explicit_universe(reader, config, compressed)
     research_start = pd.Timestamp(config["startDate"])
     end = pd.Timestamp(config["endDate"])
     target_weight = float(target_parameters["targetWeight"])
@@ -77,9 +77,26 @@ def simulate_sentinel_targets(
     table_artifacts: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[pd.DataFrame, OpenTradeCalendar]:
     validate_sentinel_config(config)
-    root, reader = _input_reader(input_root, compressed, table_artifacts)
-    calendar = _load_calendar(root, reader, config, compressed, table_artifacts)
-    members = set(config["universe"]["members"])
+    return simulate_etf_targets(
+        input_root,
+        config,
+        targets,
+        compressed=compressed,
+        table_artifacts=table_artifacts,
+    )
+
+
+def simulate_etf_targets(
+    input_root: Path,
+    config: dict[str, Any],
+    targets: pd.DataFrame,
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None = None,
+) -> tuple[pd.DataFrame, OpenTradeCalendar]:
+    root, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
+    calendar = load_frozen_calendar(root, reader, config, compressed, table_artifacts)
+    members = set(validate_explicit_universe(reader, config, compressed))
     bars = reader("fund_daily_bars")
     factors = reader("fund_adjust_factors")
     warmup_start = pd.Timestamp(config["warmupStart"])
@@ -95,7 +112,7 @@ def simulate_sentinel_targets(
         & factors["trade_date"].between(warmup_start, end)
     ].copy()
     if bars.empty or factors.empty:
-        raise ValueError("sentinel baseline 冻结 ETF 输入不完整")
+        raise ValueError("ETF baseline 冻结输入不完整")
     prices = build_adjusted_price_panel(bars, factors)
     prices["is_buyable_at_open"] = True
     prices["is_sellable_at_open"] = True
@@ -122,7 +139,24 @@ def summarize_sentinel_metrics(
     table_artifacts: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     validate_sentinel_config(config)
-    _, reader = _input_reader(input_root, compressed, table_artifacts)
+    return summarize_etf_metrics(
+        input_root,
+        config,
+        nav,
+        compressed=compressed,
+        table_artifacts=table_artifacts,
+    )
+
+
+def summarize_etf_metrics(
+    input_root: Path,
+    config: dict[str, Any],
+    nav: pd.DataFrame,
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    _, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
     benchmark_bars = reader("index_daily_bars")
     warmup_start = pd.Timestamp(config["warmupStart"])
     research_start = pd.Timestamp(config["startDate"])
@@ -133,7 +167,7 @@ def summarize_sentinel_metrics(
         & benchmark_bars["trade_date"].between(warmup_start, end)
     ].copy()
     if benchmark_bars.empty:
-        raise ValueError("sentinel baseline 冻结基准输入不完整")
+        raise ValueError("ETF baseline 冻结基准输入不完整")
     benchmark = benchmark_bars[["trade_date", "close"]].copy().sort_values("trade_date")
     benchmark["close"] = pd.to_numeric(benchmark["close"], errors="raise")
     benchmark["nav"] = benchmark["close"] / benchmark["close"].iloc[0]
@@ -202,7 +236,7 @@ def validate_sentinel_config(config: dict[str, Any]) -> dict[str, Any]:
     return target_parameters
 
 
-def _input_reader(
+def open_strategy_inputs(
     input_root: Path,
     compressed: bool,
     table_artifacts: dict[str, dict[str, Any]] | None,
@@ -216,7 +250,7 @@ def _input_reader(
     return root, _plain_reader(root)
 
 
-def _validate_universe(reader: Any, config: dict[str, Any], compressed: bool) -> tuple[str, ...]:
+def validate_explicit_universe(reader: Any, config: dict[str, Any], compressed: bool) -> tuple[str, ...]:
     members = tuple(sorted(set(config["universe"]["members"])))
     if compressed:
         universe = reader("universe")
@@ -226,7 +260,7 @@ def _validate_universe(reader: Any, config: dict[str, Any], compressed: bool) ->
     return members
 
 
-def _load_calendar(
+def load_frozen_calendar(
     root: Path,
     reader: Any,
     config: dict[str, Any],

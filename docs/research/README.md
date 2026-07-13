@@ -53,6 +53,20 @@ python scripts/research/reproduce_quant_research.py outputs/research-runs/runs/<
 
 sentinel 仅验证研究管线，所有 manifest 都标记 `researchOnly=true`、`notInvestmentAdvice=true`、`executionEnabled=false`。它不是 alpha 研究、买卖评级或收益承诺。
 
+## 固定 ETF 趋势 baseline
+
+`configs/research/etf_trend_baseline.json` 登记为 `etf_trend_120d@1`。它只使用单只显式 ETF 的冻结日频复权收盘价，以固定 120 个开市日移动平均形成月末 1/0 目标，并在下一开市日开盘尝试执行。窗口、月末频率和权重均固定，不允许参数网格、自动搜索或事后挑选。
+
+运行时先按配置的 `warmupStart..endDate`、`510300.SH` 和 `000300.SH` 创建匹配的 ETF quality run，再执行：
+
+```bash
+python scripts/research/run_quant_research.py \
+  --config configs/research/etf_trend_baseline.json \
+  --quality-run-id <QUALITY_RUN_ID>
+```
+
+该 baseline 只用于证明多策略分发、因果 rolling feature、月末目标与离线复现合同，不构成 alpha 结论、评级或交易建议。
+
 ## 生产验收基线
 
 2026-07-12 已在生产 PostgreSQL 上完成固定 2025-12 `510300.SH` / `000300.SH` 验收：质量运行 `4930ff05-a332-4a62-b7a8-1c7479126bca` 的 30 条规则全部通过；冻结快照为 `cb9bac39488283a13e5d31604471841b7ac5311e0e5852f1d9ac8d0639152dab`；研究运行 `a22fb663-1b66-4579-ab58-e6d3236d1843` 的结果指纹为 `61aa690cc0f7ea6e1b090cbbdae359696a74ad5434266167c175b6453bbe5079`。数据库地址不可连接时连续两次 reproduce 均精确匹配。
