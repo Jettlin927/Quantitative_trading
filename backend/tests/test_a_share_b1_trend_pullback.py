@@ -101,6 +101,30 @@ class AShareB1TrendPullbackTest(unittest.TestCase):
         actual = calculate_b1_feature_frame(pd.concat([bars, future], ignore_index=True), self.config)
         pd.testing.assert_frame_equal(expected, actual.iloc[: len(expected)].reset_index(drop=True))
 
+    def test_leading_suspension_without_prior_price_stays_ineligible(self) -> None:
+        dates = pd.bdate_range("2024-01-02", periods=120)
+        close = pd.Series([float("nan"), float("nan")] + [10 + index * 0.01 for index in range(118)])
+        bars = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": "SYN001.SZ",
+                "adj_high": close + 0.2,
+                "adj_low": close - 0.2,
+                "adj_close": close,
+                "vol": [float("nan"), float("nan")] + [1000.0] * 118,
+                "is_valuation_carried": [True, True] + [False] * 118,
+            }
+        )
+
+        features = calculate_b1_feature_frame(bars, self.config)
+
+        self.assertTrue(features.iloc[:2]["adj_close"].isna().all())
+        self.assertFalse(features.iloc[:2]["entry_signal"].any())
+
+        bars.loc[0, "is_valuation_carried"] = False
+        with self.assertRaisesRegex(ValueError, "无停牌沿用证据"):
+            calculate_b1_feature_frame(bars, self.config)
+
     def test_next_open_t3_exit_and_declared_t3_off_are_distinct(self) -> None:
         dates = pd.bdate_range("2025-01-02", periods=6)
         calendar = _calendar(dates, self.addCleanup)

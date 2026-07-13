@@ -171,7 +171,8 @@ def calculate_b1_feature_frame(
         filled = frame.groupby("ts_code", sort=False)[column].ffill()
         frame.loc[carried, column] = filled[carried]
     frame.loc[carried & frame["vol"].isna(), "vol"] = 0.0
-    if frame[["adj_high", "adj_low", "adj_close", "vol"]].isna().any().any():
+    missing_market_data = frame[["adj_high", "adj_low", "adj_close", "vol"]].isna().any(axis=1)
+    if (missing_market_data & ~carried).any():
         raise ValueError("B1 行情存在无停牌沿用证据的缺失价格或成交量")
 
     parts: list[pd.DataFrame] = []
