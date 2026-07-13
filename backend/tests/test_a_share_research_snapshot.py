@@ -19,6 +19,7 @@ from backend.app.models import (
     StockListing,
     TradeCalendar,
 )
+from backend.app.quant_research.artifacts import read_canonical_csv_gz
 from backend.app.quant_research.snapshot import (
     SnapshotCapacityPolicy,
     SnapshotCapacityError,
@@ -153,6 +154,47 @@ class AShareResearchSnapshotTest(unittest.TestCase):
                 fresh_snapshot.manifest["universeHash"],
                 fresh_report["universeHash"],
             )
+
+    def test_snapshot_excludes_raw_member_delisted_before_window(self):
+        with Session(self.engine) as db:
+            db.add_all(
+                [
+                    IndustryMember(
+                        index_code="SYNIND.SI",
+                        con_code="OLD001.SZ",
+                        con_name="窗口前退市成员",
+                        in_date=date(2020, 1, 1),
+                    ),
+                    StockListing(
+                        ts_code="OLD001.SZ",
+                        symbol="OLD001",
+                        name="窗口前退市成员",
+                        exchange="SZSE",
+                        list_status="D",
+                        list_date=date(2020, 1, 1),
+                        delist_date=date(2025, 12, 31),
+                    ),
+                ]
+            )
+            db.commit()
+            report = run_data_quality_check(
+                db,
+                self._contract(),
+                code_commit="a-share-test",
+            )
+            self.assertEqual(report["status"], "ready")
+
+            snapshot = freeze_input_snapshot(
+                db,
+                self._config(report["qualityRunId"]),
+                Path(self.tmp.name) / "delisted-snapshots",
+                capacity_policy=SnapshotCapacityPolicy(min_remaining_bytes=0),
+            )
+
+        memberships = read_canonical_csv_gz(
+            snapshot.path / "inputs" / "industry_members.csv.gz"
+        )
+        self.assertNotIn("OLD001.SZ", set(memberships["con_code"]))
 
     def test_membership_resolution_blocks_empty_gap_overlap_and_missing_listing(self):
         scenarios = (
