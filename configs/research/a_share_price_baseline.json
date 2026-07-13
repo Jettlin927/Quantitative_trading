@@ -19,6 +19,11 @@
   },
   "qualityRunId": "__REQUIRED_BY_CLI__",
   "randomSeed": 7,
+  "riskPolicy": {
+    "lookbackPeriods": 60,
+    "minPeriods": 20,
+    "mode": "rolling_covariance"
+  },
   "scope": "a_share_cross_section",
   "startDate": "2025-12-01",
   "strategyId": "a_share_price_baseline",

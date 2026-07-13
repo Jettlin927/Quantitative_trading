@@ -202,6 +202,10 @@ class ResearchSnapshotPostgresIntegrationTest(unittest.TestCase):
                     "walk_forward_metrics.csv.gz",
                     manifest["artifactHashes"],
                 )
+                self.assertIn(
+                    "risk_contributions.csv.gz",
+                    manifest["artifactHashes"],
+                )
                 with patch(
                     "backend.app.quant_research.runner.Session",
                     side_effect=AssertionError("database disabled"),
