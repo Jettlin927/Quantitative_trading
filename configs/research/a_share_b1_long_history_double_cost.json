@@ -56,7 +56,7 @@
   "universe": {
     "mode": "industry_membership",
     "source": "industry_members",
-    "sourceKey": "801890.SI"
+    "sourceKey": "801030.SI"
   },
   "validationPolicy": {
     "mode": "anchored",
