@@ -111,6 +111,10 @@
   - `baselines.py`：仅用于管线验收、无参数搜索和无收益主张的单 ETF sentinel。
   - `readiness.py`：inventory、quality run 和风险能力 readiness；`index_weights` / `industry_proxy_daily` 缺失时明确 blocked。
 
+- `scripts/research/render_etf_trend_120d_report.py`
+  - 只接受固定120日趋势的基础、零、双倍成本三个 canonical 运行，重建同一ETF被动基准与同平均暴露静态组合，并生成长历史 HTML/JSON 报告。
+  - 报告首屏明确完整周期与年度子区间，避免把逐年稳定性表误读为总回测只有一年。
+
 - `backend/tests/fixtures/quant_research_golden/`
   - 完全合成的 2 股票 + 1 ETF + 1 指数、15 交易日黄金夹具。
   - 固定时点可得日、信号/执行日、净值和指标预期；不包含真实 Tushare 数据、持仓或凭据。
