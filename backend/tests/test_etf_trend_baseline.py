@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import tempfile
 import unittest
 from datetime import date, datetime, timezone
@@ -22,7 +23,11 @@ from backend.app.models import (
     IndexDailyBar,
     TradeCalendar,
 )
-from backend.app.quant_research.etf_trend_baseline import build_etf_trend_targets
+from backend.app.quant_research.etf_trend_baseline import (
+    build_etf_trend_targets,
+    validate_etf_trend_config,
+)
+from backend.app.quant_research.run_config import validate_run_config
 from backend.app.quant_research.runner import reproduce_quant_research, run_quant_research
 from backend.app.quant_research.snapshot import SnapshotCapacityPolicy
 from backend.app.quant_research.universe import build_explicit_universe
@@ -110,6 +115,38 @@ class EtfTrendBaselineTest(unittest.TestCase):
                 config = {**self.config, "featureParameters": parameters}
                 with self.assertRaisesRegex(ValueError, "120"):
                     build_etf_trend_targets(self.root, config, compressed=False)
+
+    def test_long_history_configs_keep_one_fixed_signal_and_three_cost_scenarios(self):
+        config_dir = Path(__file__).resolve().parents[2] / "configs" / "research"
+        paths = {
+            "base": config_dir / "etf_trend_120d_long_history.json",
+            "zero": config_dir / "etf_trend_120d_long_history_zero_cost.json",
+            "double": config_dir / "etf_trend_120d_long_history_double_cost.json",
+        }
+        configs = {
+            label: json.loads(path.read_text(encoding="utf-8"))
+            for label, path in paths.items()
+        }
+        expected_costs = {
+            "base": (0.00035, 0.00085, 0.001),
+            "zero": (0.0, 0.0, 0.0),
+            "double": (0.0007, 0.0017, 0.002),
+        }
+        for label, config in configs.items():
+            config["qualityRunId"] = "test-quality"
+            validate_run_config(config)
+            validate_etf_trend_config(config)
+            self.assertEqual(config["warmupStart"], "2012-05-28")
+            self.assertEqual(config["startDate"], "2012-11-19")
+            self.assertEqual(config["endDate"], "2026-06-29")
+            self.assertEqual(config["featureParameters"], {"movingAverageWindow": 120})
+            self.assertEqual(
+                tuple(
+                    float(config["costModel"][field])
+                    for field in ("buyRate", "sellRate", "slippageRate")
+                ),
+                expected_costs[label],
+            )
 
     def test_formal_pipeline_reproduces_without_database(self):
         engine = create_engine(f"sqlite+pysqlite:///{self.root / 'trend.sqlite'}")
