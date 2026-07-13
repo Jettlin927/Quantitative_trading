@@ -72,8 +72,8 @@ class ResearchResumeTest(unittest.TestCase):
         run_id = self._interrupt_and_mark("simulation")
         with (
             patch("backend.app.quant_research.runner.freeze_input_snapshot") as snapshot_stage,
-            patch("backend.app.quant_research.runner.build_sentinel_targets") as target_stage,
-            patch("backend.app.quant_research.runner.simulate_sentinel_targets") as simulation_stage,
+            patch("backend.app.quant_research.runner._build_strategy_targets") as target_stage,
+            patch("backend.app.quant_research.runner._simulate_strategy_targets") as simulation_stage,
         ):
             result = self._resume(run_id)
         snapshot_stage.assert_not_called()
@@ -85,9 +85,9 @@ class ResearchResumeTest(unittest.TestCase):
         run_id = self._interrupt_and_mark("finalize")
         with (
             patch("backend.app.quant_research.runner.freeze_input_snapshot") as snapshot_stage,
-            patch("backend.app.quant_research.runner.build_sentinel_targets") as target_stage,
-            patch("backend.app.quant_research.runner.simulate_sentinel_targets") as simulation_stage,
-            patch("backend.app.quant_research.runner.summarize_sentinel_metrics") as metrics_stage,
+            patch("backend.app.quant_research.runner._build_strategy_targets") as target_stage,
+            patch("backend.app.quant_research.runner._simulate_strategy_targets") as simulation_stage,
+            patch("backend.app.quant_research.runner._summarize_strategy_metrics") as metrics_stage,
         ):
             result = self._resume(run_id)
         snapshot_stage.assert_not_called()
@@ -146,7 +146,7 @@ class ResearchResumeTest(unittest.TestCase):
         payload[-2] ^= 0x01
         checkpoint.write_bytes(payload)
         with (
-            patch("backend.app.quant_research.runner.summarize_sentinel_metrics") as metrics_stage,
+            patch("backend.app.quant_research.runner._summarize_strategy_metrics") as metrics_stage,
             self.assertRaises(ResumeIntegrityError),
         ):
             self._resume(run_id)
@@ -160,7 +160,7 @@ class ResearchResumeTest(unittest.TestCase):
         payload[-1] ^= 0x01
         nav.write_bytes(payload)
         with (
-            patch("backend.app.quant_research.runner.summarize_sentinel_metrics") as metrics_stage,
+            patch("backend.app.quant_research.runner._summarize_strategy_metrics") as metrics_stage,
             self.assertRaises(ResumeIntegrityError),
         ):
             self._resume(run_id)
