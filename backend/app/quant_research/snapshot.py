@@ -907,6 +907,7 @@ def _build_a_share_slices(
             select(*columns(IndustryMember, membership_columns))
             .where(
                 IndustryMember.index_code == membership.source_key,
+                IndustryMember.con_code.in_(members),
                 IndustryMember.in_date <= end,
                 or_(IndustryMember.out_date.is_(None), IndustryMember.out_date >= start),
             )
