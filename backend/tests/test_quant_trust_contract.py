@@ -47,6 +47,9 @@ class QuantTrustContractDocumentationTest(unittest.TestCase):
             "rebalance_executions",
             "walk-forward",
             "test/OOS",
+            "risk_exposures",
+            "risk_contributions",
+            "artifact schema v2",
         )
         required_tables = (
             "stock_daily_bars",
@@ -58,6 +61,8 @@ class QuantTrustContractDocumentationTest(unittest.TestCase):
             "stock_suspend_events",
             "stock_listings",
             "industry_members",
+            "index_weights",
+            "industry_proxy_daily",
         )
         for value in (*required_terms, *required_tables):
             self.assertIn(value, contract)

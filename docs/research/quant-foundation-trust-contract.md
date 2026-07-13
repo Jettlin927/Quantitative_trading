@@ -1,6 +1,6 @@
 # 量化研究底座可信合同
 
-状态：Phase 0 冻结版 1.0
+状态：Phase 5 冻结版 2.0
 适用范围：`backend/app/quant_research/` 下的新离线研究链路
 
 ## 目的与边界
@@ -152,7 +152,26 @@ canonical 序列化不得包含 `run_id`、生成时间、临时目录、本机�
 
 模拟执行产物必须与真实交易隔离，使用 `rebalance_requests`、`rebalance_executions` 和 `positions` 等研究语义，不使用或暗示真实订单/成交。请求、执行、阻断、成本、现金、持仓和 NAV 必须能逐日对账；blocked/partial 动作不能消失或被算作已成交。
 
-walk-forward 只允许固定参数的 rolling/anchored 窗口。汇总结论只使用 test/OOS 区间，训练区间不得混入 OOS 收益，也不得触发自动调参、自动挑选或自动发布。风险和分配工件只能读取冻结收益、持仓和行业成员；不可行约束、非有限数或数据不足必须显式失败/null，不能静默放宽或填零。
+artifact schema v2 的公共确定性产物合同为：
+
+| 工件 | 自然键 | 合同 |
+| --- | --- | --- |
+| `targets.csv.gz` | `signal_date,ts_code` | 特征可得日不晚于信号日；只表达目标权重 |
+| `nav.csv.gz` | `trade_date` | 每日 NAV、现金、暴露、换手、成本和阻断摘要 |
+| `rebalance_requests.csv.gz` | `execution_date,ts_code` | 模拟目标变化，不是真实订单 |
+| `rebalance_executions.csv.gz` | `execution_date,ts_code` | `filled/partial/blocked`、固定原因和成本；不是真实成交 |
+| `positions.csv.gz` | `trade_date,ts_code` | 每日收盘后模拟持仓权重 |
+| `walk_forward_windows.csv.gz` / `walk_forward_metrics.csv.gz` | `window_id` | 必须成对存在；指标行只允许 `sample_role=test_oos` |
+| `risk_exposures.csv.gz` | `trade_date` | gross/net/cash、最大权重、HHI、行业暴露和 benchmark beta |
+| `risk_contributions.csv.gz` | `trade_date,ts_code` | 权重、边际/总风险贡献和组合波动；必须与风险暴露成对存在 |
+
+walk-forward 只允许固定参数的 rolling/anchored 窗口。汇总结论只使用 test/OOS 区间，训练区间不得混入 OOS 收益，也不得触发自动调参、自动挑选或自动发布。缺省 `validationPolicy` 的旧 v2 配置不生成额外工件。
+
+风险层只允许从冻结复权收益、`nav`、`positions`、历史行业成员和冻结基准计算滚动协方差、beta 与贡献。缺省 `riskPolicy` 的旧配置不生成风险工件；启用时两份风险工件必须共同进入 checkpoint、manifest、`artifactHashes` 和结果指纹。窗口不足可以保持 null；协方差、权重或贡献出现 NaN/Infinity、自然键重复，或总风险贡献与组合波动不闭合时必须失败，不能自动填零。
+
+受约束分配只允许等权和逆波动率起始权重，并按固定顺序施加单票、行业、最低现金和单次换手上限。裁剪、再归一化和换手收缩必须确定性；不可行输入必须失败，不得静默放宽。输出仍只是 `ts_code,industry,target_weight`，不得生成真实订单、成交或券商调用。
+
+基础行业暴露可以使用冻结自 `industry_members` 的逐日 universe。完整指数成分归因在非空 `index_weights` 落地前必须 blocked；行业基准比较在非空且可复现的 `industry_proxy_daily` 落地前必须 blocked。`index_daily_bars`、当前成分列表或临时现场计算不能冒充这两类数据。未来若新增上述表，必须单独设计 Alembic、隔离 PostgreSQL 验收和生产迁移，并在生产 upgrade 前再次取得用户确认。
 
 归档 schema 升级必须显式记录版本。新运行可以增加 canonical 工件，但已完成旧版本归档仍按原工件集合验证和 reproduce；未完成临时运行不得跨 schema 版本续跑。
 

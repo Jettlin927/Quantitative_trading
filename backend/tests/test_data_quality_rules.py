@@ -37,7 +37,10 @@ from backend.app.models import (
 )
 from backend.app.quant_research.readiness import evaluate_quality_run_readiness, evaluate_research_readiness
 from backend.app.schemas import DataQualityRunRequest
-from scripts.research.check_data_quality import main as quality_cli_main
+from scripts.research.check_data_quality import (
+    main as quality_cli_main,
+    parse_args as parse_quality_cli_args,
+)
 
 
 class DataQualityRulesTest(unittest.TestCase):
@@ -508,6 +511,28 @@ class DataQualityRulesTest(unittest.TestCase):
             with patch("builtins.print"):
                 self.assertEqual(quality_cli_main(args), 2)
                 self.assertEqual(quality_cli_main([*args[:-1], "not-a-database-url"]), 3)
+
+    def test_cli_accepts_industry_source_key_without_inline_members(self):
+        args = parse_quality_cli_args(
+            [
+                "--scope",
+                "a_share_cross_section",
+                "--start-date",
+                "2025-06-02",
+                "--end-date",
+                "2026-06-29",
+                "--universe-type",
+                "industry_membership",
+                "--universe-source",
+                "industry_members",
+                "--universe-source-key",
+                "801080.SI",
+                "--benchmark",
+                "000300.SH",
+            ]
+        )
+        self.assertEqual(args.universe, [])
+        self.assertEqual(args.universe_source_key, "801080.SI")
 
 
 class DataQualityRegistryAndReadinessTest(unittest.TestCase):

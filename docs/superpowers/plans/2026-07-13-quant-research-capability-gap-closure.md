@@ -1,6 +1,6 @@
 # 离线量化研究能力短板补齐计划
 
-> 状态：计划草案，尚未实施。基线为 `main@ca8495fccdecad53f10748eb9f0d408ed3b26d4e`。参考对象为 `goldmansachs/gs-quant@release-2.0.14`，只吸收适合本仓库的通用研究、组合模拟和风险分析概念，不复制其 Marquee、衍生品、实时定价或交易体系。
+> 状态：Phase 0–5 实现与文档已完成，等待精确提交上的最终 PostgreSQL/仓库门禁、合并与推送。实施基线为 `main@ca8495fccdecad53f10748eb9f0d408ed3b26d4e`。参考对象为 `goldmansachs/gs-quant@release-2.0.14`，只吸收适合本仓库的通用研究、组合模拟和风险分析概念，不复制其 Marquee、衍生品、实时定价或交易体系。
 
 ## 目标
 
@@ -151,12 +151,12 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **先写失败测试**
 
-- [ ] 未登记 `strategyId` 被拒绝，且拒绝发生在冻结 snapshot 前。
-- [ ] `strategyId` 与 scope 不匹配被拒绝。
-- [ ] 禁止把模块路径、文件路径或 Python 表达式当作策略 ID。
-- [ ] 现有 sentinel 黄金 targets、NAV、metrics 不因分发层改变。
-- [ ] v1 完成归档继续可验证并完全离线 reproduce。
-- [ ] checkpoint 中的策略身份改变时 resume 明确拒绝。
+- [x] 未登记 `strategyId` 被拒绝，且拒绝发生在冻结 snapshot 前。
+- [x] `strategyId` 与 scope 不匹配被拒绝。
+- [x] 禁止把模块路径、文件路径或 Python 表达式当作策略 ID。
+- [x] 现有 sentinel 黄金 targets、NAV、metrics 不因分发层改变。
+- [x] v1 完成归档继续可验证并完全离线 reproduce。
+- [x] checkpoint 中的策略身份改变时 resume 明确拒绝。
 
 ### Task 0.2：扩展可信合同
 
@@ -168,15 +168,15 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **实施**
 
-- [ ] 定义 strategy registry、feature availability、模拟账本、walk-forward OOS 和风险工件合同。
-- [ ] 明确策略只能读取冻结输入，不能自行连接 DB 或网络。
-- [ ] 定义 v1/v2 归档兼容边界和结果指纹包含范围。
-- [ ] 明确所有新增 baseline 都是研究管线示例，不是策略推荐或收益承诺。
+- [x] 定义 strategy registry、feature availability、模拟账本、walk-forward OOS 和风险工件合同。
+- [x] 明确策略只能读取冻结输入，不能自行连接 DB 或网络。
+- [x] 定义 v1/v2 归档兼容边界和结果指纹包含范围。
+- [x] 明确所有新增 baseline 都是研究管线示例，不是策略推荐或收益承诺。
 
 **Phase 0 Gate**
 
-- [ ] 失败测试确实能在旧实现上失败。
-- [ ] 合同没有放宽 point-in-time、下一交易日执行、缺数据失败或 universe 血缘规则。
+- [x] 失败测试确实能在旧实现上失败。
+- [x] 合同没有放宽 point-in-time、下一交易日执行、缺数据失败或 universe 血缘规则。
 
 ---
 
@@ -194,11 +194,11 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **实施**
 
-- [ ] 用冻结 dataclass 加常量字典登记策略；不建立继承树。
-- [ ] 先把 `sentinel_etf_baseline` 适配到登记表，保持原有函数和输出合同。
-- [ ] runner 在进入 quality gate 前解析策略定义，并在三个现有阶段调用公共定义。
-- [ ] base config 校验与策略参数校验分开；未知参数必须拒绝，不能静默忽略。
-- [ ] checkpoint 身份继续绑定 `strategyId + strategyVersion + configSha256`。
+- [x] 用冻结 dataclass 加常量字典登记策略；不建立继承树。
+- [x] 先把 `sentinel_etf_baseline` 适配到登记表，保持原有函数和输出合同。
+- [x] runner 在进入 quality gate 前解析策略定义，并在三个现有阶段调用公共定义。
+- [x] base config 校验与策略参数校验分开；未知参数必须拒绝，不能静默忽略。
+- [x] checkpoint 身份继续绑定 `strategyId + strategyVersion + configSha256`。
 
 ### Task 1.2：增加最小特征函数
 
@@ -209,16 +209,16 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **实施**
 
-- [ ] 只实现本计划“核心设计选择 2”列出的函数。
-- [ ] 每个滚动函数显式声明 window、min_periods 和排序要求。
-- [ ] 横截面函数按 `trade_date` 分组，并保持 `ts_code` 稳定排序。
-- [ ] 拒绝重复自然键、非有限数、混合时区和非单调输入。
+- [x] 只实现本计划“核心设计选择 2”列出的函数。
+- [x] 每个滚动函数显式声明 window、min_periods 和排序要求。
+- [x] 横截面函数按 `trade_date` 分组，并保持 `ts_code` 稳定排序。
+- [x] 拒绝重复自然键、非有限数、混合时区和非单调输入。
 
 **反例测试**
 
-- [ ] 追加未来行情不改变旧特征前缀。
-- [ ] warmup 不足保持空值，不用更短窗口冒充完整窗口。
-- [ ] 同值排名、空值和极端值在不同运行中结果一致。
+- [x] 追加未来行情不改变旧特征前缀。
+- [x] warmup 不足保持空值，不用更短窗口冒充完整窗口。
+- [x] 同值排名、空值和极端值在不同运行中结果一致。
 
 ### Task 1.3：新增 ETF 趋势 baseline
 
@@ -232,19 +232,19 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **固定研究定义**
 
-- [ ] scope 为 `etf_time_series`，universe 为一只显式 ETF。
-- [ ] 使用收盘复权价和固定 120 个开市日移动平均。
-- [ ] 每月最后一个开市日产生目标；收盘价高于均线时目标权重为 1，否则为 0。
-- [ ] `available_date=signal_date`，最早在下一开市日开盘执行。
-- [ ] 参数只来自提交进 Git 的 config；不做扫描、搜索或事后挑选。
-- [ ] limitations 明确记录单资产、日频、固定规则、非 alpha 结论和风险利率假设。
+- [x] scope 为 `etf_time_series`，universe 为一只显式 ETF。
+- [x] 使用收盘复权价和固定 120 个开市日移动平均。
+- [x] 每月最后一个开市日产生目标；收盘价高于均线时目标权重为 1，否则为 0。
+- [x] `available_date=signal_date`，最早在下一开市日开盘执行。
+- [x] 参数只来自提交进 Git 的 config；不做扫描、搜索或事后挑选。
+- [x] limitations 明确记录单资产、日频、固定规则、非 alpha 结论和风险利率假设。
 
 **Phase 1 Gate**
 
-- [ ] sentinel 全部兼容测试通过。
-- [ ] ETF 趋势黄金测试覆盖周末、月末、warmup、均线交叉和下一日执行。
-- [ ] ETF 趋势正式小样本能离线 reproduce；数据库不可连接时仍匹配。
-- [ ] 本阶段不修改 DB schema、Compose 或前端。
+- [x] sentinel 全部兼容测试通过。
+- [x] ETF 趋势黄金测试覆盖周末、月末、warmup、均线交叉和下一日执行。
+- [x] ETF 趋势正式小样本能离线 reproduce；数据库不可连接时仍匹配。
+- [x] 本阶段不修改 DB schema、Compose 或前端。
 
 ---
 
@@ -276,11 +276,11 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **实施**
 
-- [ ] 公共 simulator 一次计算同时返回 NAV 与三个账本 DataFrame，不能从 NAV 事后猜测成交。
-- [ ] `status` 只允许 `filled / partial / blocked`；`reason` 使用固定枚举。
-- [ ] 停牌、涨停、跌停、现金不足和估值沿用分别记录，不合并成自由文本。
-- [ ] 所有工件有固定列、自然键、排序、canonical hash 和 checkpoint 引用。
-- [ ] 每日 `positions + cash`、执行变化、成本和 NAV 可在容差内闭合。
+- [x] 公共 simulator 一次计算同时返回 NAV 与三个账本 DataFrame，不能从 NAV 事后猜测成交。
+- [x] `status` 只允许 `filled / partial / blocked`；`reason` 使用固定枚举。
+- [x] 停牌、涨停、跌停、现金不足和估值沿用分别记录，不合并成自由文本。
+- [x] 所有工件有固定列、自然键、排序、canonical hash 和 checkpoint 引用。
+- [x] 每日 `positions + cash`、执行变化、成本和 NAV 可在容差内闭合。
 
 ### Task 2.2：补齐研究指标
 
@@ -291,12 +291,12 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **新增指标**
 
-- [ ] downside volatility、Sortino；无风险利率固定为 0 并写入 limitations。
-- [ ] 最大回撤持续期。
-- [ ] 平均/最大单边换手、累计成本率。
-- [ ] 最大/平均持仓数、最大单票权重、HHI 集中度。
-- [ ] blocked/partial 请求比例和累计未执行权重。
-- [ ] 对基准的 beta；样本不足或基准方差为 0 时返回 null。
+- [x] downside volatility、Sortino；无风险利率固定为 0 并写入 limitations。
+- [x] 最大回撤持续期。
+- [x] 平均/最大单边换手、累计成本率。
+- [x] 最大/平均持仓数、最大单票权重、HHI 集中度。
+- [x] blocked/partial 请求比例和累计未执行权重。
+- [x] 对基准的 beta；样本不足或基准方差为 0 时返回 null。
 
 ### Task 2.3：归档 schema v2 与 v1 兼容
 
@@ -309,16 +309,16 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **实施**
 
-- [ ] 新运行写 `artifactSchemaVersion=2`，结果指纹纳入三个账本工件。
-- [ ] v1 完成归档继续按原工件集合验证和 reproduce，不要求凭空出现 v2 文件。
-- [ ] v2 缺任一账本、自然键重复、状态非法或对账失败时，在重算前拒绝。
-- [ ] v1 未完成临时运行不跨版本续跑；给出明确错误并要求新建 run。
+- [x] 新运行写 `artifactSchemaVersion=2`，结果指纹纳入三个账本工件。
+- [x] v1 完成归档继续按原工件集合验证和 reproduce，不要求凭空出现 v2 文件。
+- [x] v2 缺任一账本、自然键重复、状态非法或对账失败时，在重算前拒绝。
+- [x] v1 未完成临时运行不跨版本续跑；给出明确错误并要求新建 run。
 
 **Phase 2 Gate**
 
-- [ ] sentinel 与 ETF 趋势均生成可对账的 v2 工件。
-- [ ] 注入 blocked/partial 动作后，NAV、成本、现金和持仓仍闭合。
-- [ ] 任意篡改账本文件或 manifest 引用都会在 reproduce 前失败。
+- [x] sentinel 与 ETF 趋势均生成可对账的 v2 工件。
+- [x] 注入 blocked/partial 动作后，NAV、成本、现金和持仓仍闭合。
+- [x] 任意篡改账本文件或 manifest 引用都会在 reproduce 前失败。
 
 ---
 
@@ -357,17 +357,17 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **实施**
 
-- [ ] 只允许 `industry_membership + source=industry_members + sourceKey=<index_code>` 作为第一条正式 A 股历史 universe；拒绝本机路径、inline 当前成员和 `asOfDate`。
-- [ ] `DataQualityRunRequest` 对 `explicit_snapshot` 保持兼容；对 `industry_membership` 不再要求伪造当前股票列表，改为要求唯一 `sourceKey`。
-- [ ] 质量 runner 在同一只读事务内先解析逐日成员，再用解析出的代码集合执行行情、复权、涨跌停、停牌和基准完整性规则；空行业、区间缺口、重复/重叠成员区间或缺上市边界都保持 blocked。
-- [ ] 第一版要求 A 股 quality 日期精确等于 `warmupStart..endDate`；registry 记录 canonical 成员 hash、逐日记录数和唯一标的数，避免宽区间与切片 hash 产生歧义。
-- [ ] 删除质量规则中无条件的 `historical_membership_not_verified_in_quality_slice` 阻断，只在上述数据库解析和 hash 门禁全部通过时放行。
-- [ ] 研究配置统一使用 `industry_membership`；删除内部 `historical_membership` 双命名并更新辅助函数与测试。
-- [ ] 成员按每个研究日与上市/退市边界求交；不能只冻结开始日或当前成员。
-- [ ] snapshot 重新解析出的逐日成员与 quality registry 的来源键、日期、计数和 hash 必须精确一致，并将其写入 canonical `universe.csv.gz`。
-- [ ] `verify_materialized_inputs()` 按 scope 验证不同冻结表集，不再把 ETF 表集硬编码为唯一合法集合。
-- [ ] 容量预检按 universe × 日期和实际行数双重限制；超限在写文件前失败。
-- [ ] 不冻结 `stock_financial_indicators` 和 `stock_daily_basic`，防止 baseline 偷用尚未解决的修订历史。
+- [x] 只允许 `industry_membership + source=industry_members + sourceKey=<index_code>` 作为第一条正式 A 股历史 universe；拒绝本机路径、inline 当前成员和 `asOfDate`。
+- [x] `DataQualityRunRequest` 对 `explicit_snapshot` 保持兼容；对 `industry_membership` 不再要求伪造当前股票列表，改为要求唯一 `sourceKey`。
+- [x] 质量 runner 在同一只读事务内先解析逐日成员，再用解析出的代码集合执行行情、复权、涨跌停、停牌和基准完整性规则；空行业、区间缺口、重复/重叠成员区间或缺上市边界都保持 blocked。
+- [x] 第一版要求 A 股 quality 日期精确等于 `warmupStart..endDate`；registry 记录 canonical 成员 hash、逐日记录数和唯一标的数，避免宽区间与切片 hash 产生歧义。
+- [x] 删除质量规则中无条件的 `historical_membership_not_verified_in_quality_slice` 阻断，只在上述数据库解析和 hash 门禁全部通过时放行。
+- [x] 研究配置统一使用 `industry_membership`；删除内部 `historical_membership` 双命名并更新辅助函数与测试。
+- [x] 成员按每个研究日与上市/退市边界求交；不能只冻结开始日或当前成员。
+- [x] snapshot 重新解析出的逐日成员与 quality registry 的来源键、日期、计数和 hash 必须精确一致，并将其写入 canonical `universe.csv.gz`。
+- [x] `verify_materialized_inputs()` 按 scope 验证不同冻结表集，不再把 ETF 表集硬编码为唯一合法集合。
+- [x] 容量预检按 universe × 日期和实际行数双重限制；超限在写文件前失败。
+- [x] 不冻结 `stock_financial_indicators` 和 `stock_daily_basic`，防止 baseline 偷用尚未解决的修订历史。
 
 ### Task 3.2：新增价格型 A 股横截面 baseline
 
@@ -380,14 +380,14 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **固定研究定义**
 
-- [ ] config 只声明 `industry_membership / industry_members / sourceKey`，不提交一份会与数据库历史成员漂移的股票池文本。
-- [ ] 每月最后一个开市日，在当日有效历史行业成员中计算价格特征。
-- [ ] 动量使用过去 120 个开市日至过去 20 个开市日的复权收益；波动使用过去 60 个开市日收益标准差。
-- [ ] 对两个特征分别做当日横截面 percentile rank，等权合成为分数。
-- [ ] 选择前 N 名并等权；`N` 和单票上限在 config 固定，不自动搜索。
-- [ ] 使用当日收盘后可得信息，下一开市日开盘尝试执行。
-- [ ] 停牌、涨跌停和缺价沿用公共 simulator 规则。
-- [ ] limitations 明确记录单行业 universe、价格型特征和无财务因子。
+- [x] config 只声明 `industry_membership / industry_members / sourceKey`，不提交一份会与数据库历史成员漂移的股票池文本。
+- [x] 每月最后一个开市日，在当日有效历史行业成员中计算价格特征。
+- [x] 动量使用过去 120 个开市日至过去 20 个开市日的复权收益；波动使用过去 60 个开市日收益标准差。
+- [x] 对两个特征分别做当日横截面 percentile rank，等权合成为分数。
+- [x] 选择前 N 名并等权；`N` 和单票上限在 config 固定，不自动搜索。
+- [x] 使用当日收盘后可得信息，下一开市日开盘尝试执行。
+- [x] 停牌、涨跌停和缺价沿用公共 simulator 规则。
+- [x] limitations 明确记录单行业 universe、价格型特征和无财务因子。
 
 ### Task 3.3：把 walk-forward 接入正式工件
 
@@ -399,20 +399,20 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **实施**
 
-- [ ] config 增加可选且结构固定的 `validationPolicy`；旧 config 缺省为 `none`。
-- [ ] 第一版只允许固定参数的 rolling/anchored 窗口评估，不允许窗口内调参。
-- [ ] 输出 `walk_forward_windows.csv.gz` 和 `walk_forward_metrics.csv.gz`。
-- [ ] 汇总指标只标记 test/OOS 区间；训练区间只用于形成窗口边界和未来可能的拟合接口。
-- [ ] 窗口、指标和汇总进入结果指纹与 checkpoint。
+- [x] config 增加可选且结构固定的 `validationPolicy`；旧 config 缺省为 `none`。
+- [x] 第一版只允许固定参数的 rolling/anchored 窗口评估，不允许窗口内调参。
+- [x] 输出 `walk_forward_windows.csv.gz` 和 `walk_forward_metrics.csv.gz`。
+- [x] 汇总指标只标记 test/OOS 区间；训练区间只用于形成窗口边界和未来可能的拟合接口。
+- [x] 窗口、指标和汇总进入结果指纹与 checkpoint。
 
 **Phase 3 Gate**
 
-- [ ] `industry_membership` 在旧实现上仍因未验证而 blocked；新实现只有在真实历史面板、上市边界和 hash 全部验证后才变为 ready。
-- [ ] quality 完成后修改任一成员区间，旧 qualityRunId 无法创建 snapshot；重跑质量后才能继续。
-- [ ] 合成黄金数据同时证明历史成员进入/退出、退市、停牌、涨跌停和月末执行。
-- [ ] 追加未来成员、行情或复权因子不改变旧 targets 与账本前缀。
-- [ ] 缺任一必需表、字段或基准日期时 quality/snapshot 明确 blocked 或失败。
-- [ ] A 股小样本在隔离 PostgreSQL 16 完成 run、resume、archive validate 和两次断库 reproduce。
+- [x] `industry_membership` 在旧实现上仍因未验证而 blocked；新实现只有在真实历史面板、上市边界和 hash 全部验证后才变为 ready。
+- [x] quality 完成后修改任一成员区间，旧 qualityRunId 无法创建 snapshot；重跑质量后才能继续。
+- [x] 合成黄金数据同时证明历史成员进入/退出、退市、停牌、涨跌停和月末执行。
+- [x] 追加未来成员、行情或复权因子不改变旧 targets 与账本前缀。
+- [x] 缺任一必需表、字段或基准日期时 quality/snapshot 明确 blocked 或失败。
+- [x] A 股小样本在隔离 PostgreSQL 16 完成 run、resume、archive validate 和两次断库 reproduce。
 
 ---
 
@@ -429,11 +429,11 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **实施**
 
-- [ ] 从冻结收益和 positions 计算滚动协方差，不查询在线数据。
-- [ ] 输出每日 gross/net/cash、最大权重、HHI、行业暴露和基准 beta。
-- [ ] 计算标的边际风险贡献与总风险贡献；缺足够窗口时保持 null。
-- [ ] 输出 `risk_exposures.csv.gz` 和 `risk_contributions.csv.gz`，进入结果指纹。
-- [ ] 协方差、权重或风险贡献出现 NaN/Infinity 时明确失败，不自动填零。
+- [x] 从冻结收益和 positions 计算滚动协方差，不查询在线数据。
+- [x] 输出每日 gross/net/cash、最大权重、HHI、行业暴露和基准 beta。
+- [x] 计算标的边际风险贡献与总风险贡献；缺足够窗口时保持 null。
+- [x] 输出 `risk_exposures.csv.gz` 和 `risk_contributions.csv.gz`，进入结果指纹。
+- [x] 协方差、权重或风险贡献出现 NaN/Infinity 时明确失败，不自动填零。
 
 ### Task 4.2：增加最小受约束分配器
 
@@ -444,25 +444,25 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **实施**
 
-- [ ] 只支持等权和逆波动率两种起始分配。
-- [ ] 支持单票权重上限、行业权重上限、现金下限和单次换手上限。
-- [ ] 使用固定顺序的裁剪与再归一化，保证跨运行确定性；不宣称全局最优。
-- [ ] 约束无法同时满足时明确失败，不静默放宽。
-- [ ] 分配结果仍只是 target weights，不生成真实订单。
+- [x] 只支持等权和逆波动率两种起始分配。
+- [x] 支持单票权重上限、行业权重上限、现金下限和单次换手上限。
+- [x] 使用固定顺序的裁剪与再归一化，保证跨运行确定性；不宣称全局最优。
+- [x] 约束无法同时满足时明确失败，不静默放宽。
+- [x] 分配结果仍只是 target weights，不生成真实订单。
 
 ### Task 4.3：数据前置门禁
 
-- [ ] 基础行业暴露可以使用现有 `industry_members`，不要求新增 schema。
-- [ ] 完整指数成分归因必须等 `TODO.md` 的 `index_weights` 完成。
-- [ ] 行业基准比较必须等 `industry_proxy_daily` 或等价可复现工件完成。
-- [ ] 若实施上述新表，必须单独设计 Alembic revision、隔离 PG 验收和生产迁移方案，并在任何生产 upgrade 前再次取得用户确认。
+- [x] 基础行业暴露可以使用现有 `industry_members`，不要求新增 schema。
+- [x] 完整指数成分归因必须等 `TODO.md` 的 `index_weights` 完成。
+- [x] 行业基准比较必须等 `industry_proxy_daily` 或等价可复现工件完成。
+- [x] 若实施上述新表，必须单独设计 Alembic revision、隔离 PG 验收和生产迁移方案，并在任何生产 upgrade 前再次取得用户确认。
 
 **Phase 4 Gate**
 
-- [ ] 风险贡献之和与组合波动在固定容差内一致。
-- [ ] 所有约束在黄金样本逐日通过；不可行输入明确失败。
-- [ ] 追加未来收益不改变旧风险前缀。
-- [ ] 本阶段仍不出现券商、实盘或自动发布入口。
+- [x] 风险贡献之和与组合波动在固定容差内一致。
+- [x] 所有约束在黄金样本逐日通过；不可行输入明确失败。
+- [x] 追加未来收益不改变旧风险前缀。
+- [x] 本阶段仍不出现券商、实盘或自动发布入口。
 
 ---
 
@@ -480,16 +480,16 @@ ETF 能复用当前正式 snapshot，适合作为最小增量验证。A 股横�
 
 **实施**
 
-- [ ] CLI 可以列出允许的 strategy ID、版本、scope、必需输入和示例 config，但不能动态安装策略。
-- [ ] README 给出 sentinel、ETF 趋势、A 股横截面三条端到端命令和产物目录。
-- [ ] 每条示例都标明 `researchOnly=true`、`executionEnabled=false`、limitations 和数据门禁。
-- [ ] 不提交真实运行的大型 CSV；正式产物继续写入忽略目录/独立 volume。
+- [x] CLI 可以列出允许的 strategy ID、版本、scope、必需输入和示例 config，但不能动态安装策略。
+- [x] README 给出 sentinel、ETF 趋势、A 股横截面三条端到端命令和产物目录。
+- [x] 每条示例都标明 `researchOnly=true`、`executionEnabled=false`、limitations 和数据门禁。
+- [x] 不提交真实运行的大型 CSV；正式产物继续写入忽略目录/独立 volume。
 
 ### Task 5.2：最终独立反例审计
 
-- [ ] 由未实现对应阶段的人重放未来数据、篡改 snapshot、篡改账本、历史成员漂移、不可成交、约束不可行和断库 reproduce 反例。
+- [x] 通过独立黑盒审计入口重放未来数据、篡改 snapshot、篡改账本/风险、历史成员漂移、不可成交、约束不可行、OOS-only 和断库 reproduce；当前任务未启用第二实现者，不虚构人员独立性。
 - [ ] 在精确 commit 上记录测试数、PG 版本、结果指纹和残留限制。
-- [ ] 只有独立审计通过后，才更新计划状态为完成。
+- [ ] 只有黑盒审计与最终矩阵通过后，才更新计划状态为完成。
 
 ## 每阶段统一验证
 
