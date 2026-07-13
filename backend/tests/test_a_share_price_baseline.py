@@ -164,6 +164,39 @@ class ASharePriceBaselineTest(unittest.TestCase):
         self.assertEqual(executions.loc["SYN001.SZ", "reason"], "limit_down")
         self.assertEqual(executions.loc["SYN003.SZ", "reason"], "limit_up")
 
+    def test_missing_limit_before_first_membership_is_not_treated_as_tradable(self):
+        modified = {name: frame.copy() for name, frame in self.frames.items()}
+        first_date = modified["stock_limit_prices"]["trade_date"].min()
+        modified["stock_limit_prices"] = modified["stock_limit_prices"][
+            ~(
+                modified["stock_limit_prices"]["ts_code"].eq("SYN003.SZ")
+                & modified["stock_limit_prices"]["trade_date"].eq(first_date)
+            )
+        ]
+        root = self.root / "pre-membership-missing-limit"
+        root.mkdir()
+        _write_plain_inputs(root, modified)
+
+        targets = build_a_share_price_targets(root, self.config, compressed=False)
+
+        self.assertFalse(targets.empty)
+
+    def test_missing_limit_after_first_membership_is_rejected(self):
+        modified = {name: frame.copy() for name, frame in self.frames.items()}
+        active_date = pd.Timestamp("2025-12-01")
+        modified["stock_limit_prices"] = modified["stock_limit_prices"][
+            ~(
+                modified["stock_limit_prices"]["ts_code"].eq("SYN003.SZ")
+                & modified["stock_limit_prices"]["trade_date"].eq(active_date)
+            )
+        ]
+        root = self.root / "post-membership-missing-limit"
+        root.mkdir()
+        _write_plain_inputs(root, modified)
+
+        with self.assertRaisesRegex(ValueError, "入选后日线缺少涨跌停价格"):
+            build_a_share_price_targets(root, self.config, compressed=False)
+
     def test_formal_a_share_run_archives_and_reproduces_without_database(self):
         engine = create_engine(f"sqlite+pysqlite:///{self.root / 'formal.sqlite'}")
         Base.metadata.create_all(engine)

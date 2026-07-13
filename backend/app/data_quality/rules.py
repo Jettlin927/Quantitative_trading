@@ -251,6 +251,7 @@ def check_calendar_coverage(db: Session, contract: QualityCheckContract) -> list
                     dependent=StockLimitPrice,
                     table_name="stock_limit_prices",
                     rule_id="calendar.limit_price_coverage",
+                    start_at_first_membership=contract.universe_type == "industry_membership",
                 ),
             ]
         )
@@ -625,8 +626,22 @@ def _calendar_primary_coverage(
         .where(primary.ts_code.in_(contract.universe))
         .where(or_(master.list_date.is_(None), primary.trade_date >= master.list_date))
     )
+    if contract.universe_type == "industry_membership":
+        count_stmt = count_stmt.where(
+            exists(
+                select(1).where(
+                    IndustryMember.index_code == contract.universe_source_key,
+                    IndustryMember.con_code == primary.ts_code,
+                    IndustryMember.in_date <= primary.trade_date,
+                    or_(
+                        IndustryMember.out_date.is_(None),
+                        IndustryMember.out_date >= primary.trade_date,
+                    ),
+                )
+            )
+        )
     if hasattr(master, "delist_date"):
-        count_stmt = count_stmt.where(or_(master.delist_date.is_(None), primary.trade_date <= master.delist_date))
+        count_stmt = count_stmt.where(or_(master.delist_date.is_(None), primary.trade_date < master.delist_date))
     actual_counts = dict(db.execute(count_stmt.group_by(primary.ts_code)).all())
     actual_exempt_dates: dict[str, set[date]] = {}
     if contract.scope == "a_share_cross_section":
@@ -649,25 +664,35 @@ def _calendar_primary_coverage(
             if _suspension_exempts_daily_bar(timing):
                 actual_exempt_dates.setdefault(code, set()).add(trade_date)
 
-    expected_windows: dict[str, tuple[int, int, int, set[date]]] = {}
+    membership_dates: dict[str, list[date]] = {}
+    if contract.universe_type == "industry_membership":
+        for trade_date, code in contract.universe_membership_records:
+            membership_dates.setdefault(code, []).append(trade_date)
+    expected_windows: dict[str, tuple[list[date], int]] = {}
     eligible_actual_counts: dict[str, int] = {}
     open_date_set = set(open_dates)
     failed_rows = 0
     checked_rows = 0
     for row in master_rows:
-        active_start = max(contract.start_date, row.list_date or contract.start_date)
-        active_end = contract.end_date
-        if hasattr(row, "delist_date") and row.delist_date:
-            active_end = min(active_end, row.delist_date)
-        left = bisect_left(open_dates, active_start)
-        right = bisect_right(open_dates, active_end)
-        active_exemptions = {
-            trade_date
-            for trade_date in exempt_suspensions.get(row.ts_code, set())
-            if active_start <= trade_date <= active_end and trade_date in open_date_set
-        }
-        expected_count = max(0, right - left - len(active_exemptions))
-        expected_windows[row.ts_code] = (left, right, expected_count, active_exemptions)
+        if contract.universe_type == "industry_membership":
+            expected_dates = [
+                trade_date
+                for trade_date in membership_dates.get(row.ts_code, [])
+                if not row.delist_date or trade_date < row.delist_date
+            ]
+        else:
+            active_start = max(contract.start_date, row.list_date or contract.start_date)
+            left = bisect_left(open_dates, active_start)
+            right = (
+                bisect_left(open_dates, row.delist_date)
+                if hasattr(row, "delist_date") and row.delist_date
+                else bisect_right(open_dates, contract.end_date)
+            )
+            expected_dates = open_dates[left:right]
+        active_exemptions = set(expected_dates) & exempt_suspensions.get(row.ts_code, set()) & open_date_set
+        expected_dates = [trade_date for trade_date in expected_dates if trade_date not in active_exemptions]
+        expected_count = len(expected_dates)
+        expected_windows[row.ts_code] = (expected_dates, expected_count)
         eligible_actual_counts[row.ts_code] = max(
             0,
             int(actual_counts.get(row.ts_code, 0))
@@ -680,7 +705,7 @@ def _calendar_primary_coverage(
     for code in sorted(expected_windows):
         if len(samples) >= MAX_SAMPLE_ISSUES:
             break
-        left, right, expected_count, active_exemptions = expected_windows[code]
+        expected_dates, expected_count = expected_windows[code]
         if expected_count <= eligible_actual_counts.get(code, 0):
             continue
         actual_dates = set(
@@ -692,8 +717,8 @@ def _calendar_primary_coverage(
                 )
             ).all()
         )
-        for trade_date in open_dates[left:right]:
-            if trade_date in active_exemptions or trade_date in actual_dates:
+        for trade_date in expected_dates:
+            if trade_date in actual_dates:
                 continue
             samples.append({"tsCode": code, "tradeDate": trade_date.isoformat()})
             if len(samples) >= MAX_SAMPLE_ISSUES:
@@ -785,8 +810,19 @@ def _same_key_coverage(
     dependent: type[Any],
     table_name: str,
     rule_id: str,
+    start_at_first_membership: bool = False,
 ) -> QualityRuleResult:
-    filters = _scope_filters(primary, contract)
+    filters = list(_scope_filters(primary, contract))
+    if start_at_first_membership:
+        first_membership_date = (
+            select(func.min(IndustryMember.in_date))
+            .where(
+                IndustryMember.index_code == contract.universe_source_key,
+                IndustryMember.con_code == primary.ts_code,
+            )
+            .scalar_subquery()
+        )
+        filters.append(primary.trade_date >= first_membership_date)
     missing = ~exists(
         select(1).where(
             dependent.ts_code == primary.ts_code,
@@ -798,7 +834,7 @@ def _same_key_coverage(
         rule_id=rule_id,
         table_name=table_name,
         model=primary,
-        filters=filters,
+        filters=tuple(filters),
         failure_condition=missing,
         sample_columns=(primary.ts_code, primary.trade_date),
     )

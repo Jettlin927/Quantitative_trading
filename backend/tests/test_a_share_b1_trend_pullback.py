@@ -41,7 +41,14 @@ class AShareB1TrendPullbackTest(unittest.TestCase):
             config["qualityRunId"] = "test-quality"
             validate_a_share_b1_config(config)
             self.assertEqual(config["initialCapital"], "100000")
-            self.assertEqual(config["universe"]["sourceKey"], "801890.SI")
+            self.assertEqual(config["universe"]["sourceKey"], "801180.SI")
+            self.assertEqual(
+                set(config["allowedWarnings"]),
+                {
+                    "adjustment.factor_jump:stock_adjust_factors",
+                    "domain.unlisted_codes:stock_limit_prices",
+                },
+            )
             self.assertEqual(config["featureParameters"]["bbiWindows"], [14, 28, 57, 114])
             self.assertEqual(config["featureParameters"]["kdjJThreshold"], "13")
             self.assertEqual(config["targetWeightParameters"]["topN"], 2)
