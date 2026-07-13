@@ -32,13 +32,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--scope", required=True, choices=["a_share_cross_section", "etf_time_series"])
     parser.add_argument("--start-date", required=True, type=parse_date)
     parser.add_argument("--end-date", required=True, type=parse_date)
-    parser.add_argument("--universe", required=True, nargs="+", help="空格或逗号分隔的证券代码。")
+    parser.add_argument(
+        "--universe",
+        nargs="+",
+        default=[],
+        help="显式 universe 的证券代码；industry_membership 必须省略。",
+    )
     parser.add_argument(
         "--universe-type",
         choices=["explicit_snapshot", "static_current", "industry_membership"],
         default="explicit_snapshot",
     )
     parser.add_argument("--universe-source", help="股票池文件、配置或历史成员来源标识。")
+    parser.add_argument(
+        "--universe-source-key",
+        help="industry_membership 的唯一规范化行业代码。",
+    )
     parser.add_argument("--universe-as-of-date", type=parse_date, help="显式快照的形成日期。")
     parser.add_argument("--required-datasets", nargs="*", choices=sorted(SUPPORTED_DATASETS), default=[])
     parser.add_argument("--benchmark")
@@ -59,6 +68,7 @@ def main(argv: list[str] | None = None) -> int:
             universe=universe,
             universe_type=args.universe_type,
             universe_source=args.universe_source,
+            universe_source_key=args.universe_source_key,
             universe_as_of_date=args.universe_as_of_date,
             required_datasets=args.required_datasets,
             benchmark=args.benchmark,

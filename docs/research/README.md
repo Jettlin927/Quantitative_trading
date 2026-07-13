@@ -13,6 +13,31 @@
 - 一次性运行产物写入被 Git 忽略的 `outputs/research-runs/`，不再把大型逐事件 CSV 提交到主仓库。
 - `docs/research/strategy-results/` 仅为历史只读档案，不代表当前策略候选或新底座验收结果。
 
+## 静态策略与统一入口
+
+正式 runner 只允许源码静态登记的三条研究策略；不能动态安装、按模块路径导入或上传策略代码：
+
+| strategy ID | 版本 | scope | 示例配置 | 用途 |
+| --- | --- | --- | --- | --- |
+| `sentinel_etf_baseline` | `1` | `etf_time_series` | `configs/research/sentinel_etf_baseline.json` | 验证质量门禁、冻结快照和离线复现 |
+| `etf_trend_120d` | `1` | `etf_time_series` | `configs/research/etf_trend_baseline.json` | 固定 120 日均线、月末 1/0 目标的时序 baseline |
+| `a_share_price_baseline` | `1` | `a_share_cross_section` | `configs/research/a_share_price_baseline.json` | 固定 120–20 动量、60 日波动、历史行业成员的价格型横截面 baseline |
+
+不用连接数据库即可查看登记身份、必需冻结输入和示例配置：
+
+```bash
+python scripts/research/run_quant_research.py --list-strategies
+```
+
+三条策略都固定 `researchOnly=true`、`notInvestmentAdvice=true`、`executionEnabled=false`、`realBrokerConnected=false`。它们是研究协议示例，不是推荐、评级、收益承诺或真实交易入口。
+
+新运行使用 artifact schema v2，公共产物包括 `targets.csv.gz`、`nav.csv.gz`、`rebalance_requests.csv.gz`、`rebalance_executions.csv.gz`、`positions.csv.gz`、`metrics.json`、`limitations.json`、`manifest.json` 和 hash-chain checkpoints。显式启用验证或风险策略时，还会成对写入：
+
+- `walk_forward_windows.csv.gz` 与 `walk_forward_metrics.csv.gz`：只汇总 `test_oos`，训练区间不进入结论。
+- `risk_exposures.csv.gz` 与 `risk_contributions.csv.gz`：只读取冻结收益、NAV、positions 和历史成员，并进入结果指纹。
+
+已完成的 artifact schema v1 归档仍可验证和离线 reproduce；未完成的 v1 临时运行不能跨版本续跑。
+
 ## 可复现 ETF sentinel
 
 `configs/research/sentinel_etf_baseline.json` 是第一条正式研究闭环配置。它只使用日频 ETF、基金复权因子、冻结的官方交易日历和指数基准，采用固定信号日、固定目标权重、下一交易日开盘执行；没有参数搜索，不依赖分钟线、期权或财务横截面。
@@ -66,6 +91,50 @@ python scripts/research/run_quant_research.py \
 ```
 
 该 baseline 只用于证明多策略分发、因果 rolling feature、月末目标与离线复现合同，不构成 alpha 结论、评级或交易建议。
+
+## 固定 A 股价格型横截面 baseline
+
+`configs/research/a_share_price_baseline.json` 登记为 `a_share_price_baseline@1`。它只使用 `industry_members` 的逐日历史成员、上市/退市边界、日线、复权、涨跌停、停牌和指数基准；不读取财务指标，也不使用当前股票列表冒充历史 universe。每个完整月末以固定 120–20 日动量和 60 日波动率做横截面排名，选择固定 topN 等权，并在下一开市日开盘尝试执行。
+
+质量检查的日期必须精确覆盖配置的 `warmupStart..endDate`。industry universe 不接受 inline 股票代码、文件路径或 `asOfDate`：
+
+```bash
+python scripts/research/check_data_quality.py \
+  --scope a_share_cross_section \
+  --start-date 2025-06-02 \
+  --end-date 2026-06-29 \
+  --universe-type industry_membership \
+  --universe-source industry_members \
+  --universe-source-key 801080.SI \
+  --benchmark 000300.SH
+
+python scripts/research/run_quant_research.py \
+  --config configs/research/a_share_price_baseline.json \
+  --quality-run-id <QUALITY_RUN_ID>
+```
+
+该配置固定启用 anchored walk-forward 和 60/20 日滚动协方差风险工件。完整月末可用成员不足 topN、历史成员漂移、缺复权/涨跌停/停牌/上市边界、基准不重叠或风险数值非有限时都会失败，不做数据回退或参数搜索。
+
+## 风险、约束分配与数据门禁
+
+`backend/app/quant_research/risk.py` 输出逐日 gross/net/cash、最大权重、HHI、历史行业暴露、benchmark beta，以及标的边际/总风险贡献。窗口不足保持 null；有效窗口内总风险贡献之和必须在数值容差内等于组合年化波动。NaN、Infinity、重复键或不闭合会失败，不能自动填零。
+
+`backend/app/quant_research/allocation.py` 是纯研究目标权重函数，支持等权和逆波动率起始分配、单票上限、行业上限、最低现金与单次单边换手上限。它采用固定顺序的裁剪、重分配和线性换手收缩，不宣称全局最优；不可行约束明确失败。当前登记 baseline 尚未自动调用该分配器，它也不会生成订单或连接券商。
+
+能力边界保持显式：
+
+- 基础历史行业暴露使用现有 `industry_members`/冻结 universe。
+- 完整指数成分归因在非空 `index_weights` 落地前保持 blocked，不能用当前成分或 `index_daily_bars` 替代。
+- 行业基准比较在非空、可复现的 `industry_proxy_daily` 落地前保持 blocked。
+- 上述新表若未来实施，必须单独设计 Alembic、隔离 PostgreSQL 验收和生产迁移，并重新取得用户确认。
+
+Phase 5 黑盒反例审计入口：
+
+```bash
+python scripts/research/audit_quant_research.py
+```
+
+该入口固定重放未来前缀、快照/账本/风险篡改、历史成员漂移、不可成交、约束不可行、OOS-only、resume 和断库 reproduce；完整 PostgreSQL 语义仍由 `scripts/ops/test_postgres_integration.sh` 验证。
 
 ## 生产验收基线
 

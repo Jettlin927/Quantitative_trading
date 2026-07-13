@@ -4,19 +4,29 @@
 
 ## 当前接手状态
 
-- 本地仓库：`/Users/jettlin/code/Quantitative_trading`；用户常用 Windows 副本路径仍可能是 `E:\coding_things\Quantitative_trading`。
-- 可信工程已于 2026-07-11 快进合入 GitHub `main`，生产运行时代码为 `c24ade495492f64ea82aa229827858cdef52cdf6`。本地任务分支仍为 `codex/quant-foundation-trustworthiness`；文档收口后 `main` 可能领先运行时代码，接手必须现场运行 `git status -sb`、`git log -3 --oneline` 和 `git rev-list --left-right --count origin/main...HEAD`，并把“仓库最新提交”与“生产运行时提交”分开核对。
+- 本地仓库：`/Users/jettlin/code/Quantitative_trading`；用户常用 Windows 副本路径仍可能是 `E:\coding_things\Quantitative_trading`。接手必须现场运行 `git status -sb`、`git log -10 --oneline` 和 `git rev-list --left-right --count origin/main...HEAD`，不要从本文猜当前分支或远端提交。
+- 2026-07-13 的量化研究能力补齐已实现静态三策略分发、因果特征、可审计模拟账本、A 股历史行业成员 baseline、OOS-only walk-forward、透明风险工件、确定性约束分配和风险数据 readiness。该轮只授权验证后合并/推送代码，不包含生产部署、生产研究运行或数据库迁移；生产运行时代码仍须与仓库最新 `main` 分开核对。
+- 可信工程的既有生产运行时代码为 `c24ade495492f64ea82aa229827858cdef52cdf6`。GitHub `main` 后续已有文档提交；接手不能把“仓库最新提交”写成“生产已部署”。
 - 当前目标：数据完整性、无未来函数、结果可复现、进程重启可靠四条可信门禁。分钟线、期权、新付费源、券商和真实交易继续暂缓。
 - Phase 0–5 已完成。首次独立审计发现的 4 个问题修复后，同一审计者在精确提交 `f506d0e58c303afe7ad561b37ceff27c6e5e681f` 重放 39/39 反例；PostgreSQL 16.14 全矩阵 162/162、0 跳过。生产发布后又在精确部署代码上执行 73 项定向门禁，72 项通过、1 项显式 PG URL 用例按设计跳过。
 - 运行时代码对应的 GitHub Actions CI run `29158046019` 四个 job 全部成功；生产验收证据提交 `1fe3162f4953c08fa4ad5de160994565b320406c` 已 fast-forward 推送 `main`，对应 CI run `29161789513` 的四个 job 也全部成功。生产 quality、snapshot、sentinel、断库 reproduce 和 worker 重启恢复的完整证据见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
 - 生产 PostgreSQL 已在用户明确确认后完成 fingerprint 门禁、baseline stamp、`0002→0006` 和 13 个普通重复索引清理。后续新的生产 DDL、数据删除、volume 操作或覆盖恢复仍必须再次确认。
+
+## 2026-07-13 新增研究能力
+
+- `scripts/research/run_quant_research.py --list-strategies` 不连接数据库，列出 `sentinel_etf_baseline@1`、`etf_trend_120d@1`、`a_share_price_baseline@1` 的 scope、必需冻结输入和示例配置。
+- artifact schema v2 的公共 runner 同时生成 `targets/nav`、调仓请求、模拟执行和 positions；walk-forward 与风险工件按配置成对出现并进入 checkpoint、manifest 和结果指纹。已完成 v1 归档保持兼容，未完成 v1 不跨版本续跑。
+- A 股价格 baseline 只使用逐日 `industry_members`、上市/退市、日线、复权、涨跌停、停牌和基准；固定 120–20 动量、60 日波动、月末 topN 等权和下一开市日开盘执行，不读取财务指标或当前成员列表。
+- `risk.py` 从冻结输入计算 gross/net/cash、集中度、历史行业暴露、benchmark beta 和边际/总风险贡献；贡献之和必须等于组合波动。`allocation.py` 只输出受单票、行业、现金和换手约束的研究目标权重，不生成订单。
+- 完整指数成分归因仍因缺 `index_weights` blocked；行业基准比较仍因缺可复现 `industry_proxy_daily` blocked。不要用 `index_daily_bars`、当前成分或现场临时代理冒充。
+- 固定反例审计入口为 `python scripts/research/audit_quant_research.py`；完整数据库语义入口仍是 `PYTHON_BIN=.venv/bin/python scripts/ops/test_postgres_integration.sh`。
 
 ## 当前服务器事实
 
 - SSH：`ubuntu@182.254.180.169`；活动持久 volume 为 `quant_todo_p0_postgres_data_todo_p0`，严禁 `docker compose down -v` 或删除该 volume。
 - 当前四容器为 `db/api/worker/frontend`；API/worker/frontend bind 到 `/opt/quantitative-trading-release-20260712-0101`，API 使用无 `--reload` 的生产命令。API/worker 的 `APP_GIT_COMMIT` 均为 `c24ade495492f64ea82aa229827858cdef52cdf6`。
 - Compose project label 为 `quantitative-trading`；当前 release 的服务器覆盖文件继续把 DB/API/frontend 端口限制在 loopback，并指向上述 external PG volume。PostgreSQL 只监听 `127.0.0.1:5432`，worker 不对宿主机暴露端口。
-- 生产 schema revision 为 `0006_worker_heartbeats`。13 个重复普通索引迁移前逻辑大小合计 `4,166,868,992` bytes、迁移后为 0，唯一守卫完整；迁移后 `pg_database_size=16,295,099,415` bytes，`public` 索引逻辑大小合计 `7,166,763,008` bytes，根盘约 40 GiB、剩余约 9.0 GiB。镜像构建与索引迁移发生在同一窗口，不能把索引逻辑大小表述为 `df` 的精确净释放。
+- 生产 schema revision 为 `0006_worker_heartbeats`。13 个重复普通索引迁移前逻辑大小合计 `4,166,868,992` bytes、迁移后为 0，唯一守卫完整；迁移后 `pg_database_size=16,295,099,415` bytes，`public` 索引逻辑大小合计 `7,166,763,008` bytes。2026-07-13 三次只读复核均为根盘约 40 GiB、已用 29 GiB、可用 9.0 GiB、77%；当前不需扩容，低于 5 GiB 时应先通知用户。镜像构建与索引迁移发生在同一窗口，不能把索引逻辑大小表述为 `df` 的精确净释放。
 - `data_sync_jobs` 当前 6 行均为最终 `ok`，其中 2 行是生产 queued/expired-running 恢复演练；queued/running/failed/expired lease 均为 0，worker 心跳新鲜。
 - 最新生产全量 custom-format dump 已流式保存到本机 `/Users/jettlin/backups/Quantitative_trading/quant_trading_2026-07-11_2138+0800.dump`，大小 `2,232,308,654` bytes、权限 `0600`、SHA-256 `7c13b7ec933fd0ec965f07cea57db8add43a29fc96ec9b3d53d544aed040dd14`。PostgreSQL 16 `pg_restore -l` 得到 250 个非注释 TOC 条目/25 个 `TABLE DATA` 段，整包 `pg_restore --file=/dev/null` 读取也成功。该备份是迁移前恢复点，迁移后新增 registry 记录不在其中。
 
@@ -40,7 +50,7 @@
 
 - PostgreSQL 输入在 `REPEATABLE READ + READ ONLY` 事务内按精确切片冻结；transaction 合同进入 `snapshot_id`。
 - canonical CSV.gz 固定列、排序、ISO 日期、gzip mtime=0 和 SHA-256；`\N` 只表示 null，非 null 值若恰等于该哨兵会在写入/hash 前严格拒绝。
-- `ResearchRun` 绑定 canonical config、代码提交、依赖/环境、随机种子和 snapshot；结果指纹只含确定性 targets/nav/metrics。
+- `ResearchRun` 绑定 canonical config、代码提交、依赖/环境、随机种子和 snapshot；结果指纹包含确定性 targets/nav/metrics、v2 模拟账本，以及启用时成对出现的 walk-forward/风险工件。
 - manifest 的输入副本、`dataSnapshot.tableArtifacts`、实际文件和 checkpoint hash 链交叉验证；reproduce 在任何计算前拒绝篡改。
 - `scripts/research/reproduce_quant_research.py` 只读取冻结输入；在线数据库后续改变不影响旧运行。
 

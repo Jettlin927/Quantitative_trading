@@ -94,15 +94,21 @@
   - 信任边界以 `docs/research/quant-foundation-trust-contract.md` 为准；新 loader、特征、模拟器和 runner 必须先满足其 quality scope、宇宙血缘和时点可得合同。
   - `dataset.py`：严格复权、公告日 point-in-time 关联、历史成员筛选。
   - `repository.py`：从 DB 加载显式历史股票池和基准；缺历史上市、复权或涨跌停数据时失败。
-  - `portfolio.py`：信号在下一交易日开盘生效的目标权重模拟，含现金、权重漂移、成本及开盘可买卖硬约束。
-  - `metrics.py`：绝对和基准相对指标。
-  - `validation.py`：anchored/rolling walk-forward 窗口。
-  - `manifest.py`：run id、参数哈希、Git commit、数据快照和研究边界。
-  - `run_config.py`：canonical 配置、环境和可复现键。
+  - `strategy_registry.py`：三条源码静态登记策略的身份、scope、必需冻结表、示例配置和函数分发；禁止动态 import。
+  - `features.py`：baseline 实际使用的因果时序/横截面特征；warmup 保持 null。
+  - `etf_trend_baseline.py`：固定 120 日均线、月末 1/0 目标的 ETF baseline。
+  - `a_share_price_baseline.py`：固定 120–20 动量、60 日波动和历史行业成员的 A 股价格 baseline。
+  - `portfolio.py`：下一交易日开盘目标权重模拟，一次产生 NAV、请求、模拟执行和逐日持仓；含现金、成本及开盘可买卖硬约束。
+  - `metrics.py`：绝对/基准相对、回撤持续期、成本、换手、持仓和集中度指标。
+  - `validation.py`：固定参数 anchored/rolling walk-forward，仅输出 test/OOS 指标。
+  - `risk.py`：从冻结收益、NAV、positions、历史成员和基准生成暴露与风险贡献 canonical 工件。
+  - `allocation.py`：等权/逆波动率、单票/行业/现金/换手约束的确定性目标权重分配；不生成订单。
+  - `manifest.py`：run id、参数哈希、Git commit、数据快照、artifact schema 和结果指纹。
+  - `run_config.py`：canonical 配置、validation/risk policy、环境和可复现键。
   - `snapshot.py` / `artifacts.py`：只读一致性切片、canonical CSV.gz、容量门禁、SHA-256 和原子完成语义。
-  - `runner.py`：质量门禁、快照、目标、模拟、指标、manifest、finalize 的 hash-chain checkpoint；支持 stale `running`→`interrupted` 和严格 `--resume`。
+  - `runner.py`：质量门禁、快照、目标、模拟、指标、风险、manifest、finalize 的 hash-chain checkpoint；支持归档验证、断库 reproduce、stale `running`→`interrupted` 和严格 `--resume`。
   - `baselines.py`：仅用于管线验收、无参数搜索和无收益主张的单 ETF sentinel。
-  - `readiness.py`：inventory 与基于质量运行 ID 的研究级 readiness 分层。
+  - `readiness.py`：inventory、quality run 和风险能力 readiness；`index_weights` / `industry_proxy_daily` 缺失时明确 blocked。
 
 - `backend/tests/fixtures/quant_research_golden/`
   - 完全合成的 2 股票 + 1 ETF + 1 指数、15 交易日黄金夹具。
@@ -171,8 +177,9 @@
 - `scripts/ops/install_daily_sync_cron.sh`：安装 `CRON_TZ=Asia/Shanghai` 的 20:30 日更任务。
 - `scripts/ops/test_postgres_integration.sh`：启动 PostgreSQL 16 tmpfs，自动发现全部后端测试并在退出时清理容器/网络。
 - `scripts/research/check_data_quality.py`：研究范围质量 CLI，`blocked=2`、`failed=3`。
-- `scripts/research/run_quant_research.py`：新运行或 `--resume RUN_ID`；正式运行要求 `APP_GIT_COMMIT`。
+- `scripts/research/run_quant_research.py`：`--list-strategies`、新运行或 `--resume RUN_ID`；正式运行要求 `APP_GIT_COMMIT`。
 - `scripts/research/reproduce_quant_research.py`：只读冻结输入离线重现，不访问在线行情库。
+- `scripts/research/audit_quant_research.py`：Phase 5 固定黑盒反例矩阵；PostgreSQL 语义仍使用完整隔离矩阵验证。
 
 ## my_quant 地图
 
@@ -226,7 +233,7 @@
 后端最小检查：
 
 ```powershell
-python -m py_compile backend\app\database.py backend\app\models.py backend\app\schemas.py backend\app\tushare_client.py backend\app\us_research.py backend\app\main.py backend\app\quant_research\dataset.py backend\app\quant_research\repository.py backend\app\quant_research\portfolio.py backend\app\quant_research\metrics.py backend\app\quant_research\validation.py backend\app\quant_research\manifest.py backend\app\quant_research\readiness.py
+python -m py_compile backend\app\database.py backend\app\models.py backend\app\schemas.py backend\app\tushare_client.py backend\app\us_research.py backend\app\main.py backend\app\quant_research\dataset.py backend\app\quant_research\repository.py backend\app\quant_research\features.py backend\app\quant_research\portfolio.py backend\app\quant_research\metrics.py backend\app\quant_research\validation.py backend\app\quant_research\risk.py backend\app\quant_research\allocation.py backend\app\quant_research\manifest.py backend\app\quant_research\readiness.py backend\app\quant_research\runner.py
 python -m unittest discover backend\tests -v
 ```
 

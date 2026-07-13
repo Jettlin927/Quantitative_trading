@@ -36,6 +36,7 @@ class StrategyDefinition:
     strategy_id: str
     strategy_version: str
     scope: str
+    example_config: str
     required_tables: tuple[str, ...]
     validate_config: Callable[[dict[str, Any]], None]
     build_targets: StrategyCallable
@@ -49,6 +50,7 @@ _STRATEGIES = {
         strategy_id="sentinel_etf_baseline",
         strategy_version="1",
         scope="etf_time_series",
+        example_config="configs/research/sentinel_etf_baseline.json",
         required_tables=(
             "trade_calendars",
             "funds",
@@ -68,6 +70,7 @@ _STRATEGIES = {
         strategy_id="etf_trend_120d",
         strategy_version="1",
         scope="etf_time_series",
+        example_config="configs/research/etf_trend_baseline.json",
         required_tables=(
             "trade_calendars",
             "funds",
@@ -87,6 +90,7 @@ _STRATEGIES = {
         strategy_id="a_share_price_baseline",
         strategy_version="1",
         scope="a_share_cross_section",
+        example_config="configs/research/a_share_price_baseline.json",
         required_tables=(
             "trade_calendars",
             "stock_listings",

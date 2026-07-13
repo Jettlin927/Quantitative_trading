@@ -21,6 +21,7 @@ from backend.app.quant_research.runner import (
     resume_quant_research,
     run_quant_research,
 )
+from backend.app.quant_research.strategy_registry import list_strategy_definitions
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -34,6 +35,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     identity = parser.add_mutually_exclusive_group(required=True)
     identity.add_argument("--quality-run-id")
     identity.add_argument("--resume", metavar="RUN_ID")
+    identity.add_argument(
+        "--list-strategies",
+        action="store_true",
+        help="列出源码静态登记策略；不连接数据库。",
+    )
     parser.add_argument(
         "--output-root",
         type=Path,
@@ -52,6 +58,32 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.list_strategies:
+        print(
+            json.dumps(
+                {
+                    "status": "ok",
+                    "strategies": [
+                        {
+                            "strategyId": definition.strategy_id,
+                            "strategyVersion": definition.strategy_version,
+                            "scope": definition.scope,
+                            "requiredInputs": list(definition.required_tables),
+                            "exampleConfig": definition.example_config,
+                        }
+                        for definition in list_strategy_definitions()
+                    ],
+                    "boundaries": {
+                        "researchOnly": True,
+                        "executionEnabled": False,
+                        "brokerConnected": False,
+                    },
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
+        return 0
     try:
         engine = create_engine(args.database_url, pool_pre_ping=True)
         try:
