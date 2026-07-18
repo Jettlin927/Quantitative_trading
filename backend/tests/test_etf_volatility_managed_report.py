@@ -8,11 +8,13 @@ import unittest
 import numpy as np
 import pandas as pd
 
+from backend.app.quant_research.reporting import (
+    deflated_sharpe,
+    probability_backtest_overfitting,
+)
 from scripts.research.render_etf_volatility_managed_report import (
     TRIAL_DISPLAY_NAMES,
     TRIAL_GLOSSARY,
-    _deflated_sharpe,
-    _probability_backtest_overfitting,
     classify_gate_run,
     classify_run,
 )
@@ -68,6 +70,33 @@ class EtfVolatilityManagedReportTest(unittest.TestCase):
         self.assertTrue(
             all(row["initialCapital"] == 100_000 for row in followup["comparison"])
         )
+
+    def test_low_volatility_report_includes_required_cost_and_robustness_evidence(self):
+        report_dir = (
+            REPO_ROOT
+            / "docs"
+            / "research"
+            / "strategy-results"
+            / "etf-volatility-managed-20260713"
+        )
+        html = (report_dir / "index.html").read_text(encoding="utf-8")
+        summary = json.loads((report_dir / "summary.json").read_text(encoding="utf-8"))
+        followup_html = html[: html.index("附录：原始 ETF 波动率管理策略复现")]
+        followup = summary["lowVolatilityGateFollowup"]
+
+        for heading in (
+            "累计单边换手",
+            "累计成本率",
+            "多重试验与过拟合",
+            "支持证据",
+            "反对证据",
+            "尚缺证据",
+        ):
+            self.assertIn(heading, followup_html)
+        self.assertEqual(followup["multipleTesting"]["trialCount"], 5)
+        self.assertEqual(len(followup["supportingEvidence"]), 3)
+        self.assertEqual(len(followup["opposingEvidence"]), 3)
+        self.assertEqual(len(followup["missingEvidence"]), 3)
 
     def test_classifies_only_preregistered_trials_and_cost_scenarios(self):
         configs = {
@@ -142,8 +171,8 @@ class EtfVolatilityManagedReportTest(unittest.TestCase):
             }
         )
 
-        dsr = _deflated_sharpe(returns, ("T0", "T1", "T2", "T3"))
-        pbo = _probability_backtest_overfitting(
+        dsr = deflated_sharpe(returns, ("T0", "T1", "T2", "T3"))
+        pbo = probability_backtest_overfitting(
             returns,
             ("T0", "T1", "T2", "T3"),
         )

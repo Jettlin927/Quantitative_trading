@@ -16,16 +16,15 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from backend.app.quant_research.metrics import summarize_performance
+from backend.app.quant_research.reporting import hac_alpha, tail_metrics
 from scripts.research.render_etf_volatility_managed_report import (
     _aligned_returns,
     _build_passive_nav,
     _fmt,
-    _hac_alpha,
     _html_table,
     _json_safe,
     _line_svg,
     _read_frame,
-    _tail_metrics,
 )
 
 
@@ -212,7 +211,7 @@ def build_summary(
     )
     stress = _stress_rows(returns, navs["base_cost"], executions, targets)
     walk_forward = _walk_forward_rows(base, navs["base_cost"], passive)
-    hac = _hac_alpha(returns["base_cost"], returns["passive"])
+    hac = hac_alpha(returns["base_cost"], returns["passive"])
     drawdown = _drawdown_info(navs["base_cost"], base["metrics"])
 
     base_row = comparison_by_label["base_cost"]
@@ -501,7 +500,7 @@ def _comparison_row(
     passive_metrics: dict[str, Any],
     nav: pd.DataFrame,
 ) -> dict[str, Any]:
-    tail = _tail_metrics(returns)
+    tail = tail_metrics(returns)
     active = returns - passive_returns
     active_volatility = float(active.std(ddof=1))
     benchmark_variance = float(passive_returns.var(ddof=1))

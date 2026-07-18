@@ -25,6 +25,8 @@ from backend.app.models import (
 from backend.app.quant_research.etf_volatility_managed import (
     build_etf_low_volatility_gate_targets,
     build_etf_volatility_managed_targets,
+    simulate_etf_volatility_managed_targets,
+    summarize_etf_volatility_managed_metrics,
     validate_etf_low_volatility_gate_config,
     validate_etf_volatility_managed_config,
 )
@@ -81,6 +83,35 @@ class EtfVolatilityManagedTest(unittest.TestCase):
             compressed=False,
         )
         pd.testing.assert_frame_equal(expected, actual)
+
+    def test_oos_metrics_include_first_execution_day_from_initial_capital(self):
+        targets = build_etf_volatility_managed_targets(
+            self.root,
+            self.config,
+            compressed=False,
+        )
+        simulation, _ = simulate_etf_volatility_managed_targets(
+            self.root,
+            self.config,
+            targets,
+            compressed=False,
+        )
+        metrics = summarize_etf_volatility_managed_metrics(
+            self.root,
+            self.config,
+            simulation.nav,
+            compressed=False,
+        )
+        oos_nav = simulation.nav[
+            pd.to_datetime(simulation.nav["trade_date"]) >= pd.Timestamp(self.config["startDate"])
+        ]
+
+        self.assertNotAlmostEqual(float(oos_nav.iloc[0]["nav"]), 1.0)
+        self.assertAlmostEqual(
+            metrics["totalReturn"],
+            float(oos_nav.iloc[-1]["nav"] - 1.0),
+            places=13,
+        )
 
     def test_only_four_preregistered_trials_are_allowed(self):
         trials = (

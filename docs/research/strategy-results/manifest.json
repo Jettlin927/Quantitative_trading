@@ -1,22 +1,100 @@
 {
+  "manifestVersion": 2,
   "source": "docs/research/strategy-results",
   "mode": "readonly",
   "executionEnabled": false,
+  "landingPage": "index.html",
   "resultSets": [
+    {
+      "id": "etf-volatility-managed-20260713",
+      "title": "沪深300 ETF 波动率管理与低波动准入",
+      "strategy": "波动率管理（4 个预登记变体）+ 低波动准入追加验证",
+      "status": "不通过",
+      "archiveClass": "current-trustworthy",
+      "updatedAt": "2026-07-19",
+      "dataRange": "2012-06-01 至 2026-06-29；主结论 OOS 为 2018-01-01 起",
+      "benchmark": "同一 ETF 因果复权被动持有；低波动准入另比 50% ETF + 50% 现金",
+      "conclusion": "两个主策略均未通过最大回撤与风险调整收益门禁；低波动准入还是同一 OOS 上的事后第五个研究假设。",
+      "artifacts": {
+        "reportHtml": "etf-volatility-managed-20260713/index.html",
+        "summaryJson": "etf-volatility-managed-20260713/summary.json"
+      }
+    },
+    {
+      "id": "etf-trend-120d-long-history-20260713",
+      "title": "沪深300 ETF 120 日均线趋势",
+      "strategy": "月末 120 日均线趋势开关",
+      "status": "不通过",
+      "archiveClass": "current-trustworthy",
+      "updatedAt": "2026-07-13",
+      "dataRange": "2012-11-01 至 2026-06-29",
+      "benchmark": "同一 ETF 因果复权被动持有及同平均暴露静态组合",
+      "conclusion": "基础成本 CAGR 近乎为零且最大回撤差于两类基准；零成本结果也未扭转结论。",
+      "artifacts": {
+        "reportHtml": "etf-trend-120d-long-history-20260713/index.html",
+        "summaryJson": "etf-trend-120d-long-history-20260713/summary.json"
+      }
+    },
+    {
+      "id": "a-share-b1-trend-pullback-20260713",
+      "title": "A 股 B1 趋势回调公开规则近似复现",
+      "strategy": "行业历史成员上的 B1 趋势回调代理规则",
+      "status": "不通过",
+      "archiveClass": "current-trustworthy",
+      "updatedAt": "2026-07-13",
+      "dataRange": "2011-07-01 至 2026-06-29",
+      "benchmark": "申万房地产行业代理基准；另与来源公布短区间做非等价对照",
+      "conclusion": "未取得来源完整公式，不能声称精确复现；可信长历史主版本显著亏损，不值得继续在同一历史上调参。",
+      "artifacts": {
+        "reportHtml": "a-share-b1-trend-pullback-20260713/index.html",
+        "summaryJson": "a-share-b1-trend-pullback-20260713/summary.json"
+      }
+    },
     {
       "id": "b1-standard-phased-backtest-20260627",
       "title": "B1 标准分阶段回测",
       "strategy": "B1 趋势回调",
       "status": "观察",
+      "archiveClass": "legacy",
       "updatedAt": "2026-06-27",
       "dataRange": "2025-01-01 至 2026-06-26",
       "warmupRange": "2024-06-01 起",
       "sample": "A 股普通主板候选，Tushare 前复权样本 179 只",
       "benchmark": "沪深300市场门",
-      "conclusion": "四个阶段均未通过年化收益门；现实压力下年化 28.66%，最大回撤 -23.34%，只能保留为观察。",
+      "conclusion": "四个阶段均未通过年化收益门；现实压力下年化 28.66%，最大回撤 -23.34%，只保留为旧观察档案。",
       "artifacts": {
         "phasedJson": "b1_standard_phased_backtest_20260627_latest.json",
         "scoreScanCsv": "b1_score_weight_scan_20260627_latest.csv"
+      }
+    },
+    {
+      "id": "ma-trend-reversal-20260629",
+      "title": "均线趋势与趋势反转历史研究",
+      "strategy": "MA5 / MA20 / MA60 趋势跟踪与趋势反转",
+      "status": "历史档案",
+      "archiveClass": "legacy",
+      "updatedAt": "2026-06-29",
+      "dataRange": "以报告内数据覆盖为准",
+      "benchmark": "全市场等权代理与报告内组合假设",
+      "conclusion": "旧研究管线产物，仅供追溯；没有按当前可信研究标准补齐门禁，不作为当前候选。",
+      "artifacts": {
+        "reportHtml": "ma-trend-reversal-20260629/index.html",
+        "summaryJson": "ma-trend-reversal-20260629/summary.json"
+      }
+    },
+    {
+      "id": "value-sector-stopfall-20260629",
+      "title": "低估质量与行业止跌历史研究",
+      "strategy": "低估质量 + 行业止跌",
+      "status": "历史档案",
+      "archiveClass": "legacy",
+      "updatedAt": "2026-06-29",
+      "dataRange": "以报告内数据覆盖为准",
+      "benchmark": "报告内账户与行业假设",
+      "conclusion": "旧研究管线产物，仅供追溯；没有按当前可信研究标准补齐门禁，不作为当前候选。",
+      "artifacts": {
+        "reportHtml": "value-sector-stopfall-20260629/index.html",
+        "summaryJson": "value-sector-stopfall-20260629/summary.json"
       }
     }
   ]

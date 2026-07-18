@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from math import sqrt
+from math import isfinite, sqrt
 from typing import Any
 
 import pandas as pd
@@ -12,14 +12,17 @@ def summarize_performance(
     periods_per_year: int = 252,
     *,
     include_extended: bool = False,
+    initial_strategy_nav: float | None = None,
+    initial_benchmark_nav: float | None = None,
 ) -> dict[str, Any]:
     strategy = _normalize_nav(nav, "策略")
-    returns = strategy["nav"].pct_change(fill_method=None).dropna()
-    total_return = strategy["nav"].iloc[-1] / strategy["nav"].iloc[0] - 1
-    annualized_return = _annualized_return(strategy["nav"], periods_per_year)
+    strategy_path = _nav_path(strategy["nav"], initial_strategy_nav, "策略")
+    returns = strategy_path.pct_change(fill_method=None).dropna()
+    total_return = strategy_path.iloc[-1] / strategy_path.iloc[0] - 1
+    annualized_return = _annualized_return(strategy_path, periods_per_year)
     annualized_volatility = _finite_or_none(returns.std(ddof=1) * sqrt(periods_per_year)) if len(returns) > 1 else None
     sharpe = _ratio(returns.mean() * periods_per_year, annualized_volatility)
-    drawdown = strategy["nav"] / strategy["nav"].cummax() - 1
+    drawdown = strategy_path / strategy_path.cummax() - 1
     max_drawdown = float(drawdown.min())
     result: dict[str, Any] = {
         "startDate": strategy["trade_date"].iloc[0].date().isoformat(),
@@ -54,12 +57,14 @@ def summarize_performance(
         aligned = strategy.merge(benchmark, on="trade_date", how="inner", suffixes=("_strategy", "_benchmark"))
         if len(aligned) < 2:
             raise ValueError("策略与基准重叠日期不足")
-        strategy_returns = aligned["nav_strategy"].pct_change(fill_method=None)
-        benchmark_returns = aligned["nav_benchmark"].pct_change(fill_method=None)
+        aligned_strategy_path = _nav_path(aligned["nav_strategy"], initial_strategy_nav, "策略")
+        aligned_benchmark_path = _nav_path(aligned["nav_benchmark"], initial_benchmark_nav, "基准")
+        strategy_returns = aligned_strategy_path.pct_change(fill_method=None)
+        benchmark_returns = aligned_benchmark_path.pct_change(fill_method=None)
         active_returns = (strategy_returns - benchmark_returns).dropna()
         tracking_error = _finite_or_none(active_returns.std(ddof=1) * sqrt(periods_per_year)) if len(active_returns) > 1 else None
-        aligned_strategy_total = aligned["nav_strategy"].iloc[-1] / aligned["nav_strategy"].iloc[0] - 1
-        benchmark_total = aligned["nav_benchmark"].iloc[-1] / aligned["nav_benchmark"].iloc[0] - 1
+        aligned_strategy_total = aligned_strategy_path.iloc[-1] / aligned_strategy_path.iloc[0] - 1
+        benchmark_total = aligned_benchmark_path.iloc[-1] / aligned_benchmark_path.iloc[0] - 1
         result.update(
             {
                 "benchmarkTotalReturn": float(benchmark_total),
@@ -254,6 +259,16 @@ def _annualized_return(nav: pd.Series, periods_per_year: int) -> float | None:
         return None
     value = (nav.iloc[-1] / nav.iloc[0]) ** (periods_per_year / periods) - 1
     return _finite_or_none(value)
+
+
+def _nav_path(nav: pd.Series, initial_nav: float | None, label: str) -> pd.Series:
+    path = nav.astype(float).reset_index(drop=True)
+    if initial_nav is None:
+        return path
+    value = float(initial_nav)
+    if not isfinite(value) or value <= 0:
+        raise ValueError(f"{label}初始净值必须是有限正数")
+    return pd.concat([pd.Series([value], dtype=float), path], ignore_index=True)
 
 
 def _ratio(numerator: float | None, denominator: float | None) -> float | None:

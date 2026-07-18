@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>量化研究结果总览</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18211d;
+      --muted: #637069;
+      --paper: #f2f1eb;
+      --panel: #fbfaf5;
+      --line: #c9ccc3;
+      --strong-line: #8f9992;
+      --accent: #0f6a53;
+      --danger: #a7372d;
+      --warn: #9a6418;
+      --legacy: #59636f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "SFMono-Regular", "Cascadia Code", "PingFang SC", "Microsoft YaHei", monospace;
+      line-height: 1.55;
+    }
+    a { color: inherit; }
+    .shell { width: min(1320px, calc(100% - 32px)); margin: 0 auto; }
+    header { border-bottom: 1px solid var(--strong-line); background: var(--ink); color: #f7f5ed; }
+    .masthead { display: grid; grid-template-columns: 1fr auto; gap: 24px; padding: 34px 0 30px; align-items: end; }
+    .eyebrow { color: #a7c9bc; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { margin: 8px 0 6px; font-size: clamp(28px, 5vw, 52px); line-height: 1.05; letter-spacing: -.04em; }
+    .lede { max-width: 780px; margin: 0; color: #cfd5d0; }
+    .timestamp { color: #aeb7b1; text-align: right; font-size: 12px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--strong-line); border-top: 0; background: var(--panel); }
+    .stat { padding: 18px; border-right: 1px solid var(--line); }
+    .stat:last-child { border-right: 0; }
+    .stat span { display: block; color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+    .stat b { display: block; margin-top: 4px; font-size: 25px; }
+    main { padding: 32px 0 56px; }
+    .toolbar { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 18px; }
+    .toolbar h2 { margin: 0; font-size: 18px; }
+    .filters { display: flex; gap: 8px; }
+    button {
+      border: 1px solid var(--strong-line);
+      background: transparent;
+      color: var(--ink);
+      padding: 7px 12px;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    button[aria-pressed="true"] { background: var(--ink); color: white; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
+    article {
+      grid-column: span 6;
+      display: flex;
+      flex-direction: column;
+      min-height: 300px;
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--danger);
+      background: var(--panel);
+      padding: 20px;
+    }
+    article[data-class="legacy"] { border-top-color: var(--legacy); }
+    .meta { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .badge { display: inline-block; padding: 3px 7px; border: 1px solid currentColor; color: var(--danger); font-size: 11px; }
+    [data-class="legacy"] .badge { color: var(--legacy); }
+    .date { color: var(--muted); font-size: 11px; }
+    article h3 { margin: 17px 0 6px; font-size: 21px; line-height: 1.25; }
+    .strategy { margin: 0 0 15px; color: var(--accent); font-size: 12px; }
+    .facts { display: grid; grid-template-columns: 90px 1fr; gap: 7px 12px; margin: 0; font-size: 12px; }
+    .facts dt { color: var(--muted); }
+    .facts dd { margin: 0; }
+    .conclusion { margin: 16px 0 20px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: auto; }
+    .actions a { border-bottom: 1px solid var(--ink); text-decoration: none; font-size: 12px; }
+    .actions a:hover, .actions a:focus-visible { color: var(--accent); border-color: var(--accent); }
+    .notice { margin-top: 24px; padding: 18px 20px; border: 1px solid var(--strong-line); background: #e7e8e1; font-size: 12px; }
+    .notice strong { color: var(--danger); }
+    footer { padding: 20px 0 34px; color: var(--muted); font-size: 11px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 800px) {
+      .masthead { grid-template-columns: 1fr; }
+      .timestamp { text-align: left; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .stat:nth-child(2) { border-right: 0; }
+      .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      article { grid-column: 1 / -1; }
+      .toolbar { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell masthead">
+      <div>
+        <div class="eyebrow">Quant Research / Read-only Archive</div>
+        <h1>研究结果总览</h1>
+        <p class="lede">一个入口查看当前可信报告与旧研究档案。状态、基准和证据边界直接展示；这里没有回测执行、交易信号或实盘入口。</p>
+      </div>
+      <div class="timestamp">清单版本 v2<br>更新于 2026-07-19</div>
+    </div>
+  </header>
+
+  <div class="shell stats" aria-label="结果统计">
+    <div class="stat"><span>结果包</span><b>6</b></div>
+    <div class="stat"><span>当前可信</span><b>3</b></div>
+    <div class="stat"><span>研究通过</span><b>0</b></div>
+    <div class="stat"><span>执行能力</span><b>关闭</b></div>
+  </div>
+
+  <main class="shell">
+    <div class="toolbar">
+      <h2>结果清单</h2>
+      <div class="filters" aria-label="结果筛选">
+        <button type="button" data-filter="current" aria-pressed="true">当前可信</button>
+        <button type="button" data-filter="all" aria-pressed="false">全部档案</button>
+      </div>
+    </div>
+
+    <section class="grid" aria-live="polite">
+      <article data-class="current">
+        <div class="meta"><span class="badge">不通过</span><span class="date">2026-07-19</span></div>
+        <h3>沪深300 ETF 波动率管理与低波动准入</h3>
+        <p class="strategy">4 个预登记变体 + 同 OOS 追加的第 5 个研究假设</p>
+        <dl class="facts"><dt>区间</dt><dd>2012-06 至 2026-06；主 OOS 自 2018-01</dd><dt>基准</dt><dd>同 ETF 被动；低波动准入另比固定半仓</dd></dl>
+        <p class="conclusion">两项主结论均未通过最大回撤与风险调整收益门禁；追加准入规则没有独立确认集。</p>
+        <div class="actions"><a href="etf-volatility-managed-20260713/index.html">打开完整报告 →</a><a href="etf-volatility-managed-20260713/summary.json">机器摘要</a></div>
+      </article>
+
+      <article data-class="current">
+        <div class="meta"><span class="badge">不通过</span><span class="date">2026-07-13</span></div>
+        <h3>沪深300 ETF 120 日均线趋势</h3>
+        <p class="strategy">月末趋势开关 / 下一开市日开盘执行</p>
+        <dl class="facts"><dt>区间</dt><dd>2012-11 至 2026-06</dd><dt>基准</dt><dd>同 ETF 被动与同平均暴露静态组合</dd></dl>
+        <p class="conclusion">基础成本 CAGR 近乎为零，最大回撤差于两类基准；零成本归因也没有扭转结论。</p>
+        <div class="actions"><a href="etf-trend-120d-long-history-20260713/index.html">打开完整报告 →</a><a href="etf-trend-120d-long-history-20260713/summary.json">机器摘要</a></div>
+      </article>
+
+      <article data-class="current">
+        <div class="meta"><span class="badge">不通过</span><span class="date">2026-07-13</span></div>
+        <h3>A 股 B1 趋势回调公开规则近似复现</h3>
+        <p class="strategy">历史行业成员 / 代理评分 / 非精确复现</p>
+        <dl class="facts"><dt>区间</dt><dd>2011-07 至 2026-06</dd><dt>基准</dt><dd>申万房地产行业代理基准</dd></dl>
+        <p class="conclusion">来源完整公式不可得；可信长历史主版本显著亏损，不能写成严格复制，也不值得在同一历史上继续调参。</p>
+        <div class="actions"><a href="a-share-b1-trend-pullback-20260713/index.html">打开完整报告 →</a><a href="a-share-b1-trend-pullback-20260713/summary.json">机器摘要</a></div>
+      </article>
+
+      <article data-class="legacy" hidden>
+        <div class="meta"><span class="badge">旧观察</span><span class="date">2026-06-27</span></div>
+        <h3>B1 标准分阶段回测</h3>
+        <p class="strategy">旧管线 / 短区间 / 179 只样本</p>
+        <dl class="facts"><dt>区间</dt><dd>2025-01 至 2026-06</dd><dt>地位</dt><dd>被 2026-07-13 长历史近似复现取代</dd></dl>
+        <p class="conclusion">四阶段均未通过收益门，仅作为旧证据链保留。</p>
+        <div class="actions"><a href="b1_standard_phased_backtest_20260627_latest.json">分阶段 JSON</a><a href="b1_score_weight_scan_20260627_latest.csv">权重扫描 CSV</a></div>
+      </article>
+
+      <article data-class="legacy" hidden>
+        <div class="meta"><span class="badge">历史档案</span><span class="date">2026-06-29</span></div>
+        <h3>均线趋势与趋势反转历史研究</h3>
+        <p class="strategy">MA5 / MA20 / MA60 旧研究管线</p>
+        <dl class="facts"><dt>标准</dt><dd>未按当前可信研究规范重新验收</dd><dt>用途</dt><dd>只读追溯</dd></dl>
+        <p class="conclusion">报告内的 status=ok 只代表旧脚本执行完成，不等于“研究通过”。</p>
+        <div class="actions"><a href="ma-trend-reversal-20260629/index.html">打开旧报告 →</a><a href="ma-trend-reversal-20260629/summary.json">机器摘要</a></div>
+      </article>
+
+      <article data-class="legacy" hidden>
+        <div class="meta"><span class="badge">历史档案</span><span class="date">2026-06-29</span></div>
+        <h3>低估质量与行业止跌历史研究</h3>
+        <p class="strategy">低估质量 + 行业止跌旧研究管线</p>
+        <dl class="facts"><dt>标准</dt><dd>未按当前可信研究规范重新验收</dd><dt>用途</dt><dd>只读追溯</dd></dl>
+        <p class="conclusion">旧报告不作为当前策略候选，也不提供任何买卖建议。</p>
+        <div class="actions"><a href="value-sector-stopfall-20260629/index.html">打开旧报告 →</a><a href="value-sector-stopfall-20260629/summary.json">机器摘要</a></div>
+      </article>
+    </section>
+
+    <aside class="notice"><strong>边界：</strong>本目录是只读结果投影。可信事实仍由 canonical 运行清单、数据快照、代码版本和结果指纹共同确定；“脚本成功”与“研究通过”是两回事。详尽机器清单见 <a href="manifest.json">manifest.json</a>。</aside>
+  </main>
+
+  <footer class="shell">Quantitative Trading · research only · no broker · no live orders</footer>
+  <script>
+    const buttons = document.querySelectorAll('[data-filter]');
+    const cards = document.querySelectorAll('article[data-class]');
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      const showAll = button.dataset.filter === 'all';
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      cards.forEach((card) => { card.hidden = !showAll && card.dataset.class === 'legacy'; });
+    }));
+  </script>
+</body>
+</html>
