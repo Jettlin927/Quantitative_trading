@@ -17,6 +17,7 @@ from backend.app.quant_research.runner import (
 from backend.app.quant_research.snapshot import SnapshotCapacityPolicy, SnapshotIntegrityError
 from backend.app.quant_research.validation import (
     build_walk_forward_window_frame,
+    evaluate_walk_forward,
     validate_validation_policy,
 )
 from backend.tests.research_test_support import (
@@ -94,6 +95,39 @@ class ResearchWalkForwardTest(unittest.TestCase):
         self.assertGreater(rolling["train_start"].nunique(), 1)
         self.assertTrue((anchored["train_end"] < anchored["test_start"]).all())
         self.assertTrue((rolling["train_end"] < rolling["test_start"]).all())
+
+    def test_window_metrics_include_the_first_test_day_from_previous_nav(self):
+        dates = pd.bdate_range("2026-01-05", periods=7)
+        strategy = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "nav": [1.0, 1.0, 1.0, 1.1, 1.1, 1.21, 1.21],
+            }
+        )
+        benchmark = pd.DataFrame(
+            {
+                "ts_code": "BENCH.SH",
+                "trade_date": dates,
+                "close": [100.0, 100.0, 100.0, 120.0, 120.0, 132.0, 132.0],
+            }
+        )
+
+        _, metrics, _ = evaluate_walk_forward(
+            strategy,
+            benchmark,
+            benchmark="BENCH.SH",
+            research_start=dates[0],
+            research_end=dates[-1],
+            policy={
+                "mode": "anchored",
+                "trainPeriods": 3,
+                "testPeriods": 2,
+                "stepPeriods": 2,
+            },
+        )
+
+        self.assertAlmostEqual(metrics.iloc[0]["total_return"], 0.10)
+        self.assertAlmostEqual(metrics.iloc[0]["benchmark_total_return"], 0.20)
 
     def test_formal_run_archives_only_oos_window_metrics_and_reproduces(self):
         config = golden_run_config(self.quality_run_id, self.universe_hash)

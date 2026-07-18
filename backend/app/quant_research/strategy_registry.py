@@ -11,11 +11,11 @@ from .baselines import (
     summarize_sentinel_metrics_v2,
     validate_sentinel_config,
     simulate_etf_targets_with_ledger,
-    summarize_etf_metrics,
 )
 from .etf_trend_baseline import (
     build_etf_trend_targets,
     etf_trend_limitations,
+    summarize_etf_trend_metrics,
     validate_etf_trend_config,
 )
 from .etf_volatility_managed import (
@@ -56,6 +56,7 @@ class StrategyDefinition:
     strategy_version: str
     scope: str
     example_config: str
+    walk_forward_benchmark_source: str
     required_tables: tuple[str, ...]
     validate_config: Callable[[dict[str, Any]], None]
     build_targets: StrategyCallable
@@ -70,6 +71,7 @@ _STRATEGIES = {
         strategy_version="1",
         scope="etf_time_series",
         example_config="configs/research/sentinel_etf_baseline.json",
+        walk_forward_benchmark_source="config_market_reference",
         required_tables=(
             "trade_calendars",
             "funds",
@@ -90,6 +92,7 @@ _STRATEGIES = {
         strategy_version="1",
         scope="etf_time_series",
         example_config="configs/research/etf_trend_baseline.json",
+        walk_forward_benchmark_source="universe_adjusted_etf",
         required_tables=(
             "trade_calendars",
             "funds",
@@ -102,7 +105,7 @@ _STRATEGIES = {
         validate_config=validate_etf_trend_config,
         build_targets=build_etf_trend_targets,
         simulate=simulate_etf_targets_with_ledger,
-        summarize_metrics=summarize_etf_metrics,
+        summarize_metrics=summarize_etf_trend_metrics,
         limitations=etf_trend_limitations,
     ),
     "etf_volatility_managed": StrategyDefinition(
@@ -110,6 +113,7 @@ _STRATEGIES = {
         strategy_version="1",
         scope="etf_time_series",
         example_config="configs/research/etf_volatility_managed_baseline.json",
+        walk_forward_benchmark_source="universe_adjusted_etf",
         required_tables=(
             "trade_calendars",
             "funds",
@@ -130,6 +134,7 @@ _STRATEGIES = {
         strategy_version="1",
         scope="etf_time_series",
         example_config="configs/research/etf_low_volatility_gate.json",
+        walk_forward_benchmark_source="universe_adjusted_etf",
         required_tables=(
             "trade_calendars",
             "funds",
@@ -150,6 +155,7 @@ _STRATEGIES = {
         strategy_version="1",
         scope="a_share_cross_section",
         example_config="configs/research/a_share_price_baseline.json",
+        walk_forward_benchmark_source="config_market_reference",
         required_tables=(
             "trade_calendars",
             "stock_listings",
@@ -173,6 +179,7 @@ _STRATEGIES = {
         strategy_version="1",
         scope="a_share_cross_section",
         example_config="configs/research/a_share_b1_long_history.json",
+        walk_forward_benchmark_source="config_market_reference",
         required_tables=(
             "trade_calendars",
             "stock_listings",

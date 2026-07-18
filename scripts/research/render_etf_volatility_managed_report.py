@@ -26,6 +26,8 @@ from backend.app.quant_research.reporting import (
     hac_alpha,
     probability_backtest_overfitting,
     returns_from_initial_nav,
+    summarize_nav_window,
+    summarize_return_subperiod,
     tail_metrics,
 )
 
@@ -34,14 +36,14 @@ DEFAULT_RUN_ROOT = (
     REPO_ROOT
     / "outputs"
     / "research-runs"
-    / "volatility-managed-2026-07-13"
+    / "volatility-managed-2026-07-19"
     / "canonical-runs"
 )
 DEFAULT_GATE_RUN_ROOT = (
     REPO_ROOT
     / "outputs"
     / "research-runs"
-    / "low-volatility-gate-2026-07-13"
+    / "low-volatility-gate-2026-07-19"
     / "canonical-runs"
 )
 DEFAULT_OUTPUT_DIR = (
@@ -218,10 +220,15 @@ def classify_gate_run(config: dict[str, Any]) -> str:
         for field in ("buyRate", "sellRate", "slippageRate")
     )
     if cost == BASE_COST:
-        return "base_cost"
-    if cost == tuple(value * 2 for value in BASE_COST):
-        return "double_cost"
-    raise ValueError(f"低波动准入未登记的成本场景：{cost}")
+        label = "base_cost"
+        filename = "etf_low_volatility_gate.json"
+    elif cost == tuple(value * 2 for value in BASE_COST):
+        label = "double_cost"
+        filename = "etf_low_volatility_gate_double_cost.json"
+    else:
+        raise ValueError(f"低波动准入未登记的成本场景：{cost}")
+    _assert_preregistered_config(config, filename, "低波动准入")
+    return label
 
 
 def classify_run(config: dict[str, Any]) -> str:
@@ -231,11 +238,11 @@ def classify_run(config: dict[str, Any]) -> str:
         float(config["costModel"][field])
         for field in ("buyRate", "sellRate", "slippageRate")
     )
-    if cost == (0.0, 0.0, 0.0):
-        return "zero_cost"
-    if cost == tuple(value * 2 for value in BASE_COST):
-        return "double_cost"
-    if cost != BASE_COST:
+    if cost not in {
+        BASE_COST,
+        (0.0, 0.0, 0.0),
+        tuple(value * 2 for value in BASE_COST),
+    }:
         raise ValueError(f"未登记的成本场景：{cost}")
     identity = (
         features["realizedVarianceEstimator"],
@@ -249,9 +256,62 @@ def classify_run(config: dict[str, Any]) -> str:
         ("previous_month", "1", "0.1"): "T3",
     }
     try:
-        return labels[identity]
+        base_label = labels[identity]
     except KeyError as exc:
         raise ValueError(f"未登记的试验配置：{identity}") from exc
+    if cost == (0.0, 0.0, 0.0):
+        label = "zero_cost"
+        if base_label != "T0":
+            raise ValueError("零成本运行配置偏离事前登记")
+    elif cost == tuple(value * 2 for value in BASE_COST):
+        label = "double_cost"
+        if base_label != "T0":
+            raise ValueError("双倍成本运行配置偏离事前登记")
+    else:
+        label = base_label
+    filenames = {
+        "T0": "etf_volatility_managed_baseline.json",
+        "T1": "etf_volatility_managed_inverse_volatility.json",
+        "T2": "etf_volatility_managed_smoothed_variance.json",
+        "T3": "etf_volatility_managed_rebalance_band.json",
+    }
+    expected = json.loads(
+        (REPO_ROOT / "configs" / "research" / filenames[base_label]).read_text(
+            encoding="utf-8"
+        )
+    )
+    if label == "zero_cost":
+        expected["costModel"] = {
+            "buyRate": "0",
+            "sellRate": "0",
+            "slippageRate": "0",
+        }
+    elif label == "double_cost":
+        expected["costModel"] = {
+            "buyRate": "0.0007",
+            "sellRate": "0.0017",
+            "slippageRate": "0.002",
+        }
+    _assert_preregistered_payload(config, expected, f"{label} 运行")
+    return label
+
+
+def _assert_preregistered_config(
+    config: dict[str, Any], filename: str, label: str
+) -> None:
+    expected = json.loads(
+        (REPO_ROOT / "configs" / "research" / filename).read_text(encoding="utf-8")
+    )
+    _assert_preregistered_payload(config, expected, label)
+
+
+def _assert_preregistered_payload(
+    config: dict[str, Any], expected: dict[str, Any], label: str
+) -> None:
+    normalized = json.loads(json.dumps(config))
+    normalized["qualityRunId"] = "__REQUIRED_BY_CLI__"
+    if normalized != expected:
+        raise ValueError(f"{label}配置偏离事前登记")
 
 
 def build_summary(
@@ -439,7 +499,7 @@ def build_summary(
             ),
             "asset": "510300.SH 华泰柏瑞沪深300 ETF",
             "primaryBenchmark": "同一 ETF 的因果复权被动持有",
-            "marketReference": "000300.SH 只用于行情环境与公共 runner 参考，不冒充总收益基准",
+            "marketReference": "000300.SH 只用于行情环境参考，不冒充总收益基准",
             "signal": "自然月内日简单收益去均值平方和；下一月权重 min(c / RV^2, 1)",
             "calibration": "2012-06-01..2017-12-29，只用校准期确定 c",
             "oos": "2018-01-01..2026-06-29",
@@ -464,8 +524,7 @@ def build_summary(
             "observations": passive_metrics["observations"],
             "pointInTime": True,
             "offlineReproduction": (
-                "六个运行全部在 --network none 下匹配 result fingerprint；"
-                "基准逆方差强力降风险版重复两次。"
+                "原策略六个运行均在同一镜像的 --network none 容器中连续两次匹配 result fingerprint。"
             ),
         },
         "executionAndCost": execution_summary,
@@ -502,8 +561,8 @@ def build_summary(
                 for row in walk_forward
             ),
             "note": (
-                "公共 runner 的 active 字段绑定 000300.SH 价格参考；本报告从同一冻结 ETF 输入重算被动 ETF 窗口，"
-                "只把后者用于主比较。"
+                "canonical runner 与报告都以同一冻结 ETF 的因果复权价格作为窗口主基准；"
+                "000300.SH 只用于行情环境划分。"
             ),
         },
         "multipleTesting": {
@@ -539,11 +598,11 @@ def build_summary(
         "optimizationDirections": [
             {
                 "priority": 1,
-                "direction": "把逆波动温和降风险版（T1）作为唯一下一轮候选，在新时间段或另一只事前指定宽基 ETF 上独立验证。",
+                "direction": "把逆波动温和降风险版（T1）仅作为待证伪的新研究假设，在新时间段或另一只事前指定宽基 ETF 上独立验证。",
                 "evidence": (
                     f"逆波动温和降风险版 CAGR {runs['T1']['metrics']['annualizedReturn']:.2%}、最大回撤 {runs['T1']['metrics']['maxDrawdown']:.2%}，"
                     f"成本约为基准逆方差版的 {runs['T1']['metrics']['cumulativeTransactionCostRate'] / t0_metrics['cumulativeTransactionCostRate']:.1%}；"
-                    "但 Sharpe 低于基准逆方差版，当前只能是有条件候选。"
+                    "但 Sharpe 低于基准逆方差版，当前不足以形成研究候选。"
                 ),
             },
             {
@@ -814,7 +873,11 @@ def _build_low_volatility_gate_followup(
     followup = {
         "status": status,
         "initialCapital": INITIAL_CAPITAL,
-        "researchClassification": "事后探索；同一 OOS 结论上限为有条件候选",
+        "researchClassification": (
+            "事后探索；同一 OOS 结论上限为有条件候选"
+            if status == "有条件候选"
+            else "事后探索；同一 OOS 门禁失败，只保留为待证伪的新研究假设"
+        ),
         "strategyName": "沪深300 ETF 低波动准入策略",
         "rule": (
             "月末 ETF 实现方差不高于 2012-06..2017-12 校准期中位数时，"
@@ -877,7 +940,7 @@ def _build_low_volatility_gate_followup(
             ),
         },
         "supportingEvidence": [
-            "30/30 数据质量规则通过，低波动准入与原始报告复用同一 canonical 快照并完成断网复现。",
+            "30/30 数据质量规则通过，低波动准入与原始报告复用同一 canonical 快照，并在同一镜像的断网容器中连续两次复现匹配。",
             f"基础成本 CAGR {base_metrics['annualizedReturn']:.2%}，高于 50% ETF / 50% 现金基准的 {static_metrics['annualizedReturn']:.2%}。",
             "2018 年高波动下跌阶段减少了绝对损失，说明波动门槛在部分冲击环境中确实降低暴露。",
         ],
@@ -1160,17 +1223,18 @@ def _walk_forward_rows(
     ).set_index("window_id")
     rows = []
     for window in windows.itertuples(index=False):
-        strategy_slice = strategy_nav[
-            strategy_nav["trade_date"].between(window.test_start, window.test_end)
-        ]
-        passive_slice = passive_nav[
-            passive_nav["trade_date"].between(window.test_start, window.test_end)
-        ]
-        strategy_metrics = summarize_performance(
-            strategy_slice[["trade_date", "nav"]], include_extended=True
+        strategy_metrics = summarize_nav_window(
+            strategy_nav,
+            start=window.test_start,
+            end=window.test_end,
+            benchmark_nav=passive_nav,
+            include_extended=True,
         )
-        passive_metrics = summarize_performance(
-            passive_slice[["trade_date", "nav"]], include_extended=True
+        passive_metrics = summarize_nav_window(
+            passive_nav,
+            start=window.test_start,
+            end=window.test_end,
+            include_extended=True,
         )
         persisted = canonical.loc[window.window_id]
         if not math.isclose(
@@ -1180,6 +1244,13 @@ def _walk_forward_rows(
             abs_tol=1e-12,
         ):
             raise ValueError(f"walk-forward 策略指标未与 canonical 工件闭合：{window.window_id}")
+        if not math.isclose(
+            strategy_metrics["benchmarkTotalReturn"],
+            float(persisted["benchmark_total_return"]),
+            rel_tol=0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError(f"walk-forward 基准指标未与 canonical 工件闭合：{window.window_id}")
         rows.append(
             {
                 "windowId": window.window_id,
@@ -1217,19 +1288,15 @@ def _selected_return_metrics(group: pd.DataFrame) -> dict[str, Any]:
             "annualizedVolatility": None,
             "maxDrawdown": None,
         }
-    strategy_return = float((1 + group["T0"]).prod() - 1)
-    passive_return = float((1 + group["passive"]).prod() - 1)
-    wealth = (1 + group["T0"]).cumprod()
+    period = summarize_return_subperiod(group["T0"], group["passive"])
+    strategy_return = float(period["totalReturn"])
+    passive_return = float(period["benchmarkTotalReturn"])
     return {
         "strategyReturn": strategy_return,
         "passiveReturn": passive_return,
         "activeReturn": strategy_return - passive_return,
-        "annualizedVolatility": (
-            float(group["T0"].std(ddof=1) * math.sqrt(252))
-            if len(group) > 1
-            else None
-        ),
-        "maxDrawdown": float((wealth / wealth.cummax() - 1).min()),
+        "annualizedVolatility": period["annualizedVolatility"],
+        "maxDrawdown": period["maxDrawdown"],
     }
 
 
@@ -1506,7 +1573,7 @@ def _render_low_volatility_gate_followup(
     <section class="panel third"><h2>反对证据</h2>{_html_list(followup["opposingEvidence"])}</section>
     <section class="panel third"><h2>尚缺证据</h2>{_html_list(followup["missingEvidence"])}</section>
     <section class="panel"><h2>如何继续优化</h2><ol><li>不能在同一段样本外继续搜索波动阈值，否则会把这次失败变成参数拟合。</li><li>若核心目标是压回撤，下一轮只预登记一个“低波慢跌保护”机制，并在新时间段或另一只事先指定的宽基 ETF 上验证。</li><li>月度 0% / 100% 切换累计成本率 {_fmt(followup["cumulativeTransactionCostRate"], "pct")}；可单独验证渐进仓位是否降低换手，但不得同时改门槛和信号。</li><li>任何新版本仍必须与固定比例 ETF / 现金基准比较，不能只和 100% 满仓相比。</li></ol></section>
-    <section class="panel"><h2>复现身份</h2>{reproduction}<p class="note">基础成本与双倍成本运行均绑定同一数据快照，并已在断网容器中复现匹配结果指纹。</p></section>
+    <section class="panel"><h2>复现身份</h2>{reproduction}<p class="note">基础成本与双倍成本运行均绑定同一数据快照，并已在同一镜像的断网容器中连续两次复现匹配结果指纹。</p></section>
   </div>
 """
 

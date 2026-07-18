@@ -31,6 +31,20 @@ class ResearchCliTest(unittest.TestCase):
         for definition in definitions:
             with self.subTest(strategy=definition.strategy_id):
                 self.assertTrue((REPO_ROOT / definition.example_config).is_file())
+                self.assertIn(
+                    definition.walk_forward_benchmark_source,
+                    {"config_market_reference", "universe_adjusted_etf"},
+                )
+        by_id = {definition.strategy_id: definition for definition in definitions}
+        for strategy_id in (
+            "etf_low_volatility_gate",
+            "etf_trend_120d",
+            "etf_volatility_managed",
+        ):
+            self.assertEqual(
+                by_id[strategy_id].walk_forward_benchmark_source,
+                "universe_adjusted_etf",
+            )
 
     def test_list_strategies_is_static_json_and_does_not_connect_database(self):
         output = io.StringIO()
@@ -54,6 +68,7 @@ class ResearchCliTest(unittest.TestCase):
                 "scope",
                 "requiredInputs",
                 "exampleConfig",
+                "walkForwardBenchmarkSource",
             },
         )
         self.assertTrue(payload["boundaries"]["researchOnly"])

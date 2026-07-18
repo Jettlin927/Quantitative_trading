@@ -25,7 +25,12 @@ from .artifacts import (
     verify_file_artifact,
     write_dataframe_csv_gz,
 )
-from .baselines import open_strategy_inputs, summarize_sentinel_metrics
+from .baselines import (
+    load_adjusted_etf_prices,
+    open_strategy_inputs,
+    summarize_sentinel_metrics,
+    validate_explicit_universe,
+)
 from .manifest import (
     build_environment_fingerprint,
     build_research_manifest,
@@ -522,6 +527,7 @@ def _execute_pipeline(
                 working / "inputs",
                 normalized,
                 nav,
+                strategy=strategy,
                 compressed=True,
                 table_artifacts=table_artifacts,
             )
@@ -971,6 +977,7 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
                 run_path / "inputs",
                 config,
                 persisted_nav,
+                strategy=strategy,
                 compressed=True,
                 table_artifacts=table_artifacts,
             )
@@ -1089,14 +1096,26 @@ def _evaluate_walk_forward(
     config: dict[str, Any],
     nav: Any,
     *,
+    strategy: StrategyDefinition,
     compressed: bool,
     table_artifacts: dict[str, dict[str, Any]],
 ) -> tuple[Any, Any, dict[str, Any]]:
     _, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
+    benchmark_bars = reader("index_daily_bars")
+    benchmark = config["benchmark"]
+    if strategy.walk_forward_benchmark_source == "universe_adjusted_etf":
+        members = validate_explicit_universe(reader, config, compressed)
+        prices = load_adjusted_etf_prices(reader, config, members)
+        benchmark = members[0]
+        benchmark_bars = prices[["ts_code", "trade_date", "adj_close"]].rename(
+            columns={"adj_close": "close"}
+        )
+    elif strategy.walk_forward_benchmark_source != "config_market_reference":
+        raise ValueError("策略 walk-forward 主基准来源未登记")
     return evaluate_walk_forward(
         nav,
-        reader("index_daily_bars"),
-        benchmark=config["benchmark"],
+        benchmark_bars,
+        benchmark=benchmark,
         research_start=config["startDate"],
         research_end=config["endDate"],
         policy=config.get("validationPolicy"),

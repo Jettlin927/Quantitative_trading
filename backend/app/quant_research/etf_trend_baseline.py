@@ -6,12 +6,13 @@ from typing import Any
 import pandas as pd
 
 from .baselines import (
+    load_adjusted_etf_prices,
     load_frozen_calendar,
     open_strategy_inputs,
     validate_explicit_universe,
 )
-from .dataset import build_adjusted_price_panel
 from .features import moving_average
+from .metrics import summarize_performance
 
 
 ETF_TREND_LIMITATIONS = (
@@ -55,26 +56,9 @@ def build_etf_trend_targets(
     root, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
     calendar = load_frozen_calendar(root, reader, config, compressed, table_artifacts)
     members = validate_explicit_universe(reader, config, compressed)
-    bars = reader("fund_daily_bars")
-    factors = reader("fund_adjust_factors")
-    warmup_start = pd.Timestamp(config["warmupStart"])
     research_start = pd.Timestamp(config["startDate"])
     end = pd.Timestamp(config["endDate"])
-    for frame in (bars, factors):
-        frame["trade_date"] = pd.to_datetime(frame["trade_date"])
-    bars = bars[
-        bars["ts_code"].isin(members)
-        & bars["trade_date"].between(warmup_start, end)
-    ].copy()
-    factors = factors[
-        factors["ts_code"].isin(members)
-        & factors["trade_date"].between(warmup_start, end)
-    ].copy()
-    if bars.empty or factors.empty:
-        raise ValueError("ETF 趋势冻结行情或复权因子为空")
-    prices = build_adjusted_price_panel(bars, factors).sort_values(
-        ["ts_code", "trade_date"], kind="stable"
-    ).reset_index(drop=True)
+    prices = load_adjusted_etf_prices(reader, config, members)
     average = moving_average(
         prices[["trade_date", "ts_code", "adj_close"]],
         "adj_close",
@@ -106,6 +90,46 @@ def build_etf_trend_targets(
 
 def etf_trend_limitations() -> list[str]:
     return list(ETF_TREND_LIMITATIONS)
+
+
+def summarize_etf_trend_metrics(
+    input_root: Path,
+    config: dict[str, Any],
+    nav: pd.DataFrame,
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    validate_etf_trend_config(config)
+    _, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
+    members = validate_explicit_universe(reader, config, compressed)
+    prices = load_adjusted_etf_prices(reader, config, members)
+    start = pd.Timestamp(config["startDate"])
+    end = pd.Timestamp(config["endDate"])
+    strategy = nav.copy()
+    strategy["trade_date"] = pd.to_datetime(strategy["trade_date"], errors="raise")
+    strategy = strategy[strategy["trade_date"].between(start, end)]
+    passive = prices[prices["trade_date"].between(start, end)][
+        ["trade_date", "adj_open", "adj_close"]
+    ].copy()
+    if strategy.empty or passive.empty:
+        raise ValueError("ETF 趋势 OOS 策略或被动基准为空")
+    passive["nav"] = passive["adj_close"] / passive["adj_open"].iloc[0]
+    metrics = summarize_performance(
+        strategy[["trade_date", "nav"]],
+        passive[["trade_date", "nav"]],
+        include_extended=True,
+        initial_strategy_nav=1.0,
+        initial_benchmark_nav=1.0,
+    )
+    metrics.update(
+        {
+            "primaryBenchmarkType": "passive_adjusted_etf",
+            "primaryBenchmarkCode": members[0],
+            "marketReferenceCode": config["benchmark"],
+        }
+    )
+    return metrics
 
 
 def _month_end_signal_dates(

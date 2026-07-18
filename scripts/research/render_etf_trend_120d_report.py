@@ -16,7 +16,12 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from backend.app.quant_research.metrics import summarize_performance
-from backend.app.quant_research.reporting import hac_alpha, tail_metrics
+from backend.app.quant_research.reporting import (
+    hac_alpha,
+    summarize_nav_window,
+    summarize_return_subperiod,
+    tail_metrics,
+)
 from scripts.research.render_etf_volatility_managed_report import (
     _aligned_returns,
     _build_passive_nav,
@@ -107,9 +112,24 @@ def classify_run(config: dict[str, Any]) -> str:
         for field in ("buyRate", "sellRate", "slippageRate")
     )
     try:
-        return SCENARIOS[costs]
+        label = SCENARIOS[costs]
     except KeyError as exc:
         raise ValueError(f"未登记的成本场景：{costs}") from exc
+    filenames = {
+        "base_cost": "etf_trend_120d_long_history.json",
+        "zero_cost": "etf_trend_120d_long_history_zero_cost.json",
+        "double_cost": "etf_trend_120d_long_history_double_cost.json",
+    }
+    expected = json.loads(
+        (REPO_ROOT / "configs" / "research" / filenames[label]).read_text(
+            encoding="utf-8"
+        )
+    )
+    normalized = json.loads(json.dumps(config))
+    normalized["qualityRunId"] = "__REQUIRED_BY_CLI__"
+    if normalized != expected:
+        raise ValueError(f"{SCENARIO_NAMES[label]}配置偏离事前登记")
+    return label
 
 
 def load_runs(run_root: Path) -> dict[str, dict[str, Any]]:
@@ -170,11 +190,17 @@ def build_summary(
     comparison_navs = {**navs, "static": static}
     returns = _aligned_returns(comparison_navs, passive)
     performance = {
-        label: summarize_performance(frame[["trade_date", "nav"]], include_extended=True)
+        label: summarize_performance(
+            frame[["trade_date", "nav"]],
+            include_extended=True,
+            initial_strategy_nav=1.0,
+        )
         for label, frame in comparison_navs.items()
     }
     performance["passive"] = summarize_performance(
-        passive[["trade_date", "nav"]], include_extended=True
+        passive[["trade_date", "nav"]],
+        include_extended=True,
+        initial_strategy_nav=1.0,
     )
     _assert_canonical_metrics(runs, performance)
 
@@ -572,20 +598,16 @@ def _period_metrics(group: pd.DataFrame) -> dict[str, Any]:
             "annualizedVolatility": None,
             "strategyMaxDrawdown": None,
         }
-    strategy_return = float((1 + group["base_cost"]).prod() - 1)
-    passive_return = float((1 + group["passive"]).prod() - 1)
-    wealth = (1 + group["base_cost"]).cumprod()
+    period = summarize_return_subperiod(group["base_cost"], group["passive"])
+    strategy_return = float(period["totalReturn"])
+    passive_return = float(period["benchmarkTotalReturn"])
     return {
         "strategyReturn": strategy_return,
         "passiveReturn": passive_return,
         "staticReturn": float((1 + group["static"]).prod() - 1),
         "activeReturn": strategy_return - passive_return,
-        "annualizedVolatility": (
-            float(group["base_cost"].std(ddof=1) * math.sqrt(252))
-            if len(group) > 1
-            else None
-        ),
-        "strategyMaxDrawdown": float((wealth / wealth.cummax() - 1).min()),
+        "annualizedVolatility": period["annualizedVolatility"],
+        "strategyMaxDrawdown": period["maxDrawdown"],
     }
 
 
@@ -757,17 +779,18 @@ def _walk_forward_rows(
     ).set_index("window_id")
     rows = []
     for window in windows.itertuples(index=False):
-        strategy_slice = strategy_nav[
-            strategy_nav["trade_date"].between(window.test_start, window.test_end)
-        ]
-        passive_slice = passive_nav[
-            passive_nav["trade_date"].between(window.test_start, window.test_end)
-        ]
-        strategy_metrics = summarize_performance(
-            strategy_slice[["trade_date", "nav"]], include_extended=True
+        strategy_metrics = summarize_nav_window(
+            strategy_nav,
+            start=window.test_start,
+            end=window.test_end,
+            benchmark_nav=passive_nav,
+            include_extended=True,
         )
-        passive_metrics = summarize_performance(
-            passive_slice[["trade_date", "nav"]], include_extended=True
+        passive_metrics = summarize_nav_window(
+            passive_nav,
+            start=window.test_start,
+            end=window.test_end,
+            include_extended=True,
         )
         canonical = persisted.loc[window.window_id]
         if not math.isclose(
@@ -777,6 +800,13 @@ def _walk_forward_rows(
             abs_tol=1e-12,
         ):
             raise ValueError(f"walk-forward 未与 canonical 工件闭合：{window.window_id}")
+        if not math.isclose(
+            strategy_metrics["benchmarkTotalReturn"],
+            float(canonical["benchmark_total_return"]),
+            rel_tol=0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError(f"walk-forward 基准未与 canonical 工件闭合：{window.window_id}")
         rows.append(
             {
                 "window": window.window_id,

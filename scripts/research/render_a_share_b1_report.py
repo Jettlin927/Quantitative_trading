@@ -16,7 +16,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from backend.app.quant_research.reporting import hac_alpha, tail_metrics
+from backend.app.quant_research.reporting import (
+    hac_alpha,
+    summarize_return_subperiod,
+    tail_metrics,
+)
 
 
 DEFAULT_RUN_ROOT = (
@@ -897,16 +901,16 @@ def _period_summary(group: pd.DataFrame) -> dict[str, Any]:
             "annualizedVolatility": None,
             "maxDrawdown": None,
         }
-    strategy_return = float((1 + group["strategy"]).prod() - 1)
-    benchmark_return = float((1 + group["benchmark"]).prod() - 1)
-    wealth = (1 + group["strategy"]).cumprod()
+    period = summarize_return_subperiod(group["strategy"], group["benchmark"])
+    strategy_return = float(period["totalReturn"])
+    benchmark_return = float(period["benchmarkTotalReturn"])
     return {
         "observations": int(len(group)),
         "strategyReturn": strategy_return,
         "benchmarkReturn": benchmark_return,
         "activeReturn": strategy_return - benchmark_return,
-        "annualizedVolatility": float(group["strategy"].std(ddof=1) * math.sqrt(252)) if len(group) > 1 else None,
-        "maxDrawdown": float((wealth / wealth.cummax() - 1).min()),
+        "annualizedVolatility": period["annualizedVolatility"],
+        "maxDrawdown": period["maxDrawdown"],
     }
 
 

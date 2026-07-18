@@ -5,7 +5,7 @@ from typing import Any, Iterable
 
 import pandas as pd
 
-from .metrics import summarize_performance
+from .reporting import summarize_nav_window
 
 
 WALK_FORWARD_WINDOW_COLUMNS = (
@@ -195,9 +195,11 @@ def evaluate_walk_forward(
         ].rename(columns={"close": "nav"})
         if len(test_nav) != window.test_periods or len(test_benchmark) != window.test_periods:
             raise ValueError("walk-forward test 窗口缺少策略或基准日期")
-        metrics = summarize_performance(
-            test_nav,
-            test_benchmark,
+        metrics = summarize_nav_window(
+            strategy,
+            start=window.test_start,
+            end=window.test_end,
+            benchmark_nav=benchmark_frame.rename(columns={"close": "nav"}),
             include_extended=True,
         )
         rows.append(

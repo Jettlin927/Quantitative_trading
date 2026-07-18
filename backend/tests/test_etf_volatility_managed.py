@@ -30,6 +30,8 @@ from backend.app.quant_research.etf_volatility_managed import (
     validate_etf_low_volatility_gate_config,
     validate_etf_volatility_managed_config,
 )
+from backend.app.quant_research.artifacts import read_canonical_csv_gz
+from backend.app.quant_research.dataset import build_adjusted_price_panel
 from backend.app.quant_research.runner import reproduce_quant_research, run_quant_research
 from backend.app.quant_research.snapshot import SnapshotCapacityPolicy
 from backend.app.quant_research.universe import build_explicit_universe
@@ -274,6 +276,43 @@ class EtfVolatilityManagedTest(unittest.TestCase):
                 self.assertEqual(result.manifest["strategyId"], strategy_id)
                 self.assertIn("walk_forward_metrics.csv.gz", result.manifest["artifactHashes"])
                 self.assertIn("risk_exposures.csv.gz", result.manifest["artifactHashes"])
+                windows = read_canonical_csv_gz(
+                    result.path / "walk_forward_windows.csv.gz"
+                )
+                metrics = read_canonical_csv_gz(
+                    result.path / "walk_forward_metrics.csv.gz"
+                )
+                nav = read_canonical_csv_gz(result.path / "nav.csv.gz")
+                bars = read_canonical_csv_gz(
+                    result.path / "inputs" / "fund_daily_bars.csv.gz"
+                )
+                factors = read_canonical_csv_gz(
+                    result.path / "inputs" / "fund_adjust_factors.csv.gz"
+                )
+                prices = build_adjusted_price_panel(bars, factors)
+                first_window = windows.iloc[0]
+                test_start = pd.Timestamp(first_window["test_start"])
+                test_end = pd.Timestamp(first_window["test_end"])
+                prior_strategy_nav = float(
+                    nav[pd.to_datetime(nav["trade_date"]) < test_start].iloc[-1]["nav"]
+                )
+                final_strategy_nav = float(
+                    nav[pd.to_datetime(nav["trade_date"]) == test_end].iloc[0]["nav"]
+                )
+                prior_benchmark_nav = float(
+                    prices[prices["trade_date"] < test_start].iloc[-1]["adj_close"]
+                )
+                final_benchmark_nav = float(
+                    prices[prices["trade_date"] == test_end].iloc[0]["adj_close"]
+                )
+                self.assertAlmostEqual(
+                    float(metrics.iloc[0]["total_return"]),
+                    final_strategy_nav / prior_strategy_nav - 1,
+                )
+                self.assertAlmostEqual(
+                    float(metrics.iloc[0]["benchmark_total_return"]),
+                    final_benchmark_nav / prior_benchmark_nav - 1,
+                )
         engine.dispose()
 
 

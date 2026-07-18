@@ -70,6 +70,9 @@ def main(argv: list[str] | None = None) -> int:
                             "scope": definition.scope,
                             "requiredInputs": list(definition.required_tables),
                             "exampleConfig": definition.example_config,
+                            "walkForwardBenchmarkSource": (
+                                definition.walk_forward_benchmark_source
+                            ),
                         }
                         for definition in list_strategy_definitions()
                     ],

@@ -6,12 +6,12 @@ from typing import Any
 import pandas as pd
 
 from .baselines import (
+    load_adjusted_etf_prices,
     load_frozen_calendar,
     open_strategy_inputs,
     simulate_etf_targets_with_ledger,
     validate_explicit_universe,
 )
-from .dataset import build_adjusted_price_panel
 from .metrics import summarize_performance
 
 
@@ -108,7 +108,7 @@ def build_etf_volatility_managed_targets(
     root, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
     calendar = load_frozen_calendar(root, reader, config, compressed, table_artifacts)
     members = validate_explicit_universe(reader, config, compressed)
-    prices = _load_adjusted_prices(reader, config, members)
+    prices = load_adjusted_etf_prices(reader, config, members)
     monthly = _monthly_statistics(prices, config)
     scale, _ = _calibrate_scale(monthly, config)
     return _targets_from_monthly(monthly, calendar, config, scale)
@@ -143,7 +143,7 @@ def summarize_etf_volatility_managed_metrics(
     validate_etf_volatility_managed_config(config)
     _, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
     members = tuple(sorted(set(config["universe"]["members"])))
-    prices = _load_adjusted_prices(reader, config, members)
+    prices = load_adjusted_etf_prices(reader, config, members)
     monthly = _monthly_statistics(prices, config)
     scale, calibration_observations = _calibrate_scale(monthly, config)
 
@@ -245,7 +245,7 @@ def build_etf_low_volatility_gate_targets(
     root, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
     calendar = load_frozen_calendar(root, reader, config, compressed, table_artifacts)
     members = validate_explicit_universe(reader, config, compressed)
-    prices = _load_adjusted_prices(reader, config, members)
+    prices = load_adjusted_etf_prices(reader, config, members)
     monthly = _monthly_statistics(prices, config)
     threshold, _ = _calibrate_gate_threshold(monthly, config)
     return _gate_targets_from_monthly(monthly, calendar, config, threshold)
@@ -280,7 +280,7 @@ def summarize_etf_low_volatility_gate_metrics(
     validate_etf_low_volatility_gate_config(config)
     _, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
     members = tuple(sorted(set(config["universe"]["members"])))
-    prices = _load_adjusted_prices(reader, config, members)
+    prices = load_adjusted_etf_prices(reader, config, members)
     monthly = _monthly_statistics(prices, config)
     threshold, calibration_observations = _calibrate_gate_threshold(monthly, config)
     targets = _gate_targets_from_monthly(monthly, _CalendarProxy(prices), config, threshold)
@@ -348,36 +348,6 @@ def summarize_etf_low_volatility_gate_metrics(
 
 def etf_low_volatility_gate_limitations() -> list[str]:
     return list(ETF_LOW_VOLATILITY_GATE_LIMITATIONS)
-
-
-def _load_adjusted_prices(
-    reader: Any,
-    config: dict[str, Any],
-    members: tuple[str, ...],
-) -> pd.DataFrame:
-    bars = reader("fund_daily_bars")
-    factors = reader("fund_adjust_factors")
-    warmup_start = pd.Timestamp(config["warmupStart"])
-    end = pd.Timestamp(config["endDate"])
-    for frame in (bars, factors):
-        frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="raise")
-        frame["ts_code"] = frame["ts_code"].astype(str).str.strip().str.upper()
-    bars = bars[
-        bars["ts_code"].isin(members)
-        & bars["trade_date"].between(warmup_start, end)
-    ].copy()
-    factors = factors[
-        factors["ts_code"].isin(members)
-        & factors["trade_date"].between(warmup_start, end)
-    ].copy()
-    if bars.empty or factors.empty:
-        raise ValueError("ETF 波动率管理冻结行情或复权因子为空")
-    prices = build_adjusted_price_panel(bars, factors).sort_values(
-        ["ts_code", "trade_date"], kind="stable"
-    ).reset_index(drop=True)
-    if prices["ts_code"].nunique() != 1 or prices["adj_close"].isna().any():
-        raise ValueError("ETF 波动率管理必须得到一只 ETF 的完整复权价格")
-    return prices
 
 
 def _monthly_statistics(prices: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
