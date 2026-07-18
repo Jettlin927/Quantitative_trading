@@ -38,6 +38,11 @@ class EtfTrendReportTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "未登记的成本场景"):
             classify_run(invalid)
 
+        disguised_rule = deepcopy(base)
+        disguised_rule["targetWeightParameters"]["riskOffWeight"] = "0.1"
+        with self.assertRaisesRegex(ValueError, "偏离事前登记"):
+            classify_run(disguised_rule)
+
     def test_report_leads_with_the_full_history_not_one_year_rows(self):
         html = (REPORT_DIR / "index.html").read_text(encoding="utf-8")
 
@@ -68,6 +73,7 @@ class EtfTrendReportTest(unittest.TestCase):
         self.assertAlmostEqual(comparison["base_cost"]["cagr"], 0.0005196046812980804)
         self.assertAlmostEqual(comparison["base_cost"]["maxDrawdown"], -0.52818204070411)
         self.assertAlmostEqual(comparison["passive"]["finalCapital"], 284_968.2040816326)
+        self.assertAlmostEqual(comparison["passive"]["totalReturn"], 1.849682040816326)
         self.assertAlmostEqual(comparison["passive"]["cagr"], 0.08320054946592181)
         self.assertAlmostEqual(comparison["static"]["finalCapital"], 173_338.92156242114)
         self.assertEqual(comparison["passive"]["informationRatioDisplay"], "not_applicable")

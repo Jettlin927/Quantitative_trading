@@ -241,6 +241,36 @@ def summarize_etf_metrics(
     )
 
 
+def load_adjusted_etf_prices(
+    reader: Any,
+    config: dict[str, Any],
+    members: tuple[str, ...],
+) -> pd.DataFrame:
+    bars = reader("fund_daily_bars")
+    factors = reader("fund_adjust_factors")
+    warmup_start = pd.Timestamp(config["warmupStart"])
+    end = pd.Timestamp(config["endDate"])
+    for frame in (bars, factors):
+        frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="raise")
+        frame["ts_code"] = frame["ts_code"].astype(str).str.strip().str.upper()
+    bars = bars[
+        bars["ts_code"].isin(members)
+        & bars["trade_date"].between(warmup_start, end)
+    ].copy()
+    factors = factors[
+        factors["ts_code"].isin(members)
+        & factors["trade_date"].between(warmup_start, end)
+    ].copy()
+    if bars.empty or factors.empty:
+        raise ValueError("ETF 冻结行情或复权因子为空")
+    prices = build_adjusted_price_panel(bars, factors).sort_values(
+        ["ts_code", "trade_date"], kind="stable"
+    ).reset_index(drop=True)
+    if prices["ts_code"].nunique() != 1 or prices["adj_close"].isna().any():
+        raise ValueError("ETF 策略必须得到一只 ETF 的完整复权价格")
+    return prices
+
+
 def sentinel_limitations() -> list[str]:
     return list(SENTINEL_LIMITATIONS)
 

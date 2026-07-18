@@ -21,23 +21,27 @@ def build_strategy_results_overview(repo_root: Path) -> dict[str, Any]:
     result_sets = []
     for item in manifest.get("resultSets", []):
         artifacts = item.get("artifacts", {})
+        for key in artifacts:
+            artifact_path(results_root, artifacts, key)
         phased = read_json_rows(artifact_path(results_root, artifacts, "phasedJson"))
         score_scan = read_csv_rows(
             artifact_path(results_root, artifacts, "scoreScanCsv"), limit=8
         )
-        report_summary = read_json_object(
-            artifact_path(results_root, artifacts, "summaryJson")
-        )
+        if "summaryJson" in artifacts:
+            report_summary = read_declared_json_object(
+                artifact_path(results_root, artifacts, "summaryJson"),
+                "summaryJson",
+            )
+            summary = summarize_report(report_summary)
+        else:
+            summary = summarize_phases(phased)
+        summary["status"] = item.get("status")
         result_sets.append(
             {
                 **item,
                 "phases": phased,
                 "scoreScanTop": score_scan,
-                "summary": (
-                    summarize_report(report_summary)
-                    if report_summary
-                    else summarize_phases(phased)
-                ),
+                "summary": summary,
             }
         )
 
@@ -59,7 +63,16 @@ def artifact_path(
     value = artifacts.get(key)
     if not isinstance(value, str) or not value:
         return None
-    return results_root / value
+    relative = Path(value)
+    if relative.is_absolute():
+        raise ValueError(f"{key} 必须位于策略结果目录内")
+    root = results_root.resolve()
+    resolved = (root / relative).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"{key} 必须位于策略结果目录内") from exc
+    return resolved
 
 
 def read_json_rows(path: Path | None) -> list[dict[str, Any]]:
@@ -69,11 +82,13 @@ def read_json_rows(path: Path | None) -> list[dict[str, Any]]:
     return payload.get("rows", [])
 
 
-def read_json_object(path: Path | None) -> dict[str, Any]:
+def read_declared_json_object(path: Path | None, label: str) -> dict[str, Any]:
     if path is None or not path.is_file():
-        return {}
+        raise ValueError(f"已声明的 {label} 文件不存在")
     payload = json.loads(path.read_text(encoding="utf-8"))
-    return payload if isinstance(payload, dict) else {}
+    if not isinstance(payload, dict):
+        raise ValueError(f"已声明的 {label} 必须是 JSON object")
+    return payload
 
 
 def read_csv_rows(path: Path | None, limit: int) -> list[dict[str, Any]]:
@@ -127,7 +142,7 @@ def summarize_report(payload: dict[str, Any]) -> dict[str, Any]:
         if isinstance(against, list) and against:
             conclusion_text = against[0]
     return {
-        "status": payload.get("status"),
+        "sourceExecutionStatus": payload.get("status"),
         "conclusion": conclusion_text,
         "reportGeneratedAt": (
             payload.get("reportGeneratedAt")

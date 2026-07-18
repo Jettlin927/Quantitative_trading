@@ -8,6 +8,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from .metrics import summarize_performance
+
 
 def returns_from_initial_nav(nav: pd.Series, *, initial_nav: float = 1.0) -> pd.Series:
     """Return a dated NAV series' returns, including its first move from initial NAV."""
@@ -19,6 +21,104 @@ def returns_from_initial_nav(nav: pd.Series, *, initial_nav: float = 1.0) -> pd.
     if not returns.empty:
         returns.iloc[0] = float(numeric.iloc[0]) / initial_nav - 1.0
     return returns
+
+
+def summarize_nav_window(
+    nav: pd.DataFrame,
+    *,
+    start: object,
+    end: object,
+    benchmark_nav: pd.DataFrame | None = None,
+    include_extended: bool = True,
+) -> dict[str, Any]:
+    """Summarize a NAV subwindow using the last NAV before the window as its base."""
+
+    strategy = _normalized_nav_frame(nav, "策略")
+    window_start = pd.Timestamp(start)
+    window_end = pd.Timestamp(end)
+    strategy_window = strategy[
+        strategy["trade_date"].between(window_start, window_end)
+    ]
+    strategy_prior = strategy[strategy["trade_date"].lt(window_start)]
+    if strategy_window.empty or strategy_prior.empty:
+        raise ValueError("策略子区间为空或缺少窗口前净值")
+
+    benchmark_window = None
+    benchmark_initial = None
+    if benchmark_nav is not None:
+        benchmark = _normalized_nav_frame(benchmark_nav, "基准")
+        benchmark_window = benchmark[
+            benchmark["trade_date"].between(window_start, window_end)
+        ]
+        benchmark_prior = benchmark[benchmark["trade_date"].lt(window_start)]
+        if benchmark_window.empty or benchmark_prior.empty:
+            raise ValueError("基准子区间为空或缺少窗口前净值")
+        benchmark_initial = float(benchmark_prior.iloc[-1]["nav"])
+
+    return summarize_performance(
+        strategy_window,
+        benchmark_window,
+        include_extended=include_extended,
+        initial_strategy_nav=float(strategy_prior.iloc[-1]["nav"]),
+        initial_benchmark_nav=benchmark_initial,
+    )
+
+
+def summarize_return_subperiod(
+    strategy_returns: pd.Series,
+    benchmark_returns: pd.Series | None = None,
+    *,
+    periods_per_year: int = 252,
+) -> dict[str, float | None]:
+    """Summarize an already selected return subperiod with initial wealth fixed at one."""
+
+    strategy = pd.to_numeric(strategy_returns, errors="raise")
+    if benchmark_returns is not None:
+        frame = pd.concat(
+            [
+                strategy.rename("strategy"),
+                pd.to_numeric(benchmark_returns, errors="raise").rename("benchmark"),
+            ],
+            axis=1,
+        ).dropna()
+        strategy = frame["strategy"]
+        benchmark = frame["benchmark"]
+    else:
+        strategy = strategy.dropna()
+        benchmark = None
+    if strategy.empty:
+        raise ValueError("收益子区间不能为空")
+
+    wealth = pd.concat(
+        [pd.Series([1.0]), (1.0 + strategy.reset_index(drop=True)).cumprod()],
+        ignore_index=True,
+    )
+    drawdown = wealth / wealth.cummax() - 1.0
+    result: dict[str, float | None] = {
+        "totalReturn": float(wealth.iloc[-1] - 1.0),
+        "annualizedVolatility": (
+            float(strategy.std(ddof=1) * math.sqrt(periods_per_year))
+            if len(strategy) > 1
+            else None
+        ),
+        "maxDrawdown": float(drawdown.min()),
+    }
+    if benchmark is not None:
+        result["benchmarkTotalReturn"] = float((1.0 + benchmark).prod() - 1.0)
+    return result
+
+
+def _normalized_nav_frame(nav: pd.DataFrame, label: str) -> pd.DataFrame:
+    required = {"trade_date", "nav"}
+    if not required.issubset(nav.columns):
+        raise ValueError(f"{label}净值缺少 trade_date 或 nav")
+    frame = nav[["trade_date", "nav"]].copy()
+    frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="raise")
+    frame["nav"] = pd.to_numeric(frame["nav"], errors="raise")
+    frame = frame.sort_values("trade_date", kind="stable").reset_index(drop=True)
+    if frame.empty or frame["trade_date"].duplicated().any():
+        raise ValueError(f"{label}净值日期为空或重复")
+    return frame
 
 
 def tail_metrics(returns: pd.Series) -> dict[str, float]:

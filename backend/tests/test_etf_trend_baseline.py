@@ -29,6 +29,7 @@ from backend.app.quant_research.etf_trend_baseline import (
 )
 from backend.app.quant_research.run_config import validate_run_config
 from backend.app.quant_research.runner import reproduce_quant_research, run_quant_research
+from backend.app.quant_research.artifacts import read_canonical_csv_gz
 from backend.app.quant_research.snapshot import SnapshotCapacityPolicy
 from backend.app.quant_research.universe import build_explicit_universe
 from backend.tests.research_test_support import golden_run_config
@@ -187,16 +188,18 @@ class EtfTrendBaselineTest(unittest.TestCase):
                     )
                 )
                 db.add(FundAdjustFactor(ts_code="SYNETF.SZ", trade_date=trade_date.date(), adj_factor=Decimal("1")))
+                index_close = Decimal(1000 + offset * 2)
+                index_previous = Decimal(1000 + max(offset - 1, 0) * 2)
                 db.add(
                     IndexDailyBar(
                         ts_code="SYNIDX.SH",
                         trade_date=trade_date.date(),
-                        open=close,
-                        high=close,
-                        low=close,
-                        close=close,
-                        pre_close=previous,
-                        change_amount=close - previous,
+                        open=index_previous,
+                        high=index_close,
+                        low=index_previous,
+                        close=index_close,
+                        pre_close=index_previous,
+                        change_amount=index_close - index_previous,
                         pct_chg=Decimal("0"),
                         vol=Decimal("1000"),
                         amount=Decimal("10000"),
@@ -252,6 +255,12 @@ class EtfTrendBaselineTest(unittest.TestCase):
             as_of_date=dates[0].date(),
             source=source,
         )
+        config["validationPolicy"] = {
+            "mode": "anchored",
+            "trainPeriods": 10,
+            "testPeriods": 5,
+            "stepPeriods": 5,
+        }
         output_root = self.root / "formal-runs"
         with Session(engine) as db:
             result = run_quant_research(
@@ -267,6 +276,41 @@ class EtfTrendBaselineTest(unittest.TestCase):
         reproduction = reproduce_quant_research(result.path)
         self.assertTrue(reproduction["matches"])
         self.assertEqual(result.manifest["strategyId"], "etf_trend_120d")
+        metrics = json.loads((result.path / "metrics.json").read_text(encoding="utf-8"))
+        nav = read_canonical_csv_gz(result.path / "nav.csv.gz")
+        fund_bars = read_canonical_csv_gz(
+            result.path / "inputs" / "fund_daily_bars.csv.gz"
+        )
+        research_start = pd.Timestamp(config["startDate"])
+        research_end = pd.Timestamp(config["endDate"])
+        first_open = float(
+            fund_bars[pd.to_datetime(fund_bars["trade_date"]) >= research_start]
+            .iloc[0]["open"]
+        )
+        last_close = float(
+            fund_bars[pd.to_datetime(fund_bars["trade_date"]) == research_end]
+            .iloc[0]["close"]
+        )
+        self.assertAlmostEqual(
+            metrics["benchmarkTotalReturn"], last_close / first_open - 1
+        )
+        windows = read_canonical_csv_gz(result.path / "walk_forward_windows.csv.gz")
+        window_metrics = read_canonical_csv_gz(
+            result.path / "walk_forward_metrics.csv.gz"
+        )
+        first_window = windows.iloc[0]
+        test_start = pd.Timestamp(first_window["test_start"])
+        test_end = pd.Timestamp(first_window["test_end"])
+        prior_nav = float(
+            nav[pd.to_datetime(nav["trade_date"]) < test_start].iloc[-1]["nav"]
+        )
+        final_nav = float(
+            nav[pd.to_datetime(nav["trade_date"]) == test_end].iloc[0]["nav"]
+        )
+        self.assertAlmostEqual(
+            float(window_metrics.iloc[0]["total_return"]),
+            final_nav / prior_nav - 1,
+        )
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ import pandas as pd
 from backend.app.quant_research.reporting import (
     deflated_sharpe,
     probability_backtest_overfitting,
+    summarize_return_subperiod,
 )
 from scripts.research.render_etf_volatility_managed_report import (
     TRIAL_DISPLAY_NAMES,
@@ -24,6 +25,16 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class EtfVolatilityManagedReportTest(unittest.TestCase):
+    def test_subperiod_drawdown_includes_the_first_return_from_initial_wealth(self):
+        metrics = summarize_return_subperiod(
+            pd.Series([-0.10, 0.05]),
+            pd.Series([-0.20, 0.10]),
+        )
+
+        self.assertAlmostEqual(metrics["totalReturn"], -0.055)
+        self.assertAlmostEqual(metrics["benchmarkTotalReturn"], -0.12)
+        self.assertAlmostEqual(metrics["maxDrawdown"], -0.10)
+
     def test_report_explains_internal_trial_ids_before_results(self):
         report_path = (
             REPO_ROOT
@@ -57,8 +68,8 @@ class EtfVolatilityManagedReportTest(unittest.TestCase):
         summary = json.loads((report_dir / "summary.json").read_text(encoding="utf-8"))
 
         self.assertIn("统一基准本金 ¥100,000", html)
-        self.assertIn("策略期末资产</span><b>¥127,647", html)
-        self.assertIn("累计盈亏</span><b>¥27,647", html)
+        self.assertIn("策略期末资产</span><b>¥129,035", html)
+        self.assertIn("累计盈亏</span><b>¥29,035", html)
         self.assertIn("高点到谷底损失：-¥83,749", html)
         self.assertLess(
             html.index("沪深300 ETF 低波动准入策略"),
@@ -98,6 +109,25 @@ class EtfVolatilityManagedReportTest(unittest.TestCase):
         self.assertEqual(len(followup["opposingEvidence"]), 3)
         self.assertEqual(len(followup["missingEvidence"]), 3)
 
+    def test_failed_report_does_not_promote_any_variant_to_candidate(self):
+        report_dir = (
+            REPO_ROOT
+            / "docs"
+            / "research"
+            / "strategy-results"
+            / "etf-volatility-managed-20260713"
+        )
+        html = (report_dir / "index.html").read_text(encoding="utf-8")
+        summary_text = (report_dir / "summary.json").read_text(encoding="utf-8")
+
+        for forbidden in (
+            "作为唯一下一轮候选",
+            "当前只能是有条件候选",
+            "结论上限为有条件候选",
+        ):
+            self.assertNotIn(forbidden, html)
+            self.assertNotIn(forbidden, summary_text)
+
     def test_classifies_only_preregistered_trials_and_cost_scenarios(self):
         configs = {
             "T0": "etf_volatility_managed_baseline.json",
@@ -135,6 +165,15 @@ class EtfVolatilityManagedReportTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "成本场景"):
             classify_run(invalid)
 
+        disguised_zero_cost = deepcopy(loaded["T1"])
+        disguised_zero_cost["costModel"] = {
+            "buyRate": "0",
+            "sellRate": "0",
+            "slippageRate": "0",
+        }
+        with self.assertRaisesRegex(ValueError, "偏离事前登记"):
+            classify_run(disguised_zero_cost)
+
     def test_classifies_low_volatility_gate_cost_scenarios(self):
         base = json.loads(
             (REPO_ROOT / "configs" / "research" / "etf_low_volatility_gate.json").read_text(
@@ -156,6 +195,13 @@ class EtfVolatilityManagedReportTest(unittest.TestCase):
         invalid["costModel"]["slippageRate"] = "0.003"
         with self.assertRaisesRegex(ValueError, "低波动准入未登记的成本场景"):
             classify_gate_run(invalid)
+
+        disguised_threshold = deepcopy(base)
+        disguised_threshold["featureParameters"]["thresholdMethod"] = (
+            "calibration_60th_percentile"
+        )
+        with self.assertRaisesRegex(ValueError, "偏离事前登记"):
+            classify_gate_run(disguised_threshold)
 
     def test_multiple_testing_diagnostics_are_finite_probabilities(self):
         dates = pd.bdate_range("2018-01-02", periods=2057)
