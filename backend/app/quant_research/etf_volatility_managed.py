@@ -153,15 +153,17 @@ def summarize_etf_volatility_managed_metrics(
     strategy_nav["trade_date"] = pd.to_datetime(strategy_nav["trade_date"])
     strategy_nav = strategy_nav[strategy_nav["trade_date"].between(research_start, end)]
     passive = prices[prices["trade_date"].between(research_start, end)][
-        ["trade_date", "adj_close"]
+        ["trade_date", "adj_open", "adj_close"]
     ].copy()
     if strategy_nav.empty or passive.empty:
         raise ValueError("ETF 波动率管理 OOS 策略或被动基准为空")
-    passive["nav"] = passive["adj_close"] / passive["adj_close"].iloc[0]
+    passive["nav"] = passive["adj_close"] / passive["adj_open"].iloc[0]
     metrics = summarize_performance(
         strategy_nav[["trade_date", "nav"]],
         passive[["trade_date", "nav"]],
         include_extended=True,
+        initial_strategy_nav=1.0,
+        initial_benchmark_nav=1.0,
     )
     targets = _targets_from_monthly(monthly, _CalendarProxy(prices), config, scale)
     weights = targets["target_weight"].astype(float)
@@ -289,25 +291,29 @@ def summarize_etf_low_volatility_gate_metrics(
     strategy_nav["trade_date"] = pd.to_datetime(strategy_nav["trade_date"])
     strategy_nav = strategy_nav[strategy_nav["trade_date"].between(research_start, end)]
     passive = prices[prices["trade_date"].between(research_start, end)][
-        ["trade_date", "adj_close"]
+        ["trade_date", "adj_open", "adj_close"]
     ].copy()
     if strategy_nav.empty or passive.empty:
         raise ValueError("ETF 低波动准入 OOS 策略或被动基准为空")
-    passive["nav"] = passive["adj_close"] / passive["adj_close"].iloc[0]
+    passive["nav"] = passive["adj_close"] / passive["adj_open"].iloc[0]
     static_half = passive[["trade_date"]].copy()
     static_half["nav"] = 0.5 + 0.5 * passive["nav"]
     passive_metrics = summarize_performance(
         passive[["trade_date", "nav"]],
         include_extended=True,
+        initial_strategy_nav=1.0,
     )
     metrics = summarize_performance(
         strategy_nav[["trade_date", "nav"]],
         passive[["trade_date", "nav"]],
         include_extended=True,
+        initial_strategy_nav=1.0,
+        initial_benchmark_nav=1.0,
     )
     static_half_metrics = summarize_performance(
         static_half[["trade_date", "nav"]],
         include_extended=True,
+        initial_strategy_nav=1.0,
     )
     weights = targets["target_weight"].astype(float)
     metrics.update(

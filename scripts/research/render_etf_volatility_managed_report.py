@@ -3,11 +3,9 @@ from __future__ import annotations
 import argparse
 from datetime import datetime
 from html import escape
-import itertools
 import json
 import math
 from pathlib import Path
-from statistics import NormalDist
 import sys
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -23,6 +21,13 @@ if str(REPO_ROOT) not in sys.path:
 from backend.app.quant_research.artifacts import read_canonical_csv_gz
 from backend.app.quant_research.dataset import build_adjusted_price_panel
 from backend.app.quant_research.metrics import summarize_performance
+from backend.app.quant_research.reporting import (
+    deflated_sharpe,
+    hac_alpha,
+    probability_backtest_overfitting,
+    returns_from_initial_nav,
+    tail_metrics,
+)
 
 
 DEFAULT_RUN_ROOT = (
@@ -280,6 +285,7 @@ def build_summary(
     passive_metrics = summarize_performance(
         passive[["trade_date", "nav"]],
         include_extended=True,
+        initial_strategy_nav=1.0,
     )
     executions = _read_frame(
         t0["path"] / "rebalance_executions.csv.gz",
@@ -306,9 +312,9 @@ def build_summary(
     stress = _stress_rows(returns, t0_nav, executions)
     walk_forward = _walk_forward_rows(t0, t0_nav, passive)
     tail = _tail_rows(returns)
-    hac = _hac_alpha(returns["T0"], returns["passive"])
-    dsr = _deflated_sharpe(returns, ("T0", "T1", "T2", "T3"))
-    pbo = _probability_backtest_overfitting(
+    hac = hac_alpha(returns["T0"], returns["passive"])
+    dsr = deflated_sharpe(returns, ("T0", "T1", "T2", "T3"))
+    pbo = probability_backtest_overfitting(
         returns,
         ("T0", "T1", "T2", "T3"),
     )
@@ -609,6 +615,7 @@ def build_summary(
             gate_runs,
             passive,
             manifest,
+            returns,
         )
         summary["lowVolatilityGateFollowup"] = followup
         charts.update(followup_charts)
@@ -619,6 +626,7 @@ def _build_low_volatility_gate_followup(
     runs: dict[str, dict[str, Any]],
     passive: pd.DataFrame,
     original_manifest: dict[str, Any],
+    original_returns: pd.DataFrame,
 ) -> tuple[dict[str, Any], dict[str, pd.Series]]:
     base = runs["base_cost"]
     double = runs["double_cost"]
@@ -667,10 +675,11 @@ def _build_low_volatility_gate_followup(
     passive_metrics = summarize_performance(
         passive[["trade_date", "nav"]],
         include_extended=True,
+        initial_strategy_nav=1.0,
     )
     static_half = passive[["trade_date"]].copy()
     static_half["nav"] = 0.5 + 0.5 * passive["nav"]
-    static_half_returns = static_half["nav"].pct_change(fill_method=None).dropna()
+    static_half_returns = returns_from_initial_nav(static_half["nav"])
     static_metrics = base["metrics"]["staticHalfBenchmarkMetrics"]
     base_metrics = base["metrics"]
     double_metrics = double["metrics"]
@@ -686,6 +695,17 @@ def _build_low_volatility_gate_followup(
     )
     largest_year = max(yearly, key=lambda row: row["activeLogWealth"])
     stability_pass = largest_year["activeLogWealth"] <= total_active_log
+    trial_returns = original_returns[
+        ["trade_date", "T0", "T1", "T2", "T3"]
+    ].merge(
+        returns[["trade_date", "T0"]].rename(columns={"T0": "low_vol_gate"}),
+        on="trade_date",
+        how="inner",
+        validate="one_to_one",
+    )
+    trial_candidates = ("T0", "T1", "T2", "T3", "low_vol_gate")
+    dsr = deflated_sharpe(trial_returns, trial_candidates)
+    pbo = probability_backtest_overfitting(trial_returns, trial_candidates)
     gates = [
         _gate(
             "相对满仓被动回撤",
@@ -801,8 +821,9 @@ def _build_low_volatility_gate_followup(
             "下月 100% 持有 ETF；高于门槛时 100% 现金；下一开市日开盘执行。"
         ),
         "oneLine": (
-            "低波动准入没有改善回撤：基础成本最大回撤 -52.82%，"
-            "比 100% 被动持有的 -42.16% 和 50% ETF / 50% 现金的 -25.21% 都更差。"
+            f"低波动准入没有改善回撤：基础成本最大回撤 {base_metrics['maxDrawdown']:.2%}，"
+            f"比 100% 被动持有的 {passive_metrics['maxDrawdown']:.2%} 和 50% ETF / 50% 现金的 "
+            f"{static_metrics['maxDrawdown']:.2%} 都更差。"
         ),
         "interpretation": (
             "该门槛确实在 2018 年高波动下跌中减少损失，但在 2022 年低波慢跌中继续持仓，"
@@ -832,6 +853,44 @@ def _build_low_volatility_gate_followup(
                 for row in walk_forward
             ),
         },
+        "multipleTesting": {
+            "trialCount": len(trial_candidates),
+            "trialDefinition": (
+                "原始报告的四个波动率管理变体，加上同一 OOS 上追加的低波动准入规则；"
+                "零成本和双倍成本只作为压力场景，不重复计作策略试验。"
+            ),
+            "winnerByNetSharpe": dsr["winner"],
+            "winnerDisplayName": (
+                "沪深300 ETF 低波动准入策略"
+                if dsr["winner"] == "low_vol_gate"
+                else next(
+                    item["name"]
+                    for item in TRIAL_GLOSSARY
+                    if item["id"] == dsr["winner"]
+                )
+            ),
+            "deflatedSharpeRatio": dsr,
+            "pbo": pbo,
+            "interpretation": (
+                "低波动准入是在同一段 OOS 上看过原始四个变体后追加的第五个研究假设；"
+                "DSR/PBO 只能作为过拟合反证，不能把这段 OOS 再当成独立确认集。"
+            ),
+        },
+        "supportingEvidence": [
+            "30/30 数据质量规则通过，低波动准入与原始报告复用同一 canonical 快照并完成断网复现。",
+            f"基础成本 CAGR {base_metrics['annualizedReturn']:.2%}，高于 50% ETF / 50% 现金基准的 {static_metrics['annualizedReturn']:.2%}。",
+            "2018 年高波动下跌阶段减少了绝对损失，说明波动门槛在部分冲击环境中确实降低暴露。",
+        ],
+        "opposingEvidence": [
+            f"最大回撤 {base_metrics['maxDrawdown']:.2%}，同时差于被动 {passive_metrics['maxDrawdown']:.2%} 和半仓基准 {static_metrics['maxDrawdown']:.2%}。",
+            f"相对半仓基准 Sharpe 改善 {base_metrics['sharpeImprovementVsStaticHalf']:.3f}，未达到 0.05 门槛。",
+            f"五个同 OOS 研究假设的 PBO 为 {pbo['probability']:.1%}；追加规则没有独立样本外确认。",
+        ],
+        "missingEvidence": [
+            "缺少另一只事前指定宽基 ETF 或后续新时间段的独立样本外验证。",
+            "现金收益仍按 0，未纳入 point-in-time 现金利率与税费细分。",
+            "未绑定目标资金规模、ADV 参与率和市场冲击模型，容量仍为 not_available。",
+        ],
         "drawdownEpisode": {
             "peakDate": peak["trade_date"].date().isoformat(),
             "troughDate": trough["trade_date"].date().isoformat(),
@@ -871,6 +930,8 @@ def _build_low_volatility_gate_followup(
             - 1
         ),
         "gate_exposure": nav.set_index("trade_date")["gross_exposure"],
+        "gate_turnover": nav.set_index("trade_date")["one_way_turnover"].cumsum(),
+        "gate_cost": nav.set_index("trade_date")["transaction_cost_rate"].cumsum(),
     }
     return followup, charts
 
@@ -883,7 +944,7 @@ def _followup_comparison_row(
     *,
     average_exposure: float,
 ) -> dict[str, Any]:
-    tail = _tail_metrics(returns)
+    tail = tail_metrics(returns)
     return {
         "label": label,
         "initialCapital": INITIAL_CAPITAL,
@@ -922,7 +983,7 @@ def _comparison_rows(
     rows: list[dict[str, Any]] = []
     for label in ("passive", *TRIAL_ORDER):
         metrics = passive_metrics if label == "passive" else runs[label]["metrics"]
-        tail = _tail_metrics(returns["passive" if label == "passive" else label])
+        tail = tail_metrics(returns["passive" if label == "passive" else label])
         rows.append(
             {
                 "label": labels[label],
@@ -1142,134 +1203,9 @@ def _tail_rows(returns: pd.DataFrame) -> list[dict[str, Any]]:
         **{label: TRIAL_DISPLAY_NAMES[label] for label in ("T0", "T1", "T2", "T3")},
     }
     return [
-        {"label": labels[label], **_tail_metrics(returns[label])}
+        {"label": labels[label], **tail_metrics(returns[label])}
         for label in labels
     ]
-
-
-def _tail_metrics(returns: pd.Series) -> dict[str, float]:
-    series = pd.to_numeric(returns, errors="raise").dropna()
-    losses = -series
-    var95 = float(losses.quantile(0.95))
-    return {
-        "skew": float(series.skew()),
-        "excessKurtosis": float(series.kurt()),
-        "var95": var95,
-        "es95": float(losses[losses >= var95].mean()),
-    }
-
-
-def _hac_alpha(strategy: pd.Series, benchmark: pd.Series) -> dict[str, float | int]:
-    frame = pd.concat([strategy.rename("strategy"), benchmark.rename("benchmark")], axis=1).dropna()
-    y = frame["strategy"].to_numpy(dtype=float)
-    x = np.column_stack([np.ones(len(frame)), frame["benchmark"].to_numpy(dtype=float)])
-    coefficients = np.linalg.solve(x.T @ x, x.T @ y)
-    residuals = y - x @ coefficients
-    lag = int(math.floor(4 * (len(frame) / 100) ** (2 / 9)))
-    xu = x * residuals[:, None]
-    meat = xu.T @ xu
-    for offset in range(1, lag + 1):
-        weight = 1 - offset / (lag + 1)
-        gamma = xu[offset:].T @ xu[:-offset]
-        meat += weight * (gamma + gamma.T)
-    inverse = np.linalg.inv(x.T @ x)
-    covariance = inverse @ meat @ inverse
-    alpha = float(coefficients[0] * 252)
-    standard_error = float(math.sqrt(covariance[0, 0]) * 252)
-    return {
-        "observations": int(len(frame)),
-        "neweyWestLag": lag,
-        "annualizedAlpha": alpha,
-        "beta": float(coefficients[1]),
-        "annualizedAlphaStandardError": standard_error,
-        "alphaTStatistic": float(coefficients[0] / math.sqrt(covariance[0, 0])),
-        "ci95Low": alpha - 1.96 * standard_error,
-        "ci95High": alpha + 1.96 * standard_error,
-        "strategyLag1Autocorrelation": float(frame["strategy"].autocorr(1)),
-    }
-
-
-def _deflated_sharpe(
-    returns: pd.DataFrame,
-    candidates: tuple[str, ...],
-) -> dict[str, Any]:
-    sharpes = {
-        candidate: float(returns[candidate].mean() / returns[candidate].std(ddof=1))
-        for candidate in candidates
-    }
-    winner = max(candidates, key=lambda candidate: sharpes[candidate])
-    trial_std = float(pd.Series(sharpes).std(ddof=1))
-    count = len(candidates)
-    normal = NormalDist()
-    euler_gamma = 0.5772156649015329
-    expected_max = trial_std * (
-        (1 - euler_gamma) * normal.inv_cdf(1 - 1 / count)
-        + euler_gamma * normal.inv_cdf(1 - 1 / (count * math.e))
-    )
-    series = returns[winner].dropna()
-    observed = sharpes[winner]
-    skew = float(series.skew())
-    kurtosis = float(series.kurt() + 3)
-    denominator = math.sqrt(
-        1 - skew * observed + ((kurtosis - 1) / 4) * observed**2
-    )
-    statistic = (observed - expected_max) * math.sqrt(len(series) - 1) / denominator
-    return {
-        "winner": winner,
-        "trialCount": count,
-        "observations": int(len(series)),
-        "dailySharpe": observed,
-        "expectedMaximumDailySharpe": expected_max,
-        "probability": normal.cdf(statistic),
-        "zStatistic": statistic,
-    }
-
-
-def _probability_backtest_overfitting(
-    returns: pd.DataFrame,
-    candidates: tuple[str, ...],
-) -> dict[str, Any]:
-    monthly = (
-        returns.set_index("trade_date")[list(candidates)]
-        .resample("ME")
-        .apply(lambda values: float((1 + values).prod() - 1))
-        .dropna()
-    )
-    partition_count = 8
-    blocks = [list(values) for values in np.array_split(range(len(monthly)), partition_count)]
-    logits: list[float] = []
-    winner_counts = {candidate: 0 for candidate in candidates}
-
-    def sharpe(candidate: str, positions: list[int]) -> float:
-        series = monthly.iloc[positions][candidate]
-        volatility = float(series.std(ddof=1))
-        return float(series.mean() / volatility) if volatility > 0 else -math.inf
-
-    for selected in itertools.combinations(range(partition_count), partition_count // 2):
-        train = [position for block in selected for position in blocks[block]]
-        test = [
-            position
-            for block in range(partition_count)
-            if block not in selected
-            for position in blocks[block]
-        ]
-        winner = max(candidates, key=lambda candidate: (sharpe(candidate, train), candidate))
-        winner_counts[winner] += 1
-        ordered = sorted(
-            candidates,
-            key=lambda candidate: (sharpe(candidate, test), candidate),
-        )
-        rank = ordered.index(winner) + 1
-        percentile = rank / (len(candidates) + 1)
-        logits.append(math.log(percentile / (1 - percentile)))
-    return {
-        "method": "CSCV, 8 个连续月度分块",
-        "monthlyObservations": int(len(monthly)),
-        "combinations": int(len(logits)),
-        "probability": float(sum(value <= 0 for value in logits) / len(logits)),
-        "medianLogit": float(pd.Series(logits).median()),
-        "trainingWinnerCounts": winner_counts,
-    }
 
 
 def _selected_return_metrics(group: pd.DataFrame) -> dict[str, Any]:
@@ -1340,12 +1276,13 @@ def _build_passive_nav(run_path: Path, start: pd.Timestamp, end: pd.Timestamp) -
     factors = read_canonical_csv_gz(run_path / "inputs" / "fund_adjust_factors.csv.gz")
     prices = build_adjusted_price_panel(bars, factors)
     prices["trade_date"] = pd.to_datetime(prices["trade_date"], errors="raise")
+    prices["adj_open"] = pd.to_numeric(prices["adj_open"], errors="raise")
     prices["adj_close"] = pd.to_numeric(prices["adj_close"], errors="raise")
     prices = prices[prices["trade_date"].between(start, end)].sort_values("trade_date")
     if prices.empty:
         raise ValueError("被动 ETF OOS 净值为空")
-    result = prices[["trade_date", "adj_close"]].copy()
-    result["nav"] = result["adj_close"] / result["adj_close"].iloc[0]
+    result = prices[["trade_date", "adj_open", "adj_close"]].copy()
+    result["nav"] = result["adj_close"] / result["adj_open"].iloc[0]
     return result[["trade_date", "nav"]]
 
 
@@ -1362,9 +1299,9 @@ def _aligned_returns(
             validate="one_to_one",
         )
     returns = frame[["trade_date"]].copy()
-    returns["passive"] = frame["passive_nav"].pct_change(fill_method=None)
+    returns["passive"] = returns_from_initial_nav(frame["passive_nav"])
     for label in navs:
-        returns[label] = frame[f"{label}_nav"].pct_change(fill_method=None)
+        returns[label] = returns_from_initial_nav(frame[f"{label}_nav"])
     return returns.dropna().reset_index(drop=True)
 
 
@@ -1452,6 +1389,14 @@ def _render_low_volatility_gate_followup(
             "现金": 1 - charts["gate_exposure"],
         },
         {"ETF 风险资产": "#0f6a53", "现金": "#a26a16"},
+    )
+    turnover_chart = _line_svg(
+        {"累计单边换手": charts["gate_turnover"]},
+        {"累计单边换手": "#315c8a"},
+    )
+    cost_chart = _line_svg(
+        {"累计成本率": charts["gate_cost"]},
+        {"累计成本率": "#a26a16"},
     )
     gates = _html_table(
         followup["gates"],
@@ -1549,11 +1494,17 @@ def _render_low_volatility_gate_followup(
     <section class="panel half"><h2>回撤曲线</h2><div class="legend"><span><i class="dot" style="background:#a7372d"></i>低波动准入策略</span><span><i class="dot" style="background:#a26a16"></i>50% ETF + 50% 现金</span><span><i class="dot" style="background:#65706b"></i>100% 被动持有 ETF</span></div>{gate_drawdown_chart}</section>
     <section class="panel half"><h2>风险资产与现金仓位</h2>{exposure_chart}</section>
     <section class="panel half"><h2>最深回撤发生了什么</h2><ul><li>回撤前高点：{escape(episode["peakDate"])}，账户资产 {_fmt(episode["peakCapital"], "money")}。</li><li>谷底：{escape(episode["troughDate"])}，账户资产 {_fmt(episode["troughCapital"], "money")}。</li><li>高点到谷底损失：{_fmt(-episode["drawdownLoss"], "money")}，即 {_fmt(episode["maxDrawdown"], "pct")}。</li><li>修复日期：{escape(recovery)}。</li></ul><p>核心失效机制是低波慢跌：2022 年策略亏损比被动更多，2023 年策略又保持全年 100% 风险资产暴露；月频滞后还可能在冲击后离场、错过随后的反弹。</p></section>
+    <section class="panel half"><h2>累计单边换手</h2>{turnover_chart}</section>
+    <section class="panel half"><h2>累计成本率</h2>{cost_chart}</section>
     <section class="panel"><h2>事前验证门禁</h2>{gates}<p class="note">门禁以最大回撤、同风险量级基准、双倍成本和环境稳定性为主；只要关键门禁失败，就不能因为某些年份表现好而判为有效。</p></section>
     <section class="panel"><h2>逐年表现</h2>{yearly}</section>
     <section class="panel"><h2>不同方向与波动环境</h2><p class="note">行情方向由沪深300指数当月收益划分；波动环境门槛固定为校准期月实现方差中位数 {followup["regimeVarianceThreshold"]:.8f}。</p>{regimes}</section>
     <section class="panel"><h2>压力阶段</h2>{stress}</section>
     <section class="panel"><h2>滚动样本外窗口</h2>{walk_forward}</section>
+    <section class="panel"><h2>多重试验与过拟合</h2><ul><li>本次统一计算 {followup["multipleTesting"]["trialCount"]} 个研究假设：{escape(followup["multipleTesting"]["trialDefinition"])}</li><li>DSR：{_fmt(followup["multipleTesting"]["deflatedSharpeRatio"]["probability"], "pct")}；净 Sharpe 冠军为 {escape(followup["multipleTesting"]["winnerDisplayName"])}。</li><li>PBO：{_fmt(followup["multipleTesting"]["pbo"]["probability"], "pct")}；8 个连续月度块、{followup["multipleTesting"]["pbo"]["combinations"]} 个 CSCV 组合。</li></ul><p>{escape(followup["multipleTesting"]["interpretation"])}</p></section>
+    <section class="panel third"><h2>支持证据</h2>{_html_list(followup["supportingEvidence"])}</section>
+    <section class="panel third"><h2>反对证据</h2>{_html_list(followup["opposingEvidence"])}</section>
+    <section class="panel third"><h2>尚缺证据</h2>{_html_list(followup["missingEvidence"])}</section>
     <section class="panel"><h2>如何继续优化</h2><ol><li>不能在同一段样本外继续搜索波动阈值，否则会把这次失败变成参数拟合。</li><li>若核心目标是压回撤，下一轮只预登记一个“低波慢跌保护”机制，并在新时间段或另一只事先指定的宽基 ETF 上验证。</li><li>月度 0% / 100% 切换累计成本率 {_fmt(followup["cumulativeTransactionCostRate"], "pct")}；可单独验证渐进仓位是否降低换手，但不得同时改门槛和信号。</li><li>任何新版本仍必须与固定比例 ETF / 现金基准比较，不能只和 100% 满仓相比。</li></ol></section>
     <section class="panel"><h2>复现身份</h2>{reproduction}<p class="note">基础成本与双倍成本运行均绑定同一数据快照，并已在断网容器中复现匹配结果指纹。</p></section>
   </div>

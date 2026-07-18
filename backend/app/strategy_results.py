@@ -21,34 +21,63 @@ def build_strategy_results_overview(repo_root: Path) -> dict[str, Any]:
     result_sets = []
     for item in manifest.get("resultSets", []):
         artifacts = item.get("artifacts", {})
-        phased = read_json_rows(results_root / artifacts.get("phasedJson", ""))
-        score_scan = read_csv_rows(results_root / artifacts.get("scoreScanCsv", ""), limit=8)
+        phased = read_json_rows(artifact_path(results_root, artifacts, "phasedJson"))
+        score_scan = read_csv_rows(
+            artifact_path(results_root, artifacts, "scoreScanCsv"), limit=8
+        )
+        report_summary = read_json_object(
+            artifact_path(results_root, artifacts, "summaryJson")
+        )
         result_sets.append(
             {
                 **item,
                 "phases": phased,
                 "scoreScanTop": score_scan,
-                "summary": summarize_phases(phased),
+                "summary": (
+                    summarize_report(report_summary)
+                    if report_summary
+                    else summarize_phases(phased)
+                ),
             }
         )
 
     return {
+        "manifestVersion": manifest.get("manifestVersion", 1),
         "source": manifest.get("source", "docs/research/strategy-results"),
         "mode": manifest.get("mode", "readonly"),
         "executionEnabled": bool(manifest.get("executionEnabled", False)),
+        "landingPage": manifest.get("landingPage"),
         "resultSets": result_sets,
     }
 
 
-def read_json_rows(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
+def artifact_path(
+    results_root: Path,
+    artifacts: dict[str, Any],
+    key: str,
+) -> Path | None:
+    value = artifacts.get(key)
+    if not isinstance(value, str) or not value:
+        return None
+    return results_root / value
+
+
+def read_json_rows(path: Path | None) -> list[dict[str, Any]]:
+    if path is None or not path.is_file():
         return []
     payload = json.loads(path.read_text(encoding="utf-8"))
     return payload.get("rows", [])
 
 
-def read_csv_rows(path: Path, limit: int) -> list[dict[str, Any]]:
-    if not path.exists():
+def read_json_object(path: Path | None) -> dict[str, Any]:
+    if path is None or not path.is_file():
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return payload if isinstance(payload, dict) else {}
+
+
+def read_csv_rows(path: Path | None, limit: int) -> list[dict[str, Any]]:
+    if path is None or not path.is_file():
         return []
     with path.open("r", encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
@@ -81,4 +110,28 @@ def summarize_phases(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "bestAnnualReturn": best_annual.get("annual_return"),
         "worstDrawdownPhase": worst_drawdown.get("phase"),
         "worstDrawdown": worst_drawdown.get("max_drawdown"),
+    }
+
+
+def summarize_report(payload: dict[str, Any]) -> dict[str, Any]:
+    conclusion = payload.get("conclusion")
+    if isinstance(conclusion, dict):
+        conclusion_text = conclusion.get("oneLine")
+    else:
+        conclusion_text = conclusion
+    if not conclusion_text:
+        conclusion_text = payload.get("oneSentenceConclusion")
+    if not conclusion_text:
+        evidence = payload.get("evidence")
+        against = evidence.get("against") if isinstance(evidence, dict) else None
+        if isinstance(against, list) and against:
+            conclusion_text = against[0]
+    return {
+        "status": payload.get("status"),
+        "conclusion": conclusion_text,
+        "reportGeneratedAt": (
+            payload.get("reportGeneratedAt")
+            or payload.get("researchDate")
+            or payload.get("generated_at")
+        ),
     }

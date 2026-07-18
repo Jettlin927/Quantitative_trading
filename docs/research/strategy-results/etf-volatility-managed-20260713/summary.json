@@ -1,11 +1,11 @@
 {
   "status": "不通过",
   "initialCapital": 100000.0,
-  "reportGeneratedAt": "2026-07-13T17:52:32+08:00",
+  "reportGeneratedAt": "2026-07-19T03:00:30+08:00",
   "conclusion": {
     "oneLine": "基准逆方差强力降风险版明显降低波动并提高净 CAGR，但最大回撤和 Sharpe 改善未达到事前门槛，且主动收益被少数年份主导，因此不能认定为好策略。",
-    "strongestSupport": "年化波动是被动的 79.1%，净 CAGR 高出 0.93%。",
-    "strongestOpposition": "最大回撤仍达 40.9%，是被动回撤的 97.0%；Sharpe 改善仅 0.093。",
+    "strongestSupport": "年化波动是被动的 79.1%，净 CAGR 高出 0.77%。",
+    "strongestOpposition": "最大回撤仍达 40.9%，是被动回撤的 97.0%；Sharpe 改善仅 0.085。",
     "bestEnvironment": "高波动下跌月相对保护最明显，但绝对亏损仍大。",
     "failureEnvironment": "波动突然上升或持续熊市；上一月方差反应偏慢，不能阻止深回撤。",
     "researchOnly": true
@@ -113,35 +113,35 @@
     {
       "name": "年化波动",
       "rule": "逆方差强力降风险版（T0） / 被动 <= 90%",
-      "actual": 0.7908559540629075,
+      "actual": 0.7908664031671541,
       "threshold": 0.9,
       "passed": true
     },
     {
       "name": "最大回撤",
       "rule": "|逆方差强力降风险版（T0） 最大回撤| / |被动最大回撤| <= 85%",
-      "actual": 0.970020408376869,
+      "actual": 0.9700204083768692,
       "threshold": 0.85,
       "passed": false
     },
     {
       "name": "Sharpe 改善",
       "rule": "逆方差强力降风险版（T0） - 被动 >= 0.10",
-      "actual": 0.09267352610793628,
+      "actual": 0.08516274904201804,
       "threshold": 0.1,
       "passed": false
     },
     {
       "name": "CAGR 保留",
       "rule": "逆方差强力降风险版（T0） - 被动 >= -2 个百分点",
-      "actual": 0.009279921742314956,
+      "actual": 0.007746512954571738,
       "threshold": -0.02,
       "passed": true
     },
     {
       "name": "双倍成本",
       "rule": "双倍成本 Sharpe - 被动 >= 0",
-      "actual": 0.06722113989170642,
+      "actual": 0.05971036282578818,
       "threshold": 0.0,
       "passed": true
     },
@@ -162,9 +162,9 @@
       "name": "单年不主导",
       "rule": "最大单年主动对数财富贡献不超过整段净主动对数财富",
       "actual": {
-        "year": 2018,
-        "largestContribution": 0.10305132103560516,
-        "wholePeriod": 0.07230281767812374
+        "year": 2024,
+        "largestContribution": 0.10177358414949689,
+        "wholePeriod": 0.060140176867426065
       },
       "threshold": "largestContribution <= wholePeriod",
       "passed": false
@@ -174,18 +174,18 @@
     {
       "label": "被动 ETF",
       "initialCapital": 100000.0,
-      "finalCapital": 140461.65801005455,
-      "profitAndLoss": 40461.65801005457,
-      "totalReturn": 0.4046165801005457,
+      "finalCapital": 142180.474187368,
+      "profitAndLoss": 42180.47418736801,
+      "totalReturn": 0.4218047418736801,
       "relativeWealth": 0.0,
-      "cagr": 0.04252355679976172,
-      "volatility": 0.19577012803072008,
-      "sharpe": 0.3106167919658258,
-      "downsideVolatility": 0.13553881728538755,
-      "sortino": 0.44864999082589113,
-      "maxDrawdown": -0.42155347080635797,
+      "cagr": 0.04405696558750494,
+      "volatility": 0.19576754147189301,
+      "sharpe": 0.31812756903174405,
+      "downsideVolatility": 0.13550586752987806,
+      "sortino": 0.4596040983246898,
+      "maxDrawdown": -0.42155347080635786,
       "maxDrawdownDuration": 1299,
-      "calmar": 0.10087345910928358,
+      "calmar": 0.10451097817610584,
       "es95": 0.028004220547989893,
       "trackingError": null,
       "informationRatio": null,
@@ -200,7 +200,7 @@
       "finalCapital": 150993.5880220578,
       "profitAndLoss": 50993.588022057826,
       "totalReturn": 0.5099358802205782,
-      "relativeWealth": 0.0749808179770266,
+      "relativeWealth": 0.06198540189896762,
       "cagr": 0.051803478542076675,
       "volatility": 0.15482597138075269,
       "sharpe": 0.4032903180737621,
@@ -223,7 +223,7 @@
       "finalCapital": 154024.1214087913,
       "profitAndLoss": 54024.12140879132,
       "totalReturn": 0.5402412140879131,
-      "relativeWealth": 0.0965563385117234,
+      "relativeWealth": 0.0833000965084385,
       "cagr": 0.05436843112395673,
       "volatility": 0.17774523400592113,
       "sharpe": 0.38649674936732537,
@@ -246,7 +246,7 @@
       "finalCapital": 141970.165247662,
       "profitAndLoss": 41970.16524766199,
       "totalReturn": 0.41970165247661995,
-      "relativeWealth": 0.010739637129297153,
+      "relativeWealth": -0.001479168928842256,
       "cagr": 0.04388944624009161,
       "volatility": 0.16739803103979878,
       "sharpe": 0.3400734273596335,
@@ -269,7 +269,7 @@
       "finalCapital": 148989.2930885131,
       "profitAndLoss": 48989.29308851312,
       "totalReturn": 0.4898929308851312,
-      "relativeWealth": 0.06071147955442857,
+      "relativeWealth": 0.04788856514975692,
       "cagr": 0.050082172718338036,
       "volatility": 0.15439585979292691,
       "sharpe": 0.39339223965900333,
@@ -292,7 +292,7 @@
       "finalCapital": 155970.17656438283,
       "profitAndLoss": 55970.17656438281,
       "totalReturn": 0.5597017656438281,
-      "relativeWealth": 0.11041104579029049,
+      "relativeWealth": 0.09698731457909249,
       "cagr": 0.05599226343597197,
       "volatility": 0.15500456728648004,
       "sharpe": 0.4286378220308941,
@@ -315,7 +315,7 @@
       "finalCapital": 146172.69794454376,
       "profitAndLoss": 46172.697944543754,
       "totalReturn": 0.4617269794454375,
-      "relativeWealth": 0.040659066790172504,
+      "relativeWealth": 0.028078565499188857,
       "cagr": 0.047628593879208925,
       "volatility": 0.1546679405860009,
       "sharpe": 0.3778379318575322,
@@ -336,73 +336,73 @@
   "tailRisk": [
     {
       "label": "被动 ETF",
-      "skew": 0.005253047786426134,
-      "excessKurtosis": 6.815686767078459,
-      "var95": 0.017880194246373132,
+      "skew": 0.004278757799057085,
+      "excessKurtosis": 6.8118446405585775,
+      "var95": 0.017875583968527113,
       "es95": 0.028004220547989893
     },
     {
       "label": "逆方差强力降风险版（T0）",
-      "skew": 0.7521764033120771,
-      "excessKurtosis": 15.93943144107708,
-      "var95": 0.012928033208474271,
+      "skew": 0.7508023399222074,
+      "excessKurtosis": 15.928010175614002,
+      "var95": 0.01292668827761822,
       "es95": 0.02108824689701825
     },
     {
       "label": "逆波动温和降风险版（T1）",
-      "skew": 0.38238153781460216,
-      "excessKurtosis": 8.55902164719462,
-      "var95": 0.01550038156221678,
+      "skew": 0.38125549314039403,
+      "excessKurtosis": 8.554242914233681,
+      "var95": 0.015496536601246821,
       "es95": 0.024559843463987516
     },
     {
       "label": "三个月方差平滑版（T2）",
-      "skew": 0.4121805850936817,
-      "excessKurtosis": 10.337951609500994,
-      "var95": 0.014381212893546297,
+      "skew": 0.41100140534340274,
+      "excessKurtosis": 10.330898368017454,
+      "var95": 0.014380853261355629,
       "es95": 0.023633174014458157
     },
     {
       "label": "10 个百分点调仓缓冲版（T3）",
-      "skew": 0.7203870974648078,
-      "excessKurtosis": 16.014960377208304,
-      "var95": 0.012952671548993877,
+      "skew": 0.7190265432384194,
+      "excessKurtosis": 16.003427421222877,
+      "var95": 0.012951778673458089,
       "es95": 0.021031292954569028
     }
   ],
   "alphaHac": {
-    "observations": 2056,
+    "observations": 2057,
     "neweyWestLag": 7,
-    "annualizedAlpha": 0.019046429088804693,
-    "beta": 0.7135956373762591,
-    "annualizedAlphaStandardError": 0.028601495966171085,
-    "alphaTStatistic": 0.66592422687723,
-    "ci95Low": -0.03701250300489063,
-    "ci95High": 0.07510536118250002,
-    "strategyLag1Autocorrelation": 0.10013810581010701
+    "annualizedAlpha": 0.019228385900758576,
+    "beta": 0.7136537216099096,
+    "annualizedAlphaStandardError": 0.028591004797205357,
+    "alphaTStatistic": 0.6725327087013767,
+    "ci95Low": -0.036809983501763927,
+    "ci95High": 0.07526675530328107,
+    "strategyLag1Autocorrelation": 0.1003539579458846
   },
   "yearly": [
     {
       "year": 2018,
-      "observations": 242,
-      "strategyReturn": -0.17147226632549706,
-      "passiveReturn": -0.2526011414424366,
-      "activeReturn": 0.08112887511693956,
-      "annualizedVolatility": 0.1351293637049471,
-      "maxDrawdown": -0.22574720502166723,
-      "requestCount": 11,
-      "turnover": 2.480612516789244,
-      "cost": 0.00410025190438949,
+      "observations": 243,
+      "strategyReturn": -0.1629197301789147,
+      "passiveReturn": -0.24345529148456213,
+      "activeReturn": 0.08053556130564743,
+      "annualizedVolatility": 0.1353196946731394,
+      "maxDrawdown": -0.2257472050216669,
+      "requestCount": 12,
+      "turnover": 3.428776325979195,
+      "cost": 0.00538027304679589,
       "blockedRate": 0.0,
-      "averageExposure": 0.571183347947216,
-      "activeLogWealth": 0.10305132103560516
+      "averageExposure": 0.5727421011160508,
+      "activeLogWealth": 0.10115833706518534
     },
     {
       "year": 2019,
       "observations": 244,
       "strategyReturn": 0.271568913123724,
-      "passiveReturn": 0.38604229656044664,
-      "activeReturn": -0.11447338343672264,
+      "passiveReturn": 0.3860422965604462,
+      "activeReturn": -0.1144733834367222,
       "annualizedVolatility": 0.13184188542809552,
       "maxDrawdown": -0.08110056276798805,
       "requestCount": 10,
@@ -410,14 +410,14 @@
       "cost": 0.004115505045394123,
       "blockedRate": 0.0,
       "averageExposure": 0.6965605454885186,
-      "activeLogWealth": -0.08620091460117507
+      "activeLogWealth": -0.08620091460117474
     },
     {
       "year": 2020,
       "observations": 243,
       "strategyReturn": 0.28275594162484574,
-      "passiveReturn": 0.2907714843749991,
-      "activeReturn": -0.00801554275015337,
+      "passiveReturn": 0.2907714843749998,
+      "activeReturn": -0.008015542750154037,
       "annualizedVolatility": 0.19249353329212912,
       "maxDrawdown": -0.1279329487899341,
       "requestCount": 9,
@@ -425,14 +425,14 @@
       "cost": 0.005497787235941047,
       "blockedRate": 0.0,
       "averageExposure": 0.7033140918567476,
-      "activeLogWealth": -0.00622924674392536
+      "activeLogWealth": -0.006229246743925859
     },
     {
       "year": 2021,
       "observations": 243,
       "strategyReturn": -0.034433171965223996,
-      "passiveReturn": -0.040296391410901466,
-      "activeReturn": 0.00586321944567747,
+      "passiveReturn": -0.0402963914109008,
+      "activeReturn": 0.005863219445676804,
       "annualizedVolatility": 0.12960289392918706,
       "maxDrawdown": -0.11874011531234796,
       "requestCount": 10,
@@ -440,14 +440,14 @@
       "cost": 0.004607881046559351,
       "blockedRate": 0.0,
       "averageExposure": 0.7166544832625225,
-      "activeLogWealth": 0.006090819721028214
+      "activeLogWealth": 0.00609081972102752
     },
     {
       "year": 2022,
       "observations": 242,
       "strategyReturn": -0.21656171677591263,
-      "passiveReturn": -0.20137905844585613,
-      "activeReturn": -0.015182658330056498,
+      "passiveReturn": -0.20137905844585702,
+      "activeReturn": -0.01518265833005561,
       "annualizedVolatility": 0.15855715282887503,
       "maxDrawdown": -0.26807002461361595,
       "requestCount": 11,
@@ -455,14 +455,14 @@
       "cost": 0.004370803462720969,
       "blockedRate": 0.0,
       "averageExposure": 0.7388032255482686,
-      "activeLogWealth": -0.019194129038238056
+      "activeLogWealth": -0.019194129038236946
     },
     {
       "year": 2023,
       "observations": 242,
       "strategyReturn": -0.09126337355687697,
-      "passiveReturn": -0.09751127443594243,
-      "activeReturn": 0.00624790087906546,
+      "passiveReturn": -0.09751127443594232,
+      "activeReturn": 0.006247900879065349,
       "annualizedVolatility": 0.1311953521319121,
       "maxDrawdown": -0.19269154656441223,
       "requestCount": 5,
@@ -470,14 +470,14 @@
       "cost": 0.0015074914084429003,
       "blockedRate": 0.0,
       "averageExposure": 0.9809571008219747,
-      "activeLogWealth": 0.006899114629008038
+      "activeLogWealth": 0.006899114629007913
     },
     {
       "year": 2024,
       "observations": 242,
       "strategyReturn": 0.2998454120930618,
-      "passiveReturn": 0.1740646164684918,
-      "activeReturn": 0.12578079562457,
+      "passiveReturn": 0.17406461646849358,
+      "activeReturn": 0.12578079562456823,
       "annualizedVolatility": 0.19546623875200894,
       "maxDrawdown": -0.12377850162866422,
       "requestCount": 5,
@@ -485,14 +485,14 @@
       "cost": 0.003045645031702083,
       "blockedRate": 0.0,
       "averageExposure": 0.7850109330700499,
-      "activeLogWealth": 0.10177358414949839
+      "activeLogWealth": 0.10177358414949689
     },
     {
       "year": 2025,
       "observations": 243,
       "strategyReturn": 0.1967939727278898,
-      "passiveReturn": 0.20836372792825353,
-      "activeReturn": -0.01156975520036374,
+      "passiveReturn": 0.20836372792825508,
+      "activeReturn": -0.011569755200365295,
       "annualizedVolatility": 0.13968035995455583,
       "maxDrawdown": -0.10075444146994406,
       "requestCount": 8,
@@ -500,14 +500,14 @@
       "cost": 0.004251718796370475,
       "blockedRate": 0.0,
       "averageExposure": 0.8971694021959318,
-      "activeLogWealth": -0.009620861400803232
+      "activeLogWealth": -0.009620861400804509
     },
     {
       "year": 2026,
       "observations": 115,
       "strategyReturn": 0.04479541856727565,
-      "passiveReturn": 0.0704594668954015,
-      "activeReturn": -0.025664048328125855,
+      "passiveReturn": 0.0704594668954035,
+      "activeReturn": -0.025664048328127853,
       "annualizedVolatility": 0.16594425968438992,
       "maxDrawdown": -0.07600241318262857,
       "requestCount": 3,
@@ -515,7 +515,7 @@
       "cost": 0.0009172597794023,
       "blockedRate": 0.0,
       "averageExposure": 0.9176167722436847,
-      "activeLogWealth": -0.02426687007287278
+      "activeLogWealth": -0.02426687007287464
     }
   ],
   "regimeDefinition": {
@@ -527,20 +527,20 @@
     {
       "direction": "上涨",
       "volatility": "低波动",
-      "startDate": "2018-01-03",
+      "startDate": "2018-01-02",
       "endDate": "2026-04-30",
       "months": 17,
-      "observations": 349,
-      "strategyReturn": 1.2449817026906582,
-      "passiveReturn": 1.5721271517384778,
-      "activeReturn": -0.3271454490478196,
-      "annualizedVolatility": 0.12123445776080154,
-      "maxDrawdown": -0.038774718883287984,
-      "requestCount": 10,
-      "turnover": 2.9728012596393594,
-      "cost": 0.004320379536456547,
+      "observations": 350,
+      "strategyReturn": 1.2681556851420694,
+      "passiveReturn": 1.603602031226234,
+      "activeReturn": -0.33544634608416457,
+      "annualizedVolatility": 0.12124956825770669,
+      "maxDrawdown": -0.038774718883288095,
+      "requestCount": 11,
+      "turnover": 3.9209650688293096,
+      "cost": 0.005600400678862946,
       "blockedRate": 0.0,
-      "averageExposure": 0.8795096637682853
+      "averageExposure": 0.8797109514945877
     },
     {
       "direction": "上涨",
@@ -550,8 +550,8 @@
       "months": 12,
       "observations": 240,
       "strategyReturn": 1.0991770315537481,
-      "passiveReturn": 1.5714808900558026,
-      "activeReturn": -0.4723038585020545,
+      "passiveReturn": 1.571480890055804,
+      "activeReturn": -0.4723038585020558,
       "annualizedVolatility": 0.22668370566019186,
       "maxDrawdown": -0.06775844421699073,
       "requestCount": 9,
@@ -568,8 +568,8 @@
       "months": 17,
       "observations": 340,
       "strategyReturn": -0.44669908676955994,
-      "passiveReturn": -0.472919851985675,
-      "activeReturn": 0.02622076521611505,
+      "passiveReturn": -0.4729198519856753,
+      "activeReturn": 0.026220765216115383,
       "annualizedVolatility": 0.12466570797678181,
       "maxDrawdown": -0.45660179032096815,
       "requestCount": 9,
@@ -604,8 +604,8 @@
       "months": 27,
       "observations": 538,
       "strategyReturn": 0.11611088738891073,
-      "passiveReturn": 0.17280273311324912,
-      "activeReturn": -0.056691845724338386,
+      "passiveReturn": 0.17280273311325178,
+      "activeReturn": -0.05669184572434105,
       "annualizedVolatility": 0.11198210825068491,
       "maxDrawdown": -0.07724015426864261,
       "requestCount": 18,
@@ -622,8 +622,8 @@
       "months": 11,
       "observations": 221,
       "strategyReturn": -0.004594805133865454,
-      "passiveReturn": 0.03681441054641166,
-      "activeReturn": -0.04140921568027711,
+      "passiveReturn": 0.03681441054641277,
+      "activeReturn": -0.04140921568027822,
       "annualizedVolatility": 0.1576354158764048,
       "maxDrawdown": -0.10570971155607056,
       "requestCount": 11,
@@ -638,17 +638,17 @@
       "name": "2018 全年",
       "startDate": "2018-01-01",
       "endDate": "2018-12-31",
-      "observations": 242,
-      "strategyReturn": -0.17147226632549706,
-      "passiveReturn": -0.2526011414424366,
-      "activeReturn": 0.08112887511693956,
-      "annualizedVolatility": 0.1351293637049471,
-      "maxDrawdown": -0.22574720502166723,
-      "requestCount": 11,
-      "turnover": 2.480612516789244,
-      "cost": 0.00410025190438949,
+      "observations": 243,
+      "strategyReturn": -0.1629197301789147,
+      "passiveReturn": -0.24345529148456213,
+      "activeReturn": 0.08053556130564743,
+      "annualizedVolatility": 0.1353196946731394,
+      "maxDrawdown": -0.2257472050216669,
+      "requestCount": 12,
+      "turnover": 3.428776325979195,
+      "cost": 0.00538027304679589,
       "blockedRate": 0.0,
-      "averageExposure": 0.571183347947216
+      "averageExposure": 0.5727421011160508
     },
     {
       "name": "COVID 冲击",
@@ -656,8 +656,8 @@
       "endDate": "2020-04-30",
       "observations": 64,
       "strategyReturn": -0.046261378213615756,
-      "passiveReturn": -0.051226025734401825,
-      "activeReturn": 0.00496464752078607,
+      "passiveReturn": -0.05122602573440149,
+      "activeReturn": 0.004964647520785737,
       "annualizedVolatility": 0.21506556071345798,
       "maxDrawdown": -0.08297653924306903,
       "requestCount": 3,
@@ -672,8 +672,8 @@
       "endDate": "2022-10-31",
       "observations": 198,
       "strategyReturn": -0.27070076334304005,
-      "passiveReturn": -0.2770229414320665,
-      "activeReturn": 0.0063221780890264645,
+      "passiveReturn": -0.2770229414320676,
+      "activeReturn": 0.006322178089027575,
       "annualizedVolatility": 0.1640768301693992,
       "maxDrawdown": -0.26807002461361595,
       "requestCount": 9,
@@ -688,8 +688,8 @@
       "endDate": "2024-02-08",
       "observations": 28,
       "strategyReturn": -0.03428802612800719,
-      "passiveReturn": -0.018596409605402542,
-      "activeReturn": -0.015691616522604646,
+      "passiveReturn": -0.01859640960540221,
+      "activeReturn": -0.01569161652260498,
       "annualizedVolatility": 0.1754658035049674,
       "maxDrawdown": -0.0564157672677944,
       "requestCount": 1,
@@ -709,9 +709,9 @@
         "strategyReturn": 0.4449169335009222,
         "passiveReturn": 0.49261101829662013,
         "strategySharpe": 2.259049488238531,
-        "passiveSharpe": 1.9484665498216434,
+        "passiveSharpe": 1.948466549821648,
         "strategyMaxDrawdown": -0.06775844421699073,
-        "passiveMaxDrawdown": -0.16047619047619055
+        "passiveMaxDrawdown": -0.16047619047619066
       },
       {
         "windowId": "wf-0002",
@@ -719,11 +719,11 @@
         "testEnd": "2022-02-28",
         "observations": 252,
         "strategyReturn": -0.14449406031286627,
-        "passiveReturn": -0.18440297602068323,
+        "passiveReturn": -0.18440297602068312,
         "strategySharpe": -1.1557504547125748,
-        "passiveSharpe": -1.0740722311522446,
+        "passiveSharpe": -1.074072231152237,
         "strategyMaxDrawdown": -0.15921203120060434,
-        "passiveMaxDrawdown": -0.20772549910546212
+        "passiveMaxDrawdown": -0.207725499105462
       },
       {
         "windowId": "wf-0003",
@@ -733,9 +733,9 @@
         "strategyReturn": -0.13431495455274967,
         "passiveReturn": -0.11738893701883413,
         "strategySharpe": -0.8458250205682404,
-        "passiveSharpe": -0.5343530233951229,
+        "passiveSharpe": -0.5343530233951292,
         "strategyMaxDrawdown": -0.2199212521317988,
-        "passiveMaxDrawdown": -0.22651334345845098
+        "passiveMaxDrawdown": -0.22651334345845087
       },
       {
         "windowId": "wf-0004",
@@ -743,9 +743,9 @@
         "testEnd": "2024-03-26",
         "observations": 252,
         "strategyReturn": -0.11388540079129039,
-        "passiveReturn": -0.09383241790347085,
+        "passiveReturn": -0.09383241790347097,
         "strategySharpe": -0.8557675105330332,
-        "passiveSharpe": -0.646978327266036,
+        "passiveSharpe": -0.646978327266028,
         "strategyMaxDrawdown": -0.209320669214779,
         "passiveMaxDrawdown": -0.21574942868665148
       },
@@ -757,9 +757,9 @@
         "strategyReturn": 0.24919450079459926,
         "passiveReturn": 0.09934154022330355,
         "strategySharpe": 1.192464233507875,
-        "passiveSharpe": 0.5275863403953391,
+        "passiveSharpe": 0.5275863403953422,
         "strategyMaxDrawdown": -0.12377850162866422,
-        "passiveMaxDrawdown": -0.16251133272892115
+        "passiveMaxDrawdown": -0.16251133272892127
       },
       {
         "windowId": "wf-0006",
@@ -767,9 +767,9 @@
         "testEnd": "2026-04-27",
         "observations": 252,
         "strategyReturn": 0.2734188782141229,
-        "passiveReturn": 0.30373815004962523,
+        "passiveReturn": 0.30373815004962545,
         "strategySharpe": 1.9937432627987117,
-        "passiveSharpe": 1.978746788015892,
+        "passiveSharpe": 1.9787467880159026,
         "strategyMaxDrawdown": -0.07600241318262857,
         "passiveMaxDrawdown": -0.07600241318262746
       }
@@ -785,21 +785,21 @@
     "deflatedSharpeRatio": {
       "winner": "T0",
       "trialCount": 4,
-      "observations": 2056,
-      "dailySharpe": 0.02540490209007885,
-      "expectedMaximumDailySharpe": 0.0018571445367472365,
-      "probability": 0.859087876949757,
-      "zStatistic": 1.0762303574606802
+      "observations": 2057,
+      "dailySharpe": 0.025906661667409816,
+      "expectedMaximumDailySharpe": 0.0018602481407644425,
+      "probability": 0.8642066572687196,
+      "zStatistic": 1.0994159300566142
     },
     "pbo": {
       "method": "CSCV, 8 个连续月度分块",
       "monthlyObservations": 102,
       "combinations": 70,
-      "probability": 0.7571428571428571,
+      "probability": 0.7714285714285715,
       "medianLogit": -0.4054651081081643,
       "trainingWinnerCounts": {
-        "T0": 31,
-        "T1": 33,
+        "T0": 32,
+        "T1": 32,
         "T2": 6,
         "T3": 0
       }
@@ -809,15 +809,15 @@
   "supportingEvidence": [
     "30/30 数据质量规则通过，canonical 快照、执行账本和离线复现完整。",
     "逆方差强力降风险版年化波动 15.48%，低于被动 19.58%。",
-    "逆方差强力降风险版净 CAGR 5.18%，高于被动 4.25%。",
-    "双倍成本 Sharpe 0.378，仍高于被动 0.311。"
+    "逆方差强力降风险版净 CAGR 5.18%，高于被动 4.41%。",
+    "双倍成本 Sharpe 0.378，仍高于被动 0.318。"
   ],
   "opposingEvidence": [
     "逆方差强力降风险版最大回撤 -40.89%，远未达到相对被动缩减 15% 的门槛。",
-    "逆方差强力降风险版 Sharpe 改善 0.093，低于 0.10 门槛。",
-    "HAC 年化 alpha 1.90%，95% 区间 -3.70%..7.51%，不能排除 0。",
-    "PBO 75.7%，四个变体中的样本内赢家经常在对应样本外落到后半区。",
-    "2018 单年主动对数财富贡献超过整段净主动对数财富，稳定性门禁失败。"
+    "逆方差强力降风险版 Sharpe 改善 0.085，低于 0.10 门槛。",
+    "HAC 年化 alpha 1.92%，95% 区间 -3.68%..7.53%，不能排除 0。",
+    "PBO 77.1%，四个变体中的样本内赢家经常在对应样本外落到后半区。",
+    "2024 单年主动对数财富贡献超过整段净主动对数财富，稳定性门禁失败。"
   ],
   "missingEvidence": [
     "未绑定可投资现金收益率，现金收益按 0。",
@@ -987,8 +987,8 @@
         "rule": "最大单年主动对数财富贡献不超过整段净主动对数财富",
         "actual": {
           "year": 2018,
-          "largestContribution": 0.19342484381399777,
-          "wholePeriod": -0.09566324608891935
+          "largestContribution": 0.19207575424470258,
+          "wholePeriod": -0.10782588689961703
         },
         "threshold": "largestContribution <= wholePeriod",
         "passed": false
@@ -998,18 +998,18 @@
       {
         "label": "100% 被动持有 ETF",
         "initialCapital": 100000.0,
-        "finalCapital": 140461.65801005455,
-        "profitAndLoss": 40461.65801005457,
-        "totalReturn": 0.4046165801005457,
+        "finalCapital": 142180.474187368,
+        "profitAndLoss": 42180.47418736801,
+        "totalReturn": 0.4218047418736801,
         "relativeWealth": 0.0,
-        "cagr": 0.04252355679976172,
-        "volatility": 0.19577012803072008,
-        "sharpe": 0.3106167919658258,
-        "downsideVolatility": 0.13553881728538755,
-        "sortino": 0.44864999082589113,
-        "maxDrawdown": -0.42155347080635797,
+        "cagr": 0.04405696558750494,
+        "volatility": 0.19576754147189301,
+        "sharpe": 0.31812756903174405,
+        "downsideVolatility": 0.13550586752987806,
+        "sortino": 0.4596040983246898,
+        "maxDrawdown": -0.42155347080635786,
         "maxDrawdownDuration": 1299,
-        "calmar": 0.10087345910928358,
+        "calmar": 0.10451097817610584,
         "es95": 0.028004220547989893,
         "trackingError": null,
         "informationRatio": null,
@@ -1023,7 +1023,7 @@
         "finalCapital": 120230.82900502728,
         "profitAndLoss": 20230.829005027284,
         "totalReturn": 0.20230829005027284,
-        "relativeWealth": -0.14403097109660423,
+        "relativeWealth": -0.1543787591636182,
         "cagr": 0.022839259520500255,
         "volatility": 0.10053941279856302,
         "sharpe": 0.2748903054159589,
@@ -1032,7 +1032,7 @@
         "maxDrawdown": -0.2521187910395861,
         "maxDrawdownDuration": 1299,
         "calmar": 0.09058927907088915,
-        "es95": 0.014524372727479242,
+        "es95": 0.014608543828853663,
         "trackingError": null,
         "informationRatio": null,
         "beta": null,
@@ -1045,7 +1045,7 @@
         "finalCapital": 127647.34044362091,
         "profitAndLoss": 27647.340443620917,
         "totalReturn": 0.27647340443620916,
-        "relativeWealth": -0.09123000360366229,
+        "relativeWealth": -0.10221610123901448,
         "cagr": 0.030371080002151718,
         "volatility": 0.1469490382196678,
         "sharpe": 0.2766458096609159,
@@ -1067,7 +1067,7 @@
         "finalCapital": 121271.59050367535,
         "profitAndLoss": 21271.590503675354,
         "totalReturn": 0.21271590503675353,
-        "relativeWealth": -0.13662139389672834,
+        "relativeWealth": -0.14705875615619735,
         "cagr": 0.023920386377651814,
         "volatility": 0.14684125105370094,
         "sharpe": 0.23398289517441145,
@@ -1087,25 +1087,25 @@
     "yearly": [
       {
         "year": 2018,
-        "observations": 242,
-        "strategyReturn": -0.09310757875651965,
-        "passiveReturn": -0.2526011414424366,
-        "activeReturn": 0.15949356268591697,
-        "annualizedVolatility": 0.10018395364815064,
-        "maxDrawdown": -0.17350329471401804,
-        "requestCount": 3,
-        "turnover": 2.9986518200429417,
-        "cost": 0.0050481799570579,
+        "observations": 243,
+        "strategyReturn": -0.0832476366735958,
+        "passiveReturn": -0.24345529148456213,
+        "activeReturn": 0.16020765481096633,
+        "annualizedVolatility": 0.10063169790555576,
+        "maxDrawdown": -0.17350329471401849,
+        "requestCount": 4,
+        "turnover": 3.997303640085884,
+        "cost": 0.0063963599141158,
         "blockedRate": 0.0,
-        "averageExposure": 0.23140495867768596,
-        "activeLogWealth": 0.19342484381399777
+        "averageExposure": 0.2345679012345679,
+        "activeLogWealth": 0.19207575424470258
       },
       {
         "year": 2019,
         "observations": 244,
         "strategyReturn": 0.21546537197634286,
-        "passiveReturn": 0.38604229656044664,
-        "activeReturn": -0.17057692458410378,
+        "passiveReturn": 0.3860422965604462,
+        "activeReturn": -0.17057692458410334,
         "annualizedVolatility": 0.11900275132242592,
         "maxDrawdown": -0.07763628027962421,
         "requestCount": 5,
@@ -1113,14 +1113,14 @@
         "cost": 0.007744539871173701,
         "blockedRate": 0.0,
         "averageExposure": 0.4016393442622951,
-        "activeLogWealth": -0.1313253916399722
+        "activeLogWealth": -0.13132539163997187
       },
       {
         "year": 2020,
         "observations": 243,
         "strategyReturn": 0.318610818853057,
-        "passiveReturn": 0.2907714843749991,
-        "activeReturn": 0.027839334478057864,
+        "passiveReturn": 0.2907714843749998,
+        "activeReturn": 0.0278393344780572,
         "annualizedVolatility": 0.18964674842671295,
         "maxDrawdown": -0.12922417896239868,
         "requestCount": 4,
@@ -1128,14 +1128,14 @@
         "cost": 0.0063963599141158,
         "blockedRate": 0.0,
         "averageExposure": 0.5802469135802469,
-        "activeLogWealth": 0.021338682950161558
+        "activeLogWealth": 0.02133868295016106
       },
       {
         "year": 2021,
         "observations": 243,
         "strategyReturn": -0.018342591097824323,
-        "passiveReturn": -0.040296391410901466,
-        "activeReturn": 0.021953800313077143,
+        "passiveReturn": -0.0402963914109008,
+        "activeReturn": 0.021953800313076477,
         "annualizedVolatility": 0.12223930500338599,
         "maxDrawdown": -0.11136432998488965,
         "requestCount": 6,
@@ -1143,14 +1143,14 @@
         "cost": 0.0095945398711737,
         "blockedRate": 0.0,
         "averageExposure": 0.49794238683127573,
-        "activeLogWealth": 0.022617880974656987
+        "activeLogWealth": 0.022617880974656293
       },
       {
         "year": 2022,
         "observations": 242,
         "strategyReturn": -0.3299234980717455,
-        "passiveReturn": -0.20137905844585613,
-        "activeReturn": -0.12854443962588935,
+        "passiveReturn": -0.20137905844585702,
+        "activeReturn": -0.12854443962588846,
         "annualizedVolatility": 0.14539730804637127,
         "maxDrawdown": -0.3300186306475602,
         "requestCount": 3,
@@ -1158,14 +1158,14 @@
         "cost": 0.0050481799570579,
         "blockedRate": 0.0,
         "averageExposure": 0.5743801652892562,
-        "activeLogWealth": -0.17549452926873063
+        "activeLogWealth": -0.17549452926872952
       },
       {
         "year": 2023,
         "observations": 242,
         "strategyReturn": -0.09849906809925024,
-        "passiveReturn": -0.09751127443594243,
-        "activeReturn": -0.0009877936633078122,
+        "passiveReturn": -0.09751127443594232,
+        "activeReturn": -0.0009877936633079232,
         "annualizedVolatility": 0.13368850158239295,
         "maxDrawdown": -0.19881093935790795,
         "requestCount": 1,
@@ -1173,14 +1173,14 @@
         "cost": 0.0013481799570579,
         "blockedRate": 0.0,
         "averageExposure": 1.0,
-        "activeLogWealth": -0.0010951213139624716
+        "activeLogWealth": -0.0010951213139625965
       },
       {
         "year": 2024,
         "observations": 242,
         "strategyReturn": 0.23602283043199845,
-        "passiveReturn": 0.1740646164684918,
-        "activeReturn": 0.06195821396350665,
+        "passiveReturn": 0.17406461646849358,
+        "activeReturn": 0.06195821396350487,
         "annualizedVolatility": 0.19512208008263088,
         "maxDrawdown": -0.1300413712212405,
         "requestCount": 3,
@@ -1188,14 +1188,14 @@
         "cost": 0.0050481799570579,
         "blockedRate": 0.0,
         "averageExposure": 0.6859504132231405,
-        "activeLogWealth": 0.051427070615586434
+        "activeLogWealth": 0.051427070615584936
       },
       {
         "year": 2025,
         "observations": 243,
         "strategyReturn": 0.2088524542611403,
-        "passiveReturn": 0.20836372792825353,
-        "activeReturn": 0.0004887263328867686,
+        "passiveReturn": 0.20836372792825508,
+        "activeReturn": 0.0004887263328852143,
         "annualizedVolatility": 0.132886503368118,
         "maxDrawdown": -0.10075444146994372,
         "requestCount": 5,
@@ -1203,14 +1203,14 @@
         "cost": 0.007744539871173701,
         "blockedRate": 0.0,
         "averageExposure": 0.7695473251028807,
-        "activeLogWealth": 0.0004043712293069768
+        "activeLogWealth": 0.0004043712293057
       },
       {
         "year": 2026,
         "observations": 115,
         "strategyReturn": -0.008833839153756018,
-        "passiveReturn": 0.0704594668954015,
-        "activeReturn": -0.07929330604915752,
+        "passiveReturn": 0.0704594668954035,
+        "activeReturn": -0.07929330604915952,
         "annualizedVolatility": 0.16096840301498375,
         "maxDrawdown": -0.08477039754046045,
         "requestCount": 2,
@@ -1218,27 +1218,27 @@
         "cost": 0.0031981799570579,
         "blockedRate": 0.0,
         "averageExposure": 0.8173913043478261,
-        "activeLogWealth": -0.07696105344996038
+        "activeLogWealth": -0.07696105344996224
       }
     ],
     "regimes": [
       {
         "direction": "上涨",
         "volatility": "低波动",
-        "startDate": "2018-01-03",
+        "startDate": "2018-01-02",
         "endDate": "2026-04-30",
         "months": 17,
-        "observations": 349,
-        "strategyReturn": 0.8769704012364348,
-        "passiveReturn": 1.5721271517384778,
-        "activeReturn": -0.6951567505020431,
-        "annualizedVolatility": 0.11105108579275945,
-        "maxDrawdown": -0.03877471888328776,
-        "requestCount": 6,
-        "turnover": 5.994607280171768,
-        "cost": 0.0090927198282316,
+        "observations": 350,
+        "strategyReturn": 0.8973772532665558,
+        "passiveReturn": 1.603602031226234,
+        "activeReturn": -0.7062247779596782,
+        "annualizedVolatility": 0.11115698222084922,
+        "maxDrawdown": -0.038774718883288095,
+        "requestCount": 7,
+        "turnover": 6.9932591002147095,
+        "cost": 0.0104408997852895,
         "blockedRate": 0.0,
-        "averageExposure": 0.7277936962750716
+        "averageExposure": 0.7285714285714285
       },
       {
         "direction": "上涨",
@@ -1248,8 +1248,8 @@
         "months": 12,
         "observations": 240,
         "strategyReturn": 0.8048235200301188,
-        "passiveReturn": 1.5714808900558026,
-        "activeReturn": -0.7666573700256838,
+        "passiveReturn": 1.571480890055804,
+        "activeReturn": -0.7666573700256851,
         "annualizedVolatility": 0.22574444313258374,
         "maxDrawdown": -0.07195891497464424,
         "requestCount": 5,
@@ -1266,8 +1266,8 @@
         "months": 17,
         "observations": 340,
         "strategyReturn": -0.4342882929656653,
-        "passiveReturn": -0.472919851985675,
-        "activeReturn": 0.0386315590200097,
+        "passiveReturn": -0.4729198519856753,
+        "activeReturn": 0.03863155902001003,
         "annualizedVolatility": 0.12159418039290153,
         "maxDrawdown": -0.46253202164118057,
         "requestCount": 3,
@@ -1302,8 +1302,8 @@
         "months": 27,
         "observations": 538,
         "strategyReturn": 0.06118099958673895,
-        "passiveReturn": 0.17280273311324912,
-        "activeReturn": -0.11162173352651017,
+        "passiveReturn": 0.17280273311325178,
+        "activeReturn": -0.11162173352651283,
         "annualizedVolatility": 0.1054174451710434,
         "maxDrawdown": -0.09746572826361743,
         "requestCount": 7,
@@ -1320,8 +1320,8 @@
         "months": 11,
         "observations": 221,
         "strategyReturn": -0.02396951625752808,
-        "passiveReturn": 0.03681441054641166,
-        "activeReturn": -0.060783926803939736,
+        "passiveReturn": 0.03681441054641277,
+        "activeReturn": -0.060783926803940846,
         "annualizedVolatility": 0.14545492783230293,
         "maxDrawdown": -0.09217040132597676,
         "requestCount": 5,
@@ -1337,17 +1337,17 @@
         "name": "2018 全年",
         "startDate": "2018-01-01",
         "endDate": "2018-12-31",
-        "observations": 242,
-        "strategyReturn": -0.09310757875651965,
-        "passiveReturn": -0.2526011414424366,
-        "activeReturn": 0.15949356268591697,
-        "annualizedVolatility": 0.10018395364815064,
-        "maxDrawdown": -0.17350329471401804,
-        "requestCount": 3,
-        "turnover": 2.9986518200429417,
-        "cost": 0.0050481799570579,
+        "observations": 243,
+        "strategyReturn": -0.0832476366735958,
+        "passiveReturn": -0.24345529148456213,
+        "activeReturn": 0.16020765481096633,
+        "annualizedVolatility": 0.10063169790555576,
+        "maxDrawdown": -0.17350329471401849,
+        "requestCount": 4,
+        "turnover": 3.997303640085884,
+        "cost": 0.0063963599141158,
         "blockedRate": 0.0,
-        "averageExposure": 0.23140495867768596
+        "averageExposure": 0.2345679012345679
       },
       {
         "name": "COVID 冲击",
@@ -1355,8 +1355,8 @@
         "endDate": "2020-04-30",
         "observations": 64,
         "strategyReturn": -0.043288128186453445,
-        "passiveReturn": -0.051226025734401825,
-        "activeReturn": 0.00793789754794838,
+        "passiveReturn": -0.05122602573440149,
+        "activeReturn": 0.007937897547948047,
         "annualizedVolatility": 0.2203506885179135,
         "maxDrawdown": -0.08433433433433424,
         "requestCount": 1,
@@ -1371,8 +1371,8 @@
         "endDate": "2022-10-31",
         "observations": 198,
         "strategyReturn": -0.33242671064922624,
-        "passiveReturn": -0.2770229414320665,
-        "activeReturn": -0.055403769217159726,
+        "passiveReturn": -0.2770229414320676,
+        "activeReturn": -0.055403769217158616,
         "annualizedVolatility": 0.16014543648786878,
         "maxDrawdown": -0.3300186306475602,
         "requestCount": 2,
@@ -1387,8 +1387,8 @@
         "endDate": "2024-02-08",
         "observations": 28,
         "strategyReturn": -0.06761404520892977,
-        "passiveReturn": -0.018596409605402542,
-        "activeReturn": -0.04901763560352723,
+        "passiveReturn": -0.01859640960540221,
+        "activeReturn": -0.049017635603527565,
         "annualizedVolatility": 0.15693615515283102,
         "maxDrawdown": -0.05519303335825221,
         "requestCount": 1,
@@ -1408,9 +1408,9 @@
           "strategyReturn": 0.46553181108846453,
           "passiveReturn": 0.49261101829662013,
           "strategySharpe": 2.3501167811686736,
-          "passiveSharpe": 1.9484665498216434,
+          "passiveSharpe": 1.948466549821648,
           "strategyMaxDrawdown": -0.06775844421699107,
-          "passiveMaxDrawdown": -0.16047619047619055
+          "passiveMaxDrawdown": -0.16047619047619066
         },
         {
           "windowId": "wf-0002",
@@ -1418,11 +1418,11 @@
           "testEnd": "2022-02-28",
           "observations": 252,
           "strategyReturn": -0.11043817934438327,
-          "passiveReturn": -0.18440297602068323,
+          "passiveReturn": -0.18440297602068312,
           "strategySharpe": -0.944232273735051,
-          "passiveSharpe": -1.0740722311522446,
+          "passiveSharpe": -1.074072231152237,
           "strategyMaxDrawdown": -0.15652010267872607,
-          "passiveMaxDrawdown": -0.20772549910546212
+          "passiveMaxDrawdown": -0.207725499105462
         },
         {
           "windowId": "wf-0003",
@@ -1432,9 +1432,9 @@
           "strategyReturn": -0.26026280538367086,
           "passiveReturn": -0.11738893701883413,
           "strategySharpe": -2.024855463127042,
-          "passiveSharpe": -0.5343530233951229,
+          "passiveSharpe": -0.5343530233951292,
           "strategyMaxDrawdown": -0.28578780549527616,
-          "passiveMaxDrawdown": -0.22651334345845098
+          "passiveMaxDrawdown": -0.22651334345845087
         },
         {
           "windowId": "wf-0004",
@@ -1442,9 +1442,9 @@
           "testEnd": "2024-03-26",
           "observations": 252,
           "strategyReturn": -0.1743874274091909,
-          "passiveReturn": -0.09383241790347085,
+          "passiveReturn": -0.09383241790347097,
           "strategySharpe": -1.4181212721493577,
-          "passiveSharpe": -0.646978327266036,
+          "passiveSharpe": -0.646978327266028,
           "strategyMaxDrawdown": -0.2142537437827653,
           "passiveMaxDrawdown": -0.21574942868665148
         },
@@ -1456,9 +1456,9 @@
           "strategyReturn": 0.2691982547413825,
           "passiveReturn": 0.09934154022330355,
           "strategySharpe": 1.2571633990139353,
-          "passiveSharpe": 0.5275863403953391,
+          "passiveSharpe": 0.5275863403953422,
           "strategyMaxDrawdown": -0.12377850162866466,
-          "passiveMaxDrawdown": -0.16251133272892115
+          "passiveMaxDrawdown": -0.16251133272892127
         },
         {
           "windowId": "wf-0006",
@@ -1466,9 +1466,9 @@
           "testEnd": "2026-04-27",
           "observations": 252,
           "strategyReturn": 0.23157411772888215,
-          "passiveReturn": 0.30373815004962523,
+          "passiveReturn": 0.30373815004962545,
           "strategySharpe": 1.9173424078294414,
-          "passiveSharpe": 1.978746788015892,
+          "passiveSharpe": 1.9787467880159026,
           "strategyMaxDrawdown": -0.07600241318262757,
           "passiveMaxDrawdown": -0.07600241318262746
         }
@@ -1476,6 +1476,51 @@
       "positiveStrategySharpeWindows": 3,
       "strategyBeatsPassiveSharpeWindows": 3
     },
+    "multipleTesting": {
+      "trialCount": 5,
+      "trialDefinition": "原始报告的四个波动率管理变体，加上同一 OOS 上追加的低波动准入规则；零成本和双倍成本只作为压力场景，不重复计作策略试验。",
+      "winnerByNetSharpe": "T0",
+      "winnerDisplayName": "逆方差强力降风险版",
+      "deflatedSharpeRatio": {
+        "winner": "T0",
+        "trialCount": 5,
+        "observations": 2057,
+        "dailySharpe": 0.025906661667409816,
+        "expectedMaximumDailySharpe": 0.003913612753159303,
+        "probability": 0.8426803265115392,
+        "zStatistic": 1.005534912724032
+      },
+      "pbo": {
+        "method": "CSCV, 8 个连续月度分块",
+        "monthlyObservations": 102,
+        "combinations": 70,
+        "probability": 0.8857142857142857,
+        "medianLogit": -0.6931471805599454,
+        "trainingWinnerCounts": {
+          "T0": 16,
+          "T1": 31,
+          "T2": 5,
+          "T3": 0,
+          "low_vol_gate": 18
+        }
+      },
+      "interpretation": "低波动准入是在同一段 OOS 上看过原始四个变体后追加的第五个研究假设；DSR/PBO 只能作为过拟合反证，不能把这段 OOS 再当成独立确认集。"
+    },
+    "supportingEvidence": [
+      "30/30 数据质量规则通过，低波动准入与原始报告复用同一 canonical 快照并完成断网复现。",
+      "基础成本 CAGR 3.04%，高于 50% ETF / 50% 现金基准的 2.28%。",
+      "2018 年高波动下跌阶段减少了绝对损失，说明波动门槛在部分冲击环境中确实降低暴露。"
+    ],
+    "opposingEvidence": [
+      "最大回撤 -52.82%，同时差于被动 -42.16% 和半仓基准 -25.21%。",
+      "相对半仓基准 Sharpe 改善 0.002，未达到 0.05 门槛。",
+      "五个同 OOS 研究假设的 PBO 为 88.6%；追加规则没有独立样本外确认。"
+    ],
+    "missingEvidence": [
+      "缺少另一只事前指定宽基 ETF 或后续新时间段的独立样本外验证。",
+      "现金收益仍按 0，未纳入 point-in-time 现金利率与税费细分。",
+      "未绑定目标资金规模、ADV 参与率和市场冲击模型，容量仍为 not_available。"
+    ],
     "drawdownEpisode": {
       "peakDate": "2021-01-25",
       "troughDate": "2024-09-13",

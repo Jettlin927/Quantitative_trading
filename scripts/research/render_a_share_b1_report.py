@@ -5,6 +5,7 @@ from html import escape
 import json
 import math
 from pathlib import Path
+import sys
 from typing import Any
 
 import numpy as np
@@ -12,6 +13,12 @@ import pandas as pd
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from backend.app.quant_research.reporting import hac_alpha, tail_metrics
+
+
 DEFAULT_RUN_ROOT = (
     REPO_ROOT
     / "outputs"
@@ -275,7 +282,7 @@ def build_summary(runs: dict[str, dict[str, Any]]) -> tuple[dict[str, Any], dict
     )
     walk_forward = _walk_forward(runs["long_primary"])
     drawdown = _drawdown_info(navs["long_primary"])
-    hac = _hac_alpha(long_returns["strategy"], long_returns["benchmark"])
+    hac = hac_alpha(long_returns["strategy"], long_returns["benchmark"])
     post_publication = _period_summary(
         long_returns[long_returns["trade_date"] >= pd.Timestamp("2026-05-18")]
     )
@@ -467,8 +474,8 @@ def build_summary(runs: dict[str, dict[str, Any]]) -> tuple[dict[str, Any], dict
         "risk": {
             "drawdown": drawdown,
             "tail": {
-                "strategy": _tail_metrics(long_returns["strategy"]),
-                "benchmark": _tail_metrics(long_returns["benchmark"]),
+                "strategy": tail_metrics(long_returns["strategy"]),
+                "benchmark": tail_metrics(long_returns["benchmark"]),
             },
             "hacAlpha": hac,
             "averageHhi": runs["long_primary"]["metrics"]["averageHhi"],
@@ -794,7 +801,7 @@ def _comparison_row(
 ) -> dict[str, Any]:
     metrics = run["metrics"]
     returns = _aligned_returns(nav, benchmark)
-    tail = _tail_metrics(returns["strategy"])
+    tail = tail_metrics(returns["strategy"])
     total_return = float(metrics["totalReturn"])
     return {
         "labelKey": label,
@@ -839,7 +846,7 @@ def _benchmark_comparison(label: str, nav: pd.DataFrame) -> dict[str, Any]:
         "informationRatio": None,
         "benchmarkTotalReturn": metrics["totalReturn"],
         "excessTotalReturn": 0.0,
-        **_tail_metrics(returns),
+        **tail_metrics(returns),
     }
 
 
@@ -878,18 +885,6 @@ def _aligned_returns(nav: pd.DataFrame, benchmark: pd.DataFrame) -> pd.DataFrame
     result["strategy"] = frame["nav_strategy"].pct_change(fill_method=None)
     result["benchmark"] = frame["nav_benchmark"].pct_change(fill_method=None)
     return result.dropna().reset_index(drop=True)
-
-
-def _tail_metrics(returns: pd.Series) -> dict[str, float]:
-    series = pd.to_numeric(returns, errors="raise").dropna()
-    losses = -series
-    var95 = float(losses.quantile(0.95))
-    return {
-        "skew": float(series.skew()),
-        "excessKurtosis": float(series.kurt()),
-        "var95": var95,
-        "es95": float(losses[losses >= var95].mean()),
-    }
 
 
 def _period_summary(group: pd.DataFrame) -> dict[str, Any]:
@@ -1103,35 +1098,6 @@ def _drawdown_info(nav: pd.DataFrame) -> dict[str, Any]:
         "maxDrawdown": float(trough["drawdown"]),
         "recoveryDate": recovery_date,
         "recovered": recovery_date is not None,
-    }
-
-
-def _hac_alpha(strategy: pd.Series, benchmark: pd.Series) -> dict[str, Any]:
-    frame = pd.concat([strategy.rename("strategy"), benchmark.rename("benchmark")], axis=1).dropna()
-    y = frame["strategy"].to_numpy(dtype=float)
-    x = np.column_stack([np.ones(len(frame)), frame["benchmark"].to_numpy(dtype=float)])
-    coefficients = np.linalg.solve(x.T @ x, x.T @ y)
-    residuals = y - x @ coefficients
-    lag = int(math.floor(4 * (len(frame) / 100) ** (2 / 9)))
-    xu = x * residuals[:, None]
-    meat = xu.T @ xu
-    for offset in range(1, lag + 1):
-        weight = 1 - offset / (lag + 1)
-        gamma = xu[offset:].T @ xu[:-offset]
-        meat += weight * (gamma + gamma.T)
-    inverse = np.linalg.inv(x.T @ x)
-    covariance = inverse @ meat @ inverse
-    alpha = float(coefficients[0] * 252)
-    standard_error = float(math.sqrt(covariance[0, 0]) * 252)
-    return {
-        "observations": int(len(frame)),
-        "neweyWestLag": lag,
-        "annualizedAlpha": alpha,
-        "beta": float(coefficients[1]),
-        "annualizedAlphaStandardError": standard_error,
-        "alphaTStatistic": float(coefficients[0] / math.sqrt(covariance[0, 0])),
-        "ci95Low": alpha - 1.96 * standard_error,
-        "ci95High": alpha + 1.96 * standard_error,
     }
 
 
