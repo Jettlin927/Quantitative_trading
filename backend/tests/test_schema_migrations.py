@@ -12,6 +12,7 @@ from unittest.mock import patch
 from alembic import command
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import DBAPIError
 
 from backend.app import main, models  # noqa: F401  # Populate Base.metadata.
 from backend.app.database import (
@@ -78,8 +79,10 @@ class SchemaMigrationTest(unittest.TestCase):
                 command.upgrade(alembic_config(connection), "head")
             expected_tables = set(Base.metadata.tables) | {"alembic_version"}
             self.assertEqual(set(inspect(engine).get_table_names()), expected_tables)
-            self.assertEqual(len(Base.metadata.tables), 30)
+            self.assertEqual(len(Base.metadata.tables), 40)
             self.assertIn("research_runs", Base.metadata.tables)
+            self.assertIn("strategy_definitions", Base.metadata.tables)
+            self.assertIn("research_publications", Base.metadata.tables)
             actual_indexes = {
                 index["name"]
                 for table_name in Base.metadata.tables
@@ -139,6 +142,56 @@ class PostgresSchemaMigrationIntegrationTest(unittest.TestCase):
             with engine.connect() as connection:
                 self.assertEqual(current_schema_heads(connection), expected_schema_heads())
             assert_schema_revision_at_head(engine)
+
+            with engine.connect() as connection:
+                trigger_names = set(
+                    connection.execute(
+                        text(
+                            "SELECT tgname FROM pg_trigger "
+                            "WHERE NOT tgisinternal AND tgname LIKE 'trg_%_immutable'"
+                        )
+                    ).scalars()
+                )
+            self.assertTrue(
+                {
+                    "trg_frozen_research_plans_immutable",
+                    "trg_research_plan_approvals_immutable",
+                    "trg_research_events_immutable",
+                    "trg_research_evaluations_immutable",
+                    "trg_research_evaluation_runs_immutable",
+                    "trg_research_evidence_refs_immutable",
+                    "trg_research_publications_terminal_immutable",
+                }.issubset(trigger_names)
+            )
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO strategy_definitions "
+                        "(strategy_id, display_name, lifecycle_status, economic_thesis, "
+                        "registry_version, code_commit, metadata_json) VALUES "
+                        "('migration-sentinel', '迁移哨兵', '活跃', '只验证不可变触发器', "
+                        "'1', :code_commit, '{}'::json)"
+                    ),
+                    {"code_commit": "c" * 40},
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO frozen_research_plans "
+                        "(id, strategy_id, issue_number, version, schema_version, plan_sha256, "
+                        "code_commit, plan_json) VALUES "
+                        "('90000000-0000-0000-0000-000000000001', 'migration-sentinel', 900, 1, "
+                        "'1', :plan_sha256, :code_commit, '{}'::json)"
+                    ),
+                    {"plan_sha256": "a" * 64, "code_commit": "c" * 40},
+                )
+            with self.assertRaisesRegex(DBAPIError, "immutable research record"):
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "UPDATE frozen_research_plans SET version = 2 "
+                            "WHERE id = '90000000-0000-0000-0000-000000000001'"
+                        )
+                    )
 
             with engine.connect() as connection:
                 command.upgrade(alembic_config(connection), "head")
