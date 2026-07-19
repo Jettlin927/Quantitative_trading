@@ -6,10 +6,10 @@
 
 - 统一术语：`CONTEXT.md`。
 - 架构决策：`docs/adr/`。
-- 文档总入口：`docs/index.md`；迁移完成前可从 `docs/research/README.md` 与 `docs/agent-code-map.md` 查旧入口。
+- 文档总入口：`docs/index.md`；代码职责见 `docs/architecture/code-map.md`，历史资料只从 `docs/archive/` 读取。
 - Issue 与 Wayfinder 规则：`docs/agents/issue-tracker.md`。
 - Agent 领域文档规则：`docs/agents/domain.md`。
-- 具体策略研究强制规范：`docs/research/strategy-evaluation-standard.md`。
+- 具体策略研究强制规范：`docs/research/contracts/strategy-evaluation-standard.md`。
 - 阶段事实审计：根目录 `操作日志.md`。
 
 易变化的生产提交、表行数、磁盘余量、运行 ID、Issue 状态和部署状态必须现场核验，不能只引用文档快照。
@@ -56,7 +56,7 @@
 
 ## 策略研究交付
 
-用户要求研究、分析、评估、回测或比较具体策略时，必须完整阅读 `docs/research/strategy-evaluation-standard.md` 并按其顺序交付，**不得只凭累计收益、年化收益或 Sharpe** 判断策略好坏。
+用户要求研究、分析、评估、回测或比较具体策略时，必须完整阅读 `docs/research/contracts/strategy-evaluation-standard.md` 并按其顺序交付，**不得只凭累计收益、年化收益或 Sharpe** 判断策略好坏。
 
 至少包含：
 
