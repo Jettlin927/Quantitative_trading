@@ -243,7 +243,7 @@ def poll_research_issues_once(
                     authorization_write_confirmed=write_confirmed,
                 )
             client.set_state_label(issue.number, set(issue.labels), result.desired_label)
-            if result.state == "blocked" and approval_found:
+            if result.state == "blocked" and result.approval_found:
                 marker = f"<!-- research-orchestrator:blocked:{prepared.plan_sha256} -->"
                 client.confirm_comment(
                     issue.number,
@@ -251,7 +251,7 @@ def poll_research_issues_once(
                     raw_comments,
                     marker=marker,
                 )
-            elif not approval_found:
+            elif not result.approval_found:
                 marker_kind = "pending" if result.state == "pending_approval" else "approval-invalid"
                 marker = (
                     f"<!-- research-orchestrator:{marker_kind}:{prepared.plan_sha256} -->"

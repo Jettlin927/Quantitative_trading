@@ -114,7 +114,6 @@ services:
       RESEARCH_MAX_ARTIFACT_MIB: ${RESEARCH_MAX_ARTIFACT_MIB:-2048}
       RESEARCH_MAX_RETRIES: ${RESEARCH_MAX_RETRIES:-2}
     volumes:
-      - .:/app
       - research_artifacts:/app/outputs/research-runs
 
   frontend:

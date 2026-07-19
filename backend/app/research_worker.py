@@ -81,6 +81,7 @@ def claim_next_research_work(
         if not try_acquire_heavy_work_claim_lock(db):
             return None
         _finalize_expired_stops(db, claimed_at)
+        _reconcile_expired_terminal_runs(db, claimed_at)
         live = db.scalar(
             select(ResearchWorkItem.id)
             .where(
@@ -131,12 +132,13 @@ def claim_next_research_work(
         plan = db.get(FrozenResearchPlan, orchestration.plan_id)
         recovered = work.status in {"leased", "running"}
         if recovered:
-            stale_run = _latest_active_run(db, work.formal_research_id)
-            if stale_run is not None:
+            stale_run = _latest_run(db, work.formal_research_id)
+            if stale_run is not None and stale_run.status == "running":
                 stale_run.status = "interrupted"
                 stale_run.error = "ResearchWorkerLeaseExpired: Worker 租约过期，保留 checkpoint 并恢复"
                 stale_run.finished_at = claimed_at
                 stale_run.heartbeat_at = claimed_at
+            if stale_run is not None and stale_run.status == "interrupted":
                 work.current_run_id = stale_run.run_id
                 work.resume_run_id = stale_run.run_id
             append_research_event(
@@ -220,9 +222,22 @@ def execute_claimed_research_work(
         return start_status
     stop_event = Event()
     heartbeat_done = Event()
+    heartbeat_failure = Event()
+    lease_lost = Event()
+    heartbeat_errors: list[Exception] = []
     heartbeat = Thread(
         target=_heartbeat_loop,
-        args=(heartbeat_done, stop_event, claim, factory, heartbeat_interval_seconds, lease_seconds),
+        args=(
+            heartbeat_done,
+            stop_event,
+            heartbeat_failure,
+            lease_lost,
+            heartbeat_errors,
+            claim,
+            factory,
+            heartbeat_interval_seconds,
+            lease_seconds,
+        ),
         daemon=True,
     )
     heartbeat.start()
@@ -242,6 +257,12 @@ def execute_claimed_research_work(
             result = _execute_with_runner(claim, factory, should_stop)
         else:
             result = executor(claim, stop_event)
+        if lease_lost.is_set():
+            return "lease_lost"
+        if heartbeat_failure.is_set():
+            raise _heartbeat_failure_error(heartbeat_errors)
+        if stop_event.is_set():
+            raise ResearchStopRequested("运行完成后检测到停止请求")
         if monotonic() >= deadline:
             raise ResearchBudgetExceeded("研究运行超过冻结 wallClockSeconds 预算")
         post_run_status = heartbeat_research_work(
@@ -270,13 +291,29 @@ def execute_claimed_research_work(
                 session_factory=factory,
             )
             return "blocked"
+        if lease_lost.is_set():
+            return "lease_lost"
+        if heartbeat_failure.is_set():
+            return fail_research_work(
+                claim,
+                _heartbeat_failure_error(heartbeat_errors),
+                transient=True,
+                session_factory=factory,
+            )
         stop_research_work(claim, str(exc), session_factory=factory)
         return "stopped"
     except ResearchBudgetExceeded as exc:
         fail_research_work(claim, exc, transient=False, session_factory=factory)
         return "blocked"
     except Exception as exc:
-        transient = isinstance(exc, (TransientResearchError, OperationalError, TimeoutError, ConnectionError))
+        if lease_lost.is_set():
+            return "lease_lost"
+        if heartbeat_failure.is_set():
+            exc = _heartbeat_failure_error(heartbeat_errors)
+        transient = isinstance(
+            exc,
+            (TransientResearchError, OperationalError, TimeoutError, ConnectionError),
+        )
         return fail_research_work(
             claim,
             exc,
@@ -512,6 +549,9 @@ def _execute_with_runner(
 def _heartbeat_loop(
     done: Event,
     stop_event: Event,
+    heartbeat_failure: Event,
+    lease_lost: Event,
+    heartbeat_errors: list[Exception],
     claim: ClaimedResearchWork,
     factory: SessionFactory,
     interval_seconds: int,
@@ -524,12 +564,23 @@ def _heartbeat_loop(
                 session_factory=factory,
                 lease_seconds=lease_seconds,
             )
-        except Exception:
+        except Exception as exc:
+            heartbeat_errors.append(exc)
+            heartbeat_failure.set()
             stop_event.set()
             return
-        if status != "ok":
+        if status == "lease_lost":
+            lease_lost.set()
             stop_event.set()
             return
+        if status == "stop_requested":
+            stop_event.set()
+            return
+
+
+def _heartbeat_failure_error(errors: list[Exception]) -> TransientResearchError:
+    error_kind = type(errors[0]).__name__ if errors else "UnknownHeartbeatError"
+    return TransientResearchError(f"研究 Worker 心跳失败：{error_kind}")
 
 
 def _owned_work(
@@ -613,6 +664,52 @@ def _block_exhausted_work(db: Session, now: datetime) -> None:
             "research_blocked",
             {"errorKind": "RetryBudgetExhausted", "runId": work.current_run_id},
             run_id=work.current_run_id,
+            occurred_at=now,
+        )
+
+
+def _reconcile_expired_terminal_runs(db: Session, now: datetime) -> None:
+    expired = db.scalars(
+        select(ResearchWorkItem).where(
+            ResearchWorkItem.status.in_(("leased", "running")),
+            ResearchWorkItem.stop_requested_at.is_(None),
+            ResearchWorkItem.lease_expires_at < now,
+        )
+    ).all()
+    for work in expired:
+        run = _latest_run(db, work.formal_research_id)
+        if run is None or run.status not in {"succeeded", "failed"}:
+            continue
+        orchestration = db.get(ResearchOrchestration, work.orchestration_id)
+        formal = db.get(FormalResearch, work.formal_research_id)
+        work.current_run_id = run.run_id
+        work.resume_run_id = None
+        _release_lease(work, now)
+        if run.status == "succeeded":
+            work.status = "succeeded"
+            orchestration.state_reason = "已从过期租约核对成功运行，等待结构化评价"
+            formal.phase = "evaluating"
+            event_type = "research_succeeded_after_lease_expiry"
+            payload = {"runId": run.run_id}
+        else:
+            work.status = "failed"
+            work.last_error_kind = "TerminalRunReconciled"
+            work.last_error = (run.error or "研究运行已失败")[:2000]
+            transition_orchestration(
+                orchestration,
+                "blocked",
+                reason="过期租约对应的运行已确定失败，拒绝盲目重试",
+            )
+            formal.phase = "stopped"
+            formal.completed_at = now
+            event_type = "research_failed_after_lease_expiry"
+            payload = {"runId": run.run_id, "retryable": False}
+        append_research_event(
+            db,
+            formal.id,
+            event_type,
+            payload,
+            run_id=run.run_id,
             occurred_at=now,
         )
 

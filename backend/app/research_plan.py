@@ -289,9 +289,10 @@ def _normalize_resource_budget(value: Any, limits: ResearchServerLimits) -> dict
     retries = value["maxRetries"]
     if isinstance(retries, bool) or not isinstance(retries, int) or not 0 <= retries <= 2:
         raise ResearchPlanError("resourceBudget.maxRetries 必须是 0 到 2 的整数")
-    cpu_text = str(value["cpuCores"])
-    if not DECIMAL_PATTERN.fullmatch(cpu_text):
+    cpu_value = value["cpuCores"]
+    if not isinstance(cpu_value, str) or not DECIMAL_PATTERN.fullmatch(cpu_value):
         raise ResearchPlanError("resourceBudget.cpuCores 必须使用字符串化十进制定点")
+    cpu_text = cpu_value
     cpu = Decimal(cpu_text)
     if cpu <= 0:
         raise ResearchPlanError("resourceBudget.cpuCores 必须大于 0")
