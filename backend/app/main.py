@@ -5,11 +5,10 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from hashlib import sha256
 import json
-import math
 from pathlib import Path
 import time
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .database import Base, assert_schema_revision_at_head, engine, get_db
+from .json_safety import json_safe_value
 from .models import (
     Asset,
     AssetDailyPrice,
@@ -54,6 +54,9 @@ from .models import (
 from .schemas import (
     DailyBarOut,
     DataQualityRunRequest,
+    FormalResearchDetailOut,
+    StrategyProfileOut,
+    StrategyProfileSummaryOut,
     StockFundamentalsOut,
     StockOut,
     StockPoolCreate,
@@ -81,6 +84,7 @@ from .schemas import (
 from .data_quality.contracts import QualityCheckContract
 from .data_quality.runner import list_quality_results, quality_run_to_dict, run_data_quality_check
 from .quant_research.readiness import evaluate_quality_run_readiness, evaluate_research_readiness
+from .research_catalog import get_formal_research_detail, get_strategy_profile, list_strategy_profiles
 from .tushare_client import decimal_or_none, get_pro_api, parse_tushare_date, tushare_date
 from .us_research import build_us_research_import_preview, build_us_research_overview
 from .strategy_results import build_strategy_results_overview
@@ -1167,6 +1171,27 @@ def get_research_readiness(scope: str = "a_share_cross_section", db: Session = D
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@app.get("/api/research/strategies", response_model=list[StrategyProfileSummaryOut])
+def list_research_strategy_profiles(db: Session = Depends(get_db)) -> list[StrategyProfileSummaryOut]:
+    return list_strategy_profiles(db)
+
+
+@app.get("/api/research/strategies/{strategy_id}", response_model=StrategyProfileOut)
+def get_research_strategy_profile(strategy_id: str, db: Session = Depends(get_db)) -> StrategyProfileOut:
+    profile = get_strategy_profile(db, strategy_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="策略档案不存在")
+    return profile
+
+
+@app.get("/api/research/formal-researches/{research_id}", response_model=FormalResearchDetailOut)
+def get_research_detail(research_id: UUID, db: Session = Depends(get_db)) -> FormalResearchDetailOut:
+    detail = get_formal_research_detail(db, str(research_id))
+    if detail is None:
+        raise HTTPException(status_code=404, detail="正式研究不存在")
+    return detail
+
+
 @app.post("/api/data-quality/runs", status_code=201)
 def create_data_quality_run(payload: DataQualityRunRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     try:
@@ -1863,23 +1888,6 @@ def sync_result_rows(result: Any) -> int:
     if isinstance(summary, dict):
         return sum(int(value or 0) for value in summary.values())
     return 0
-
-
-def json_safe_value(value: Any) -> Any:
-    if value is None or isinstance(value, (str, int, bool)):
-        return value
-    if isinstance(value, (date, datetime)):
-        return value.isoformat()
-    if isinstance(value, Decimal):
-        number = float(value)
-        return number if math.isfinite(number) else None
-    if isinstance(value, float):
-        return value if math.isfinite(value) else None
-    if isinstance(value, dict):
-        return {str(key): json_safe_value(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set)):
-        return [json_safe_value(item) for item in value]
-    return str(value)
 
 
 def sync_job_to_dict(job: DataSyncJob) -> dict[str, Any]:
