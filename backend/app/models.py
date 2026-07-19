@@ -12,6 +12,7 @@ from sqlalchemy import (
     JSON,
     Numeric,
     String,
+    Uuid,
     UniqueConstraint,
     event,
     func,
@@ -22,7 +23,14 @@ from sqlalchemy.orm import Mapped, mapped_column, validates
 from .database import Base
 
 
-RESEARCH_RUN_STATUS_VALUES = {"running", "succeeded", "failed", "interrupted"}
+RESEARCH_RUN_STATUS_VALUES = {
+    "queued",
+    "running",
+    "retrying",
+    "succeeded",
+    "failed",
+    "interrupted",
+}
 STRATEGY_LIFECYCLE_VALUES = {"活跃", "暂停", "停止研究", "已归档"}
 RESEARCH_CONCLUSION_VALUES = {"研究通过", "有条件候选", "证据不足", "受阻", "不通过"}
 FORMAL_RESEARCH_PHASE_VALUES = {"approved", "active", "evaluating", "published", "stopped"}
@@ -538,7 +546,7 @@ class ResearchRun(Base):
     __tablename__ = "research_runs"
     __table_args__ = (
         CheckConstraint(
-            "status in ('running', 'succeeded', 'failed', 'interrupted')",
+            "status in ('queued', 'running', 'retrying', 'succeeded', 'failed', 'interrupted')",
             name="ck_research_runs_status",
         ),
         SqlIndex("ix_research_runs_strategy_started", "strategy_id", "started_at"),
@@ -548,6 +556,7 @@ class ResearchRun(Base):
 
     run_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     formal_research_id: Mapped[str | None] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("formal_researches.id", ondelete="RESTRICT")
     )
     reproducibility_key: Mapped[str | None] = mapped_column(String(64))
@@ -602,7 +611,7 @@ class FrozenResearchPlan(Base):
         SqlIndex("ix_frozen_research_plans_strategy_created", "strategy_id", "created_at"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True)
     strategy_id: Mapped[str] = mapped_column(
         ForeignKey("strategy_definitions.strategy_id", ondelete="RESTRICT")
     )
@@ -626,8 +635,9 @@ class ResearchPlanApproval(Base):
         SqlIndex("ix_research_plan_approvals_plan_created", "plan_id", "created_at"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True)
     plan_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("frozen_research_plans.id", ondelete="RESTRICT")
     )
     action: Mapped[str] = mapped_column(String(16))
@@ -650,11 +660,13 @@ class FormalResearch(Base):
         SqlIndex("ix_formal_researches_phase_created", "phase", "created_at"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True)
     plan_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("frozen_research_plans.id", ondelete="RESTRICT")
     )
     approval_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("research_plan_approvals.id", ondelete="RESTRICT")
     )
     phase: Mapped[str] = mapped_column(String(16), default="approved", server_default="approved")
@@ -672,8 +684,9 @@ class ResearchEvent(Base):
         SqlIndex("ix_research_events_run_occurred", "run_id", "occurred_at"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True)
     formal_research_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("formal_researches.id", ondelete="RESTRICT")
     )
     run_id: Mapped[str | None] = mapped_column(
@@ -703,14 +716,16 @@ class ResearchEvaluation(Base):
         SqlIndex("ix_research_evaluations_research_created", "formal_research_id", "created_at"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True)
     formal_research_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("formal_researches.id", ondelete="RESTRICT")
     )
     version: Mapped[int] = mapped_column()
     conclusion: Mapped[str] = mapped_column(String(16))
     evaluation_sha256: Mapped[str] = mapped_column(String(64))
     supersedes_evaluation_id: Mapped[str | None] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("research_evaluations.id", ondelete="RESTRICT")
     )
     supporting_evidence: Mapped[list[dict]] = mapped_column(JSON, default=list)
@@ -725,6 +740,7 @@ class ResearchEvaluationRun(Base):
     __tablename__ = "research_evaluation_runs"
 
     evaluation_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("research_evaluations.id", ondelete="RESTRICT"), primary_key=True
     )
     run_id: Mapped[str] = mapped_column(
@@ -746,8 +762,9 @@ class ResearchEvidenceRef(Base):
         SqlIndex("ix_research_evidence_refs_run_kind", "run_id", "kind"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True)
     evaluation_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("research_evaluations.id", ondelete="RESTRICT")
     )
     run_id: Mapped[str | None] = mapped_column(
@@ -778,17 +795,20 @@ class ResearchPublication(Base):
         SqlIndex("ix_research_publications_status_created", "status", "created_at"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True)
     formal_research_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("formal_researches.id", ondelete="RESTRICT")
     )
     evaluation_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("research_evaluations.id", ondelete="RESTRICT")
     )
     version: Mapped[int] = mapped_column()
     status: Mapped[str] = mapped_column(String(16), default="pending", server_default="pending")
     publication_sha256: Mapped[str] = mapped_column(String(64))
     supersedes_publication_id: Mapped[str | None] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("research_publications.id", ondelete="RESTRICT")
     )
     artifact_manifest_uri: Mapped[str] = mapped_column(String(1000))
@@ -809,14 +829,16 @@ class FollowUpResearchProposal(Base):
         SqlIndex("ix_follow_up_research_proposals_strategy_created", "strategy_id", "created_at"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True)
     strategy_id: Mapped[str] = mapped_column(
         ForeignKey("strategy_definitions.strategy_id", ondelete="RESTRICT")
     )
     source_evaluation_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("research_evaluations.id", ondelete="RESTRICT")
     )
     source_evidence_ref_id: Mapped[str | None] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("research_evidence_refs.id", ondelete="RESTRICT")
     )
     title: Mapped[str] = mapped_column(String(200))
@@ -824,6 +846,7 @@ class FollowUpResearchProposal(Base):
     status: Mapped[str] = mapped_column(String(16), default="proposed", server_default="proposed")
     proposal_json: Mapped[dict] = mapped_column(JSON)
     converted_plan_id: Mapped[str | None] = mapped_column(
+        Uuid(as_uuid=False),
         ForeignKey("frozen_research_plans.id", ondelete="RESTRICT")
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

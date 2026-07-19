@@ -243,6 +243,308 @@ class PostgresSchemaMigrationIntegrationTest(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_research_domain_rejects_cross_aggregate_links(self):
+        database_url = os.environ["TEST_POSTGRES_URL"]
+        parsed_url = make_url(database_url)
+        self.assertIn(parsed_url.host, {"127.0.0.1", "localhost"})
+        self.assertEqual(parsed_url.database, "quant_migration_test")
+        engine = create_engine(database_url)
+        try:
+            self._reset_ephemeral_database(engine)
+            with engine.connect() as connection:
+                command.upgrade(alembic_config(connection), "head")
+
+            with engine.connect() as connection:
+                column_types = {
+                    (row.table_name, row.column_name): row.udt_name
+                    for row in connection.execute(
+                        text(
+                            "SELECT table_name, column_name, udt_name "
+                            "FROM information_schema.columns WHERE table_schema = 'public'"
+                        )
+                    )
+                }
+                uuid_columns = {
+                    ("frozen_research_plans", "id"),
+                    ("research_plan_approvals", "id"),
+                    ("research_plan_approvals", "plan_id"),
+                    ("formal_researches", "id"),
+                    ("formal_researches", "plan_id"),
+                    ("formal_researches", "approval_id"),
+                    ("research_runs", "formal_research_id"),
+                    ("research_events", "id"),
+                    ("research_events", "formal_research_id"),
+                    ("research_evaluations", "id"),
+                    ("research_evaluations", "formal_research_id"),
+                    ("research_evaluations", "supersedes_evaluation_id"),
+                    ("research_evaluation_runs", "evaluation_id"),
+                    ("research_evidence_refs", "id"),
+                    ("research_evidence_refs", "evaluation_id"),
+                    ("research_publications", "id"),
+                    ("research_publications", "formal_research_id"),
+                    ("research_publications", "evaluation_id"),
+                    ("research_publications", "supersedes_publication_id"),
+                    ("follow_up_research_proposals", "id"),
+                    ("follow_up_research_proposals", "source_evaluation_id"),
+                    ("follow_up_research_proposals", "source_evidence_ref_id"),
+                    ("follow_up_research_proposals", "converted_plan_id"),
+                }
+                self.assertTrue(
+                    all(column_types.get(column) == "uuid" for column in uuid_columns),
+                    column_types,
+                )
+                trigger_names = set(
+                    connection.execute(
+                        text("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")
+                    ).scalars()
+                )
+                self.assertTrue(
+                    {
+                        "trg_research_plan_approvals_consistent",
+                        "trg_formal_researches_consistent",
+                        "trg_research_runs_consistent",
+                        "trg_research_events_consistent",
+                        "trg_research_evaluations_consistent",
+                        "trg_research_evaluation_runs_consistent",
+                        "trg_research_evidence_refs_consistent",
+                        "trg_research_publications_consistent",
+                        "trg_follow_up_research_proposals_consistent",
+                        "trg_research_evaluation_runs_published_immutable",
+                        "trg_research_evidence_refs_published_immutable",
+                    }.issubset(trigger_names)
+                )
+
+            with engine.begin() as connection:
+                first = self._insert_research_graph(connection, "a", 901, publish=True)
+                second = self._insert_research_graph(connection, "b", 902, publish=False)
+                connection.execute(
+                    text(
+                        "INSERT INTO research_evaluations "
+                        "(id, formal_research_id, version, conclusion, evaluation_sha256, "
+                        "supersedes_evaluation_id, supporting_evidence, opposing_evidence, "
+                        "missing_evidence, limitations, follow_up_recommendations) VALUES "
+                        "(:id, :formal_id, 2, '证据不足', :sha, :previous_id, "
+                        "'[]'::json, '[]'::json, '[]'::json, '[]'::json, '[]'::json)"
+                    ),
+                    {
+                        "id": "a0000000-0000-0000-0000-000000000008",
+                        "formal_id": first["formal_id"],
+                        "sha": "8" * 64,
+                        "previous_id": first["evaluation_id"],
+                    },
+                )
+
+            invalid_statements = (
+                (
+                    "INSERT INTO research_plan_approvals "
+                    "(id, plan_id, action, actor_login, comment_id, comment_body, plan_sha256) "
+                    "VALUES ('c0000000-0000-0000-0000-000000000001', :plan_id, 'approved', "
+                    "'Jettlin927', 9901, '批准研究 错误哈希', :sha)",
+                    {"plan_id": first["plan_id"], "sha": "f" * 64},
+                ),
+                (
+                    "INSERT INTO research_runs "
+                    "(run_id, formal_research_id, strategy_id, status, stage, config, "
+                    "config_sha256, code_commit, environment_sha256, random_seed, metrics, "
+                    "artifact_root) VALUES "
+                    "('c0000000-0000-0000-0000-000000000002', :formal_id, :strategy_id, "
+                    "'queued', 'queued', '{}'::json, :sha, :code, :sha, 1, '{}'::json, "
+                    "'artifacts://cross-run')",
+                    {
+                        "formal_id": first["formal_id"],
+                        "strategy_id": second["strategy_id"],
+                        "sha": "c" * 64,
+                        "code": "c" * 40,
+                    },
+                ),
+                (
+                    "INSERT INTO research_events "
+                    "(id, formal_research_id, run_id, sequence_no, event_type, payload_json) "
+                    "VALUES ('c0000000-0000-0000-0000-000000000003', :formal_id, :run_id, "
+                    "2, 'cross_run', '{}'::json)",
+                    {"formal_id": first["formal_id"], "run_id": second["run_id"]},
+                ),
+                (
+                    "INSERT INTO research_evaluation_runs (evaluation_id, run_id) "
+                    "VALUES ('a0000000-0000-0000-0000-000000000008', :run_id)",
+                    {"run_id": second["run_id"]},
+                ),
+                (
+                    "INSERT INTO research_evidence_refs "
+                    "(id, evaluation_id, run_id, kind, uri, metadata_json) VALUES "
+                    "('c0000000-0000-0000-0000-000000000004', "
+                    "'a0000000-0000-0000-0000-000000000008', :run_id, 'report', "
+                    "'artifacts://cross-evidence', '{}'::json)",
+                    {"run_id": second["run_id"]},
+                ),
+                (
+                    "INSERT INTO research_publications "
+                    "(id, formal_research_id, evaluation_id, version, status, publication_sha256, "
+                    "artifact_manifest_uri, issue_number) VALUES "
+                    "('c0000000-0000-0000-0000-000000000005', :formal_id, "
+                    "'a0000000-0000-0000-0000-000000000008', 1, 'pending', :sha, "
+                    "'artifacts://cross-publication', 9905)",
+                    {"formal_id": second["formal_id"], "sha": "5" * 64},
+                ),
+                (
+                    "INSERT INTO research_evaluations "
+                    "(id, formal_research_id, version, conclusion, evaluation_sha256, "
+                    "supersedes_evaluation_id, supporting_evidence, opposing_evidence, "
+                    "missing_evidence, limitations, follow_up_recommendations) VALUES "
+                    "('a0000000-0000-0000-0000-000000000009', :formal_id, 3, '证据不足', "
+                    ":sha, :previous_id, '[]'::json, '[]'::json, '[]'::json, '[]'::json, "
+                    "'[]'::json)",
+                    {
+                        "formal_id": first["formal_id"],
+                        "sha": "9" * 64,
+                        "previous_id": second["evaluation_id"],
+                    },
+                ),
+                (
+                    "INSERT INTO follow_up_research_proposals "
+                    "(id, strategy_id, source_evaluation_id, title, rationale, status, "
+                    "proposal_json) VALUES "
+                    "('c0000000-0000-0000-0000-000000000006', :strategy_id, "
+                    "'a0000000-0000-0000-0000-000000000008', '跨研究提案', '应被拒绝', "
+                    "'proposed', '{}'::json)",
+                    {"strategy_id": second["strategy_id"]},
+                ),
+            )
+            for statement, parameters in invalid_statements:
+                with self.subTest(statement=statement[:60]):
+                    with self.assertRaisesRegex(DBAPIError, "research relation mismatch"):
+                        with engine.begin() as connection:
+                            connection.execute(text(statement), parameters)
+
+            with self.assertRaisesRegex(DBAPIError, "published evaluation is immutable"):
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "INSERT INTO research_evidence_refs "
+                            "(id, evaluation_id, kind, uri, metadata_json) VALUES "
+                            "('c0000000-0000-0000-0000-000000000007', :evaluation_id, "
+                            "'limitation', 'artifacts://late-evidence', '{}'::json)"
+                        ),
+                        {"evaluation_id": first["evaluation_id"]},
+                    )
+        finally:
+            engine.dispose()
+
+    @staticmethod
+    def _insert_research_graph(connection, prefix: str, issue_number: int, *, publish: bool):
+        ids = {
+            "strategy_id": f"migration-{prefix}",
+            "plan_id": f"{prefix}0000000-0000-0000-0000-000000000001",
+            "approval_id": f"{prefix}0000000-0000-0000-0000-000000000002",
+            "formal_id": f"{prefix}0000000-0000-0000-0000-000000000003",
+            "run_id": f"{prefix}0000000-0000-0000-0000-000000000004",
+            "evaluation_id": f"{prefix}0000000-0000-0000-0000-000000000005",
+            "evidence_id": f"{prefix}0000000-0000-0000-0000-000000000006",
+            "publication_id": f"{prefix}0000000-0000-0000-0000-000000000007",
+        }
+        connection.execute(
+            text(
+                "INSERT INTO strategy_definitions "
+                "(strategy_id, display_name, lifecycle_status, economic_thesis, registry_version, "
+                "code_commit, metadata_json) VALUES "
+                "(:strategy_id, :strategy_id, '活跃', '迁移关系哨兵', '1', :code, '{}'::json)"
+            ),
+            {**ids, "code": "c" * 40},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO frozen_research_plans "
+                "(id, strategy_id, issue_number, version, schema_version, plan_sha256, "
+                "code_commit, plan_json) VALUES "
+                "(:plan_id, :strategy_id, :issue_number, 1, '1', :plan_sha, :code, '{}'::json)"
+            ),
+            {
+                **ids,
+                "issue_number": issue_number,
+                "plan_sha": prefix * 64,
+                "code": "c" * 40,
+            },
+        )
+        connection.execute(
+            text(
+                "INSERT INTO research_plan_approvals "
+                "(id, plan_id, action, actor_login, comment_id, comment_body, plan_sha256) "
+                "VALUES (:approval_id, :plan_id, 'approved', 'Jettlin927', :comment_id, "
+                ":comment_body, :plan_sha)"
+            ),
+            {
+                **ids,
+                "comment_id": issue_number * 10,
+                "comment_body": f"批准研究 {prefix * 64}",
+                "plan_sha": prefix * 64,
+            },
+        )
+        connection.execute(
+            text(
+                "INSERT INTO formal_researches (id, plan_id, approval_id, phase) "
+                "VALUES (:formal_id, :plan_id, :approval_id, 'evaluating')"
+            ),
+            ids,
+        )
+        connection.execute(
+            text(
+                "INSERT INTO research_runs "
+                "(run_id, formal_research_id, strategy_id, status, stage, config, config_sha256, "
+                "code_commit, environment_sha256, random_seed, metrics, artifact_root) VALUES "
+                "(:run_id, :formal_id, :strategy_id, 'queued', 'queued', '{}'::json, :sha, "
+                ":code, :sha, 1, '{}'::json, :artifact_root)"
+            ),
+            {
+                **ids,
+                "sha": prefix * 64,
+                "code": "c" * 40,
+                "artifact_root": f"artifacts://migration-{prefix}",
+            },
+        )
+        connection.execute(
+            text(
+                "INSERT INTO research_evaluations "
+                "(id, formal_research_id, version, conclusion, evaluation_sha256, "
+                "supporting_evidence, opposing_evidence, missing_evidence, limitations, "
+                "follow_up_recommendations) VALUES "
+                "(:evaluation_id, :formal_id, 1, '证据不足', :sha, '[]'::json, '[]'::json, "
+                "'[]'::json, '[]'::json, '[]'::json)"
+            ),
+            {**ids, "sha": prefix * 64},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO research_evaluation_runs (evaluation_id, run_id) "
+                "VALUES (:evaluation_id, :run_id)"
+            ),
+            ids,
+        )
+        connection.execute(
+            text(
+                "INSERT INTO research_evidence_refs "
+                "(id, evaluation_id, run_id, kind, uri, metadata_json) VALUES "
+                "(:evidence_id, :evaluation_id, :run_id, 'report', :uri, '{}'::json)"
+            ),
+            {**ids, "uri": f"artifacts://migration-{prefix}/report"},
+        )
+        if publish:
+            connection.execute(
+                text(
+                    "INSERT INTO research_publications "
+                    "(id, formal_research_id, evaluation_id, version, status, publication_sha256, "
+                    "artifact_manifest_uri, issue_number) VALUES "
+                    "(:publication_id, :formal_id, :evaluation_id, 1, 'published', :sha, :uri, "
+                    ":issue_number)"
+                ),
+                {
+                    **ids,
+                    "sha": prefix * 64,
+                    "uri": f"artifacts://migration-{prefix}/manifest",
+                    "issue_number": issue_number,
+                },
+            )
+        return ids
+
     @staticmethod
     def _reset_ephemeral_database(engine) -> None:
         with engine.begin() as connection:

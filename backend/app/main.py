@@ -5,11 +5,10 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from hashlib import sha256
 import json
-import math
 from pathlib import Path
 import time
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .database import Base, assert_schema_revision_at_head, engine, get_db
+from .json_safety import json_safe_value
 from .models import (
     Asset,
     AssetDailyPrice,
@@ -1185,8 +1185,8 @@ def get_research_strategy_profile(strategy_id: str, db: Session = Depends(get_db
 
 
 @app.get("/api/research/formal-researches/{research_id}", response_model=FormalResearchDetailOut)
-def get_research_detail(research_id: str, db: Session = Depends(get_db)) -> FormalResearchDetailOut:
-    detail = get_formal_research_detail(db, research_id)
+def get_research_detail(research_id: UUID, db: Session = Depends(get_db)) -> FormalResearchDetailOut:
+    detail = get_formal_research_detail(db, str(research_id))
     if detail is None:
         raise HTTPException(status_code=404, detail="正式研究不存在")
     return detail
@@ -1888,23 +1888,6 @@ def sync_result_rows(result: Any) -> int:
     if isinstance(summary, dict):
         return sum(int(value or 0) for value in summary.values())
     return 0
-
-
-def json_safe_value(value: Any) -> Any:
-    if value is None or isinstance(value, (str, int, bool)):
-        return value
-    if isinstance(value, (date, datetime)):
-        return value.isoformat()
-    if isinstance(value, Decimal):
-        number = float(value)
-        return number if math.isfinite(number) else None
-    if isinstance(value, float):
-        return value if math.isfinite(value) else None
-    if isinstance(value, dict):
-        return {str(key): json_safe_value(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set)):
-        return [json_safe_value(item) for item in value]
-    return str(value)
 
 
 def sync_job_to_dict(job: DataSyncJob) -> dict[str, Any]:

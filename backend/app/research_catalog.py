@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .json_safety import json_safe_value
 from .models import (
     FollowUpResearchProposal,
     FormalResearch,
@@ -60,7 +61,7 @@ def get_strategy_profile(db: Session, strategy_id: str) -> StrategyProfileOut | 
         economic_thesis=strategy.economic_thesis,
         registry_version=strategy.registry_version,
         code_commit=strategy.code_commit,
-        metadata_json=dict(strategy.metadata_json or {}),
+        metadata_json=json_safe_value(strategy.metadata_json or {}),
         formal_researches=[_formal_research_summary(db, item) for item in formal_researches],
         follow_up_proposals=[_proposal_out(item) for item in proposals],
         created_at=strategy.created_at,
@@ -130,8 +131,8 @@ def _strategy_summary(db: Session, strategy: StrategyDefinition) -> StrategyProf
             .where(FrozenResearchPlan.strategy_id == strategy.strategy_id)
         ).all()
     )
-    latest_evaluation = _latest_evaluation(db, research_ids)
     latest_publication = _latest_publication(db, research_ids)
+    publication_evaluation = _publication_evaluation(db, latest_publication)
     return StrategyProfileSummaryOut(
         strategy_id=strategy.strategy_id,
         display_name=strategy.display_name,
@@ -139,24 +140,25 @@ def _strategy_summary(db: Session, strategy: StrategyDefinition) -> StrategyProf
         registry_version=strategy.registry_version,
         code_commit=strategy.code_commit,
         formal_research_count=len(research_ids),
-        latest_conclusion=latest_evaluation.conclusion if latest_evaluation else None,
+        latest_publication_id=latest_publication.id if latest_publication else None,
+        latest_publication_evaluation_id=(
+            publication_evaluation.id if publication_evaluation else None
+        ),
+        latest_publication_conclusion=(
+            publication_evaluation.conclusion if publication_evaluation else None
+        ),
         latest_publication_status=latest_publication.status if latest_publication else None,
     )
 
 
 def _formal_research_summary(db: Session, research: FormalResearch) -> FormalResearchSummaryOut:
-    latest_evaluation = db.scalar(
-        select(ResearchEvaluation)
-        .where(ResearchEvaluation.formal_research_id == research.id)
-        .order_by(ResearchEvaluation.version.desc())
-        .limit(1)
-    )
     latest_publication = db.scalar(
         select(ResearchPublication)
         .where(ResearchPublication.formal_research_id == research.id)
         .order_by(ResearchPublication.version.desc())
         .limit(1)
     )
+    publication_evaluation = _publication_evaluation(db, latest_publication)
     run_count = int(
         db.scalar(
             select(func.count()).select_from(ResearchRun).where(ResearchRun.formal_research_id == research.id)
@@ -168,23 +170,16 @@ def _formal_research_summary(db: Session, research: FormalResearch) -> FormalRes
         plan_id=research.plan_id,
         phase=research.phase,
         run_count=run_count,
-        latest_evaluation_id=latest_evaluation.id if latest_evaluation else None,
-        latest_conclusion=latest_evaluation.conclusion if latest_evaluation else None,
         latest_publication_id=latest_publication.id if latest_publication else None,
-        publication_status=latest_publication.status if latest_publication else None,
+        latest_publication_evaluation_id=(
+            publication_evaluation.id if publication_evaluation else None
+        ),
+        latest_publication_conclusion=(
+            publication_evaluation.conclusion if publication_evaluation else None
+        ),
+        latest_publication_status=latest_publication.status if latest_publication else None,
         created_at=research.created_at,
         completed_at=research.completed_at,
-    )
-
-
-def _latest_evaluation(db: Session, research_ids: list[str]) -> ResearchEvaluation | None:
-    if not research_ids:
-        return None
-    return db.scalar(
-        select(ResearchEvaluation)
-        .where(ResearchEvaluation.formal_research_id.in_(research_ids))
-        .order_by(ResearchEvaluation.created_at.desc(), ResearchEvaluation.version.desc())
-        .limit(1)
     )
 
 
@@ -199,6 +194,17 @@ def _latest_publication(db: Session, research_ids: list[str]) -> ResearchPublica
     )
 
 
+def _publication_evaluation(
+    db: Session, publication: ResearchPublication | None
+) -> ResearchEvaluation | None:
+    if publication is None:
+        return None
+    evaluation = db.get(ResearchEvaluation, publication.evaluation_id)
+    if evaluation is None:
+        raise RuntimeError("研究发布缺少对应评价记录")
+    return evaluation
+
+
 def _plan_out(plan: FrozenResearchPlan) -> FrozenResearchPlanOut:
     return FrozenResearchPlanOut(
         id=plan.id,
@@ -208,7 +214,7 @@ def _plan_out(plan: FrozenResearchPlan) -> FrozenResearchPlanOut:
         schema_version=plan.schema_version,
         plan_sha256=plan.plan_sha256,
         code_commit=plan.code_commit,
-        plan_json=dict(plan.plan_json or {}),
+        plan_json=json_safe_value(plan.plan_json or {}),
         created_at=plan.created_at,
     )
 
@@ -254,7 +260,7 @@ def _event_out(event: ResearchEvent) -> ResearchEventOut:
         run_id=event.run_id,
         sequence_no=event.sequence_no,
         event_type=event.event_type,
-        payload_json=dict(event.payload_json or {}),
+        payload_json=json_safe_value(event.payload_json or {}),
         occurred_at=event.occurred_at,
     )
 
@@ -279,11 +285,13 @@ def _evaluation_out(db: Session, evaluation: ResearchEvaluation) -> ResearchEval
         conclusion=evaluation.conclusion,
         evaluation_sha256=evaluation.evaluation_sha256,
         supersedes_evaluation_id=evaluation.supersedes_evaluation_id,
-        supporting_evidence=list(evaluation.supporting_evidence or []),
-        opposing_evidence=list(evaluation.opposing_evidence or []),
-        missing_evidence=list(evaluation.missing_evidence or []),
-        limitations=list(evaluation.limitations or []),
-        follow_up_recommendations=list(evaluation.follow_up_recommendations or []),
+        supporting_evidence=json_safe_value(evaluation.supporting_evidence or []),
+        opposing_evidence=json_safe_value(evaluation.opposing_evidence or []),
+        missing_evidence=json_safe_value(evaluation.missing_evidence or []),
+        limitations=json_safe_value(evaluation.limitations or []),
+        follow_up_recommendations=json_safe_value(
+            evaluation.follow_up_recommendations or []
+        ),
         run_ids=run_ids,
         evidence_refs=[_evidence_out(item) for item in evidence_refs],
         created_at=evaluation.created_at,
@@ -298,7 +306,7 @@ def _evidence_out(evidence: ResearchEvidenceRef) -> ResearchEvidenceRefOut:
         kind=evidence.kind,
         uri=evidence.uri,
         sha256=evidence.sha256,
-        metadata_json=dict(evidence.metadata_json or {}),
+        metadata_json=json_safe_value(evidence.metadata_json or {}),
         created_at=evidence.created_at,
     )
 
@@ -329,7 +337,7 @@ def _proposal_out(proposal: FollowUpResearchProposal) -> FollowUpResearchProposa
         title=proposal.title,
         rationale=proposal.rationale,
         status=proposal.status,
-        proposal_json=dict(proposal.proposal_json or {}),
+        proposal_json=json_safe_value(proposal.proposal_json or {}),
         converted_plan_id=proposal.converted_plan_id,
         created_at=proposal.created_at,
     )

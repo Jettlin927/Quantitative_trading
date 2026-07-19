@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 import unittest
 
-from sqlalchemy import create_engine
+from sqlalchemy import Uuid, create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -52,7 +53,7 @@ class ResearchDomainTest(unittest.TestCase):
             economic_thesis="只验证研究管线，不评价 alpha。",
             registry_version="1",
             code_commit="c" * 40,
-            metadata_json={"scope": "etf_time_series"},
+            metadata_json={"scope": "etf_time_series", "nonFinite": float("nan")},
         )
         plan = FrozenResearchPlan(
             id="10000000-0000-0000-0000-000000000001",
@@ -62,7 +63,7 @@ class ResearchDomainTest(unittest.TestCase):
             schema_version="1",
             plan_sha256="a" * 64,
             code_commit="c" * 40,
-            plan_json={"strategyId": strategy.strategy_id},
+            plan_json={"strategyId": strategy.strategy_id, "nonFinite": float("nan")},
         )
         approval = ResearchPlanApproval(
             id="10000000-0000-0000-0000-000000000002",
@@ -104,7 +105,7 @@ class ResearchDomainTest(unittest.TestCase):
             run_id=runs[0].run_id,
             sequence_no=1,
             event_type="run_finalized",
-            payload_json={"stage": "finalized"},
+            payload_json={"stage": "finalized", "nonFinite": float("nan")},
         )
         evaluation = ResearchEvaluation(
             id="40000000-0000-0000-0000-000000000001",
@@ -112,7 +113,7 @@ class ResearchDomainTest(unittest.TestCase):
             version=1,
             conclusion="证据不足",
             evaluation_sha256="1" * 64,
-            supporting_evidence=[{"statement": "两次运行可复现"}],
+            supporting_evidence=[{"statement": "两次运行可复现", "score": float("nan")}],
             opposing_evidence=[{"statement": "尚未评价 alpha"}],
             missing_evidence=[{"statement": "缺少匹配基准"}],
             limitations=[{"statement": "仅为哨兵"}],
@@ -129,7 +130,7 @@ class ResearchDomainTest(unittest.TestCase):
             kind="report",
             uri="artifacts://sentinel/report.json",
             sha256="2" * 64,
-            metadata_json={"mediaType": "application/json"},
+            metadata_json={"mediaType": "application/json", "nonFinite": float("inf")},
         )
         publication = ResearchPublication(
             id="60000000-0000-0000-0000-000000000001",
@@ -151,7 +152,7 @@ class ResearchDomainTest(unittest.TestCase):
             title="补充匹配基准评价",
             rationale="当前评价缺少匹配基准。",
             status="proposed",
-            proposal_json={"inheritsApproval": False},
+            proposal_json={"inheritsApproval": False, "nonFinite": float("-inf")},
         )
         db.add_all(
             [
@@ -183,7 +184,10 @@ class ResearchDomainTest(unittest.TestCase):
         }
 
     def test_status_namespaces_are_explicit_and_disjoint(self) -> None:
-        self.assertEqual(RESEARCH_RUN_STATUS_VALUES, {"running", "succeeded", "failed", "interrupted"})
+        self.assertEqual(
+            RESEARCH_RUN_STATUS_VALUES,
+            {"queued", "running", "retrying", "succeeded", "failed", "interrupted"},
+        )
         self.assertEqual(STRATEGY_LIFECYCLE_VALUES, {"活跃", "暂停", "停止研究", "已归档"})
         self.assertEqual(RESEARCH_CONCLUSION_VALUES, {"研究通过", "有条件候选", "证据不足", "受阻", "不通过"})
         self.assertEqual(FORMAL_RESEARCH_PHASE_VALUES, {"approved", "active", "evaluating", "published", "stopped"})
@@ -223,6 +227,15 @@ class ResearchDomainTest(unittest.TestCase):
             db.commit()
             self.assertEqual(replacement.supersedes_evaluation_id, evaluation.id)
 
+            listed = list_strategy_profiles(db)
+            profile = get_strategy_profile(db, graph["strategy"].strategy_id)
+            self.assertEqual(str(listed[0].latest_publication_evaluation_id), evaluation.id)
+            self.assertEqual(listed[0].latest_publication_conclusion, "证据不足")
+            self.assertEqual(
+                str(profile.formal_researches[0].latest_publication_evaluation_id), evaluation.id
+            )
+            self.assertEqual(profile.formal_researches[0].latest_publication_conclusion, "证据不足")
+
     def test_frozen_and_evaluated_records_reject_orm_overwrite(self) -> None:
         with Session(self.engine) as db:
             graph = self.seed_graph(db)
@@ -261,6 +274,21 @@ class ResearchDomainTest(unittest.TestCase):
             with self.assertRaises(IntegrityError):
                 db.commit()
 
+    def test_cross_layer_record_ids_use_uuid_columns(self) -> None:
+        for model in (
+            FrozenResearchPlan,
+            ResearchPlanApproval,
+            FormalResearch,
+            ResearchEvent,
+            ResearchEvaluation,
+            ResearchEvidenceRef,
+            ResearchPublication,
+            FollowUpResearchProposal,
+        ):
+            with self.subTest(model=model.__name__):
+                self.assertIsInstance(model.__table__.c.id.type, Uuid)
+        self.assertIsInstance(ResearchRun.__table__.c.formal_research_id.type, Uuid)
+
     def test_read_only_catalog_projects_the_same_versioned_graph(self) -> None:
         with Session(self.engine) as db:
             graph = self.seed_graph(db)
@@ -269,7 +297,7 @@ class ResearchDomainTest(unittest.TestCase):
             research = get_formal_research_detail(db, graph["formal"].id)
 
         self.assertEqual([item.strategy_id for item in listed], ["sentinel_etf_baseline"])
-        self.assertEqual(profile.formal_researches[0].latest_conclusion, "证据不足")
+        self.assertEqual(profile.formal_researches[0].latest_publication_conclusion, "证据不足")
         self.assertEqual(research.plan.plan_sha256, "a" * 64)
         self.assertEqual([run.run_id for run in research.runs], [
             "20000000-0000-0000-0000-000000000001",
@@ -278,6 +306,14 @@ class ResearchDomainTest(unittest.TestCase):
         self.assertEqual(research.evaluations[0].evidence_refs[0].sha256, "2" * 64)
         self.assertEqual(research.publications[0].publication_sha256, "3" * 64)
         self.assertFalse(research.follow_up_proposals[0].proposal_json["inheritsApproval"])
+        self.assertIsNone(profile.metadata_json["nonFinite"])
+        self.assertIsNone(research.plan.plan_json["nonFinite"])
+        self.assertIsNone(research.events[0].payload_json["nonFinite"])
+        self.assertIsNone(research.evaluations[0].supporting_evidence[0]["score"])
+        self.assertIsNone(research.evaluations[0].evidence_refs[0].metadata_json["nonFinite"])
+        self.assertIsNone(research.follow_up_proposals[0].proposal_json["nonFinite"])
+        json.dumps(profile.model_dump(mode="json"), allow_nan=False)
+        json.dumps(research.model_dump(mode="json"), allow_nan=False)
 
     def test_only_read_routes_are_exposed(self) -> None:
         route_methods = {
@@ -308,6 +344,9 @@ class ResearchDomainTest(unittest.TestCase):
         self.assertIn("batch_op.add_column", source)
         self.assertIn("formal_research_id", source)
         self.assertIn("prevent_immutable_research_mutation", source)
+        self.assertIn("ensure_research_relation_consistency", source)
+        self.assertIn("prevent_published_evaluation_extension", source)
+        self.assertIn("sa.Uuid(as_uuid=False)", source)
         self.assertIn("禁止自动降级", source)
         self.assertNotIn("op.drop_table", source)
 

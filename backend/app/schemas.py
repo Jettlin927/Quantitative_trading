@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -239,7 +240,7 @@ class ResearchRunOut(BaseModel):
     run_id: str
     reproducibility_key: str | None = None
     strategy_id: str
-    status: Literal["running", "succeeded", "failed", "interrupted"]
+    status: Literal["queued", "running", "retrying", "succeeded", "failed", "interrupted"]
     stage: str
     config_sha256: str
     data_snapshot_id: str | None = None
@@ -261,12 +262,16 @@ class StrategyProfileSummaryOut(BaseModel):
     registry_version: str
     code_commit: str
     formal_research_count: int = 0
-    latest_conclusion: Literal["研究通过", "有条件候选", "证据不足", "受阻", "不通过"] | None = None
+    latest_publication_id: UUID | None = None
+    latest_publication_evaluation_id: UUID | None = None
+    latest_publication_conclusion: Literal[
+        "研究通过", "有条件候选", "证据不足", "受阻", "不通过"
+    ] | None = None
     latest_publication_status: Literal["pending", "published", "failed"] | None = None
 
 
 class FrozenResearchPlanOut(BaseModel):
-    id: str
+    id: UUID
     strategy_id: str
     issue_number: int
     version: int
@@ -278,8 +283,8 @@ class FrozenResearchPlanOut(BaseModel):
 
 
 class ResearchPlanApprovalOut(BaseModel):
-    id: str
-    plan_id: str
+    id: UUID
+    plan_id: UUID
     action: Literal["approved", "invalidated", "stopped"]
     actor_login: str
     comment_id: int
@@ -290,10 +295,10 @@ class ResearchPlanApprovalOut(BaseModel):
 
 class ResearchRunSummaryOut(BaseModel):
     run_id: str
-    formal_research_id: str | None = None
+    formal_research_id: UUID | None = None
     reproducibility_key: str | None = None
     strategy_id: str
-    status: Literal["running", "succeeded", "failed", "interrupted"]
+    status: Literal["queued", "running", "retrying", "succeeded", "failed", "interrupted"]
     stage: str
     config_sha256: str
     data_snapshot_id: str | None = None
@@ -308,8 +313,8 @@ class ResearchRunSummaryOut(BaseModel):
 
 
 class ResearchEventOut(BaseModel):
-    id: str
-    formal_research_id: str
+    id: UUID
+    formal_research_id: UUID
     run_id: str | None = None
     sequence_no: int
     event_type: str
@@ -318,8 +323,8 @@ class ResearchEventOut(BaseModel):
 
 
 class ResearchEvidenceRefOut(BaseModel):
-    id: str
-    evaluation_id: str
+    id: UUID
+    evaluation_id: UUID
     run_id: str | None = None
     kind: Literal[
         "input_snapshot",
@@ -338,12 +343,12 @@ class ResearchEvidenceRefOut(BaseModel):
 
 
 class ResearchEvaluationOut(BaseModel):
-    id: str
-    formal_research_id: str
+    id: UUID
+    formal_research_id: UUID
     version: int
     conclusion: Literal["研究通过", "有条件候选", "证据不足", "受阻", "不通过"]
     evaluation_sha256: str
-    supersedes_evaluation_id: str | None = None
+    supersedes_evaluation_id: UUID | None = None
     supporting_evidence: list[dict[str, Any]] = Field(default_factory=list)
     opposing_evidence: list[dict[str, Any]] = Field(default_factory=list)
     missing_evidence: list[dict[str, Any]] = Field(default_factory=list)
@@ -355,13 +360,13 @@ class ResearchEvaluationOut(BaseModel):
 
 
 class ResearchPublicationOut(BaseModel):
-    id: str
-    formal_research_id: str
-    evaluation_id: str
+    id: UUID
+    formal_research_id: UUID
+    evaluation_id: UUID
     version: int
     status: Literal["pending", "published", "failed"]
     publication_sha256: str
-    supersedes_publication_id: str | None = None
+    supersedes_publication_id: UUID | None = None
     artifact_manifest_uri: str
     issue_number: int
     issue_comment_id: int | None = None
@@ -370,27 +375,29 @@ class ResearchPublicationOut(BaseModel):
 
 
 class FollowUpResearchProposalOut(BaseModel):
-    id: str
+    id: UUID
     strategy_id: str
-    source_evaluation_id: str
-    source_evidence_ref_id: str | None = None
+    source_evaluation_id: UUID
+    source_evidence_ref_id: UUID | None = None
     title: str
     rationale: str
     status: Literal["proposed", "accepted", "rejected", "converted"]
     proposal_json: dict[str, Any]
-    converted_plan_id: str | None = None
+    converted_plan_id: UUID | None = None
     created_at: datetime | None = None
 
 
 class FormalResearchSummaryOut(BaseModel):
-    id: str
-    plan_id: str
+    id: UUID
+    plan_id: UUID
     phase: Literal["approved", "active", "evaluating", "published", "stopped"]
     run_count: int = 0
-    latest_evaluation_id: str | None = None
-    latest_conclusion: Literal["研究通过", "有条件候选", "证据不足", "受阻", "不通过"] | None = None
-    latest_publication_id: str | None = None
-    publication_status: Literal["pending", "published", "failed"] | None = None
+    latest_publication_id: UUID | None = None
+    latest_publication_evaluation_id: UUID | None = None
+    latest_publication_conclusion: Literal[
+        "研究通过", "有条件候选", "证据不足", "受阻", "不通过"
+    ] | None = None
+    latest_publication_status: Literal["pending", "published", "failed"] | None = None
     created_at: datetime | None = None
     completed_at: datetime | None = None
 
@@ -410,7 +417,7 @@ class StrategyProfileOut(BaseModel):
 
 
 class FormalResearchDetailOut(BaseModel):
-    id: str
+    id: UUID
     phase: Literal["approved", "active", "evaluating", "published", "stopped"]
     plan: FrozenResearchPlanOut
     approval: ResearchPlanApprovalOut
