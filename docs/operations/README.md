@@ -4,6 +4,7 @@
 
 - [CI/CD 与部署边界](cicd.md)
 - [远端 Docker 只读巡检](remote-docker-inspection.md)
+- [新服务器安全容器运行环境](new-server-runtime.md)
 - [私有 HTTPS 入口身份认证决策](private-https-authentication-decision.md)
 - [不可变生产验收证据](../acceptance/)
 

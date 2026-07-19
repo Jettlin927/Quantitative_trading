@@ -18,6 +18,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Docker and local runtime noise
+docker-compose.server.yml
 *.log
 *.tmp
 artifacts/

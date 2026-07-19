@@ -1,0 +1,81 @@
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?必须在服务器 .env 设置 POSTGRES_PASSWORD}
+    ports: !override
+      - name: postgres-loopback
+        target: 5432
+        published: "${POSTGRES_PORT:-5432}"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    volumes: !override
+      - type: bind
+        source: ${POSTGRES_DATA_DIR:-/srv/quantitative-trading/postgres}
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
+    cpus: 0.75
+    mem_limit: 1280m
+    mem_reservation: 512m
+    pids_limit: 256
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  api:
+    ports: !override
+      - name: api-loopback
+        target: 8000
+        published: "${API_PORT:-18000}"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    volumes: !override
+      - type: bind
+        source: ${RESEARCH_ARTIFACTS_DIR:-/srv/quantitative-trading/research-artifacts}
+        target: /app/outputs/research-runs
+        bind:
+          create_host_path: false
+    cpus: 0.45
+    mem_limit: 640m
+    mem_reservation: 256m
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  worker:
+    volumes: !override []
+    cpus: 0.35
+    mem_limit: 512m
+    mem_reservation: 192m
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  frontend:
+    ports: !override
+      - name: frontend-loopback
+        target: 5173
+        published: "${FRONTEND_PORT:-15173}"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    volumes: !override []
+    cpus: 0.25
+    mem_limit: 384m
+    mem_reservation: 128m
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes: !override {}
