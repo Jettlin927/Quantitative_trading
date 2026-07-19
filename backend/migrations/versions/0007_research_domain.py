@@ -37,7 +37,7 @@ def upgrade() -> None:
 
     op.create_table(
         "frozen_research_plans",
-        sa.Column("id", sa.String(length=36), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
         sa.Column("strategy_id", sa.String(length=80), nullable=False),
         sa.Column("issue_number", sa.Integer(), nullable=False),
         sa.Column("version", sa.Integer(), nullable=False),
@@ -63,8 +63,8 @@ def upgrade() -> None:
 
     op.create_table(
         "research_plan_approvals",
-        sa.Column("id", sa.String(length=36), nullable=False),
-        sa.Column("plan_id", sa.String(length=36), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
+        sa.Column("plan_id", sa.Uuid(as_uuid=False), nullable=False),
         sa.Column("action", sa.String(length=16), nullable=False),
         sa.Column("actor_login", sa.String(length=80), nullable=False),
         sa.Column("comment_id", sa.BigInteger(), nullable=False),
@@ -88,9 +88,9 @@ def upgrade() -> None:
 
     op.create_table(
         "formal_researches",
-        sa.Column("id", sa.String(length=36), nullable=False),
-        sa.Column("plan_id", sa.String(length=36), nullable=False),
-        sa.Column("approval_id", sa.String(length=36), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
+        sa.Column("plan_id", sa.Uuid(as_uuid=False), nullable=False),
+        sa.Column("approval_id", sa.Uuid(as_uuid=False), nullable=False),
         sa.Column("phase", sa.String(length=16), nullable=False, server_default="approved"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
@@ -113,7 +113,12 @@ def upgrade() -> None:
 
     with op.batch_alter_table("research_runs") as batch_op:
         batch_op.add_column(
-            sa.Column("formal_research_id", sa.String(length=36), nullable=True)
+            sa.Column("formal_research_id", sa.Uuid(as_uuid=False), nullable=True)
+        )
+        batch_op.drop_constraint("ck_research_runs_status", type_="check")
+        batch_op.create_check_constraint(
+            "ck_research_runs_status",
+            "status in ('queued', 'running', 'retrying', 'succeeded', 'failed', 'interrupted')",
         )
         batch_op.create_foreign_key(
             "fk_research_runs_formal_research",
@@ -130,8 +135,8 @@ def upgrade() -> None:
 
     op.create_table(
         "research_events",
-        sa.Column("id", sa.String(length=36), nullable=False),
-        sa.Column("formal_research_id", sa.String(length=36), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
+        sa.Column("formal_research_id", sa.Uuid(as_uuid=False), nullable=False),
         sa.Column("run_id", sa.String(length=36), nullable=True),
         sa.Column("sequence_no", sa.Integer(), nullable=False),
         sa.Column("event_type", sa.String(length=80), nullable=False),
@@ -154,12 +159,12 @@ def upgrade() -> None:
 
     op.create_table(
         "research_evaluations",
-        sa.Column("id", sa.String(length=36), nullable=False),
-        sa.Column("formal_research_id", sa.String(length=36), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
+        sa.Column("formal_research_id", sa.Uuid(as_uuid=False), nullable=False),
         sa.Column("version", sa.Integer(), nullable=False),
         sa.Column("conclusion", sa.String(length=16), nullable=False),
         sa.Column("evaluation_sha256", sa.String(length=64), nullable=False),
-        sa.Column("supersedes_evaluation_id", sa.String(length=36), nullable=True),
+        sa.Column("supersedes_evaluation_id", sa.Uuid(as_uuid=False), nullable=True),
         sa.Column("supporting_evidence", sa.JSON(), nullable=False),
         sa.Column("opposing_evidence", sa.JSON(), nullable=False),
         sa.Column("missing_evidence", sa.JSON(), nullable=False),
@@ -193,7 +198,7 @@ def upgrade() -> None:
 
     op.create_table(
         "research_evaluation_runs",
-        sa.Column("evaluation_id", sa.String(length=36), nullable=False),
+        sa.Column("evaluation_id", sa.Uuid(as_uuid=False), nullable=False),
         sa.Column("run_id", sa.String(length=36), nullable=False),
         sa.ForeignKeyConstraint(["evaluation_id"], ["research_evaluations.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["run_id"], ["research_runs.run_id"], ondelete="RESTRICT"),
@@ -202,8 +207,8 @@ def upgrade() -> None:
 
     op.create_table(
         "research_evidence_refs",
-        sa.Column("id", sa.String(length=36), nullable=False),
-        sa.Column("evaluation_id", sa.String(length=36), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
+        sa.Column("evaluation_id", sa.Uuid(as_uuid=False), nullable=False),
         sa.Column("run_id", sa.String(length=36), nullable=True),
         sa.Column("kind", sa.String(length=24), nullable=False),
         sa.Column("uri", sa.String(length=1000), nullable=False),
@@ -231,13 +236,13 @@ def upgrade() -> None:
 
     op.create_table(
         "research_publications",
-        sa.Column("id", sa.String(length=36), nullable=False),
-        sa.Column("formal_research_id", sa.String(length=36), nullable=False),
-        sa.Column("evaluation_id", sa.String(length=36), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
+        sa.Column("formal_research_id", sa.Uuid(as_uuid=False), nullable=False),
+        sa.Column("evaluation_id", sa.Uuid(as_uuid=False), nullable=False),
         sa.Column("version", sa.Integer(), nullable=False),
         sa.Column("status", sa.String(length=16), nullable=False, server_default="pending"),
         sa.Column("publication_sha256", sa.String(length=64), nullable=False),
-        sa.Column("supersedes_publication_id", sa.String(length=36), nullable=True),
+        sa.Column("supersedes_publication_id", sa.Uuid(as_uuid=False), nullable=True),
         sa.Column("artifact_manifest_uri", sa.String(length=1000), nullable=False),
         sa.Column("issue_number", sa.Integer(), nullable=False),
         sa.Column("issue_comment_id", sa.BigInteger(), nullable=True),
@@ -271,15 +276,15 @@ def upgrade() -> None:
 
     op.create_table(
         "follow_up_research_proposals",
-        sa.Column("id", sa.String(length=36), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
         sa.Column("strategy_id", sa.String(length=80), nullable=False),
-        sa.Column("source_evaluation_id", sa.String(length=36), nullable=False),
-        sa.Column("source_evidence_ref_id", sa.String(length=36), nullable=True),
+        sa.Column("source_evaluation_id", sa.Uuid(as_uuid=False), nullable=False),
+        sa.Column("source_evidence_ref_id", sa.Uuid(as_uuid=False), nullable=True),
         sa.Column("title", sa.String(length=200), nullable=False),
         sa.Column("rationale", sa.String(length=2000), nullable=False),
         sa.Column("status", sa.String(length=16), nullable=False, server_default="proposed"),
         sa.Column("proposal_json", sa.JSON(), nullable=False),
-        sa.Column("converted_plan_id", sa.String(length=36), nullable=True),
+        sa.Column("converted_plan_id", sa.Uuid(as_uuid=False), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.CheckConstraint(
             "status in ('proposed', 'accepted', 'rejected', 'converted')",
@@ -307,7 +312,169 @@ def upgrade() -> None:
         unique=False,
     )
 
+    _install_postgres_relation_guards()
     _install_postgres_immutability_guards()
+
+
+def _install_postgres_relation_guards() -> None:
+    if op.get_bind().dialect.name != "postgresql":
+        return
+    op.execute(
+        """
+        CREATE FUNCTION ensure_research_relation_consistency()
+        RETURNS trigger AS $$
+        BEGIN
+          IF TG_TABLE_NAME = 'research_plan_approvals' THEN
+            IF NOT EXISTS (
+              SELECT 1 FROM frozen_research_plans plan
+              WHERE plan.id = NEW.plan_id AND plan.plan_sha256 = NEW.plan_sha256
+            ) THEN
+              RAISE EXCEPTION 'research relation mismatch: %', TG_TABLE_NAME;
+            END IF;
+          ELSIF TG_TABLE_NAME = 'formal_researches' THEN
+            IF NOT EXISTS (
+              SELECT 1
+              FROM research_plan_approvals approval
+              JOIN frozen_research_plans plan ON plan.id = NEW.plan_id
+              WHERE approval.id = NEW.approval_id
+                AND approval.plan_id = NEW.plan_id
+                AND approval.action = 'approved'
+                AND approval.plan_sha256 = plan.plan_sha256
+            ) THEN
+              RAISE EXCEPTION 'research relation mismatch: %', TG_TABLE_NAME;
+            END IF;
+          ELSIF TG_TABLE_NAME = 'research_runs' THEN
+            IF NEW.formal_research_id IS NOT NULL AND NOT EXISTS (
+              SELECT 1
+              FROM formal_researches research
+              JOIN frozen_research_plans plan ON plan.id = research.plan_id
+              WHERE research.id = NEW.formal_research_id
+                AND plan.strategy_id = NEW.strategy_id
+            ) THEN
+              RAISE EXCEPTION 'research relation mismatch: %', TG_TABLE_NAME;
+            END IF;
+          ELSIF TG_TABLE_NAME = 'research_events' THEN
+            IF NEW.run_id IS NOT NULL AND NOT EXISTS (
+              SELECT 1 FROM research_runs run
+              WHERE run.run_id = NEW.run_id
+                AND run.formal_research_id = NEW.formal_research_id
+            ) THEN
+              RAISE EXCEPTION 'research relation mismatch: %', TG_TABLE_NAME;
+            END IF;
+          ELSIF TG_TABLE_NAME = 'research_evaluations' THEN
+            IF NEW.supersedes_evaluation_id IS NOT NULL AND NOT EXISTS (
+              SELECT 1 FROM research_evaluations previous
+              WHERE previous.id = NEW.supersedes_evaluation_id
+                AND previous.formal_research_id = NEW.formal_research_id
+            ) THEN
+              RAISE EXCEPTION 'research relation mismatch: %', TG_TABLE_NAME;
+            END IF;
+          ELSIF TG_TABLE_NAME = 'research_evaluation_runs' THEN
+            IF NOT EXISTS (
+              SELECT 1
+              FROM research_evaluations evaluation
+              JOIN research_runs run ON run.run_id = NEW.run_id
+              WHERE evaluation.id = NEW.evaluation_id
+                AND run.formal_research_id = evaluation.formal_research_id
+            ) THEN
+              RAISE EXCEPTION 'research relation mismatch: %', TG_TABLE_NAME;
+            END IF;
+          ELSIF TG_TABLE_NAME = 'research_evidence_refs' THEN
+            IF NEW.run_id IS NOT NULL AND NOT EXISTS (
+              SELECT 1
+              FROM research_evaluations evaluation
+              JOIN research_runs run ON run.run_id = NEW.run_id
+              WHERE evaluation.id = NEW.evaluation_id
+                AND run.formal_research_id = evaluation.formal_research_id
+            ) THEN
+              RAISE EXCEPTION 'research relation mismatch: %', TG_TABLE_NAME;
+            END IF;
+          ELSIF TG_TABLE_NAME = 'research_publications' THEN
+            IF NOT EXISTS (
+              SELECT 1 FROM research_evaluations evaluation
+              WHERE evaluation.id = NEW.evaluation_id
+                AND evaluation.formal_research_id = NEW.formal_research_id
+            ) OR (
+              NEW.supersedes_publication_id IS NOT NULL AND NOT EXISTS (
+                SELECT 1 FROM research_publications previous
+                WHERE previous.id = NEW.supersedes_publication_id
+                  AND previous.formal_research_id = NEW.formal_research_id
+              )
+            ) THEN
+              RAISE EXCEPTION 'research relation mismatch: %', TG_TABLE_NAME;
+            END IF;
+          ELSIF TG_TABLE_NAME = 'follow_up_research_proposals' THEN
+            IF NOT EXISTS (
+              SELECT 1
+              FROM research_evaluations evaluation
+              JOIN formal_researches research ON research.id = evaluation.formal_research_id
+              JOIN frozen_research_plans plan ON plan.id = research.plan_id
+              WHERE evaluation.id = NEW.source_evaluation_id
+                AND plan.strategy_id = NEW.strategy_id
+            ) OR (
+              NEW.source_evidence_ref_id IS NOT NULL AND NOT EXISTS (
+                SELECT 1 FROM research_evidence_refs evidence
+                WHERE evidence.id = NEW.source_evidence_ref_id
+                  AND evidence.evaluation_id = NEW.source_evaluation_id
+              )
+            ) OR (
+              NEW.converted_plan_id IS NOT NULL AND NOT EXISTS (
+                SELECT 1 FROM frozen_research_plans plan
+                WHERE plan.id = NEW.converted_plan_id
+                  AND plan.strategy_id = NEW.strategy_id
+              )
+            ) THEN
+              RAISE EXCEPTION 'research relation mismatch: %', TG_TABLE_NAME;
+            END IF;
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+        """
+    )
+    for table_name in (
+        "research_plan_approvals",
+        "formal_researches",
+        "research_runs",
+        "research_events",
+        "research_evaluations",
+        "research_evaluation_runs",
+        "research_evidence_refs",
+        "research_publications",
+        "follow_up_research_proposals",
+    ):
+        op.execute(
+            f"""
+            CREATE TRIGGER trg_{table_name}_consistent
+            BEFORE INSERT OR UPDATE ON {table_name}
+            FOR EACH ROW EXECUTE FUNCTION ensure_research_relation_consistency()
+            """
+        )
+    op.execute(
+        """
+        CREATE FUNCTION prevent_published_evaluation_extension()
+        RETURNS trigger AS $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM research_publications publication
+            WHERE publication.evaluation_id = NEW.evaluation_id
+              AND publication.status IN ('published', 'failed')
+          ) THEN
+            RAISE EXCEPTION 'published evaluation is immutable';
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+        """
+    )
+    for table_name in ("research_evaluation_runs", "research_evidence_refs"):
+        op.execute(
+            f"""
+            CREATE TRIGGER trg_{table_name}_published_immutable
+            BEFORE INSERT ON {table_name}
+            FOR EACH ROW EXECUTE FUNCTION prevent_published_evaluation_extension()
+            """
+        )
 
 
 def _install_postgres_immutability_guards() -> None:
