@@ -1,10 +1,33 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, JSON, Boolean, Date, DateTime, ForeignKey, Index as SqlIndex, Numeric, String, UniqueConstraint, func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index as SqlIndex,
+    JSON,
+    Numeric,
+    String,
+    UniqueConstraint,
+    event,
+    func,
+    inspect as sa_inspect,
+)
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from .database import Base
+
+
+RESEARCH_RUN_STATUS_VALUES = {"running", "succeeded", "failed", "interrupted"}
+STRATEGY_LIFECYCLE_VALUES = {"活跃", "暂停", "停止研究", "已归档"}
+RESEARCH_CONCLUSION_VALUES = {"研究通过", "有条件候选", "证据不足", "受阻", "不通过"}
+FORMAL_RESEARCH_PHASE_VALUES = {"approved", "active", "evaluating", "published", "stopped"}
+PUBLICATION_STATUS_VALUES = {"pending", "published", "failed"}
+FOLLOW_UP_PROPOSAL_STATUS_VALUES = {"proposed", "accepted", "rejected", "converted"}
 
 
 class Stock(Base):
@@ -520,9 +543,13 @@ class ResearchRun(Base):
         ),
         SqlIndex("ix_research_runs_strategy_started", "strategy_id", "started_at"),
         SqlIndex("ix_research_runs_reproducibility", "reproducibility_key"),
+        SqlIndex("ix_research_runs_formal_research_started", "formal_research_id", "started_at"),
     )
 
     run_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    formal_research_id: Mapped[str | None] = mapped_column(
+        ForeignKey("formal_researches.id", ondelete="RESTRICT")
+    )
     reproducibility_key: Mapped[str | None] = mapped_column(String(64))
     strategy_id: Mapped[str] = mapped_column(String(80))
     status: Mapped[str] = mapped_column(String(16), default="running")
@@ -542,3 +569,293 @@ class ResearchRun(Base):
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error: Mapped[str | None] = mapped_column(String(2000))
+
+
+class StrategyDefinition(Base):
+    __tablename__ = "strategy_definitions"
+    __table_args__ = (
+        CheckConstraint(
+            "lifecycle_status in ('活跃', '暂停', '停止研究', '已归档')",
+            name="ck_strategy_definitions_lifecycle",
+        ),
+    )
+
+    strategy_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    display_name: Mapped[str] = mapped_column(String(160))
+    lifecycle_status: Mapped[str] = mapped_column(String(16), default="活跃", server_default="活跃")
+    economic_thesis: Mapped[str] = mapped_column(String(2000))
+    registry_version: Mapped[str] = mapped_column(String(40))
+    code_commit: Mapped[str] = mapped_column(String(64))
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class FrozenResearchPlan(Base):
+    __tablename__ = "frozen_research_plans"
+    __table_args__ = (
+        UniqueConstraint("issue_number", "version", name="uq_frozen_research_plans_issue_version"),
+        UniqueConstraint("plan_sha256", name="uq_frozen_research_plans_sha256"),
+        CheckConstraint("version > 0", name="ck_frozen_research_plans_version"),
+        SqlIndex("ix_frozen_research_plans_strategy_created", "strategy_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    strategy_id: Mapped[str] = mapped_column(
+        ForeignKey("strategy_definitions.strategy_id", ondelete="RESTRICT")
+    )
+    issue_number: Mapped[int] = mapped_column()
+    version: Mapped[int] = mapped_column()
+    schema_version: Mapped[str] = mapped_column(String(32))
+    plan_sha256: Mapped[str] = mapped_column(String(64))
+    code_commit: Mapped[str] = mapped_column(String(64))
+    plan_json: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ResearchPlanApproval(Base):
+    __tablename__ = "research_plan_approvals"
+    __table_args__ = (
+        CheckConstraint(
+            "action in ('approved', 'invalidated', 'stopped')",
+            name="ck_research_plan_approvals_action",
+        ),
+        UniqueConstraint("comment_id", name="uq_research_plan_approvals_comment"),
+        SqlIndex("ix_research_plan_approvals_plan_created", "plan_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    plan_id: Mapped[str] = mapped_column(
+        ForeignKey("frozen_research_plans.id", ondelete="RESTRICT")
+    )
+    action: Mapped[str] = mapped_column(String(16))
+    actor_login: Mapped[str] = mapped_column(String(80))
+    comment_id: Mapped[int] = mapped_column(BigInteger)
+    comment_body: Mapped[str] = mapped_column(String(500))
+    plan_sha256: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class FormalResearch(Base):
+    __tablename__ = "formal_researches"
+    __table_args__ = (
+        CheckConstraint(
+            "phase in ('approved', 'active', 'evaluating', 'published', 'stopped')",
+            name="ck_formal_researches_phase",
+        ),
+        UniqueConstraint("plan_id", name="uq_formal_researches_plan"),
+        UniqueConstraint("approval_id", name="uq_formal_researches_approval"),
+        SqlIndex("ix_formal_researches_phase_created", "phase", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    plan_id: Mapped[str] = mapped_column(
+        ForeignKey("frozen_research_plans.id", ondelete="RESTRICT")
+    )
+    approval_id: Mapped[str] = mapped_column(
+        ForeignKey("research_plan_approvals.id", ondelete="RESTRICT")
+    )
+    phase: Mapped[str] = mapped_column(String(16), default="approved", server_default="approved")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ResearchEvent(Base):
+    __tablename__ = "research_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "formal_research_id", "sequence_no", name="uq_research_events_research_sequence"
+        ),
+        CheckConstraint("sequence_no > 0", name="ck_research_events_sequence"),
+        SqlIndex("ix_research_events_run_occurred", "run_id", "occurred_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    formal_research_id: Mapped[str] = mapped_column(
+        ForeignKey("formal_researches.id", ondelete="RESTRICT")
+    )
+    run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("research_runs.run_id", ondelete="RESTRICT")
+    )
+    sequence_no: Mapped[int] = mapped_column()
+    event_type: Mapped[str] = mapped_column(String(80))
+    payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ResearchEvaluation(Base):
+    __tablename__ = "research_evaluations"
+    __table_args__ = (
+        CheckConstraint(
+            "conclusion in ('研究通过', '有条件候选', '证据不足', '受阻', '不通过')",
+            name="ck_research_evaluations_conclusion",
+        ),
+        CheckConstraint("version > 0", name="ck_research_evaluations_version"),
+        UniqueConstraint(
+            "formal_research_id", "version", name="uq_research_evaluations_research_version"
+        ),
+        UniqueConstraint("evaluation_sha256", name="uq_research_evaluations_sha256"),
+        UniqueConstraint(
+            "supersedes_evaluation_id", name="uq_research_evaluations_supersedes"
+        ),
+        SqlIndex("ix_research_evaluations_research_created", "formal_research_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    formal_research_id: Mapped[str] = mapped_column(
+        ForeignKey("formal_researches.id", ondelete="RESTRICT")
+    )
+    version: Mapped[int] = mapped_column()
+    conclusion: Mapped[str] = mapped_column(String(16))
+    evaluation_sha256: Mapped[str] = mapped_column(String(64))
+    supersedes_evaluation_id: Mapped[str | None] = mapped_column(
+        ForeignKey("research_evaluations.id", ondelete="RESTRICT")
+    )
+    supporting_evidence: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    opposing_evidence: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    missing_evidence: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    limitations: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    follow_up_recommendations: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ResearchEvaluationRun(Base):
+    __tablename__ = "research_evaluation_runs"
+
+    evaluation_id: Mapped[str] = mapped_column(
+        ForeignKey("research_evaluations.id", ondelete="RESTRICT"), primary_key=True
+    )
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("research_runs.run_id", ondelete="RESTRICT"), primary_key=True
+    )
+
+
+class ResearchEvidenceRef(Base):
+    __tablename__ = "research_evidence_refs"
+    __table_args__ = (
+        CheckConstraint(
+            "kind in ('input_snapshot', 'code', 'environment', 'parameters', "
+            "'ledger', 'statistics', 'report', 'limitation')",
+            name="ck_research_evidence_refs_kind",
+        ),
+        UniqueConstraint(
+            "evaluation_id", "kind", "uri", name="uq_research_evidence_refs_evaluation_kind_uri"
+        ),
+        SqlIndex("ix_research_evidence_refs_run_kind", "run_id", "kind"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    evaluation_id: Mapped[str] = mapped_column(
+        ForeignKey("research_evaluations.id", ondelete="RESTRICT")
+    )
+    run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("research_runs.run_id", ondelete="RESTRICT")
+    )
+    kind: Mapped[str] = mapped_column(String(24))
+    uri: Mapped[str] = mapped_column(String(1000))
+    sha256: Mapped[str | None] = mapped_column(String(64))
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ResearchPublication(Base):
+    __tablename__ = "research_publications"
+    __table_args__ = (
+        CheckConstraint(
+            "status in ('pending', 'published', 'failed')",
+            name="ck_research_publications_status",
+        ),
+        CheckConstraint("version > 0", name="ck_research_publications_version"),
+        UniqueConstraint(
+            "formal_research_id", "version", name="uq_research_publications_research_version"
+        ),
+        UniqueConstraint("publication_sha256", name="uq_research_publications_sha256"),
+        UniqueConstraint(
+            "supersedes_publication_id", name="uq_research_publications_supersedes"
+        ),
+        SqlIndex("ix_research_publications_status_created", "status", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    formal_research_id: Mapped[str] = mapped_column(
+        ForeignKey("formal_researches.id", ondelete="RESTRICT")
+    )
+    evaluation_id: Mapped[str] = mapped_column(
+        ForeignKey("research_evaluations.id", ondelete="RESTRICT")
+    )
+    version: Mapped[int] = mapped_column()
+    status: Mapped[str] = mapped_column(String(16), default="pending", server_default="pending")
+    publication_sha256: Mapped[str] = mapped_column(String(64))
+    supersedes_publication_id: Mapped[str | None] = mapped_column(
+        ForeignKey("research_publications.id", ondelete="RESTRICT")
+    )
+    artifact_manifest_uri: Mapped[str] = mapped_column(String(1000))
+    issue_number: Mapped[int] = mapped_column()
+    issue_comment_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class FollowUpResearchProposal(Base):
+    __tablename__ = "follow_up_research_proposals"
+    __table_args__ = (
+        CheckConstraint(
+            "status in ('proposed', 'accepted', 'rejected', 'converted')",
+            name="ck_follow_up_research_proposals_status",
+        ),
+        UniqueConstraint("converted_plan_id", name="uq_follow_up_research_proposals_converted_plan"),
+        SqlIndex("ix_follow_up_research_proposals_strategy_created", "strategy_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    strategy_id: Mapped[str] = mapped_column(
+        ForeignKey("strategy_definitions.strategy_id", ondelete="RESTRICT")
+    )
+    source_evaluation_id: Mapped[str] = mapped_column(
+        ForeignKey("research_evaluations.id", ondelete="RESTRICT")
+    )
+    source_evidence_ref_id: Mapped[str | None] = mapped_column(
+        ForeignKey("research_evidence_refs.id", ondelete="RESTRICT")
+    )
+    title: Mapped[str] = mapped_column(String(200))
+    rationale: Mapped[str] = mapped_column(String(2000))
+    status: Mapped[str] = mapped_column(String(16), default="proposed", server_default="proposed")
+    proposal_json: Mapped[dict] = mapped_column(JSON)
+    converted_plan_id: Mapped[str | None] = mapped_column(
+        ForeignKey("frozen_research_plans.id", ondelete="RESTRICT")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+def _reject_immutable_update(_mapper: object, _connection: object, target: Base) -> None:
+    raise RuntimeError(f"{target.__tablename__} 是不可变研究记录，不可原地修改")
+
+
+def _reject_immutable_delete(_mapper: object, _connection: object, target: Base) -> None:
+    raise RuntimeError(f"{target.__tablename__} 是不可变研究记录，不可删除")
+
+
+def _reject_terminal_publication_update(
+    _mapper: object, _connection: object, target: ResearchPublication
+) -> None:
+    history = sa_inspect(target).attrs.status.history
+    previous_status = history.deleted[0] if history.deleted else target.status
+    if previous_status in {"published", "failed"}:
+        raise RuntimeError("研究发布已终态，不可原地修改")
+
+
+for _immutable_model in (
+    FrozenResearchPlan,
+    ResearchPlanApproval,
+    ResearchEvent,
+    ResearchEvaluation,
+    ResearchEvaluationRun,
+    ResearchEvidenceRef,
+):
+    event.listen(_immutable_model, "before_update", _reject_immutable_update)
+    event.listen(_immutable_model, "before_delete", _reject_immutable_delete)
+
+event.listen(ResearchPublication, "before_update", _reject_terminal_publication_update)
+event.listen(ResearchPublication, "before_delete", _reject_immutable_delete)
