@@ -22,6 +22,8 @@
 
 历史摘要中的 `status=ok` 只表示旧脚本执行成功，不等于当前规范的 `研究通过`。API 的 `summary.status` 统一取 manifest 的“历史档案”，原值只以 `sourceExecutionStatus=ok` 返回；`manifest.json` 和总览页都把这些结果显式标记为 `legacy`/“历史档案”。
 
+把本目录映射到 PostgreSQL 统一档案时，必须遵守[研究历史迁移指南](../guides/history-migration.md)：当前三份报告保留既有“不通过”，legacy 不推断结论，旧运行只按精确身份关联。
+
 ## 发布合同
 
 新增或更新面向用户的研究结果时：
