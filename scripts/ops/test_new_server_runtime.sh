@@ -38,7 +38,7 @@ docker compose \
   --file "$SERVER_COMPOSE_FILE" \
   config --format json > "$TEST_ROOT/config.json"
 
-python3 - "$TEST_ROOT/config.json" "$TEST_ROOT" <<'PY'
+python3 - "$TEST_ROOT/config.json" "$TEST_ROOT" "$SERVER_COMPOSE_FILE" <<'PY'
 from __future__ import annotations
 
 import json
@@ -48,8 +48,11 @@ from pathlib import Path
 
 config_path = Path(sys.argv[1])
 test_root = Path(sys.argv[2]).resolve()
+server_compose_path = Path(sys.argv[3])
 config = json.loads(config_path.read_text(encoding="utf-8"))
 services = config["services"]
+server_compose = server_compose_path.read_text(encoding="utf-8")
+assert server_compose.count("create_host_path: false") == 2, server_compose_path
 
 expected_ports = {
     "db": (5432, "5432"),
@@ -75,7 +78,7 @@ for service_name, (source, target) in expected_mounts.items():
     assert mount["type"] == "bind", (service_name, mount)
     assert Path(mount["source"]).resolve() == source, (service_name, mount)
     assert mount["target"] == target, (service_name, mount)
-    assert mount.get("bind", {}).get("create_host_path") is False, (service_name, mount)
+    assert mount.get("bind", {}).get("create_host_path") in (None, False), (service_name, mount)
 
 assert services["worker"].get("volumes", []) == [], services["worker"].get("volumes")
 assert services["frontend"].get("volumes", []) == [], services["frontend"].get("volumes")
