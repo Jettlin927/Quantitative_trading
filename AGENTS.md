@@ -6,7 +6,7 @@
 
 ## 当前目标
 
-截至 2026-07-12，用户已明确重新开启“量化研究底座”，但仍保持研究模拟与真实交易隔离。可信工程的代码、隔离 PostgreSQL、远端 sandbox、独立反例审计以及经用户确认的生产 schema 迁移与发布均已完成；当前生产 revision 为 `0006_worker_heartbeats`。完整验收证据见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
+截至 2026-07-19，用户已明确重新开启“量化研究底座”，但仍保持研究模拟与真实交易隔离。可信工程的代码、隔离 PostgreSQL、远端 sandbox、独立反例审计以及经用户确认的生产 schema 迁移与发布均已完成；生产 revision 仍为 `0006_worker_heartbeats`。2026-07-13 起新增的六条静态研究策略、可信长历史报告和统一结果目录属于仓库研究能力，不能据此声称已经部署到生产。生产底座验收证据见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
 
 当前主线包括：
 
@@ -15,6 +15,7 @@
 - 美股 sample 观察池、sample 快照、sample 持仓结构入库和只读展示。
 - PostgreSQL schema、幂等 upsert、同步日志、数据覆盖度和最小数据管理前端。
 - 新建的 `backend/app/quant_research/` 纯研究协议层：point-in-time 数据集、研究组合模拟、基准指标、walk-forward、运行清单和 readiness 门禁。
+- 六条源码静态登记策略，以及 `docs/research/strategy-results/` 下当前可信报告与旧档案分层的只读统一入口。
 - `backend/app/data_quality/` 研究范围级数据质量、canonical 输入快照、可复现运行和显式中断续跑。
 - PostgreSQL 持久任务、独立租约 worker、重启恢复和 worker 心跳。
 
@@ -44,10 +45,14 @@
 - `backend/app/data_quality/`：研究范围级完整性规则与持久质量运行。
 - `backend/app/tushare_client.py`：Tushare token、日期和 Decimal 清洗。
 - `backend/app/us_research.py`：美股 sample 文件到 DB preview 的适配器。
-- `backend/app/quant_research/`：无券商、无实盘副作用的量化研究协议层。
+- `backend/app/quant_research/`：无券商、无实盘副作用的量化研究协议层；执行、净值、指标和通用报告统计诊断的公式只能在这里定义。
+- `backend/app/quant_research/reporting.py`：报告共用的收益序列、尾部风险、HAC alpha、DSR/PBO 统计口径；HTML 生成脚本不得复制一套同名算法。
+- `backend/app/strategy_results.py`：把 `docs/research/strategy-results/manifest.json` 投影为只读 API；兼容当前 `summaryJson` 报告包和旧 phased/csv 档案。
+- `scripts/research/render_*_report.py`：只负责从 canonical 工件组装表格、图形和中文叙事；不得重定义成交、成本、首日本金或核心绩效口径。
 - `frontend/`：只展示数据覆盖、同步状态、A 股样本、美股 sample 入库状态。
 - `my_quant/us_research/`：只保留美股 sample 文件、快照刷新脚本和配置；不保留报告生成或回测脚本。
 - `docs/research/a-share-data/`：只记录 A 股数据源、DB 覆盖和同步事实。
+- `docs/research/strategy-results/`：已完成研究的只读发布层；`index.html` 是统一入口，`manifest.json` 是机器清单，每个当前报告包至少含 `index.html` 与 `summary.json`。
 
 不要恢复 `strategy_research`、`backtest-reports`、`strategy-lab`、`research_engine` 等旧主线目录。新的研究底座统一放在 `backend/app/quant_research/`，一次性运行产物放在被 Git 忽略的 `outputs/research-runs/`。
 
@@ -98,6 +103,17 @@ Tushare token 默认来自 `.env` 的 `TUSHARE_TOKEN`。请求体临时传 token
 缺匹配基准、净成本、test/OOS、市场环境覆盖、关键可交易性、试验登记或复现身份时，不得输出 `研究通过`；应按规范标记 `证据不足` 或 `blocked`。baseline/sentinel 管线成功不等于策略具有 alpha。
 
 HTML 和其他面向用户的策略报告必须优先使用可读的中文方案名称，不能用 `T0`、`V2`、`baseline_a` 等内部编号代替名称。确需保留内部编号时，必须在首屏结论、指标和图表之前先列出“编号—名称—具体规则”对照，后文采用“名称（编号）”格式；运行清单和复现字段可以保留原始编号。
+
+研究期首存在由上一信号日触发的首个执行日时，总体收益、基准、成本和回撤必须从显式初始净值/本金计算，不能用首个收盘净值重新归一化而漏掉首日收益或费用。
+
+完成面向用户的研究报告后：
+
+- canonical 运行目录继续保存在被 Git 忽略的 `outputs/research-runs/`，不得把大型账本复制进文档目录。
+- 当前可信报告包写入 `docs/research/strategy-results/<report-id>/`，并登记到 `manifest.json`；统一入口 `docs/research/strategy-results/index.html` 必须能直达报告和机器摘要。
+- 断网复现次数、镜像和结果指纹必须来自可提交的 `reproduction-evidence-*.json` 并在渲染前逐项校验；不得在 HTML/JSON 生成器中硬编码“复现通过”。证据缺失、轮次不足或指纹不符时必须停止发布。
+- `researchDate` 表示研究口径日期；`reportGeneratedAt` 必须从本报告最新 canonical manifest 的 `generatedAt` 确定性派生。API 和页面展示报告生成时间时不得回退冒用研究日期。
+- 旧管线结果必须标记 `legacy`/“历史档案”；API 的 `summary.status` 统一取 manifest 的研究状态，旧脚本原始 `status=ok` 只能放在 `sourceExecutionStatus`，不得映射为 `研究通过`。
+- HTML/JSON 是 canonical 运行的只读投影；如两者不一致，以冻结输入、代码/环境身份、manifest 和 result fingerprint 为准，并重新生成报告。
 
 高频、期权、做市或其他非日频股票/ETF策略必须声明本规范中的不适用项并补充专项指标，不能静默省略。
 
@@ -207,7 +223,7 @@ API 返回必须 JSON-safe。指标和数值中的 `NaN`、`Infinity` 必须转�
 改后端时至少运行：
 
 ```powershell
-python -m py_compile backend\app\database.py backend\app\models.py backend\app\schemas.py backend\app\tushare_client.py backend\app\us_research.py backend\app\main.py backend\app\sync_worker.py
+python -m py_compile backend\app\database.py backend\app\models.py backend\app\schemas.py backend\app\tushare_client.py backend\app\us_research.py backend\app\main.py backend\app\sync_worker.py backend\app\quant_research\metrics.py backend\app\quant_research\reporting.py backend\app\strategy_results.py
 python -m unittest discover backend\tests -v
 ```
 

@@ -101,8 +101,9 @@
   - `a_share_price_baseline.py`：固定 120–20 动量、60 日波动和历史行业成员的 A 股价格 baseline。
   - `a_share_b1_trend_pullback.py`：公开 B1 趋势回调描述的事前固定近似复现；含 BBI/双重 EMA/KDJ、沪深300市场门、Top2 代理排序、分档止盈和现实成交账本。
   - `portfolio.py`：下一交易日开盘目标权重模拟，一次产生 NAV、请求、模拟执行和逐日持仓；含现金、成本及开盘可买卖硬约束。
-  - `metrics.py`：绝对/基准相对、回撤持续期、成本、换手、持仓和集中度指标。
-  - `validation.py`：固定参数 anchored/rolling walk-forward，仅输出 test/OOS 指标。
+  - `metrics.py`：绝对/基准相对、回撤持续期、成本、换手、持仓和集中度指标；期首已持有/执行的研究必须显式传入初始净值，不能漏掉首日。
+  - `reporting.py`：报告共用收益序列、尾部风险、HAC alpha、DSR 和 PBO；避免各 HTML 脚本复制统计公式。
+  - `validation.py`：固定参数 anchored/rolling walk-forward，仅输出 test/OOS 指标；每个 `StrategyDefinition` 必须显式声明 `walk_forward_benchmark_source`，ETF 趋势/波动/准入使用同一 ETF 因果复权基准，不能静默改用市场环境指数。
   - `risk.py`：从冻结收益、NAV、positions、历史成员和基准生成暴露与风险贡献 canonical 工件。
   - `allocation.py`：等权/逆波动率、单票/行业/现金/换手约束的确定性目标权重分配；不生成订单。
   - `manifest.py`：run id、参数哈希、Git commit、数据快照、artifact schema 和结果指纹。
@@ -112,13 +113,28 @@
   - `baselines.py`：仅用于管线验收、无参数搜索和无收益主张的单 ETF sentinel。
   - `readiness.py`：inventory、quality run 和风险能力 readiness；`index_weights` / `industry_proxy_daily` 缺失时明确 blocked。
 
+- `backend/app/strategy_results.py`
+  - 读取 `docs/research/strategy-results/manifest.json`，兼容当前 `summaryJson` 报告包和旧 phased/csv 档案，只返回只读结果概览；`summary.status` 取 manifest，旧脚本状态单列为 `sourceExecutionStatus`。
+  - manifest 工件路径必须是结果根目录内的普通相对文件；拒绝绝对路径、`..`、symlink 逃逸。已声明 `summaryJson` 缺失或不是 JSON 对象时显式失败，不能降级成空摘要。
+
+- `scripts/research/render_etf_volatility_managed_report.py`
+  - 只接受四个预登记波动率变体、两类成本压力场景和两个低波动准入成本场景；从 canonical 工件生成统一 HTML/JSON。
+  - 被动 ETF 与策略都从 OOS 首日开盘前初始净值 1.0 起算；报告必须包含成本/换手、DSR/PBO、支持/反对/尚缺证据和复现身份。
+
+- `scripts/research/report_evidence.py`
+  - 从 canonical manifest 派生确定性的 `reportGeneratedAt`，并校验共享复现证据中的代码身份、运行 ID、镜像、断网条件及连续两轮 result fingerprint；任何不一致都停止报告发布。
+
 - `scripts/research/render_etf_trend_120d_report.py`
   - 只接受固定120日趋势的基础、零、双倍成本三个 canonical 运行，重建同一ETF被动基准与同平均暴露静态组合，并生成长历史 HTML/JSON 报告。
   - 报告首屏明确完整周期与年度子区间，避免把逐年稳定性表误读为总回测只有一年。
 
 - `scripts/research/render_a_share_b1_report.py`
-  - 只接受五个事前登记 B1 场景和固定断网复现身份，重新计算来源对照、长历史、执行、风险、环境、压力期和 walk-forward 摘要。
+  - 只接受五个事前登记 B1 场景，并用共享证据文件校验固定断网复现身份；重新计算来源对照、长历史、执行、风险、环境、压力期和 walk-forward 摘要。
   - 生成以 100,000 元为统一展示本金的 HTML/JSON 报告，并把“近似复现”与“原网页数值复现”明确分开。
+
+- `docs/research/strategy-results/`
+  - 根 `index.html` 是当前可信报告与旧档案的统一入口，`manifest.json` 是机器清单，`reproduction-evidence-20260719.json` 是当前三组报告的两轮断网复现总账；当前报告包至少包含 `index.html` 和 `summary.json`。
+  - 这里只保存可提交的只读投影；canonical 输入、账本和运行 manifest 留在被 Git 忽略的 `outputs/research-runs/`。
 
 - `backend/tests/fixtures/quant_research_golden/`
   - 完全合成的 2 股票 + 1 ETF + 1 指数、15 交易日黄金夹具。
@@ -160,6 +176,7 @@
 - `GET /api/stocks/{ts_code}/fundamentals`：读取单票基本面概览。
 - `GET /api/stock-listings`、`/api/stocks/{ts_code}/limit-prices`、`suspend-events`：读取研究所需历史状态。
 - `GET /api/research/readiness`：只返回 inventory 级状态，不能代表某个研究切片 ready。
+- `GET /api/strategy-results/overview`：读取统一只读研究结果清单，不执行回测。
 - `POST /api/data-quality/runs`、`GET /api/data-quality/runs/{id}`：执行/读取研究范围级质量门禁。
 - `GET /api/research/readiness/{quality_run_id}`：读取绑定 quality run 的研究级 readiness。
 - `GET /api/us-research/overview`：读取美股 sample 文件预览。

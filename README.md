@@ -16,6 +16,7 @@
 - 用 `backend/app/quant_research/` 构造严格复权和公告日可见的数据集，执行受停牌/涨跌停约束的下一交易日开盘研究组合模拟，输出基准指标、walk-forward 窗口和可复现 manifest。
 - 研究运行逐阶段写入带输入/输出哈希链的 checkpoint；进程异常退出后可把陈旧 `running` 标记为 `interrupted`，校验冻结身份后显式续跑，已验证阶段不会重复计算。
 - 用 `GET /api/research/readiness` 查看 inventory；研究级 readiness 必须绑定一个已经完成的质量运行 ID，不能由表存在直接推断。
+- 用统一只读清单查看当前可信研究报告与旧档案；报告状态不等于管线执行状态，当前没有任何策略被判定为 `研究通过`。
 
 ## 技术栈
 
@@ -24,6 +25,29 @@
 - 数据库：PostgreSQL 16
 - 数据源：Tushare Pro；美股侧当前只使用本仓 sample 文件
 - 运行方式：Docker Compose（`db`、`api`、独立 `worker`、`frontend`）
+
+## 当前研究策略与结果入口
+
+正式 runner 只允许源码静态登记的六条研究策略：
+
+- `sentinel_etf_baseline@1`：验证质量、快照、运行和断库复现闭环，不评价 alpha。
+- `etf_trend_120d@1`：单 ETF、月末 120 日均线趋势开关。
+- `etf_volatility_managed@1`：上一月实现方差驱动的无杠杆 ETF 暴露。
+- `etf_low_volatility_gate@1`：固定校准期中位数门槛的低波动准入追加验证。
+- `a_share_price_baseline@1`：历史行业成员上的固定价格型横截面 baseline。
+- `a_share_b1_trend_pullback@1`：公开 B1 描述的固定代理近似复现，不声称掌握来源完整公式。
+
+统一入口是 [`docs/research/strategy-results/index.html`](docs/research/strategy-results/index.html)，机器清单是 [`manifest.json`](docs/research/strategy-results/manifest.json)，两轮断网复现总账是 [`reproduction-evidence-20260719.json`](docs/research/strategy-results/reproduction-evidence-20260719.json)。当前三组可信报告均为 `不通过`：
+
+| 报告包 | 结论边界 | 完整报告 |
+| --- | --- | --- |
+| 沪深300 ETF 波动率管理 + 低波动准入 | 最大回撤、Sharpe 改善、稳定性或独立 OOS 证据不足；两项结论均不通过 | [`etf-volatility-managed-20260713`](docs/research/strategy-results/etf-volatility-managed-20260713/index.html) |
+| 沪深300 ETF 120 日均线趋势 | 长期财富和最大回撤均差于匹配基准；零成本归因未扭转结论 | [`etf-trend-120d-long-history-20260713`](docs/research/strategy-results/etf-trend-120d-long-history-20260713/index.html) |
+| A 股 B1 趋势回调近似复现 | 来源公式不完整，长历史主版本显著亏损，只能给出“近似复现不通过” | [`a-share-b1-trend-pullback-20260713`](docs/research/strategy-results/a-share-b1-trend-pullback-20260713/index.html) |
+
+`outputs/research-runs/` 保存被 Git 忽略的 canonical 运行、冻结输入和账本；`docs/research/strategy-results/` 只保存可提交的 HTML/JSON 投影。两者冲突时，以数据快照、代码与环境身份、运行 manifest 和 result fingerprint 为准。旧管线报告在统一清单中明确标记为 `legacy`；API 的 `summary.status` 取 manifest 的研究状态，旧摘要里的 `status=ok` 只保留为 `sourceExecutionStatus`，表示脚本完成而不是研究有效。
+
+三组当前报告共 16 个 canonical 运行绑定代码提交 `26da0d347d77de7ee03a95277fc4ad45bdaa983a`，每个运行都在同一精确镜像、禁用网络的容器中连续复现 2 次，结果指纹 16/16 × 2 全部匹配。报告生成器会读取上述复现总账，并在代码身份、运行 ID、两轮指纹、镜像和断网条件任一不符时停止发布；报告的 `reportGeneratedAt` 独立于 `researchDate`，确定性取本报告最新 canonical manifest 时间。walk-forward 基准由策略登记显式指定：ETF 策略使用同一 ETF 的因果复权价格，市场指数只用于环境分类；窗口首个测试日从训练段末净值接续，不能重新归一化。
 
 ## 快速启动
 
@@ -76,7 +100,7 @@ docker compose run --rm api alembic upgrade head
 
 ## 当前服务器部署
 
-- 当前 release：`/opt/quantitative-trading-release-20260712-0101`；生产运行时代码为 `c24ade495492f64ea82aa229827858cdef52cdf6`。
+- 2026-07-19 现场复查：当前 release 为 `/opt/quantitative-trading-release-20260712-0101`，生产运行时代码为 `c24ade495492f64ea82aa229827858cdef52cdf6`。本 README 新增的研究分支尚未部署，不能把仓库提交写成生产事实。
 - 服务器运行 PostgreSQL、API、独立 worker 和前端四个容器；PostgreSQL、API 和前端端口继续只绑定 `127.0.0.1`，worker 不对宿主机暴露端口。
 - 本机建立 SSH tunnel 后访问前端；当前远端前端端口为 `127.0.0.1:15173`，隧道断开后需要重新建立。
 - 当前服务只挂载活动历史数据卷 `quant_todo_p0_postgres_data_todo_p0`；切换前的旧 volume 已按用户确认删除，不能把它写成现存回滚点。
@@ -84,7 +108,7 @@ docker compose run --rm api alembic upgrade head
 - A 股日线、估值、股票复权、指数日线和 ETF 日线的主体历史已覆盖 2012 年和 2015 年股灾区间；`scripts/ops/backfill_a_share_history.py` 用于续跑并补齐涨跌停、停复牌和 ETF 复权等 P1 数据。
 - 服务器 `crontab` 使用 `CRON_TZ=Asia/Shanghai`，每天 20:30 调用 `scripts/ops/sync_today_market_data.sh`，提交异步日更任务并轮询结果。
 - 可信底座生产 schema 已到 `0006_worker_heartbeats (head)`；独立 worker 已发布，API 启动只校验 revision，不自动迁移。
-- 13 个经验证的重复普通索引已经删除，对应唯一约束完整；服务器磁盘当前约使用 `77%`、剩余约 `9.0G`。新增美股、分钟线或期权数据前仍应先评估扩容。
+- 13 个经验证的重复普通索引已经删除，对应唯一约束完整；2026-07-19 复查服务器磁盘使用约 `76%`、剩余约 `9.1G`。新增美股、分钟线或期权数据前仍应先评估扩容。
 - 固定 2025-12 ETF 生产 quality、冻结 snapshot、sentinel、两次断库 reproduce 以及 queued/expired-running 恢复均已通过；完整 ID、输入哈希和限制见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
 
 ## 推荐使用流程
@@ -140,6 +164,7 @@ python scripts/research/run_quant_research.py \
 - `GET /api/stocks/{ts_code}/limit-prices`：读取每日涨跌停价格。
 - `GET /api/stocks/{ts_code}/suspend-events`：读取停复牌事件。
 - `GET /api/funds/{ts_code}/adjust-factors`：读取 ETF/基金复权因子。
+- `GET /api/strategy-results/overview`：读取统一只读结果清单，兼容当前报告包与旧 phased/csv 档案；不提供运行入口。
 - `GET /api/research/readiness`：读取不同研究类型的 `ready/blocked` 门禁结果。
 - `GET /api/us-research/overview`：读取美股 sample 文件，只读预览。
 - `GET /api/us-research/import-preview`：预览 sample 文件将写入哪些 DB 表。

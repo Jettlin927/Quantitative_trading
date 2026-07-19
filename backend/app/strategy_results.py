@@ -146,7 +146,6 @@ def summarize_report(payload: dict[str, Any]) -> dict[str, Any]:
         "conclusion": conclusion_text,
         "reportGeneratedAt": (
             payload.get("reportGeneratedAt")
-            or payload.get("researchDate")
             or payload.get("generated_at")
         ),
     }

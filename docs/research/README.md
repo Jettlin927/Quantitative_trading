@@ -12,7 +12,7 @@
 - `../superpowers/plans/2026-07-13-quant-research-capability-gap-closure.md`：基于当前可信底座补齐多策略分发、特征、模拟账本、A 股横截面、walk-forward 和基础风险层的分阶段计划。
 - `backend/tests/fixtures/quant_research_golden/`：完全合成的最小黄金数据集，用于锁定周末、停牌、涨跌停、复权、公告可用日和退市边界。
 - 一次性运行产物写入被 Git 忽略的 `outputs/research-runs/`，不再把大型逐事件 CSV 提交到主仓库。
-- `docs/research/strategy-results/` 仅为历史只读档案，不代表当前策略候选或新底座验收结果。
+- `docs/research/strategy-results/` 是统一只读发布层：同时登记当前可信报告与明确标记的旧档案；它不提供研究执行入口，也不把报告状态冒充生产部署或交易事实。
 
 ## 静态策略与统一入口
 
@@ -27,13 +27,16 @@
 | `a_share_price_baseline` | `1` | `a_share_cross_section` | `configs/research/a_share_price_baseline.json` | 固定 120–20 动量、60 日波动、历史行业成员的价格型横截面 baseline |
 | `a_share_b1_trend_pullback` | `1` | `a_share_cross_section` | `configs/research/a_share_b1_long_history.json` | 对公开 B1 趋势回调描述的事前固定近似复现；不宣称掌握来源完整公式 |
 
-`etf_volatility_managed@1` 的 2026-07-13 预登记真实数据复现已完成，强制状态为 `不通过`；完整门禁、分行情、压力期、DSR/PBO、优化方向和六个复现身份见 [`strategy-results/etf-volatility-managed-20260713/index.html`](strategy-results/etf-volatility-managed-20260713/index.html)。
+所有已发布结果统一从 [`strategy-results/index.html`](strategy-results/index.html) 进入，机器清单见 [`strategy-results/manifest.json`](strategy-results/manifest.json)。当前可信报告如下：
 
-`etf_low_volatility_gate@1` 随后按独立预登记规则复用同一冻结数据验证，状态同样为 `不通过`。以统一初始本金 100,000 元计，基础成本期末资产约 127,647 元，但最大回撤为 -52.82%，差于 100% 被动持有的 -42.16% 和 50% ETF / 50% 现金基准的 -25.21%；结果、逐年归因、账户资产曲线和复现身份已并入同一份 HTML 报告。
+| 策略/报告 | 样本与关键事实 | 强制状态 |
+| --- | --- | --- |
+| `etf_volatility_managed@1` | OOS `2018-01-02..2026-06-29`；首个执行日已从初始本金计入；基准逆方差版 100,000 元期末约 152,552 元，最大回撤 -40.89%，Sharpe 改善与稳定性门禁失败 | `不通过` |
+| `etf_low_volatility_gate@1` | 同一 OOS 上追加的第 5 个研究假设；100,000 元期末约 129,035 元，最大回撤 -52.82%，差于被动和固定半仓 | `不通过` |
+| `etf_trend_120d@1` | `2012-11-19..2026-06-29`；基础成本期末约 100,683 元，最大回撤 -52.82%，长期财富显著差于被动与同暴露静态基准 | `不通过` |
+| `a_share_b1_trend_pullback@1` | `2012-06-26..2026-07-10`；公开规则代理而非精确复制，长历史主版本期末约 26,649 元、最大回撤 -90.99% | `不通过` |
 
-`etf_trend_120d@1` 已按固定120日均线、月末判断、下一开市日开盘执行的规则完成 `2012-11-19..2026-06-29` 长历史验证。基础成本下，100,000 元期末约 100,683 元，CAGR 约 0.05%、最大回撤 -52.82%；同期同一ETF被动持有期末约 284,968 元、CAGR 8.32%、最大回撤 -45.45%，结论为 `不通过`。完整周期、自然年子区间、市场环境、压力期、成本归因和复现身份见 [`strategy-results/etf-trend-120d-long-history-20260713/index.html`](strategy-results/etf-trend-120d-long-history-20260713/index.html)。
-
-`a_share_b1_trend_pullback@1` 已按公开页面可见描述和事前登记的代理公式完成复现。公开源码、完整 B1 因子和全市场历史候选池不可得，因此结论严格限定为“近似复现不通过”：同周期机械口径累计收益 17.45%，未复现网页公布的 102.95%；现实成交同周期仅 1.33%。长历史主版本覆盖 `2012-06-26..2026-07-10`，100,000 元期末约 26,649 元，CAGR -9.31%、最大回撤 -90.99%。完整策略画像、来源差异、执行账本、逐年/环境/压力窗口、walk-forward 和优化边界见 [`strategy-results/a-share-b1-trend-pullback-20260713/index.html`](strategy-results/a-share-b1-trend-pullback-20260713/index.html)。
+三组报告共 16 个最终 canonical 运行均绑定代码提交 `26da0d347d77de7ee03a95277fc4ad45bdaa983a` 和镜像 `sha256:5061ca1a590f626ae4bfff58c24a0c9f07a9b62be8cf6ef554abcf3748bdbb3d`。每个运行都在该镜像的 `--network none` 容器中连续复现 2 次，result fingerprint 16/16 × 2 全部匹配；完整两轮总账见 [`strategy-results/reproduction-evidence-20260719.json`](strategy-results/reproduction-evidence-20260719.json)，报告生成器会校验各自运行子集并在不一致时停止。波动率管理与低波动准入共享 snapshot `8d3be33191f476fe0c4fed39f1ae1e95467c24ff46d90532a4202e42284faffc`；趋势报告使用 snapshot `5552b240062a2d9f549770830aefe614f481e64f1e98df03f49357610670653e`；B1 报告分别保留长历史与来源周期冻结快照。各运行 ID、配置哈希、结果指纹和独立报告生成时间以对应 `summary.json` 为准。
 
 不用连接数据库即可查看登记身份、必需冻结输入和示例配置：
 

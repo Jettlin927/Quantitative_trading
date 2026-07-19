@@ -49,6 +49,11 @@ class AShareB1ReportTest(unittest.TestCase):
         self.assertEqual(summary["period"]["formalEnd"], "2026-07-10")
         self.assertEqual(summary["period"]["openDays"], 3411)
         self.assertTrue(summary["period"]["yearRowsAreSubperiods"])
+        self.assertEqual(summary["researchDate"], "2026-07-13")
+        self.assertEqual(
+            summary["reportGeneratedAt"],
+            "2026-07-19T04:12:31+08:00",
+        )
         self.assertAlmostEqual(summary["primary"]["finalCapital"], 26_648.77802814307)
         self.assertAlmostEqual(summary["primary"]["totalReturn"], -0.7335122197185693)
         self.assertAlmostEqual(summary["primary"]["annualizedReturn"], -0.09310421379148415)
@@ -81,7 +86,24 @@ class AShareB1ReportTest(unittest.TestCase):
         self.assertTrue(summary["reproduction"]["networkDisabled"])
         self.assertTrue(summary["reproduction"]["allMatched"])
         self.assertEqual(summary["reproduction"]["matchedRunCount"], 5)
+        self.assertEqual(summary["reproduction"]["matchesPerRun"], 2)
+        self.assertEqual(summary["reproductionAudit"]["runCount"], 5)
+        self.assertEqual(
+            summary["reproductionAudit"]["evidenceFile"],
+            "reproduction-evidence-20260719.json",
+        )
         self.assertEqual(len(summary["runIdentities"]), 5)
+        self.assertIn("strategyLag1Autocorrelation", summary["risk"]["hacAlpha"])
+        self.assertEqual(
+            {row["runId"] for row in summary["runIdentities"]},
+            {
+                "fd68d6c7-1338-47ba-8bca-7ccaa9cc3713",
+                "74dd5a99-932b-4e00-8197-fe82419c8c15",
+                "d13d510b-67df-4a97-97da-8ff387f357db",
+                "3d90dcc2-c14a-4af4-acf1-959e6cc4e683",
+                "36c194a7-3d45-47ae-9593-ecd46bf29a84",
+            },
+        )
 
     def test_html_explains_scenarios_before_results_and_uses_plain_chinese(self):
         html = (REPORT_DIR / "index.html").read_text(encoding="utf-8")

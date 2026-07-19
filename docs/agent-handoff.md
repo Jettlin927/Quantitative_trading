@@ -9,29 +9,36 @@
 - 新增能力已在精确代码提交 `891b2825b62c8e91576ee54d04fbafc738c95f69` 完成最终验收：本地隔离 PostgreSQL 16.14 全量 219/219、0 跳过，固定黑盒审计 12/12；远端 `/tmp` 隔离源码复用现有 API 镜像完成 SQLite 全量 219 项、10 项 PG-only 按设计跳过，未连接生产数据库或重启服务。黄金 A 股合成运行结果指纹为 `ca9243de1c5fb8599cc589710f63c8358e9f6c9e1c5e1e0b261a0e200df71806`，连续两次断库 reproduce 匹配。
 - 上述实现与验收记录已 fast-forward 合并并推送至 `main@e51bbf37f528b4a9ea3df5ba2ae394d228ab2b6b`；GitHub CI run `29232720679` 的后端 SQLite、前端、PostgreSQL 16、Compose/Shell 四个 job 全部成功。该动作不代表生产服务器已部署新代码。
 - 可信工程的既有生产运行时代码为 `c24ade495492f64ea82aa229827858cdef52cdf6`。GitHub `main` 后续已有文档提交；接手不能把“仓库最新提交”写成“生产已部署”。
+- 2026-07-19 最终 canonical 研究代码身份为 `26da0d347d77de7ee03a95277fc4ad45bdaa983a`：统一 OOS 首日、被动基准、walk-forward、子区间净值/回撤、HAC 诊断与报告归档边界，并拒绝路径逃逸及已声明摘要损坏。该提交及其后续文档仍未部署到生产；接手必须现场核对当前分支、`main` 和 production runtime。
 - 当前目标：数据完整性、无未来函数、结果可复现、进程重启可靠四条可信门禁。分钟线、期权、新付费源、券商和真实交易继续暂缓。
 - Phase 0–5 已完成。首次独立审计发现的 4 个问题修复后，同一审计者在精确提交 `f506d0e58c303afe7ad561b37ceff27c6e5e681f` 重放 39/39 反例；PostgreSQL 16.14 全矩阵 162/162、0 跳过。生产发布后又在精确部署代码上执行 73 项定向门禁，72 项通过、1 项显式 PG URL 用例按设计跳过。
 - 运行时代码对应的 GitHub Actions CI run `29158046019` 四个 job 全部成功；生产验收证据提交 `1fe3162f4953c08fa4ad5de160994565b320406c` 已 fast-forward 推送 `main`，对应 CI run `29161789513` 的四个 job 也全部成功。生产 quality、snapshot、sentinel、断库 reproduce 和 worker 重启恢复的完整证据见 `docs/deployment/2026-07-12-production-trustworthiness-acceptance.md`。
 - 生产 PostgreSQL 已在用户明确确认后完成 fingerprint 门禁、baseline stamp、`0002→0006` 和 13 个普通重复索引清理。后续新的生产 DDL、数据删除、volume 操作或覆盖恢复仍必须再次确认。
 
-## 2026-07-13 新增研究能力
+## 2026-07-13 至 2026-07-19 新增研究能力
 
 - `scripts/research/run_quant_research.py --list-strategies` 不连接数据库，列出 `sentinel_etf_baseline@1`、`etf_trend_120d@1`、`etf_volatility_managed@1`、`etf_low_volatility_gate@1`、`a_share_price_baseline@1`、`a_share_b1_trend_pullback@1` 的 scope、必需冻结输入和示例配置。
-- `etf_low_volatility_gate@1` 已使用与原波动率管理研究相同的 quality run `e9a957f8-3024-4357-851f-1cb6ecef82ba` 和 snapshot `8d3be33191f476fe0c4fed39f1ae1e95467c24ff46d90532a4202e42284faffc` 完成真实数据验证。基础成本运行 `ae4a0001-9466-4dd7-94ae-e242f09ac2ca`、双倍成本运行 `1efdff91-a124-4b81-9e05-abcd0a7258f2` 均已断网复现；基础成本 CAGR 3.04%、Sharpe 0.277、最大回撤 -52.82%，结论为 `不通过`。按 100,000 元初始本金展示的完整反例归因在 `docs/research/strategy-results/etf-volatility-managed-20260713/index.html`。
-- `etf_trend_120d@1` 已从首个合法信号日 `2012-11-19` 验证至 `2026-06-29`。基础、零、双倍成本运行分别为 `924f43df-4341-4048-a826-861cf6e84f9e`、`68071fdf-a925-4581-8abc-5e87ff3a84d8`、`94c011a5-1d06-45b3-bd28-6bbbc31d9c39`，共享 snapshot `5552b240062a2d9f549770830aefe614f481e64f1e98df03f49357610670653e` 并全部断网复现。基础成本 CAGR 0.05%、Sharpe 0.088、最大回撤 -52.82%，远低于被动ETF CAGR 8.32%，结论为 `不通过`；完整报告在 `docs/research/strategy-results/etf-trend-120d-long-history-20260713/index.html`。
-- `a_share_b1_trend_pullback@1` 只实现公开 B1 趋势回调描述的事前固定代理，不宣称取得完整来源公式。五个 canonical 运行均绑定 `baf69b7461f0e44c37031934a7e06705102728c4` 并在断网容器精确复现。网页同周期机械口径累计 17.45%，没有复现公开 102.95%；现实成交同周期 1.33%。可信长历史主版本 `2012-06-26..2026-07-10` 以 100,000 元起步，期末约 26,649 元，CAGR -9.31%、最大回撤 -90.99%，结论为 `不通过`；报告在 `docs/research/strategy-results/a-share-b1-trend-pullback-20260713/index.html`。完整规则拿不到时不要继续在本样本调 BBI、EMA、KDJ 或代理权重。
+- `etf_low_volatility_gate@1` 最终基础/双倍成本 run 为 `251662f5-def5-4228-9330-e68e13a47748`、`7e9ea891-45db-4885-9378-d27dadc58cb0`。基础成本 100,000 元期末约 129,035 元、CAGR 3.17%、最大回撤 -52.82%，结论仍为 `不通过`。
+- `etf_volatility_managed@1` 最终六个 run 为：T0 `f24663b1-4160-465f-b9e8-ea295c2407a0`、T1 `854aa0e6-672f-4d7c-b330-1f9586c507dd`、T2 `5d082e36-6ce0-4e02-8d43-d1b2686cf9dd`、T3 `164e3704-8f42-4072-aea1-d5b1532a3049`、零成本 `b5cd6613-d822-434a-a913-983571708c78`、双倍成本 `14f79545-0ea6-474c-8faa-2e83a016283b`。T0 期末约 152,552 元、最大回撤 -40.89%；状态为 `不通过`。
+- `etf_trend_120d@1` 最终基础、零、双倍成本 run 为 `73c82e27-754f-4f6a-bc85-4fc43c4b5be3`、`0e3af953-a064-4db2-beb3-0a84416f6ce8`、`7d5e9489-78dc-4b32-94a7-b264c16be486`，共享 snapshot `5552b240062a2d9f549770830aefe614f481e64f1e98df03f49357610670653e`。3303 个开市日对应 3303 个收益观察；基础成本 CAGR 0.05%、最大回撤 -52.82%，同期被动 ETF CAGR 8.32%，结论为 `不通过`。
+- `a_share_b1_trend_pullback@1` 最终五个 run 为：网页机械口径 `fd68d6c7-1338-47ba-8bca-7ccaa9cc3713`、同周期现实成交 `74dd5a99-932b-4e00-8197-fe82419c8c15`、长历史主版本 `d13d510b-67df-4a97-97da-8ff387f357db`、页面参数一致性 `3d90dcc2-c14a-4af4-acf1-959e6cc4e683`、双倍成本 `36c194a7-3d45-47ae-9593-ecd46bf29a84`。长历史期末约 26,649 元、CAGR -9.31%、最大回撤 -90.99%，只能表述为“近似复现不通过”。
+- 上述 16 个运行均绑定代码提交 `26da0d347d77de7ee03a95277fc4ad45bdaa983a` 和镜像 `sha256:5061ca1a590f626ae4bfff58c24a0c9f07a9b62be8cf6ef554abcf3748bdbb3d`；每个运行在 `--network none` 下连续复现 2 次，16/16 × 2 的 result fingerprint 全部匹配。完整两轮总账在 `docs/research/strategy-results/reproduction-evidence-20260719.json`；三个生成器会逐项校验各自运行子集，并从最新 canonical manifest 派生独立的 `reportGeneratedAt`。
 - artifact schema v2 的公共 runner 同时生成 `targets/nav`、调仓请求、模拟执行和 positions；walk-forward 与风险工件按配置成对出现并进入 checkpoint、manifest 和结果指纹。已完成 v1 归档保持兼容，未完成 v1 不跨版本续跑。
 - A 股价格 baseline 只使用逐日 `industry_members`、上市/退市、日线、复权、涨跌停、停牌和基准；固定 120–20 动量、60 日波动、月末 topN 等权和下一开市日开盘执行，不读取财务指标或当前成员列表。
 - `risk.py` 从冻结输入计算 gross/net/cash、集中度、历史行业暴露、benchmark beta 和边际/总风险贡献；贡献之和必须等于组合波动。`allocation.py` 只输出受单票、行业、现金和换手约束的研究目标权重，不生成订单。
+- `StrategyDefinition.walk_forward_benchmark_source` 是强制合同：ETF 趋势、波动率管理和低波动准入的 canonical walk-forward 使用同一 ETF 因果复权基准，市场指数只用于环境分类；窗口首个测试日从训练段末 NAV 接续，不能重新归一化丢失首日。
 - 完整指数成分归因仍因缺 `index_weights` blocked；行业基准比较仍因缺可复现 `industry_proxy_daily` blocked。不要用 `index_daily_bars`、当前成分或现场临时代理冒充。
 - 固定反例审计入口为 `python scripts/research/audit_quant_research.py`；完整数据库语义入口仍是 `PYTHON_BIN=.venv/bin/python scripts/ops/test_postgres_integration.sh`。
+- `docs/research/strategy-results/index.html` 与 `manifest.json` 现在统一登记 3 组当前可信报告和 3 组旧档案；API `GET /api/strategy-results/overview` 同时兼容当前 `summaryJson` 和旧 phased/csv。统一 `summary.status` 只取 manifest，旧摘要 `status=ok` 仅保留为 `sourceExecutionStatus`，不得翻译为 `研究通过`。
+- 结果清单拒绝绝对路径、`..` 与 symlink 逃逸；manifest 一旦声明 `summaryJson`，文件缺失或顶层不是 JSON 对象必须显式失败，不允许静默返回空摘要。
 
 ## 当前服务器事实
 
 - SSH：`ubuntu@182.254.180.169`；活动持久 volume 为 `quant_todo_p0_postgres_data_todo_p0`，严禁 `docker compose down -v` 或删除该 volume。
 - 当前四容器为 `db/api/worker/frontend`；API/worker/frontend bind 到 `/opt/quantitative-trading-release-20260712-0101`，API 使用无 `--reload` 的生产命令。API/worker 的 `APP_GIT_COMMIT` 均为 `c24ade495492f64ea82aa229827858cdef52cdf6`。
 - Compose project label 为 `quantitative-trading`；当前 release 的服务器覆盖文件继续把 DB/API/frontend 端口限制在 loopback，并指向上述 external PG volume。PostgreSQL 只监听 `127.0.0.1:5432`，worker 不对宿主机暴露端口。
-- 生产 schema revision 为 `0006_worker_heartbeats`。13 个重复普通索引迁移前逻辑大小合计 `4,166,868,992` bytes、迁移后为 0，唯一守卫完整；迁移后 `pg_database_size=16,295,099,415` bytes，`public` 索引逻辑大小合计 `7,166,763,008` bytes。2026-07-13 本轮最终验收清理临时目录后，根盘仍为约 40 GiB、已用 29 GiB、可用 9.0 GiB、77%；当前不需扩容，低于 5 GiB 时应先通知用户。镜像构建与索引迁移发生在同一窗口，不能把索引逻辑大小表述为 `df` 的精确净释放。
+- 生产 schema revision 为 `0006_worker_heartbeats`。13 个重复普通索引迁移前逻辑大小合计 `4,166,868,992` bytes、迁移后为 0，唯一守卫完整；迁移后 `pg_database_size=16,295,099,415` bytes，`public` 索引逻辑大小合计 `7,166,763,008` bytes。2026-07-19 现场复查根盘使用约 76%、可用 9.1 GiB；当前不需扩容，低于 5 GiB 时应先通知用户。镜像构建与索引迁移发生在同一窗口，不能把索引逻辑大小表述为 `df` 的精确净释放。
+- 2026-07-19 首次用错误临时 artifact root 复用上述 snapshot 时，完整性门禁留下两条失败 ResearchRun（`f654fda4-4b89-4359-b6fe-b3f32839e3b2`、`60f89724-da53-47f6-8303-8ad6bfb4ecd9`）并把 snapshot registry 标成 `failed`；磁盘全量哈希、表工件、行数和 registry 路径全部对账一致后，已在单事务恢复为 `complete` 并读回确认。两条失败运行作为审计记录保留，未删除；后续 8 条修正运行均 `succeeded/finalized`。
 - `data_sync_jobs` 当前 6 行均为最终 `ok`，其中 2 行是生产 queued/expired-running 恢复演练；queued/running/failed/expired lease 均为 0，worker 心跳新鲜。
 - 最新生产全量 custom-format dump 已流式保存到本机 `/Users/jettlin/backups/Quantitative_trading/quant_trading_2026-07-11_2138+0800.dump`，大小 `2,232,308,654` bytes、权限 `0600`、SHA-256 `7c13b7ec933fd0ec965f07cea57db8add43a29fc96ec9b3d53d544aed040dd14`。PostgreSQL 16 `pg_restore -l` 得到 250 个非注释 TOC 条目/25 个 `TABLE DATA` 段，整包 `pg_restore --file=/dev/null` 读取也成功。该备份是迁移前恢复点，迁移后新增 registry 记录不在其中。
 

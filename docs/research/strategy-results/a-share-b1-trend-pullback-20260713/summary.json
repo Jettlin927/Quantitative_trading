@@ -4,6 +4,16 @@
   "title": "A股 B1 趋势回调公开规则近似复现",
   "status": "不通过",
   "researchDate": "2026-07-13",
+  "reportGeneratedAt": "2026-07-19T04:12:31+08:00",
+  "reproductionAudit": {
+    "evidenceFile": "reproduction-evidence-20260719.json",
+    "verifiedAt": "2026-07-19",
+    "imageDigest": "sha256:5061ca1a590f626ae4bfff58c24a0c9f07a9b62be8cf6ef554abcf3748bdbb3d",
+    "matchesPerRun": 2,
+    "runCount": 5,
+    "networkDisabled": true,
+    "allMatched": true
+  },
   "initialCapital": 100000.0,
   "oneSentenceConclusion": "未数值复现原网页，且可信长历史主版本把10万元降至约2.66万元；当前代理规则不值得继续调参，更不具备部署条件。",
   "period": {
@@ -430,27 +440,6 @@
     ]
   },
   "execution": {
-    "source_ideal": {
-      "targetSelections": 390,
-      "signalDays": 212,
-      "requests": 430,
-      "filled": 430,
-      "partial": 0,
-      "blocked": 0,
-      "blockedRate": 0.0,
-      "partialRate": 0.0,
-      "buyRequests": 198,
-      "sellRequests": 232,
-      "executedBuys": 198,
-      "executedSells": 232,
-      "uniqueBoughtSymbols": 73,
-      "turnover": 97.8187649879965,
-      "cost": 0.0,
-      "averageExposure": 0.6893145793580262,
-      "reasonCounts": {
-        "filled": 430
-      }
-    },
     "long_double_cost": {
       "targetSelections": 2406,
       "signalDays": 1375,
@@ -474,29 +463,6 @@
         "valuation_carried": 67,
         "limit_down": 8,
         "limit_up": 5
-      }
-    },
-    "source_realistic": {
-      "targetSelections": 390,
-      "signalDays": 212,
-      "requests": 475,
-      "filled": 179,
-      "partial": 204,
-      "blocked": 92,
-      "blockedRate": 0.1936842105263158,
-      "partialRate": 0.42947368421052634,
-      "buyRequests": 222,
-      "sellRequests": 253,
-      "executedBuys": 178,
-      "executedSells": 205,
-      "uniqueBoughtSymbols": 73,
-      "turnover": 76.76700131510566,
-      "cost": 0.17663480938526582,
-      "averageExposure": 0.7009296582131915,
-      "reasonCounts": {
-        "cash_capacity": 294,
-        "filled": 179,
-        "limit_down": 2
       }
     },
     "long_t3_off": {
@@ -524,6 +490,29 @@
         "limit_up": 5
       }
     },
+    "source_realistic": {
+      "targetSelections": 390,
+      "signalDays": 212,
+      "requests": 475,
+      "filled": 179,
+      "partial": 204,
+      "blocked": 92,
+      "blockedRate": 0.1936842105263158,
+      "partialRate": 0.42947368421052634,
+      "buyRequests": 222,
+      "sellRequests": 253,
+      "executedBuys": 178,
+      "executedSells": 205,
+      "uniqueBoughtSymbols": 73,
+      "turnover": 76.76700131510566,
+      "cost": 0.17663480938526582,
+      "averageExposure": 0.7009296582131915,
+      "reasonCounts": {
+        "cash_capacity": 294,
+        "filled": 179,
+        "limit_down": 2
+      }
+    },
     "long_primary": {
       "targetSelections": 2406,
       "signalDays": 1375,
@@ -547,6 +536,27 @@
         "valuation_carried": 67,
         "limit_down": 8,
         "limit_up": 5
+      }
+    },
+    "source_ideal": {
+      "targetSelections": 390,
+      "signalDays": 212,
+      "requests": 430,
+      "filled": 430,
+      "partial": 0,
+      "blocked": 0,
+      "blockedRate": 0.0,
+      "partialRate": 0.0,
+      "buyRequests": 198,
+      "sellRequests": 232,
+      "executedBuys": 198,
+      "executedSells": 232,
+      "uniqueBoughtSymbols": 73,
+      "turnover": 97.8187649879965,
+      "cost": 0.0,
+      "averageExposure": 0.6893145793580262,
+      "reasonCounts": {
+        "filled": 430
       }
     }
   },
@@ -860,7 +870,7 @@
       "benchmarkReturn": -0.8399004041048879,
       "activeReturn": 0.45510703223553994,
       "annualizedVolatility": 0.23728469313232284,
-      "maxDrawdown": -0.4929491565191677,
+      "maxDrawdown": -0.4950631005468098,
       "targetSelections": 122,
       "requestCount": 188,
       "blockedRate": 0.14893617021276595,
@@ -949,7 +959,7 @@
         "benchmarkReturn": -0.053087501870493936,
         "activeReturn": -0.1711048068733444,
         "annualizedVolatility": 0.2776151177015598,
-        "maxDrawdown": -0.2790769287284236,
+        "maxDrawdown": -0.30177570150419897,
         "targetSelections": 13,
         "requestCount": 24,
         "blockedRate": 0.125,
@@ -1008,10 +1018,10 @@
         "trainEnd": "2014-07-23",
         "testStart": "2014-07-24",
         "testEnd": "2015-08-03",
-        "strategyReturn": 1.627031597527364,
-        "benchmarkReturn": 0.7117611638723926,
-        "activeReturn": 0.9152704336549716,
-        "sharpe": 2.81817484005402,
+        "strategyReturn": 1.5968485789459832,
+        "benchmarkReturn": 0.742277688978189,
+        "activeReturn": 0.8545708899677941,
+        "sharpe": 2.7788782070939506,
         "maxDrawdown": -0.2307572008039078
       },
       {
@@ -1021,9 +1031,9 @@
         "testStart": "2015-08-04",
         "testEnd": "2016-08-12",
         "strategyReturn": 0.2317274872879548,
-        "benchmarkReturn": -0.165627143247705,
-        "activeReturn": 0.3973546305356598,
-        "sharpe": 1.0442590663396492,
+        "benchmarkReturn": -0.1397150198705464,
+        "activeReturn": 0.3714425071585013,
+        "sharpe": 1.0421843516016864,
         "maxDrawdown": -0.1786389463150466
       },
       {
@@ -1032,10 +1042,10 @@
         "trainEnd": "2016-08-12",
         "testStart": "2016-08-15",
         "testEnd": "2017-08-25",
-        "strategyReturn": -0.0265102933089796,
-        "benchmarkReturn": 0.1185618159876813,
-        "activeReturn": -0.145072109296661,
-        "sharpe": -0.015015241594018,
+        "strategyReturn": -0.0153937072680632,
+        "benchmarkReturn": 0.1522419918173989,
+        "activeReturn": -0.1676356990854621,
+        "sharpe": 0.0372496844572154,
         "maxDrawdown": -0.1415938589637508
       },
       {
@@ -1044,10 +1054,10 @@
         "trainEnd": "2017-08-25",
         "testStart": "2017-08-28",
         "testEnd": "2018-09-05",
-        "strategyReturn": -0.2165539108417856,
-        "benchmarkReturn": -0.1417152037861594,
-        "activeReturn": -0.0748387070556262,
-        "sharpe": -1.14085892831665,
+        "strategyReturn": -0.2117785381360028,
+        "benchmarkReturn": -0.1310973123023976,
+        "activeReturn": -0.0806812258336052,
+        "sharpe": -1.106987339435079,
         "maxDrawdown": -0.2495962230085411
       },
       {
@@ -1057,9 +1067,9 @@
         "testStart": "2018-09-06",
         "testEnd": "2019-09-19",
         "strategyReturn": -0.3557701805813401,
-        "benchmarkReturn": 0.2027354171197428,
-        "activeReturn": -0.5585055977010829,
-        "sharpe": -1.5875024641034967,
+        "benchmarkReturn": 0.1898769828289947,
+        "activeReturn": -0.5456471634103349,
+        "sharpe": -1.5843305381456128,
         "maxDrawdown": -0.3830608661120791
       },
       {
@@ -1068,10 +1078,10 @@
         "trainEnd": "2019-09-19",
         "testStart": "2019-09-20",
         "testEnd": "2020-10-09",
-        "strategyReturn": -0.2914682220517002,
-        "benchmarkReturn": 0.1894197633524983,
-        "activeReturn": -0.4808879854041985,
-        "sharpe": -1.1294076649226958,
+        "strategyReturn": -0.293302637065763,
+        "benchmarkReturn": 0.1928351628739126,
+        "activeReturn": -0.4861377999396757,
+        "sharpe": -1.1366561712406904,
         "maxDrawdown": -0.3673742007260451
       },
       {
@@ -1080,10 +1090,10 @@
         "trainEnd": "2020-10-09",
         "testStart": "2020-10-12",
         "testEnd": "2021-10-22",
-        "strategyReturn": -0.1909232139960994,
-        "benchmarkReturn": 0.0283149765491812,
-        "activeReturn": -0.2192381905452807,
-        "sharpe": -1.1398404075960469,
+        "strategyReturn": -0.1783028646447455,
+        "benchmarkReturn": 0.0595120266827242,
+        "activeReturn": -0.2378148913274698,
+        "sharpe": -1.042790929332168,
         "maxDrawdown": -0.2217195603831577
       },
       {
@@ -1092,11 +1102,11 @@
         "trainEnd": "2021-10-22",
         "testStart": "2021-10-25",
         "testEnd": "2022-11-04",
-        "strategyReturn": -0.2239251472751548,
-        "benchmarkReturn": -0.2434668497899448,
-        "activeReturn": 0.0195417025147899,
-        "sharpe": -1.7179657157603077,
-        "maxDrawdown": -0.2239251472751548
+        "strategyReturn": -0.236691960760585,
+        "benchmarkReturn": -0.2404469408729765,
+        "activeReturn": 0.0037549801123915,
+        "sharpe": -1.8196993329116284,
+        "maxDrawdown": -0.236691960760585
       },
       {
         "windowId": "wf-0009",
@@ -1105,9 +1115,9 @@
         "testStart": "2022-11-07",
         "testEnd": "2023-11-17",
         "strategyReturn": -0.3285458655054917,
-        "benchmarkReturn": -0.0548906733724346,
-        "activeReturn": -0.273655192133057,
-        "sharpe": -2.1803141674713737,
+        "benchmarkReturn": -0.0528528993585802,
+        "activeReturn": -0.2756929661469114,
+        "sharpe": -2.1759193502163527,
         "maxDrawdown": -0.3285458655054917
       },
       {
@@ -1117,9 +1127,9 @@
         "testStart": "2023-11-20",
         "testEnd": "2024-12-03",
         "strategyReturn": -0.1374358069007436,
-        "benchmarkReturn": 0.1050150863038585,
-        "activeReturn": -0.2424508932046022,
-        "sharpe": -0.409694329639252,
+        "benchmarkReturn": 0.1075715614764682,
+        "activeReturn": -0.2450073683772119,
+        "sharpe": -0.4088833385705689,
         "maxDrawdown": -0.3046723461504508
       },
       {
@@ -1128,10 +1138,10 @@
         "trainEnd": "2024-12-03",
         "testStart": "2024-12-04",
         "testEnd": "2025-12-16",
-        "strategyReturn": -0.18169823963334,
-        "benchmarkReturn": 0.1442537861302501,
-        "activeReturn": -0.3259520257635902,
-        "sharpe": -0.570667047048515,
+        "strategyReturn": -0.1802789762374501,
+        "benchmarkReturn": 0.1380764986647407,
+        "activeReturn": -0.3183554749021908,
+        "sharpe": -0.5633742324630355,
         "maxDrawdown": -0.2901638181552613
       }
     ]
@@ -1180,7 +1190,8 @@
       "annualizedAlphaStandardError": 0.06566877491081727,
       "alphaTStatistic": -1.4240946477415357,
       "ci95Low": -0.22222934969944036,
-      "ci95High": 0.03519224795096332
+      "ci95High": 0.03519224795096332,
+      "strategyLag1Autocorrelation": 0.05895513278190174
     },
     "averageHhi": 0.17793562971456697,
     "maxHhi": 0.5009228513710845,
@@ -1198,7 +1209,7 @@
     "sourceRisk": "无法判断：原网页没有披露候选因子、参数和回测筛选次数，无法排除来源侧过拟合。"
   },
   "supportingEvidence": [
-    "数据质量、point-in-time历史成员、可交易性、执行账本和五份断网复现全部闭合。",
+    "数据质量、point-in-time历史成员、可交易性、执行账本和5份断网复现全部闭合。",
     "网页机械口径对照在同周期仍取得17.45%累计收益，说明固定代理规则并非完全没有捕捉到短期机会。",
     "11个walk-forward测试窗中前两个为正且跑赢基准，表明2014至2016阶段曾出现有效期。"
   ],
@@ -1256,44 +1267,45 @@
   "quality": {
     "qualityRunId": "1c6fa291-9377-4399-a74f-6f5afe71bad9",
     "snapshotId": "85ba876413a5debd0d277f2a16d2d8eadcaaf9d0343692e1ec457239a5722f70",
-    "codeCommit": "baf69b7461f0e44c37031934a7e06705102728c4",
+    "codeCommit": "26da0d347d77de7ee03a95277fc4ad45bdaa983a",
     "schemaRevision": "0006_worker_heartbeats"
   },
   "runIdentities": [
     {
       "scenario": "网页机械口径对照",
-      "runId": "211cc331-6ce7-4cbf-b6b2-342d2b3cfed5",
-      "reproducibilityKey": "37980629c5e5022ea5ab45f0138383b0f7d4cb3f22b638eea0b1bffd0eca9d6f",
+      "runId": "fd68d6c7-1338-47ba-8bca-7ccaa9cc3713",
+      "reproducibilityKey": "688434a5f08f708c7136544ed0d662b2a4ff773bbce4a14cc46a38356e2c2218",
       "resultFingerprint": "217f111388ba62d7fdb8cc57b73f30f1072541e20cd1475c117224c4738ecab5"
     },
     {
       "scenario": "同周期现实成交",
-      "runId": "4b53b659-d837-447e-8e8c-67a8fe3e7a76",
-      "reproducibilityKey": "217f32f158c80cdaf387acdb7cd012fff3f0707fe44cf6ef1ffa6c5eabfabd40",
+      "runId": "74dd5a99-932b-4e00-8197-fe82419c8c15",
+      "reproducibilityKey": "cfc4d32b84886866981835a70ff5f86f83c322ed6fcdae97cd505d2e1c20131d",
       "resultFingerprint": "18a125834b01680f0aa87dc48d25d089e7afb468f2afea3267931d2f7c82eae0"
     },
     {
       "scenario": "长历史主版本",
-      "runId": "a2629d76-3c59-49ff-b404-b5f343f9c49a",
-      "reproducibilityKey": "000c5364bbf0dd59cdb547022e1f938b7769b5ea5be45a06ff5549cc598a4b4c",
-      "resultFingerprint": "8c2f9fa866cb4e17c8fe0531b5190b540f1e508792eb63f9f66735fcf6c7db58"
+      "runId": "d13d510b-67df-4a97-97da-8ff387f357db",
+      "reproducibilityKey": "bccd94af620579ccc5e04cbc26ce3847e7fe3f94d8af1e7a2466a6aa54ce52c8",
+      "resultFingerprint": "9411d1a2cf7b55f79b1fa098b7c41bfbc244c9aea798c0d826d9baf1de184202"
     },
     {
       "scenario": "页面参数一致性对照",
-      "runId": "5b277c7c-cc0e-4dc0-a7b3-ea004b052743",
-      "reproducibilityKey": "8599a3b193f23c9e07ba17f2fba190913456f8e7c76e984180273f01a49e5813",
-      "resultFingerprint": "f1439a388f4169446438a34905cc8cf830d3c048d4dd96e5ca0d821208d42c8c"
+      "runId": "3d90dcc2-c14a-4af4-acf1-959e6cc4e683",
+      "reproducibilityKey": "defa10d909fe454999492f6166712a3dcd457e16b1ad9f7dd457155a3ea5e597",
+      "resultFingerprint": "fc41b8dbc4ce8fbc0a5393c6df52aadb7e230787b7ebe1e494e7bf1559b181c0"
     },
     {
       "scenario": "双倍成本压力",
-      "runId": "3f180631-8043-4cab-898e-fce3b5277039",
-      "reproducibilityKey": "32e8a2c4f7d44586681bb23f10df81b48564fd3b24e37c6420687b42c5efc6b3",
-      "resultFingerprint": "79ef067eb651ff04259c3e81f8ddd8e6fd04dba42fd349f539710f1072ee0adb"
+      "runId": "36c194a7-3d45-47ae-9593-ecd46bf29a84",
+      "reproducibilityKey": "4d5b923e676151d481b026bcc25904bae0b2e840afde40b7d43d89c1bb888e87",
+      "resultFingerprint": "6f1e37a3aab6e2373e78c099f0a4ce42f31c797fc47e4e8b3fe2b5f3417f6a08"
     }
   ],
   "reproduction": {
     "networkDisabled": true,
     "allMatched": true,
-    "matchedRunCount": 5
+    "matchedRunCount": 5,
+    "matchesPerRun": 2
   }
 }
