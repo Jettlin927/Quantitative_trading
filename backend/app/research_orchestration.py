@@ -99,19 +99,11 @@ def apply_issue_plan(
 ) -> OrchestrationResult:
     current_time = now or datetime.now(timezone.utc)
     ordered_comments = list(comments)
+    _invalidate_reused_plan_body_edit(db, issue, prepared, current_time)
     plan, orchestration, created = _freeze_plan(db, issue, prepared)
     _supersede_older_plans(db, issue.number, plan, current_time)
 
-    approval = max(
-        (
-            comment
-            for comment in ordered_comments
-            if comment.author_login == AUTHORIZED_RESEARCH_APPROVER
-            and comment.body == prepared.approval_comment
-        ),
-        key=lambda comment: comment.id,
-        default=None,
-    )
+    approval = _bound_approval_comment(db, orchestration, ordered_comments, prepared)
     if issue.state.upper() != "OPEN":
         _prevent_closed_issue_start(db, orchestration, current_time)
         return _result(orchestration, prepared, bool(approval), False)
@@ -132,6 +124,8 @@ def apply_issue_plan(
         _invalidate_missing_approval(db, orchestration, current_time)
         if orchestration.formal_research_id is None and orchestration.state == "blocked":
             transition_orchestration(orchestration, "pending_approval", reason=None)
+        elif orchestration.formal_research_id is None:
+            orchestration.state_reason = None
         return _result(orchestration, prepared, False, False)
     if not authorization_write_confirmed:
         return _result(
@@ -267,6 +261,11 @@ def invalidate_issue_plan(
         return False
     orchestration.last_issue_body_sha256 = body_sha256
     orchestration.state_reason = reason
+    if (
+        orchestration.formal_research_id is None
+        and orchestration.state == "pending_approval"
+    ):
+        return True
     orchestration.approval_invalidated = True
     if orchestration.state in {"published", "stopped"}:
         return True
@@ -501,6 +500,54 @@ def _freeze_plan(
     else:
         orchestration.last_issue_body_sha256 = sha256(issue.body.encode("utf-8")).hexdigest()
     return plan, orchestration, created
+
+
+def _invalidate_reused_plan_body_edit(
+    db: Session,
+    issue: IssueSnapshot,
+    prepared: PreparedResearchPlan,
+    now: datetime,
+) -> None:
+    body_sha256 = sha256(issue.body.encode("utf-8")).hexdigest()
+    orchestration = db.scalar(
+        select(ResearchOrchestration)
+        .join(FrozenResearchPlan, FrozenResearchPlan.id == ResearchOrchestration.plan_id)
+        .where(
+            FrozenResearchPlan.issue_number == issue.number,
+            FrozenResearchPlan.plan_sha256 == prepared.plan_sha256,
+        )
+        .limit(1)
+    )
+    if orchestration is None or orchestration.last_issue_body_sha256 == body_sha256:
+        return
+    invalidate_issue_plan(
+        db,
+        issue.number,
+        issue.body,
+        "Issue 正文已编辑，原批准立即失效",
+        now=now,
+    )
+
+
+def _bound_approval_comment(
+    db: Session,
+    orchestration: ResearchOrchestration,
+    comments: list[CommentSnapshot],
+    prepared: PreparedResearchPlan,
+) -> CommentSnapshot | None:
+    matches = [
+        comment
+        for comment in comments
+        if comment.author_login == AUTHORIZED_RESEARCH_APPROVER
+        and comment.body == prepared.approval_comment
+    ]
+    if orchestration.formal_research_id is None:
+        return min(matches, key=lambda comment: comment.id, default=None)
+    formal = db.get(FormalResearch, orchestration.formal_research_id)
+    approval = db.get(ResearchPlanApproval, formal.approval_id) if formal else None
+    if approval is None:
+        return None
+    return next((comment for comment in matches if comment.id == approval.comment_id), None)
 
 
 def _supersede_older_plans(

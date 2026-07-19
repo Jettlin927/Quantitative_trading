@@ -115,10 +115,13 @@ compose_cmd() {
 set_deploy_identity() {
   local resolved_commit=""
   local resolved_ref="${APP_GIT_REF:-refs/unverified}"
+  local worktree_status=""
 
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     resolved_commit="$(git rev-parse HEAD)"
-    if git rev-parse --verify refs/remotes/origin/main >/dev/null 2>&1 \
+    worktree_status="$(git status --porcelain --untracked-files=all)"
+    if [[ -z "$worktree_status" ]] \
+      && git rev-parse --verify refs/remotes/origin/main >/dev/null 2>&1 \
       && git merge-base --is-ancestor "$resolved_commit" refs/remotes/origin/main; then
       resolved_ref="refs/heads/main"
     else

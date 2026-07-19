@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import os
 import unittest
+from unittest.mock import patch
 
 from alembic import command
 from sqlalchemy import create_engine, func, select
@@ -166,6 +167,11 @@ class ResearchPlanContractTest(unittest.TestCase):
         with self.assertRaisesRegex(ResearchPlanError, "禁止 JSON 浮点数"):
             prepare(floating)
 
+        integer_cpu = valid_plan_payload()
+        integer_cpu["resourceBudget"]["cpuCores"] = 1
+        with self.assertRaisesRegex(ResearchPlanError, "字符串化十进制定点"):
+            prepare(integer_cpu)
+
         over_budget = valid_plan_payload()
         over_budget["resourceBudget"]["wallClockSeconds"] = 7201
         with self.assertRaisesRegex(ResearchPlanBudgetError, "超过服务器上限"):
@@ -317,6 +323,172 @@ class ResearchOrchestrationTest(unittest.TestCase):
                 )
             )
         self.assertEqual(invalidations, 1)
+
+    def test_duplicate_approval_cannot_override_an_earlier_stop(self) -> None:
+        prepared = prepare()
+        issue = IssueSnapshot(number=90311, state="OPEN", body=issue_body(valid_plan_payload()))
+        approval = CommentSnapshot(
+            id=9031100,
+            author_login="Jettlin927",
+            body=prepared.approval_comment,
+        )
+        stop = CommentSnapshot(
+            id=9031101,
+            author_login="Jettlin927",
+            body=prepared.stop_comment,
+        )
+        duplicate = CommentSnapshot(
+            id=9031102,
+            author_login="Jettlin927",
+            body=prepared.approval_comment,
+        )
+        with self.Session.begin() as db:
+            result = apply_issue_plan(
+                db,
+                issue,
+                [approval, stop, duplicate],
+                prepared,
+                app_git_commit=APP_COMMIT,
+                app_git_ref="refs/heads/main",
+                authorization_write_confirmed=True,
+                now=NOW,
+            )
+        self.assertEqual(result.state, "stopped")
+        with self.Session() as db:
+            formal = db.scalar(select(FormalResearch))
+            persisted_approval = formal.approval_id
+            self.assertEqual(
+                db.scalar(select(ResearchWorkItem.status)),
+                "interrupted",
+            )
+            self.assertEqual(
+                db.scalar(
+                    select(ResearchEvent.payload_json).where(
+                        ResearchEvent.event_type == "plan_approved"
+                    )
+                )["approvalCommentId"],
+                approval.id,
+            )
+            self.assertIsNotNone(persisted_approval)
+
+    def test_duplicate_approval_cannot_replace_deleted_bound_approval(self) -> None:
+        prepared = prepare()
+        issue = IssueSnapshot(number=90313, state="OPEN", body=issue_body(valid_plan_payload()))
+        original = CommentSnapshot(
+            id=9031300,
+            author_login="Jettlin927",
+            body=prepared.approval_comment,
+        )
+        with self.Session.begin() as db:
+            apply_issue_plan(
+                db,
+                issue,
+                [original],
+                prepared,
+                app_git_commit=APP_COMMIT,
+                app_git_ref="refs/heads/main",
+                authorization_write_confirmed=True,
+                now=NOW,
+            )
+        replacement = CommentSnapshot(
+            id=9031301,
+            author_login="Jettlin927",
+            body=prepared.approval_comment,
+        )
+        with self.Session.begin() as db:
+            result = apply_issue_plan(
+                db,
+                issue,
+                [replacement],
+                prepared,
+                app_git_commit=APP_COMMIT,
+                app_git_ref="refs/heads/main",
+                authorization_write_confirmed=True,
+                now=NOW + timedelta(minutes=1),
+            )
+        self.assertEqual(result.state, "blocked")
+        self.assertFalse(result.approval_found)
+
+    def test_summary_edit_before_approval_remains_pending(self) -> None:
+        payload = valid_plan_payload()
+        prepared = prepare(payload)
+        original = IssueSnapshot(number=90314, state="OPEN", body=issue_body(payload))
+        with self.Session.begin() as db:
+            first = apply_issue_plan(
+                db,
+                original,
+                [],
+                prepared,
+                app_git_commit=APP_COMMIT,
+                app_git_ref="refs/heads/main",
+                authorization_write_confirmed=False,
+                now=NOW,
+            )
+        self.assertEqual(first.state, "pending_approval")
+        edited = IssueSnapshot(
+            number=original.number,
+            state="OPEN",
+            body=original.body.replace("固定研究计划。", "批准前补充的中文摘要。"),
+        )
+        with self.Session.begin() as db:
+            second = apply_issue_plan(
+                db,
+                edited,
+                [],
+                prepared,
+                app_git_commit=APP_COMMIT,
+                app_git_ref="refs/heads/main",
+                authorization_write_confirmed=False,
+                now=NOW + timedelta(minutes=1),
+            )
+        self.assertEqual(second.state, "pending_approval")
+        with self.Session() as db:
+            self.assertFalse(db.scalar(select(ResearchOrchestration.approval_invalidated)))
+
+    def test_editing_chinese_summary_invalidates_same_machine_plan(self) -> None:
+        payload = valid_plan_payload()
+        prepared = prepare(payload)
+        original = IssueSnapshot(number=90312, state="OPEN", body=issue_body(payload))
+        comments = [
+            CommentSnapshot(
+                id=9031200,
+                author_login="Jettlin927",
+                body=prepared.approval_comment,
+            )
+        ]
+        with self.Session.begin() as db:
+            apply_issue_plan(
+                db,
+                original,
+                comments,
+                prepared,
+                app_git_commit=APP_COMMIT,
+                app_git_ref="refs/heads/main",
+                authorization_write_confirmed=True,
+                now=NOW,
+            )
+
+        edited = IssueSnapshot(
+            number=original.number,
+            state="OPEN",
+            body=original.body.replace("固定研究计划。", "已编辑的中文摘要。"),
+        )
+        with self.Session.begin() as db:
+            result = apply_issue_plan(
+                db,
+                edited,
+                comments,
+                prepared,
+                app_git_commit=APP_COMMIT,
+                app_git_ref="refs/heads/main",
+                authorization_write_confirmed=True,
+                now=NOW + timedelta(minutes=1),
+            )
+        self.assertEqual(result.state, "blocked")
+        self.assertIn("永久失效", result.reason)
+        with self.Session() as db:
+            self.assertTrue(db.scalar(select(ResearchOrchestration.approval_invalidated)))
+            self.assertEqual(db.scalar(select(ResearchWorkItem.status)), "interrupted")
 
     def test_invalid_edit_before_formal_creation_cannot_revive_old_approval(self) -> None:
         prepared = prepare()
@@ -957,6 +1129,137 @@ class ResearchWorkerTest(unittest.TestCase):
             run = db.get(ResearchRun, recovered.resume_run_id)
             self.assertEqual(run.status, "interrupted")
             self.assertIn("租约过期", run.error)
+
+    def test_expired_lease_reconciles_terminal_run_without_duplicate_execution(self) -> None:
+        prepared, _issue, _comments, _ = approved_issue_graph(self.Session, issue_number=9111)
+        claim = research_worker.claim_next_research_work(
+            "worker-before-terminal-crash",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW,
+            lease_seconds=10,
+        )
+        self.assertEqual(research_worker._mark_work_running(claim, self.Session, NOW), "running")
+        run_id = "20000000-0000-0000-0000-000000000111"
+        with self.Session.begin() as db:
+            db.add(
+                ResearchRun(
+                    run_id=run_id,
+                    formal_research_id=claim.formal_research_id,
+                    strategy_id=prepared.normalized["strategy"]["id"],
+                    status="succeeded",
+                    stage="finalize",
+                    config=prepared.normalized["runConfig"],
+                    config_sha256="d" * 64,
+                    code_commit=APP_COMMIT,
+                    environment_sha256="e" * 64,
+                    random_seed=7,
+                    metrics={},
+                    result_fingerprint="f" * 64,
+                    artifact_root="outputs/research-runs/runs/20000000-0000-0000-0000-000000000111",
+                    started_at=NOW,
+                    heartbeat_at=NOW,
+                    finished_at=NOW + timedelta(seconds=1),
+                )
+            )
+
+        duplicate = research_worker.claim_next_research_work(
+            "worker-after-terminal-crash",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW + timedelta(seconds=11),
+            lease_seconds=30,
+        )
+        self.assertIsNone(duplicate)
+        with self.Session() as db:
+            work = db.get(ResearchWorkItem, claim.work_item_id)
+            formal = db.get(FormalResearch, claim.formal_research_id)
+            self.assertEqual(work.status, "succeeded")
+            self.assertEqual(work.current_run_id, run_id)
+            self.assertEqual(formal.phase, "evaluating")
+            self.assertEqual(db.scalar(select(func.count()).select_from(ResearchRun)), 1)
+
+    def test_expired_lease_blocks_terminal_failure_without_blind_retry(self) -> None:
+        prepared, _issue, _comments, _ = approved_issue_graph(self.Session, issue_number=9112)
+        claim = research_worker.claim_next_research_work(
+            "worker-before-failure-crash",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW,
+            lease_seconds=10,
+        )
+        self.assertEqual(research_worker._mark_work_running(claim, self.Session, NOW), "running")
+        run_id = "20000000-0000-0000-0000-000000000112"
+        with self.Session.begin() as db:
+            db.add(
+                ResearchRun(
+                    run_id=run_id,
+                    formal_research_id=claim.formal_research_id,
+                    strategy_id=prepared.normalized["strategy"]["id"],
+                    status="failed",
+                    stage="simulation",
+                    config=prepared.normalized["runConfig"],
+                    config_sha256="d" * 64,
+                    code_commit=APP_COMMIT,
+                    environment_sha256="e" * 64,
+                    random_seed=7,
+                    metrics={},
+                    error="ValueError: 确定性错误",
+                    artifact_root="outputs/research-runs/runs/20000000-0000-0000-0000-000000000112",
+                    started_at=NOW,
+                    heartbeat_at=NOW,
+                    finished_at=NOW + timedelta(seconds=1),
+                )
+            )
+
+        retry = research_worker.claim_next_research_work(
+            "worker-after-failure-crash",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW + timedelta(seconds=11),
+            lease_seconds=30,
+        )
+        self.assertIsNone(retry)
+        with self.Session() as db:
+            work = db.get(ResearchWorkItem, claim.work_item_id)
+            orchestration = db.get(ResearchOrchestration, claim.orchestration_id)
+            self.assertEqual(work.status, "failed")
+            self.assertEqual(orchestration.state, "blocked")
+            self.assertEqual(db.scalar(select(func.count()).select_from(ResearchRun)), 1)
+
+    def test_heartbeat_failure_retries_instead_of_becoming_user_stop(self) -> None:
+        approved_issue_graph(self.Session, issue_number=9113)
+        claim = research_worker.claim_next_research_work(
+            "worker-heartbeat-failure",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW,
+            lease_seconds=30,
+        )
+
+        def wait_for_heartbeat(_claim, stop_event):
+            self.assertTrue(stop_event.wait(timeout=1))
+            raise research_worker.ResearchStopRequested("在安全点停止")
+
+        with patch.object(
+            research_worker,
+            "heartbeat_research_work",
+            side_effect=RuntimeError("临时数据库断连"),
+        ):
+            outcome = research_worker.execute_claimed_research_work(
+                claim,
+                executor=wait_for_heartbeat,
+                session_factory=self.Session,
+                heartbeat_interval_seconds=0.01,
+                lease_seconds=30,
+            )
+        self.assertEqual(outcome, "retrying")
+        with self.Session() as db:
+            self.assertEqual(db.get(ResearchWorkItem, claim.work_item_id).status, "queued")
+            self.assertEqual(
+                db.get(ResearchOrchestration, claim.orchestration_id).state,
+                "queued",
+            )
 
     def test_expired_final_attempt_becomes_blocked_instead_of_sticking(self) -> None:
         payload = valid_plan_payload()

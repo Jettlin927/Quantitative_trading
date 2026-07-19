@@ -114,8 +114,11 @@ class ResearchManifestTest(unittest.TestCase):
         self.assertIn("RESEARCH_ARTIFACT_VOLUME:-quant_research_artifacts", compose)
         self.assertIn("set_deploy_identity", deploy)
         self.assertIn("git merge-base --is-ancestor", deploy)
+        self.assertIn("git status --porcelain --untracked-files=all", deploy)
         self.assertIn('resolved_ref="refs/unverified"', deploy)
         self.assertNotIn('export APP_GIT_REF="refs/heads/$BRANCH"', deploy)
+        research_worker = compose.split("  research-worker:", 1)[1].split("\n  frontend:", 1)[0]
+        self.assertNotIn("- .:/app", research_worker)
 
 
 if __name__ == "__main__":
