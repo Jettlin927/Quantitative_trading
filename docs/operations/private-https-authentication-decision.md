@@ -2,6 +2,8 @@
 
 关联：[调研决策：私有 HTTPS 入口的身份认证方案](https://github.com/Jettlin927/Quantitative_trading/issues/15)、[运维：建设私有 HTTPS 研究前端入口](https://github.com/Jettlin927/Quantitative_trading/issues/25)。
 
+实施入口：[私有 HTTPS 研究前端入口手册](private-https-entry.md)。
+
 ## 一句话结论
 
 采用 **Cloudflare Tunnel + Cloudflare Access**：新服务器只运行一个出站连接的 `cloudflared`，Access 仅允许一个明确身份并强制独立 MFA；前端、API 与 PostgreSQL 继续不暴露公网，SSH 隧道保留为独立恢复通道，上线仍须用户批准域名、Cloudflare 控制面和生产配置。

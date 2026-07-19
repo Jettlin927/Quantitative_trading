@@ -19,6 +19,7 @@ yarn-error.log*
 
 # Docker and local runtime noise
 docker-compose.server.yml
+docker-compose.private-https.yml
 *.log
 *.tmp
 artifacts/

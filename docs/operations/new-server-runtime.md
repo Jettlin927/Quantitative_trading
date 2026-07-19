@@ -17,6 +17,7 @@
 | `/srv/quantitative-trading/postgres` | PostgreSQL 数据根 | `root:root 0700`，未来由受控恢复流程初始化 |
 | `/srv/quantitative-trading/research-artifacts` | canonical 研究工件 | 运行用户 `0750` |
 | `/srv/quantitative-trading/backups/{daily,weekly,monthly}` | 本地备份分层 | `root:root 0700` |
+| `/srv/quantitative-trading/secrets` | 后续私有 HTTPS 文件凭据目录 | `root:root 0700`；由 #25 获批后的交互式脚本创建 |
 | `/opt/quantitative-trading` | 未来应用 checkout | 运行用户 `0755` |
 | `/opt/quantitative-trading-releases` | 不可变发布版本 | 运行用户 `0755` |
 | `/opt/quantitative-trading-bootstrap` | 仅用于 Compose 解析验收 | 运行用户 `0755` |
@@ -33,6 +34,8 @@ critical 数据使用显式 bind mount，并设置 `create_host_path: false`；�
 | API | 0.45 | 640MiB | 256 |
 | 数据 Worker | 0.35 | 512MiB | 256 |
 | 前端 | 0.25 | 384MiB | 128 |
+
+获批启用[私有 HTTPS 入口](private-https-entry.md)后，可选 `cloudflared` 增加 0.15 CPU、192MiB 和 64 PID，当前五个服务预置上限合计为 1.95 CPU / 3008MiB。这一上限仍需在空闲、登录、持续访问和重连场景实测；未通过前不能写成生产容量已验收。
 
 镜像构建、数据恢复、migration 和正式研究不得并行。Compose 的 `cpus`、`mem_limit` 和 `pids_limit` 语义以 [Compose services 规范](https://docs.docker.com/reference/compose-file/services/)为准。容器与 daemon 日志均使用 `json-file`，单文件 10MiB、最多 3 份；配置依据 [Docker 日志轮转说明](https://docs.docker.com/engine/logging/drivers/json-file/)。
 
