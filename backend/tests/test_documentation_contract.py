@@ -93,6 +93,15 @@ class DocumentationContractTest(unittest.TestCase):
         implementation = (REPO_ROOT / "backend" / "app" / "strategy_results.py").read_text(encoding="utf-8")
         self.assertIn('repo_root / "docs" / "research" / "strategy-results"', implementation)
 
+    def test_strategy_conclusion_terms_match_the_domain_contract(self) -> None:
+        standard = (
+            DOCS_ROOT / "research" / "contracts" / "strategy-evaluation-standard.md"
+        ).read_text(encoding="utf-8")
+        for conclusion in ("研究通过", "有条件候选", "证据不足", "受阻", "不通过"):
+            with self.subTest(conclusion=conclusion):
+                self.assertIn(f"| `{conclusion}` |", standard)
+        self.assertNotIn("| `blocked` |", standard)
+
     def test_all_local_markdown_links_resolve(self) -> None:
         markdown_files = [
             REPO_ROOT / "README.md",
