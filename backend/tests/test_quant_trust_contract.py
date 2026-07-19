@@ -14,8 +14,8 @@ from backend.app.quant_research.portfolio import CostModel, simulate_target_weig
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "quant_research_golden"
 REPO_ROOT = Path(__file__).parents[2]
-CONTRACT_PATH = REPO_ROOT / "docs" / "research" / "quant-foundation-trust-contract.md"
-STRATEGY_STANDARD_PATH = REPO_ROOT / "docs" / "research" / "strategy-evaluation-standard.md"
+CONTRACT_PATH = REPO_ROOT / "docs" / "research" / "contracts" / "quant-foundation-trust-contract.md"
+STRATEGY_STANDARD_PATH = REPO_ROOT / "docs" / "research" / "contracts" / "strategy-evaluation-standard.md"
 AGENTS_PATH = REPO_ROOT / "AGENTS.md"
 RESEARCH_README_PATH = REPO_ROOT / "docs" / "research" / "README.md"
 
@@ -79,7 +79,7 @@ class QuantTrustContractDocumentationTest(unittest.TestCase):
         research_readme = RESEARCH_README_PATH.read_text(encoding="utf-8")
         standard = STRATEGY_STANDARD_PATH.read_text(encoding="utf-8")
 
-        standard_relative_path = "docs/research/strategy-evaluation-standard.md"
+        standard_relative_path = "docs/research/contracts/strategy-evaluation-standard.md"
         self.assertIn(standard_relative_path, agents)
         self.assertIn("不得只凭累计收益、年化收益或 Sharpe", agents)
         self.assertIn("内部编号代替名称", agents)

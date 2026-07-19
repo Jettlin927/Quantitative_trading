@@ -58,7 +58,7 @@
 - 解决决策票时，先发布结论评论，再关闭票据，最后把结论摘要和链接追加到地图的“已决策”部分。
 - 所有面向用户的叙述以 Issue 标题称呼决策，不使用裸编号代替名称。
 
-当前主地图是 [寻路地图：量化研究自动化、研究驾驶舱与新服务器迁移](https://github.com/Jettlin927/Quantitative_trading/issues/3)，普通工程任务由 [第一阶段实施总览：量化研究自动化、研究驾驶舱与新服务器](https://github.com/Jettlin927/Quantitative_trading/issues/17) 承接。
+当前主地图是 [寻路地图：量化研究自动化、研究驾驶舱与新服务器迁移](https://github.com/Jettlin927/Quantitative_trading/issues/3)，普通工程任务由 [第一阶段实施总览：量化研究自动化、研究驾驶舱与新服务器](https://github.com/Jettlin927/Quantitative_trading/issues/17) 承接。具体策略研究先读 `docs/research/contracts/strategy-evaluation-standard.md`。
 
 ## 发布到 Issue tracker
 
