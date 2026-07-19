@@ -4,5 +4,6 @@
 
 - [生产 PostgreSQL 迁移确认单（2026-07-11）](2026-07-11-production-migration-approval.md)
 - [生产可信性验收（2026-07-12）](2026-07-12-production-trustworthiness-acceptance.md)
+- [研究历史迁移隔离演练（2026-07-19）](2026-07-19-research-history-migration-rehearsal.md)
 
 修正历史证据时新增明确替代版本，不静默覆盖旧文件。

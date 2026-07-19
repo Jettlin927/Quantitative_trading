@@ -13,10 +13,12 @@ from backend.app import main
 from backend.app.database import Base
 from backend.app.models import (
     FOLLOW_UP_PROPOSAL_STATUS_VALUES,
+    FORMAL_RESEARCH_ORIGIN_VALUES,
     FORMAL_RESEARCH_PHASE_VALUES,
     PUBLICATION_STATUS_VALUES,
     RESEARCH_CONCLUSION_VALUES,
     RESEARCH_RUN_STATUS_VALUES,
+    RESEARCH_PLAN_ACTION_VALUES,
     STRATEGY_LIFECYCLE_VALUES,
     FollowUpResearchProposal,
     FormalResearch,
@@ -193,6 +195,12 @@ class ResearchDomainTest(unittest.TestCase):
         self.assertEqual(FORMAL_RESEARCH_PHASE_VALUES, {"approved", "active", "evaluating", "published", "stopped"})
         self.assertEqual(PUBLICATION_STATUS_VALUES, {"pending", "published", "failed"})
         self.assertEqual(FOLLOW_UP_PROPOSAL_STATUS_VALUES, {"proposed", "accepted", "rejected", "converted"})
+        self.assertEqual(
+            RESEARCH_PLAN_ACTION_VALUES,
+            {"approved", "invalidated", "stopped", "historical_import"},
+        )
+        self.assertEqual(FORMAL_RESEARCH_ORIGIN_VALUES, {"native", "historical_import"})
+        self.assertEqual(ResearchPlanApproval.__table__.c.action.type.length, 24)
         self.assertTrue(RESEARCH_RUN_STATUS_VALUES.isdisjoint(STRATEGY_LIFECYCLE_VALUES))
         self.assertTrue(RESEARCH_RUN_STATUS_VALUES.isdisjoint(RESEARCH_CONCLUSION_VALUES))
 
@@ -299,6 +307,9 @@ class ResearchDomainTest(unittest.TestCase):
         self.assertEqual([item.strategy_id for item in listed], ["sentinel_etf_baseline"])
         self.assertEqual(profile.formal_researches[0].latest_publication_conclusion, "证据不足")
         self.assertEqual(research.plan.plan_sha256, "a" * 64)
+        self.assertEqual(research.origin, "native")
+        self.assertEqual(research.approval.action, "approved")
+        self.assertIsNone(research.approval.source_uri)
         self.assertEqual([run.run_id for run in research.runs], [
             "20000000-0000-0000-0000-000000000001",
             "20000000-0000-0000-0000-000000000002",
@@ -349,6 +360,27 @@ class ResearchDomainTest(unittest.TestCase):
         self.assertIn("sa.Uuid(as_uuid=False)", source)
         self.assertIn("禁止自动降级", source)
         self.assertNotIn("op.drop_table", source)
+
+    def test_0008_migration_keeps_history_import_distinct_from_approval(self) -> None:
+        migration_path = (
+            Path(__file__).resolve().parents[1]
+            / "migrations"
+            / "versions"
+            / "0008_research_history_provenance.py"
+        )
+        source = migration_path.read_text(encoding="utf-8")
+        self.assertIn('down_revision = "0007_research_domain"', source)
+        self.assertIn("historical_import", source)
+        self.assertIn("source_uri", source)
+        self.assertIn("ensure_formal_research_origin_consistency", source)
+        self.assertIn("ensure_historical_run_link_consistency", source)
+        self.assertIn("ck_formal_researches_historical_phase", source)
+        self.assertIn("NEW.origin = 'native' AND approval.action = 'approved'", source)
+        self.assertIn("NEW.origin = 'historical_import'", source)
+        self.assertIn("historical research cannot authorize new or mismatched run", source)
+        self.assertIn("historical research run is immutable", source)
+        self.assertIn("formal research identity is immutable", source)
+        self.assertIn("禁止自动降级", source)
 
 
 if __name__ == "__main__":

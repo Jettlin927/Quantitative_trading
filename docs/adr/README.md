@@ -7,3 +7,4 @@
 - [GitHub 控制研究，服务器执行研究](0003-github-controls-server-executes.md)
 - [已发布研究不可覆盖](0004-published-research-is-immutable.md)
 - [新服务器通过并行验收接替生产](0005-new-server-replaces-production-safely.md)
+- [历史研究导入是来源记录，不是研究批准](0006-history-import-is-provenance-not-approval.md)
