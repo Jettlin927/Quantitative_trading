@@ -78,6 +78,7 @@ jobs:
         run: |
           docker compose config >/dev/null
           docker compose --file docker-compose.test.yml config >/dev/null
+          scripts/ops/test_new_server_runtime.sh
       - name: 运维 Shell 语法
         shell: bash
         run: |
