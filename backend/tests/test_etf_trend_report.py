@@ -66,19 +66,27 @@ class EtfTrendReportTest(unittest.TestCase):
         self.assertEqual(summary["period"]["formalStart"], "2012-11-19")
         self.assertEqual(summary["period"]["formalEnd"], "2026-06-29")
         self.assertEqual(summary["period"]["openDays"], 3303)
+        self.assertEqual(summary["period"]["returnObservations"], 3303)
         self.assertTrue(summary["period"]["yearRowsAreSubperiods"])
+        self.assertEqual(summary["researchDate"], "2026-07-13")
+        self.assertEqual(
+            summary["reportGeneratedAt"],
+            "2026-07-19T04:05:03+08:00",
+        )
         self.assertAlmostEqual(
             comparison["base_cost"]["finalCapital"], 100_682.99208697966
         )
-        self.assertAlmostEqual(comparison["base_cost"]["cagr"], 0.0005196046812980804)
+        self.assertAlmostEqual(comparison["base_cost"]["cagr"], 0.0005194473274949818)
         self.assertAlmostEqual(comparison["base_cost"]["maxDrawdown"], -0.52818204070411)
-        self.assertAlmostEqual(comparison["passive"]["finalCapital"], 284_968.2040816326)
-        self.assertAlmostEqual(comparison["passive"]["totalReturn"], 1.849682040816326)
-        self.assertAlmostEqual(comparison["passive"]["cagr"], 0.08320054946592181)
-        self.assertAlmostEqual(comparison["static"]["finalCapital"], 173_338.92156242114)
+        self.assertAlmostEqual(comparison["passive"]["finalCapital"], 285_097.5)
+        self.assertAlmostEqual(comparison["passive"]["totalReturn"], 1.850975)
+        self.assertAlmostEqual(comparison["passive"]["cagr"], 0.08321182802874971)
+        self.assertAlmostEqual(comparison["static"]["finalCapital"], 173_370.09631649856)
         self.assertEqual(comparison["passive"]["informationRatioDisplay"], "not_applicable")
         self.assertAlmostEqual(summary["targetGap"]["targetCagr"], 0.5)
-        self.assertAlmostEqual(summary["targetGap"]["metricYears"], 3302 / 252)
+        self.assertAlmostEqual(summary["targetGap"]["metricYears"], 3303 / 252)
+        self.assertEqual(summary["hacAlpha"]["observations"], 3303)
+        self.assertIn("strategyLag1Autocorrelation", summary["hacAlpha"])
 
     def test_report_preserves_cost_reproduction_and_coverage_evidence(self):
         summary = json.loads((REPORT_DIR / "summary.json").read_text(encoding="utf-8"))
@@ -95,7 +103,23 @@ class EtfTrendReportTest(unittest.TestCase):
         self.assertTrue(yearly[2026]["coverage"].startswith("部分年度"))
         self.assertTrue(summary["reproduction"]["allMatched"])
         self.assertTrue(summary["reproduction"]["networkDisabled"])
+        self.assertEqual(summary["reproduction"]["baseRepeatedMatches"], 2)
+        self.assertEqual(summary["reproduction"]["zeroCostMatches"], 2)
+        self.assertEqual(summary["reproduction"]["doubleCostMatches"], 2)
+        self.assertEqual(summary["reproductionAudit"]["runCount"], 3)
+        self.assertEqual(
+            summary["reproductionAudit"]["evidenceFile"],
+            "reproduction-evidence-20260719.json",
+        )
         self.assertEqual(len(summary["runIdentities"]), 3)
+        self.assertEqual(
+            {row["runId"] for row in summary["runIdentities"]},
+            {
+                "73c82e27-754f-4f6a-bc85-4fc43c4b5be3",
+                "0e3af953-a064-4db2-beb3-0a84416f6ce8",
+                "7d5e9489-78dc-4b32-94a7-b264c16be486",
+            },
+        )
 
 
 if __name__ == "__main__":

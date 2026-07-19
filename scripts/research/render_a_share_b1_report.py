@@ -21,13 +21,17 @@ from backend.app.quant_research.reporting import (
     summarize_return_subperiod,
     tail_metrics,
 )
+from scripts.research.report_evidence import (
+    canonical_report_timestamp,
+    verify_reproduction_evidence,
+)
 
 
 DEFAULT_RUN_ROOT = (
     REPO_ROOT
     / "outputs"
     / "research-runs"
-    / "b1-trend-pullback-2026-07-13"
+    / "b1-trend-pullback-2026-07-19-final"
     / "canonical-runs"
 )
 DEFAULT_OUTPUT_DIR = (
@@ -36,6 +40,13 @@ DEFAULT_OUTPUT_DIR = (
     / "research"
     / "strategy-results"
     / "a-share-b1-trend-pullback-20260713"
+)
+DEFAULT_REPRODUCTION_EVIDENCE = (
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "strategy-results"
+    / "reproduction-evidence-20260719.json"
 )
 INITIAL_CAPITAL = 100_000.0
 SOURCE_URL = (
@@ -83,13 +94,6 @@ SCENARIO_CONFIGS = {
     "long_t3_off": "a_share_b1_long_history_declared_t3_off.json",
     "long_double_cost": "a_share_b1_long_history_double_cost.json",
 }
-REPRODUCED_RUN_IDS = {
-    "211cc331-6ce7-4cbf-b6b2-342d2b3cfed5",
-    "4b53b659-d837-447e-8e8c-67a8fe3e7a76",
-    "a2629d76-3c59-49ff-b404-b5f343f9c49a",
-    "5b277c7c-cc0e-4dc0-a7b3-ea004b052743",
-    "3f180631-8043-4cab-898e-fce3b5277039",
-}
 STRESS_WINDOWS = (
     ("2015至2016急跌", "2015-06-12", "2016-02-29"),
     ("2018全年", "2018-01-01", "2018-12-31"),
@@ -103,10 +107,19 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="从五个 canonical 运行生成 B1 趋势回调研究报告。")
     parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--reproduction-evidence",
+        type=Path,
+        default=DEFAULT_REPRODUCTION_EVIDENCE,
+    )
     args = parser.parse_args(argv)
 
     runs = load_runs(args.run_root)
-    summary, charts = build_summary(runs)
+    reproduction_audit = verify_reproduction_evidence(
+        args.reproduction_evidence,
+        runs,
+    )
+    summary, charts = build_summary(runs, reproduction_audit)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     summary_path = args.output_dir / "summary.json"
     report_path = args.output_dir / "index.html"
@@ -242,13 +255,13 @@ def load_runs(run_root: Path) -> dict[str, dict[str, Any]]:
         }
         if len(snapshots) != 1 or len(periods) != 1:
             raise ValueError("同周期场景没有绑定同一日期与数据快照")
-    actual_run_ids = {run["manifest"]["runId"] for run in runs.values()}
-    if actual_run_ids != REPRODUCED_RUN_IDS:
-        raise ValueError("报告运行 ID 与已断网复现集合不一致")
     return runs
 
 
-def build_summary(runs: dict[str, dict[str, Any]]) -> tuple[dict[str, Any], dict[str, str]]:
+def build_summary(
+    runs: dict[str, dict[str, Any]],
+    reproduction_audit: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, str]]:
     navs = {label: _load_nav(run) for label, run in runs.items()}
     benchmarks = {
         "source": _load_benchmark_nav(runs["source_ideal"]),
@@ -363,6 +376,8 @@ def build_summary(runs: dict[str, dict[str, Any]]) -> tuple[dict[str, Any], dict
         "title": "A股 B1 趋势回调公开规则近似复现",
         "status": status,
         "researchDate": "2026-07-13",
+        "reportGeneratedAt": canonical_report_timestamp(runs),
+        "reproductionAudit": reproduction_audit,
         "initialCapital": INITIAL_CAPITAL,
         "oneSentenceConclusion": "未数值复现原网页，且可信长历史主版本把10万元降至约2.66万元；当前代理规则不值得继续调参，更不具备部署条件。",
         "period": {
@@ -498,7 +513,7 @@ def build_summary(runs: dict[str, dict[str, Any]]) -> tuple[dict[str, Any], dict
             "sourceRisk": "无法判断：原网页没有披露候选因子、参数和回测筛选次数，无法排除来源侧过拟合。",
         },
         "supportingEvidence": [
-            "数据质量、point-in-time历史成员、可交易性、执行账本和五份断网复现全部闭合。",
+            f"数据质量、point-in-time历史成员、可交易性、执行账本和{reproduction_audit['runCount']}份断网复现全部闭合。",
             "网页机械口径对照在同周期仍取得17.45%累计收益，说明固定代理规则并非完全没有捕捉到短期机会。",
             "11个walk-forward测试窗中前两个为正且跑赢基准，表明2014至2016阶段曾出现有效期。",
         ],
@@ -561,9 +576,10 @@ def build_summary(runs: dict[str, dict[str, Any]]) -> tuple[dict[str, Any], dict
         },
         "runIdentities": run_identities,
         "reproduction": {
-            "networkDisabled": True,
-            "allMatched": True,
-            "matchedRunCount": len(REPRODUCED_RUN_IDS),
+            "networkDisabled": reproduction_audit["networkDisabled"],
+            "allMatched": reproduction_audit["allMatched"],
+            "matchedRunCount": reproduction_audit["runCount"],
+            "matchesPerRun": reproduction_audit["matchesPerRun"],
         },
     }
 
@@ -1490,12 +1506,12 @@ def render_html(summary: dict[str, Any], charts: dict[str, str]) -> str:
   </section>
 
   <section>
-    <div class="section-head"><div><span class="eyebrow">DATA & REPRODUCTION</span><h2>数据质量与复现身份</h2></div><p>五份运行均在断网容器中从冻结输入重新计算，结果指纹全部匹配。</p></div>
+    <div class="section-head"><div><span class="eyebrow">DATA & REPRODUCTION</span><h2>数据质量与复现身份</h2></div><p>审计文件 <code>{escape(summary["reproductionAudit"]["evidenceFile"])}</code> 已校验 {summary["reproductionAudit"]["runCount"]} 份运行在镜像 <code>{escape(summary["reproductionAudit"]["imageDigest"])}</code>、禁用网络条件下连续 {summary["reproductionAudit"]["matchesPerRun"]} 轮结果指纹。</p></div>
     <div class="split"><div><h3>质量门禁</h3><p>状态 <code>{escape(summary["dataEvidence"]["qualityStatus"])}</code>；通过规则 {summary["dataEvidence"]["passedRules"]}；失败规则 {summary["dataEvidence"]["failedRules"]}。</p><p>quality run <code>{escape(summary["quality"]["qualityRunId"])}</code><br>snapshot <code>{escape(summary["quality"]["snapshotId"])}</code><br>code <code>{escape(summary["quality"]["codeCommit"])}</code><br>schema <code>{escape(summary["quality"]["schemaRevision"])}</code></p><h3>显式warning</h3><ul>{warning_items}</ul></div><div><h3>停止条件</h3>{_list(summary["stopConditions"])}<h3>过拟合语义</h3><p>{escape(summary["overfitting"]["dsr"])}</p><p>{escape(summary["overfitting"]["pbo"])}</p><p>{escape(summary["overfitting"]["sourceRisk"])}</p></div></div>
     <div class="table-wrap">{reproduction}</div>
   </section>
 
-  <footer class="footer">REPORT_ID {escape(summary["reportId"])} · RESEARCH ONLY · NOT INVESTMENT ADVICE · 生成日期 {escape(summary["researchDate"])} · 所有金额按¥100,000统一展示</footer>
+  <footer class="footer">REPORT_ID {escape(summary["reportId"])} · RESEARCH ONLY · NOT INVESTMENT ADVICE · 报告生成 {escape(summary["reportGeneratedAt"])} · 所有金额按¥100,000统一展示</footer>
 </main></body></html>'''
 
 

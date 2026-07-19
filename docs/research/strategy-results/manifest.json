@@ -17,7 +17,8 @@
       "conclusion": "两个主策略均未通过最大回撤与风险调整收益门禁；低波动准入还是同一 OOS 上的事后第五个研究假设。",
       "artifacts": {
         "reportHtml": "etf-volatility-managed-20260713/index.html",
-        "summaryJson": "etf-volatility-managed-20260713/summary.json"
+        "summaryJson": "etf-volatility-managed-20260713/summary.json",
+        "reproductionEvidence": "reproduction-evidence-20260719.json"
       }
     },
     {
@@ -26,13 +27,14 @@
       "strategy": "月末 120 日均线趋势开关",
       "status": "不通过",
       "archiveClass": "current-trustworthy",
-      "updatedAt": "2026-07-13",
-      "dataRange": "2012-11-01 至 2026-06-29",
+      "updatedAt": "2026-07-19",
+      "dataRange": "2012-11-19 至 2026-06-29",
       "benchmark": "同一 ETF 因果复权被动持有及同平均暴露静态组合",
       "conclusion": "基础成本 CAGR 近乎为零且最大回撤差于两类基准；零成本结果也未扭转结论。",
       "artifacts": {
         "reportHtml": "etf-trend-120d-long-history-20260713/index.html",
-        "summaryJson": "etf-trend-120d-long-history-20260713/summary.json"
+        "summaryJson": "etf-trend-120d-long-history-20260713/summary.json",
+        "reproductionEvidence": "reproduction-evidence-20260719.json"
       }
     },
     {
@@ -41,13 +43,14 @@
       "strategy": "行业历史成员上的 B1 趋势回调代理规则",
       "status": "不通过",
       "archiveClass": "current-trustworthy",
-      "updatedAt": "2026-07-13",
-      "dataRange": "2011-07-01 至 2026-06-29",
-      "benchmark": "申万房地产行业代理基准；另与来源公布短区间做非等价对照",
+      "updatedAt": "2026-07-19",
+      "dataRange": "2012-06-26 至 2026-07-10",
+      "benchmark": "长历史使用沪深300指数；申万房地产行业代理基准缺失并保持 blocked；另与来源公布短区间做非等价对照",
       "conclusion": "未取得来源完整公式，不能声称精确复现；可信长历史主版本显著亏损，不值得继续在同一历史上调参。",
       "artifacts": {
         "reportHtml": "a-share-b1-trend-pullback-20260713/index.html",
-        "summaryJson": "a-share-b1-trend-pullback-20260713/summary.json"
+        "summaryJson": "a-share-b1-trend-pullback-20260713/summary.json",
+        "reproductionEvidence": "reproduction-evidence-20260719.json"
       }
     },
     {

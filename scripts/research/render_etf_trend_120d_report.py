@@ -22,6 +22,10 @@ from backend.app.quant_research.reporting import (
     summarize_return_subperiod,
     tail_metrics,
 )
+from scripts.research.report_evidence import (
+    canonical_report_timestamp,
+    verify_reproduction_evidence,
+)
 from scripts.research.render_etf_volatility_managed_report import (
     _aligned_returns,
     _build_passive_nav,
@@ -37,7 +41,7 @@ DEFAULT_RUN_ROOT = (
     REPO_ROOT
     / "outputs"
     / "research-runs"
-    / "trend-120d-2026-07-13"
+    / "trend-120d-2026-07-19-final"
     / "canonical-runs"
 )
 DEFAULT_OUTPUT_DIR = (
@@ -46,6 +50,13 @@ DEFAULT_OUTPUT_DIR = (
     / "research"
     / "strategy-results"
     / "etf-trend-120d-long-history-20260713"
+)
+DEFAULT_REPRODUCTION_EVIDENCE = (
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "strategy-results"
+    / "reproduction-evidence-20260719.json"
 )
 INITIAL_CAPITAL = 100_000.0
 SCENARIOS = {
@@ -75,10 +86,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--reproduction-evidence",
+        type=Path,
+        default=DEFAULT_REPRODUCTION_EVIDENCE,
+    )
     args = parser.parse_args(argv)
 
     runs = load_runs(args.run_root)
-    summary, charts = build_summary(runs)
+    reproduction_audit = verify_reproduction_evidence(
+        args.reproduction_evidence,
+        runs,
+    )
+    summary, charts = build_summary(runs, reproduction_audit)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     summary_path = args.output_dir / "summary.json"
     report_path = args.output_dir / "index.html"
@@ -173,6 +193,7 @@ def load_runs(run_root: Path) -> dict[str, dict[str, Any]]:
 
 def build_summary(
     runs: dict[str, dict[str, Any]],
+    reproduction_audit: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, str]]:
     base = runs["base_cost"]
     config = base["config"]
@@ -267,7 +288,7 @@ def build_summary(
     risk_on = int(targets["target_weight"].eq(1).sum())
     risk_off = int(targets["target_weight"].eq(0).sum())
     walk_wins = sum(row["strategyReturn"] > row["passiveReturn"] for row in walk_forward)
-    metric_years = (len(navs["base_cost"]) - 1) / 252
+    metric_years = len(returns) / 252
     target_final_capital = INITIAL_CAPITAL * (1.5**metric_years)
 
     run_identities = []
@@ -288,6 +309,8 @@ def build_summary(
         "title": "沪深300 ETF 120日均线趋势跟踪长历史验证",
         "status": status,
         "researchDate": "2026-07-13",
+        "reportGeneratedAt": canonical_report_timestamp(runs),
+        "reproductionAudit": reproduction_audit,
         "initialCapital": INITIAL_CAPITAL,
         "period": {
             "rawDataStart": config["warmupStart"],
@@ -412,11 +435,11 @@ def build_summary(
         },
         "runIdentities": run_identities,
         "reproduction": {
-            "baseRepeatedMatches": 2,
-            "zeroCostMatches": 1,
-            "doubleCostMatches": 1,
-            "networkDisabled": True,
-            "allMatched": True,
+            "baseRepeatedMatches": reproduction_audit["matchesPerRun"],
+            "zeroCostMatches": reproduction_audit["matchesPerRun"],
+            "doubleCostMatches": reproduction_audit["matchesPerRun"],
+            "networkDisabled": reproduction_audit["networkDisabled"],
+            "allMatched": reproduction_audit["allMatched"],
         },
     }
 
@@ -1240,12 +1263,12 @@ body:before{{content:"";position:fixed;inset:0;pointer-events:none;background:re
 
 <section class="section">
   <h2>数据质量与复现身份</h2>
-  <p class="note">质量运行 {escape(summary['quality']['qualityRunId'])}：{summary['quality']['passedRules']} 条通过、{summary['quality']['failedRules']} 条失败；三个运行共享快照 <code>{escape(summary['quality']['snapshotId'])}</code>。基础成本断网重复复现2次，零成本和双倍成本各1次，全部匹配。</p>
+  <p class="note">质量运行 {escape(summary['quality']['qualityRunId'])}：{summary['quality']['passedRules']} 条通过、{summary['quality']['failedRules']} 条失败；三个运行共享快照 <code>{escape(summary['quality']['snapshotId'])}</code>。审计文件 <code>{escape(summary['reproductionAudit']['evidenceFile'])}</code> 已校验三个运行在镜像 <code>{escape(summary['reproductionAudit']['imageDigest'])}</code>、禁用网络条件下连续 {summary['reproductionAudit']['matchesPerRun']} 轮结果指纹。</p>
   <div class="table-wrap">{identities}</div>
   <div class="callout"><strong>研究边界：</strong>离线模拟、无真实券商、无下单、无收益承诺。代码提交 <code>{escape(summary['quality']['codeCommit'])}</code>；生产schema revision <code>{escape(summary['quality']['schemaRevision'])}</code>。</div>
 </section>
 
-<footer class="footer">策略评价规范 1.0 · 初始本金统一为 ¥100,000 · 生成自 canonical 冻结工件</footer>
+<footer class="footer">策略评价规范 1.0 · 初始本金统一为 ¥100,000 · 报告生成 {escape(summary['reportGeneratedAt'])}</footer>
 </main></body></html>"""
 
 

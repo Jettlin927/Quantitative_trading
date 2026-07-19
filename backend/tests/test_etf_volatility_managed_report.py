@@ -13,6 +13,7 @@ from backend.app.quant_research.reporting import (
     probability_backtest_overfitting,
     summarize_return_subperiod,
 )
+from scripts.research.report_evidence import canonical_report_timestamp
 from scripts.research.render_etf_volatility_managed_report import (
     TRIAL_DISPLAY_NAMES,
     TRIAL_GLOSSARY,
@@ -25,6 +26,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class EtfVolatilityManagedReportTest(unittest.TestCase):
+    def test_report_timestamp_is_derived_from_canonical_manifests(self):
+        runs = {
+            "first": {"manifest": {"generatedAt": "2026-07-18T20:00:03+00:00"}},
+            "second": {"manifest": {"generatedAt": "2026-07-18T20:03:53+00:00"}},
+        }
+        gate_runs = {
+            "base": {"manifest": {"generatedAt": "2026-07-18T20:02:45+00:00"}}
+        }
+
+        self.assertEqual(
+            canonical_report_timestamp(runs, gate_runs),
+            "2026-07-19T04:03:53+08:00",
+        )
+
     def test_subperiod_drawdown_includes_the_first_return_from_initial_wealth(self):
         metrics = summarize_return_subperiod(
             pd.Series([-0.10, 0.05]),
@@ -108,6 +123,61 @@ class EtfVolatilityManagedReportTest(unittest.TestCase):
         self.assertEqual(len(followup["supportingEvidence"]), 3)
         self.assertEqual(len(followup["opposingEvidence"]), 3)
         self.assertEqual(len(followup["missingEvidence"]), 3)
+        self.assertEqual(followup["walkForward"]["positiveStrategySharpeWindows"], 3)
+        self.assertEqual(followup["walkForward"]["strategyBeatsPassiveSharpeWindows"], 2)
+
+    def test_report_is_bound_to_the_final_canonical_runs(self):
+        summary = json.loads(
+            (
+                REPO_ROOT
+                / "docs"
+                / "research"
+                / "strategy-results"
+                / "etf-volatility-managed-20260713"
+                / "summary.json"
+            ).read_text(encoding="utf-8")
+        )
+        expected_commit = "26da0d347d77de7ee03a95277fc4ad45bdaa983a"
+        expected_run_ids = {
+            "14f79545-0ea6-474c-8faa-2e83a016283b",
+            "164e3704-8f42-4072-aea1-d5b1532a3049",
+            "5d082e36-6ce0-4e02-8d43-d1b2686cf9dd",
+            "854aa0e6-672f-4d7c-b330-1f9586c507dd",
+            "b5cd6613-d822-434a-a913-983571708c78",
+            "f24663b1-4160-465f-b9e8-ea295c2407a0",
+        }
+
+        self.assertEqual(
+            {row["runId"] for row in summary["reproduction"].values()},
+            expected_run_ids,
+        )
+        self.assertTrue(
+            all(
+                row["codeCommit"] == expected_commit
+                for row in summary["reproduction"].values()
+            )
+        )
+        gate_runs = summary["lowVolatilityGateFollowup"]["reproduction"]
+        self.assertEqual(
+            {row["runId"] for row in gate_runs.values()},
+            {
+                "251662f5-def5-4228-9330-e68e13a47748",
+                "7e9ea891-45db-4885-9378-d27dadc58cb0",
+            },
+        )
+        self.assertTrue(
+            all(row["codeCommit"] == expected_commit for row in gate_runs.values())
+        )
+        self.assertEqual(
+            summary["reportGeneratedAt"],
+            "2026-07-19T04:03:53+08:00",
+        )
+        self.assertEqual(summary["researchDate"], "2026-07-13")
+        self.assertEqual(summary["reproductionAudit"]["runCount"], 8)
+        self.assertEqual(
+            summary["reproductionAudit"]["evidenceFile"],
+            "reproduction-evidence-20260719.json",
+        )
 
     def test_failed_report_does_not_promote_any_variant_to_candidate(self):
         report_dir = (

@@ -5,13 +5,26 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from backend.app.strategy_results import build_strategy_results_overview
+from backend.app.strategy_results import (
+    build_strategy_results_overview,
+    summarize_report,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class StrategyResultsTest(unittest.TestCase):
+    def test_research_date_is_not_report_generation_time(self):
+        summary = summarize_report(
+            {
+                "status": "不通过",
+                "researchDate": "2026-07-13",
+            }
+        )
+
+        self.assertIsNone(summary["reportGeneratedAt"])
+
     def test_builds_readonly_strategy_result_archive(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -221,6 +234,13 @@ class StrategyResultsTest(unittest.TestCase):
                     )
                 )
                 self.assertEqual(summary["status"], result["status"], result["id"])
+                self.assertEqual(
+                    result["artifacts"]["reproductionEvidence"],
+                    summary["reproductionAudit"]["evidenceFile"],
+                )
+                self.assertTrue(
+                    summary["reportGeneratedAt"].startswith("2026-07-19T")
+                )
 
         by_id = {result["id"]: result for result in manifest["resultSets"]}
         trend = by_id["etf-trend-120d-long-history-20260713"]

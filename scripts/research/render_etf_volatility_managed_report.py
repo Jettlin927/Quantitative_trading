@@ -8,7 +8,6 @@ import math
 from pathlib import Path
 import sys
 from typing import Any
-from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -30,20 +29,24 @@ from backend.app.quant_research.reporting import (
     summarize_return_subperiod,
     tail_metrics,
 )
+from scripts.research.report_evidence import (
+    canonical_report_timestamp,
+    verify_reproduction_evidence,
+)
 
 
 DEFAULT_RUN_ROOT = (
     REPO_ROOT
     / "outputs"
     / "research-runs"
-    / "volatility-managed-2026-07-19"
+    / "volatility-managed-2026-07-19-final"
     / "canonical-runs"
 )
 DEFAULT_GATE_RUN_ROOT = (
     REPO_ROOT
     / "outputs"
     / "research-runs"
-    / "low-volatility-gate-2026-07-19"
+    / "low-volatility-gate-2026-07-19-final"
     / "canonical-runs"
 )
 DEFAULT_OUTPUT_DIR = (
@@ -52,6 +55,13 @@ DEFAULT_OUTPUT_DIR = (
     / "research"
     / "strategy-results"
     / "etf-volatility-managed-20260713"
+)
+DEFAULT_REPRODUCTION_EVIDENCE = (
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "strategy-results"
+    / "reproduction-evidence-20260719.json"
 )
 TRIAL_ORDER = ("T0", "T1", "T2", "T3", "zero_cost", "double_cost")
 GATE_RUN_ORDER = ("base_cost", "double_cost")
@@ -102,11 +112,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
     parser.add_argument("--gate-run-root", type=Path, default=DEFAULT_GATE_RUN_ROOT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--reproduction-evidence",
+        type=Path,
+        default=DEFAULT_REPRODUCTION_EVIDENCE,
+    )
     args = parser.parse_args(argv)
 
     runs = load_runs(args.run_root)
     gate_runs = load_gate_runs(args.gate_run_root)
-    summary, charts = build_summary(runs, gate_runs)
+    reproduction_audit = verify_reproduction_evidence(
+        args.reproduction_evidence,
+        runs,
+        gate_runs,
+    )
+    summary, charts = build_summary(runs, gate_runs, reproduction_audit)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     summary_path = args.output_dir / "summary.json"
     report_path = args.output_dir / "index.html"
@@ -316,7 +336,8 @@ def _assert_preregistered_payload(
 
 def build_summary(
     runs: dict[str, dict[str, Any]],
-    gate_runs: dict[str, dict[str, Any]] | None = None,
+    gate_runs: dict[str, dict[str, Any]],
+    reproduction_audit: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, pd.Series]]:
     t0 = runs["T0"]
     config = t0["config"]
@@ -468,9 +489,9 @@ def build_summary(
     summary = {
         "status": status,
         "initialCapital": INITIAL_CAPITAL,
-        "reportGeneratedAt": datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(
-            timespec="seconds"
-        ),
+        "researchDate": "2026-07-13",
+        "reportGeneratedAt": canonical_report_timestamp(runs, gate_runs),
+        "reproductionAudit": reproduction_audit,
         "conclusion": {
             "oneLine": (
                 "基准逆方差强力降风险版明显降低波动并提高净 CAGR，但最大回撤和 Sharpe 改善未达到事前门槛，"
@@ -524,7 +545,10 @@ def build_summary(
             "observations": passive_metrics["observations"],
             "pointInTime": True,
             "offlineReproduction": (
-                "原策略六个运行均在同一镜像的 --network none 容器中连续两次匹配 result fingerprint。"
+                f"本报告 {reproduction_audit['runCount']} 个运行均在镜像 "
+                f"{reproduction_audit['imageDigest']} 的 --network none 容器中连续"
+                f"{reproduction_audit['matchesPerRun']}次匹配 result fingerprint；"
+                f"审计输入为 {reproduction_audit['evidenceFile']}。"
             ),
         },
         "executionAndCost": execution_summary,
@@ -669,15 +693,15 @@ def build_summary(
         "gross": t0_nav.set_index("trade_date")["gross_exposure"],
         "cash": t0_nav.set_index("trade_date")["cash_weight"],
     }
-    if gate_runs is not None:
-        followup, followup_charts = _build_low_volatility_gate_followup(
-            gate_runs,
-            passive,
-            manifest,
-            returns,
-        )
-        summary["lowVolatilityGateFollowup"] = followup
-        charts.update(followup_charts)
+    followup, followup_charts = _build_low_volatility_gate_followup(
+        gate_runs,
+        passive,
+        manifest,
+        returns,
+        reproduction_audit,
+    )
+    summary["lowVolatilityGateFollowup"] = followup
+    charts.update(followup_charts)
     return summary, charts
 
 
@@ -686,6 +710,7 @@ def _build_low_volatility_gate_followup(
     passive: pd.DataFrame,
     original_manifest: dict[str, Any],
     original_returns: pd.DataFrame,
+    reproduction_audit: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, pd.Series]]:
     base = runs["base_cost"]
     double = runs["double_cost"]
@@ -873,6 +898,7 @@ def _build_low_volatility_gate_followup(
     followup = {
         "status": status,
         "initialCapital": INITIAL_CAPITAL,
+        "reproductionAudit": reproduction_audit,
         "researchClassification": (
             "事后探索；同一 OOS 结论上限为有条件候选"
             if status == "有条件候选"
@@ -940,7 +966,9 @@ def _build_low_volatility_gate_followup(
             ),
         },
         "supportingEvidence": [
-            "30/30 数据质量规则通过，低波动准入与原始报告复用同一 canonical 快照，并在同一镜像的断网容器中连续两次复现匹配。",
+            "30/30 数据质量规则通过，低波动准入与原始报告复用同一 canonical 快照，"
+            f"并由 {reproduction_audit['evidenceFile']} 证明在同一镜像的断网容器中连续"
+            f"{reproduction_audit['matchesPerRun']}次复现匹配。",
             f"基础成本 CAGR {base_metrics['annualizedReturn']:.2%}，高于 50% ETF / 50% 现金基准的 {static_metrics['annualizedReturn']:.2%}。",
             "2018 年高波动下跌阶段减少了绝对损失，说明波动门槛在部分冲击环境中确实降低暴露。",
         ],
@@ -1419,6 +1447,7 @@ def _render_low_volatility_gate_followup(
     charts: dict[str, pd.Series],
 ) -> str:
     status_class = "fail" if followup["status"] == "不通过" else "pass"
+    reproduction_audit = followup["reproductionAudit"]
     strategy_row = next(
         row
         for row in followup["comparison"]
@@ -1573,7 +1602,7 @@ def _render_low_volatility_gate_followup(
     <section class="panel third"><h2>反对证据</h2>{_html_list(followup["opposingEvidence"])}</section>
     <section class="panel third"><h2>尚缺证据</h2>{_html_list(followup["missingEvidence"])}</section>
     <section class="panel"><h2>如何继续优化</h2><ol><li>不能在同一段样本外继续搜索波动阈值，否则会把这次失败变成参数拟合。</li><li>若核心目标是压回撤，下一轮只预登记一个“低波慢跌保护”机制，并在新时间段或另一只事先指定的宽基 ETF 上验证。</li><li>月度 0% / 100% 切换累计成本率 {_fmt(followup["cumulativeTransactionCostRate"], "pct")}；可单独验证渐进仓位是否降低换手，但不得同时改门槛和信号。</li><li>任何新版本仍必须与固定比例 ETF / 现金基准比较，不能只和 100% 满仓相比。</li></ol></section>
-    <section class="panel"><h2>复现身份</h2>{reproduction}<p class="note">基础成本与双倍成本运行均绑定同一数据快照，并已在同一镜像的断网容器中连续两次复现匹配结果指纹。</p></section>
+    <section class="panel"><h2>复现身份</h2>{reproduction}<p class="note">基础成本与双倍成本运行均绑定同一数据快照；审计文件 <code>{escape(reproduction_audit["evidenceFile"])}</code> 已校验镜像 <code>{escape(reproduction_audit["imageDigest"])}</code>、禁用网络和连续 {reproduction_audit["matchesPerRun"]} 轮结果指纹。</p></section>
   </div>
 """
 
@@ -1810,8 +1839,8 @@ def render_html(summary: dict[str, Any], charts: dict[str, pd.Series]) -> str:
     <section class="panel third"><h2>反对证据</h2>{_html_list(summary["opposingEvidence"])}</section>
     <section class="panel third"><h2>尚缺证据</h2>{_html_list(summary["missingEvidence"])}</section>
     <section class="panel"><h2>9. 策略画像、执行与风险边界</h2><p>{escape(summary["strategyProfile"]["economicHypothesis"])}</p><ul><li>信号：{escape(summary["strategyProfile"]["signal"])}</li><li>执行：{escape(summary["strategyProfile"]["execution"])}</li><li>主比较：{escape(summary["strategyProfile"]["primaryBenchmark"])}</li><li>校准/OOS：{escape(summary["strategyProfile"]["calibration"])} / {escape(summary["strategyProfile"]["oos"])}</li><li>独立月度决策 {summary["executionAndCost"]["independentDecisionMonths"]} 次；产生调仓请求 {summary["executionAndCost"]["rebalanceRequests"]} 次；阻塞 {summary["executionAndCost"]["blockedRequests"]} 次。</li><li>基础成本：buy={summary["executionAndCost"]["baseCostModel"]["buyRate"]}、sell={summary["executionAndCost"]["baseCostModel"]["sellRate"]}、slippage={summary["executionAndCost"]["baseCostModel"]["slippageRate"]}；零成本到净结果的累计财富拖累 {_fmt(summary["executionAndCost"]["grossToNetWealthDrag"], "pct")}。</li><li>最大单一权重 {_fmt(summary["riskAndCapacity"]["maximumSingleWeight"], "pct")}；平均 HHI {summary["riskAndCapacity"]["averageHhi"]:.3f}；单资产持仓时风险贡献全部来自 ETF。</li><li>容量：not_available；没有目标资金规模、冲击和 ADV 参与率合同。Profit Factor：not_applicable（连续权重没有稳定单笔边界）。</li></ul></section>
-    <section class="panel"><h2>10. 复现身份</h2><p>quality_run={escape(summary["dataEvidence"]["qualityRunId"])} · snapshot={escape(summary["dataEvidence"]["dataSnapshotId"])} · code={escape(summary["reproduction"]["T0"]["codeCommit"])}</p>{reproduction}</section>
-    <section class="panel"><h2>一手来源与反证</h2><ul>{source_items}</ul><p class="note">报告生成：{escape(summary["reportGeneratedAt"])}。所有数值来自同一 canonical 快照与运行账本。</p></section>
+    <section class="panel"><h2>10. 复现身份</h2><p>quality_run={escape(summary["dataEvidence"]["qualityRunId"])} · snapshot={escape(summary["dataEvidence"]["dataSnapshotId"])} · code={escape(summary["reproduction"]["T0"]["codeCommit"])}</p>{reproduction}<p class="note">审计文件 <code>{escape(summary["reproductionAudit"]["evidenceFile"])}</code> 已校验本报告 {summary["reproductionAudit"]["runCount"]} 个运行在镜像 <code>{escape(summary["reproductionAudit"]["imageDigest"])}</code>、禁用网络条件下连续 {summary["reproductionAudit"]["matchesPerRun"]} 轮结果指纹。</p></section>
+    <section class="panel"><h2>一手来源与反证</h2><ul>{source_items}</ul><p class="note">研究日期：{escape(summary["researchDate"])}；报告对应的最新 canonical 工件生成时间：{escape(summary["reportGeneratedAt"])}。所有数值来自同一 canonical 快照与运行账本。</p></section>
   </div>
 </main></body></html>"""
 
