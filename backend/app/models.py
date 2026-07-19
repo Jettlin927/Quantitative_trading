@@ -571,6 +571,11 @@ class ResearchRun(Base):
         SqlIndex("ix_research_runs_strategy_started", "strategy_id", "started_at"),
         SqlIndex("ix_research_runs_reproducibility", "reproducibility_key"),
         SqlIndex("ix_research_runs_formal_research_started", "formal_research_id", "started_at"),
+        SqlIndex(
+            "uq_research_runs_orchestration_attempt",
+            "orchestration_attempt_id",
+            unique=True,
+        ),
     )
 
     run_id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -578,6 +583,7 @@ class ResearchRun(Base):
         Uuid(as_uuid=False),
         ForeignKey("formal_researches.id", ondelete="RESTRICT")
     )
+    orchestration_attempt_id: Mapped[str | None] = mapped_column(Uuid(as_uuid=False))
     reproducibility_key: Mapped[str | None] = mapped_column(String(64))
     strategy_id: Mapped[str] = mapped_column(String(80))
     status: Mapped[str] = mapped_column(String(16), default="running")
@@ -751,10 +757,14 @@ class ResearchWorkItem(Base):
         ),
         CheckConstraint(
             "((status in ('leased', 'running') and lease_owner is not null and "
-            "lease_expires_at is not null) or "
+            "lease_token is not null and lease_expires_at is not null) or "
             "(status not in ('leased', 'running') and lease_owner is null and "
-            "lease_expires_at is null))",
+            "lease_token is null and lease_expires_at is null))",
             name="ck_research_work_items_lease_shape",
+        ),
+        CheckConstraint(
+            "status not in ('leased', 'running') or current_attempt_id is not null",
+            name="ck_research_work_items_active_attempt",
         ),
         UniqueConstraint("formal_research_id", name="uq_research_work_items_formal"),
         SqlIndex("ix_research_work_items_queue", "status", "next_attempt_at", "created_at"),
@@ -775,8 +785,10 @@ class ResearchWorkItem(Base):
     max_attempts: Mapped[int] = mapped_column(default=3, server_default="3")
     next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     lease_owner: Mapped[str | None] = mapped_column(String(128))
+    lease_token: Mapped[str | None] = mapped_column(Uuid(as_uuid=False))
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    current_attempt_id: Mapped[str | None] = mapped_column(Uuid(as_uuid=False))
     current_run_id: Mapped[str | None] = mapped_column(
         ForeignKey("research_runs.run_id", ondelete="RESTRICT")
     )

@@ -261,11 +261,6 @@ def invalidate_issue_plan(
         return False
     orchestration.last_issue_body_sha256 = body_sha256
     orchestration.state_reason = reason
-    if (
-        orchestration.formal_research_id is None
-        and orchestration.state == "pending_approval"
-    ):
-        return True
     orchestration.approval_invalidated = True
     if orchestration.state in {"published", "stopped"}:
         return True

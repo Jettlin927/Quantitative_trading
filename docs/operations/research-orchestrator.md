@@ -43,7 +43,7 @@ python -m backend.app.research_plan /path/to/issue-body.md
 - 正式研究会持久绑定首次被接受的批准评论 ID；后续重复粘贴批准文本不能覆盖更早的停止评论，也不能替代已删除或编辑的原批准。
 - 编排器在创建队列前会写回或原样更新授权确认评论，以证明当前 token 仍有 Issue 写权限。权限被拒绝时不创建正式研究、不入队。
 - 冻结计划的 `strategy.codeCommit` 必须同时等于镜像内 `APP_GIT_COMMIT`。标准部署脚本只有在工作树无已跟踪或未跟踪改动、且该提交是本地 `origin/main` 的祖先时才注入 `APP_GIT_REF=refs/heads/main`，否则写入 `refs/unverified`；研究 Worker 也不挂载宿主源码。功能分支、脏工作树或无法证明来源的镜像即使含有已登记策略也不得启动正式研究。
-- Issue 正文产生新哈希后，旧计划立即标为被替代；即使编辑中的 JSON 暂时无效，也会先使既有队列受阻。尚未开始的 work item 中断，运行中的 work item 在下一阶段安全点停止。旧批准、事件、checkpoint 和工件不删除；再次启动必须形成有效的新计划哈希并重新批准。
+- Issue 正文一旦在服务端首次冻结后被编辑，同一计划哈希也永久失效；这是无法从轮询快照安全证明“编辑早于还是晚于批准”时的保守门禁。即使编辑中的 JSON 暂时无效，也会先使既有队列受阻。尚未开始的 work item 中断，运行中的 work item 在下一阶段安全点停止。旧批准、事件、checkpoint 和工件不删除；再次启动必须形成有效的新计划哈希并重新批准。
 - 精确评论 `停止研究 <plan_sha256>` 阻止新阶段。中断运行只有在计划、代码、快照和环境身份保持一致且重试预算未耗尽时，才能用 `恢复研究 <plan_sha256> <run_id>` 显式恢复。
 - GitHub 读取或写入不可用时，本轮 `github_available=false`，Worker 不领取任何新研究。既有不可变工件仍可由离线复现命令读取。
 
@@ -79,9 +79,9 @@ python -m backend.app.research_plan /path/to/issue-body.md
 - `research_orchestrations` 保存每个冻结计划的独立编排状态和被替代关系。
 - `research_work_items` 保存租约、Worker、心跳、尝试次数、当前/恢复运行和停止请求。
 - PostgreSQL advisory lock 与存活租约共同保证全局最多一个研究 work item；`FOR UPDATE SKIP LOCKED` 防止重复消费。
-- 瞬时连接/基础设施错误按冻结预算最多重试两次；计划违规、数据质量、确定性代码错误和资源超限直接受阻。
-- 租约过期时把仍为 running 的运行标成 interrupted，并用相同 `run_id` 与 checkpoint 恢复；若运行已先持久化为 succeeded 或 failed，则先核对终态并收敛 work item，绝不重复创建运行。所有迁移追加 `research_events`。
-- 心跳数据库异常按瞬时基础设施故障进入有限重试，不冒充用户停止；租约已丢失的旧 Worker 不再更新 work item。
+- 只有数据库 `OperationalError`、超时和连接错误三类可识别基础设施故障按冻结预算最多重试两次；计划违规、数据质量、未知心跳异常、确定性代码错误和资源超限直接受阻。
+- 每次新运行生成独立 `attempt_id`，运行必须以该身份登记；每次领取（包括恢复）另生成新的 `lease_token`，防止复用同一 Worker 名称的旧进程越过租约世代续租。租约过期只核对当前 attempt，不能误用同一正式研究的上一运行。仍为 running 的当前运行标成 interrupted，并用相同 `run_id`、`attempt_id` 与 checkpoint 恢复；若当前运行已先持久化为 succeeded 或 failed，则先核对终态并收敛 work item，绝不重复创建运行。所有迁移追加 `research_events`。
+- 心跳故障触发安全点中断时，interrupted 运行会写入 `resume_run_id`；若 runner 已持久化终态但收尾心跳失败，work item 保持租约直到到期核对，不重新排队。过期回收使用行锁避开正在续租的存活 Worker，租约或 attempt 已丢失的旧 Worker 不再更新 work item。
 - CPU 和内存由 Compose 容器上限约束，墙钟预算在阶段安全点检查，工件预算在运行结束读回。超限保留已有运行与工件，但正式研究进入受阻。
 
 新增 Alembic revision 只提供 schema 代码。生产 `alembic upgrade` 必须另行人工批准，本 Issue 不执行。
