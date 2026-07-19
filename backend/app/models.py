@@ -34,6 +34,25 @@ RESEARCH_RUN_STATUS_VALUES = {
 STRATEGY_LIFECYCLE_VALUES = {"活跃", "暂停", "停止研究", "已归档"}
 RESEARCH_CONCLUSION_VALUES = {"研究通过", "有条件候选", "证据不足", "受阻", "不通过"}
 FORMAL_RESEARCH_PHASE_VALUES = {"approved", "active", "evaluating", "published", "stopped"}
+RESEARCH_ORCHESTRATION_STATE_VALUES = {
+    "pending_approval",
+    "approved",
+    "queued",
+    "running",
+    "stopping",
+    "publishing",
+    "published",
+    "stopped",
+    "blocked",
+}
+RESEARCH_WORK_STATUS_VALUES = {
+    "queued",
+    "leased",
+    "running",
+    "succeeded",
+    "failed",
+    "interrupted",
+}
 PUBLICATION_STATUS_VALUES = {"pending", "published", "failed"}
 FOLLOW_UP_PROPOSAL_STATUS_VALUES = {"proposed", "accepted", "rejected", "converted"}
 
@@ -672,6 +691,105 @@ class FormalResearch(Base):
     phase: Mapped[str] = mapped_column(String(16), default="approved", server_default="approved")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ResearchOrchestration(Base):
+    __tablename__ = "research_orchestrations"
+    __table_args__ = (
+        CheckConstraint(
+            "state in ('pending_approval', 'approved', 'queued', 'running', 'stopping', "
+            "'publishing', 'published', 'stopped', 'blocked')",
+            name="ck_research_orchestrations_state",
+        ),
+        UniqueConstraint("plan_id", name="uq_research_orchestrations_plan"),
+        UniqueConstraint("formal_research_id", name="uq_research_orchestrations_formal"),
+        SqlIndex("ix_research_orchestrations_issue_created", "issue_number", "created_at"),
+        SqlIndex("ix_research_orchestrations_state_updated", "state", "updated_at"),
+    )
+
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True)
+    plan_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("frozen_research_plans.id", ondelete="RESTRICT")
+    )
+    formal_research_id: Mapped[str | None] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("formal_researches.id", ondelete="RESTRICT")
+    )
+    issue_number: Mapped[int] = mapped_column()
+    state: Mapped[str] = mapped_column(
+        String(24), default="pending_approval", server_default="pending_approval"
+    )
+    state_reason: Mapped[str | None] = mapped_column(String(2000))
+    last_issue_body_sha256: Mapped[str] = mapped_column(String(64))
+    approval_invalidated: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    superseded_by_plan_id: Mapped[str | None] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("frozen_research_plans.id", ondelete="RESTRICT")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ResearchWorkItem(Base):
+    __tablename__ = "research_work_items"
+    __table_args__ = (
+        CheckConstraint(
+            "status in ('queued', 'leased', 'running', 'succeeded', 'failed', 'interrupted')",
+            name="ck_research_work_items_status",
+        ),
+        CheckConstraint("attempt_count >= 0", name="ck_research_work_items_attempt_count"),
+        CheckConstraint(
+            "attempt_count <= max_attempts", name="ck_research_work_items_attempt_budget"
+        ),
+        CheckConstraint(
+            "max_attempts between 1 and 3", name="ck_research_work_items_max_attempts"
+        ),
+        CheckConstraint(
+            "((status in ('leased', 'running') and lease_owner is not null and "
+            "lease_expires_at is not null) or "
+            "(status not in ('leased', 'running') and lease_owner is null and "
+            "lease_expires_at is null))",
+            name="ck_research_work_items_lease_shape",
+        ),
+        UniqueConstraint("formal_research_id", name="uq_research_work_items_formal"),
+        SqlIndex("ix_research_work_items_queue", "status", "next_attempt_at", "created_at"),
+        SqlIndex("ix_research_work_items_lease", "status", "lease_expires_at"),
+    )
+
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True)
+    orchestration_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("research_orchestrations.id", ondelete="RESTRICT")
+    )
+    formal_research_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("formal_researches.id", ondelete="RESTRICT")
+    )
+    status: Mapped[str] = mapped_column(String(16), default="queued", server_default="queued")
+    attempt_count: Mapped[int] = mapped_column(default=0, server_default="0")
+    max_attempts: Mapped[int] = mapped_column(default=3, server_default="3")
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    lease_owner: Mapped[str | None] = mapped_column(String(128))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    current_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("research_runs.run_id", ondelete="RESTRICT")
+    )
+    resume_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("research_runs.run_id", ondelete="RESTRICT")
+    )
+    stop_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error_kind: Mapped[str | None] = mapped_column(String(80))
+    last_error: Mapped[str | None] = mapped_column(String(2000))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class ResearchEvent(Base):

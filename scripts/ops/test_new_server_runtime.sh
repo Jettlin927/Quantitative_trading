@@ -11,6 +11,7 @@ if [[ ! -f "$SERVER_COMPOSE_FILE" ]]; then
 fi
 
 if POSTGRES_PASSWORD= docker compose \
+  --profile research-automation \
   --env-file /dev/null \
   --file "$REPO_ROOT/docker-compose.yml" \
   --file "$SERVER_COMPOSE_FILE" \
@@ -33,6 +34,7 @@ POSTGRES_PASSWORD=compose-config-only \
 POSTGRES_DATA_DIR="$TEST_ROOT/postgres" \
 RESEARCH_ARTIFACTS_DIR="$TEST_ROOT/research-artifacts" \
 docker compose \
+  --profile research-automation \
   --env-file /dev/null \
   --file "$REPO_ROOT/docker-compose.yml" \
   --file "$SERVER_COMPOSE_FILE" \
@@ -52,7 +54,7 @@ server_compose_path = Path(sys.argv[3])
 config = json.loads(config_path.read_text(encoding="utf-8"))
 services = config["services"]
 server_compose = server_compose_path.read_text(encoding="utf-8")
-assert server_compose.count("create_host_path: false") == 2, server_compose_path
+assert server_compose.count("create_host_path: false") == 3, server_compose_path
 
 expected_ports = {
     "db": (5432, "5432"),
@@ -70,6 +72,7 @@ for service_name, (target, published) in expected_ports.items():
 expected_mounts = {
     "db": (test_root / "postgres", "/var/lib/postgresql/data"),
     "api": (test_root / "research-artifacts", "/app/outputs/research-runs"),
+    "research-worker": (test_root / "research-artifacts", "/app/outputs/research-runs"),
 }
 for service_name, (source, target) in expected_mounts.items():
     mounts = services[service_name].get("volumes", [])
@@ -83,6 +86,12 @@ for service_name, (source, target) in expected_mounts.items():
 assert services["worker"].get("volumes", []) == [], services["worker"].get("volumes")
 assert services["frontend"].get("volumes", []) == [], services["frontend"].get("volumes")
 assert not config.get("volumes"), config.get("volumes")
+research_worker = services["research-worker"]
+assert research_worker["profiles"] == ["research-automation"], research_worker["profiles"]
+assert float(research_worker["cpus"]) == 0.75, research_worker["cpus"]
+assert int(research_worker["mem_limit"]) == 768 * 1024**2, research_worker["mem_limit"]
+assert research_worker["environment"]["RESEARCH_MAX_CPU_CORES"] == "0.75"
+assert research_worker["environment"]["RESEARCH_MAX_MEMORY_MIB"] == "768"
 
 memory_total = 0
 cpu_total = 0.0
