@@ -108,9 +108,14 @@ class ResearchManifestTest(unittest.TestCase):
         deploy = (repo_root / "scripts" / "ops" / "deploy_server.sh").read_text(encoding="utf-8")
         self.assertIn("ARG APP_GIT_COMMIT", dockerfile)
         self.assertIn("ENV APP_GIT_COMMIT", dockerfile)
+        self.assertIn("ARG APP_GIT_REF", dockerfile)
+        self.assertIn("ENV APP_GIT_REF", dockerfile)
         self.assertIn("research_artifacts:/app/outputs/research-runs", compose)
         self.assertIn("RESEARCH_ARTIFACT_VOLUME:-quant_research_artifacts", compose)
         self.assertIn("set_deploy_identity", deploy)
+        self.assertIn("git merge-base --is-ancestor", deploy)
+        self.assertIn('resolved_ref="refs/unverified"', deploy)
+        self.assertNotIn('export APP_GIT_REF="refs/heads/$BRANCH"', deploy)
 
 
 if __name__ == "__main__":

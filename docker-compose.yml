@@ -25,6 +25,7 @@ services:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-}
         PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
         APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+        APP_GIT_REF: ${APP_GIT_REF:-unknown}
     container_name: quant_trading_api
     command: ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     restart: unless-stopped
@@ -38,6 +39,7 @@ services:
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
       DEEPSEEK_API_BASE: ${DEEPSEEK_API_BASE:-https://api.deepseek.com}
       APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+      APP_GIT_REF: ${APP_GIT_REF:-unknown}
     ports:
       - "${API_PORT:-18000}:8000"
     volumes:
@@ -52,6 +54,7 @@ services:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-}
         PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
         APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+        APP_GIT_REF: ${APP_GIT_REF:-unknown}
     container_name: quant_trading_worker
     command: ["python", "-m", "backend.app.sync_worker"]
     restart: unless-stopped
@@ -69,8 +72,50 @@ services:
       SYNC_WORKER_LEASE_SECONDS: ${SYNC_WORKER_LEASE_SECONDS:-60}
       SYNC_WORKER_ID: ${SYNC_WORKER_ID:-}
       APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+      APP_GIT_REF: ${APP_GIT_REF:-unknown}
     volumes:
       - .:/app
+
+  research-worker:
+    profiles: ["research-automation"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
+        APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+        APP_GIT_REF: ${APP_GIT_REF:-unknown}
+    container_name: quant_trading_research_worker
+    command: ["python", "-m", "backend.app.research_worker"]
+    restart: unless-stopped
+    cpus: ${RESEARCH_MAX_CPU_CORES:-1}
+    mem_limit: ${RESEARCH_MAX_MEMORY_MIB:-1536}m
+    pids_limit: 256
+    stop_grace_period: 90s
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-quant}:${POSTGRES_PASSWORD:-quant_password}@db:5432/${POSTGRES_DB:-quant_trading}
+      APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+      APP_GIT_REF: ${APP_GIT_REF:-unknown}
+      GITHUB_REPOSITORY: ${GITHUB_REPOSITORY:-Jettlin927/Quantitative_trading}
+      RESEARCH_GITHUB_TOKEN: ${RESEARCH_GITHUB_TOKEN:-}
+      RESEARCH_ARTIFACT_ROOT: /app/outputs/research-runs
+      RESEARCH_WORKER_POLL_SECONDS: ${RESEARCH_WORKER_POLL_SECONDS:-30}
+      RESEARCH_WORKER_HEARTBEAT_SECONDS: ${RESEARCH_WORKER_HEARTBEAT_SECONDS:-20}
+      RESEARCH_WORKER_LEASE_SECONDS: ${RESEARCH_WORKER_LEASE_SECONDS:-120}
+      RESEARCH_WORKER_ID: ${RESEARCH_WORKER_ID:-}
+      RESEARCH_MAX_WALL_CLOCK_SECONDS: ${RESEARCH_MAX_WALL_CLOCK_SECONDS:-7200}
+      RESEARCH_MAX_TRIALS: ${RESEARCH_MAX_TRIALS:-1}
+      RESEARCH_MAX_CPU_CORES: ${RESEARCH_MAX_CPU_CORES:-1}
+      RESEARCH_MAX_MEMORY_MIB: ${RESEARCH_MAX_MEMORY_MIB:-1536}
+      RESEARCH_MAX_ARTIFACT_MIB: ${RESEARCH_MAX_ARTIFACT_MIB:-2048}
+      RESEARCH_MAX_RETRIES: ${RESEARCH_MAX_RETRIES:-2}
+    volumes:
+      - .:/app
+      - research_artifacts:/app/outputs/research-runs
 
   frontend:
     build:

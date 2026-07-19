@@ -57,6 +57,7 @@ fi
 
 export TEST_POSTGRES_URL="postgresql+psycopg://quant_test:quant_test_password@127.0.0.1:${test_port}/quant_migration_test"
 export TEST_SYNC_WORKER_POSTGRES_URL="postgresql+psycopg://quant_test:quant_test_password@127.0.0.1:${test_port}/quant_worker_test"
+export TEST_RESEARCH_WORKER_POSTGRES_URL="$TEST_SYNC_WORKER_POSTGRES_URL"
 export DATABASE_URL="$TEST_POSTGRES_URL"
 export APP_GIT_COMMIT="${APP_GIT_COMMIT:-$(git rev-parse --verify HEAD)}"
 
