@@ -9,6 +9,7 @@ import socket
 from threading import Event, Thread
 from time import monotonic
 from typing import Callable
+from uuid import uuid4
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import OperationalError
@@ -38,11 +39,11 @@ from .work_coordination import try_acquire_heavy_work_claim_lock
 UTC = timezone.utc
 
 
-class TransientResearchError(RuntimeError):
+class ResearchBudgetExceeded(RuntimeError):
     pass
 
 
-class ResearchBudgetExceeded(RuntimeError):
+class ResearchHeartbeatError(RuntimeError):
     pass
 
 
@@ -53,8 +54,10 @@ class ClaimedResearchWork:
     formal_research_id: str
     plan_id: str
     worker_id: str
+    lease_token: str
     attempt_count: int
     max_attempts: int
+    attempt_id: str
     resume_run_id: str | None
     resource_budget: dict
 
@@ -132,7 +135,11 @@ def claim_next_research_work(
         plan = db.get(FrozenResearchPlan, orchestration.plan_id)
         recovered = work.status in {"leased", "running"}
         if recovered:
-            stale_run = _latest_run(db, work.formal_research_id)
+            stale_run = _run_for_attempt(
+                db,
+                work.formal_research_id,
+                work.current_attempt_id,
+            )
             if stale_run is not None and stale_run.status == "running":
                 stale_run.status = "interrupted"
                 stale_run.error = "ResearchWorkerLeaseExpired: Worker 租约过期，保留 checkpoint 并恢复"
@@ -152,9 +159,20 @@ def claim_next_research_work(
                 run_id=work.resume_run_id,
                 occurred_at=claimed_at,
             )
+        if work.resume_run_id is not None:
+            resume_run = db.get(ResearchRun, work.resume_run_id)
+            if resume_run is None or resume_run.formal_research_id != work.formal_research_id:
+                raise RuntimeError("恢复运行与研究 work item 不匹配")
+            if resume_run.orchestration_attempt_id is None:
+                resume_run.orchestration_attempt_id = str(uuid4())
+            work.current_attempt_id = resume_run.orchestration_attempt_id
+        else:
+            work.current_attempt_id = str(uuid4())
+            work.current_run_id = None
         work.status = "leased"
         work.attempt_count += 1
         work.lease_owner = worker_id
+        work.lease_token = str(uuid4())
         work.lease_expires_at = claimed_at + timedelta(seconds=lease_seconds)
         work.heartbeat_at = claimed_at
         work.last_error_kind = None
@@ -166,8 +184,10 @@ def claim_next_research_work(
             formal_research_id=work.formal_research_id,
             plan_id=plan.id,
             worker_id=worker_id,
+            lease_token=work.lease_token,
             attempt_count=work.attempt_count,
             max_attempts=work.max_attempts,
+            attempt_id=work.current_attempt_id,
             resume_run_id=work.resume_run_id,
             resource_budget=dict(plan.plan_json["resourceBudget"]),
         )
@@ -193,6 +213,8 @@ def heartbeat_research_work(
             work is None
             or work.status not in {"leased", "running"}
             or work.lease_owner != claim.worker_id
+            or work.lease_token != claim.lease_token
+            or work.current_attempt_id != claim.attempt_id
         ):
             return "lease_lost"
         work.heartbeat_at = heartbeat_at
@@ -259,23 +281,24 @@ def execute_claimed_research_work(
             result = executor(claim, stop_event)
         if lease_lost.is_set():
             return "lease_lost"
-        if heartbeat_failure.is_set():
-            raise _heartbeat_failure_error(heartbeat_errors)
-        if stop_event.is_set():
-            raise ResearchStopRequested("运行完成后检测到停止请求")
         if monotonic() >= deadline:
             raise ResearchBudgetExceeded("研究运行超过冻结 wallClockSeconds 预算")
-        post_run_status = heartbeat_research_work(
-            claim, session_factory=factory, lease_seconds=lease_seconds
-        )
+        artifact_bytes = _directory_size(result.path)
+        if artifact_bytes > int(claim.resource_budget["artifactMiB"]) * 1024 * 1024:
+            raise ResearchBudgetExceeded("研究工件超过冻结 artifactMiB 预算")
+        try:
+            post_run_status = heartbeat_research_work(
+                claim, session_factory=factory, lease_seconds=lease_seconds
+            )
+        except Exception:
+            # runner 已先持久化终态。此时重新入队会重复研究；保留当前租约，
+            # 由租约到期核对终态运行并收敛 work item。
+            return "awaiting_lease_reconciliation"
         if post_run_status == "lease_lost":
             return "lease_lost"
         if post_run_status == "stop_requested":
             stop_research_work(claim, "运行完成后、评价开始前收到停止请求", session_factory=factory)
             return "stopped"
-        artifact_bytes = _directory_size(result.path)
-        if artifact_bytes > int(claim.resource_budget["artifactMiB"]) * 1024 * 1024:
-            raise ResearchBudgetExceeded("研究工件超过冻结 artifactMiB 预算")
         return complete_research_work(
             claim,
             result,
@@ -294,10 +317,11 @@ def execute_claimed_research_work(
         if lease_lost.is_set():
             return "lease_lost"
         if heartbeat_failure.is_set():
+            heartbeat_error, transient = _classify_heartbeat_failure(heartbeat_errors)
             return fail_research_work(
                 claim,
-                _heartbeat_failure_error(heartbeat_errors),
-                transient=True,
+                heartbeat_error,
+                transient=transient,
                 session_factory=factory,
             )
         stop_research_work(claim, str(exc), session_factory=factory)
@@ -309,11 +333,12 @@ def execute_claimed_research_work(
         if lease_lost.is_set():
             return "lease_lost"
         if heartbeat_failure.is_set():
-            exc = _heartbeat_failure_error(heartbeat_errors)
-        transient = isinstance(
-            exc,
-            (TransientResearchError, OperationalError, TimeoutError, ConnectionError),
-        )
+            exc, transient = _classify_heartbeat_failure(heartbeat_errors)
+        else:
+            transient = isinstance(
+                exc,
+                (OperationalError, TimeoutError, ConnectionError),
+            )
         return fail_research_work(
             claim,
             exc,
@@ -338,6 +363,9 @@ def complete_research_work(
         work = _owned_work(db, claim)
         orchestration = db.get(ResearchOrchestration, claim.orchestration_id)
         formal = db.get(FormalResearch, claim.formal_research_id)
+        run = _run_for_attempt(db, claim.formal_research_id, claim.attempt_id)
+        if run is None or run.run_id != result.run_id:
+            raise RuntimeError("研究运行与当前 work item 尝试不匹配")
         work.status = "succeeded"
         work.current_run_id = result.run_id
         work.resume_run_id = None
@@ -386,8 +414,9 @@ def fail_research_work(
         work = _owned_work(db, claim)
         orchestration = db.get(ResearchOrchestration, claim.orchestration_id)
         formal = db.get(FormalResearch, claim.formal_research_id)
-        run = _latest_run(db, claim.formal_research_id)
+        run = _run_for_attempt(db, claim.formal_research_id, claim.attempt_id)
         work.current_run_id = run.run_id if run else work.current_run_id
+        work.resume_run_id = run.run_id if run is not None and run.status == "interrupted" else None
         work.last_error_kind = type(exc).__name__
         work.last_error = str(exc)[:2000]
         _release_lease(work, failed_at)
@@ -460,9 +489,9 @@ def stop_research_work(
         work = _owned_work(db, claim)
         orchestration = db.get(ResearchOrchestration, claim.orchestration_id)
         formal = db.get(FormalResearch, claim.formal_research_id)
-        run = _latest_run(db, claim.formal_research_id)
+        run = _run_for_attempt(db, claim.formal_research_id, claim.attempt_id)
         work.current_run_id = run.run_id if run else work.current_run_id
-        work.resume_run_id = work.current_run_id
+        work.resume_run_id = run.run_id if run is not None and run.status == "interrupted" else None
         work.status = "interrupted"
         work.last_error_kind = "ResearchStopRequested"
         work.last_error = reason[:2000]
@@ -542,6 +571,7 @@ def _execute_with_runner(
             dict(plan.plan_json["runConfig"]),
             output_root,
             formal_research_id=claim.formal_research_id,
+            orchestration_attempt_id=claim.attempt_id,
             should_stop=should_stop,
         )
 
@@ -578,9 +608,12 @@ def _heartbeat_loop(
             return
 
 
-def _heartbeat_failure_error(errors: list[Exception]) -> TransientResearchError:
-    error_kind = type(errors[0]).__name__ if errors else "UnknownHeartbeatError"
-    return TransientResearchError(f"研究 Worker 心跳失败：{error_kind}")
+def _classify_heartbeat_failure(errors: list[Exception]) -> tuple[Exception, bool]:
+    detail = errors[0] if errors else ResearchHeartbeatError("未记录心跳异常")
+    error_kind = type(detail).__name__
+    if isinstance(detail, (OperationalError, TimeoutError, ConnectionError)):
+        return ResearchHeartbeatError(f"研究 Worker 心跳失败：{error_kind}"), True
+    return ResearchHeartbeatError(f"研究 Worker 心跳异常：{error_kind}"), False
 
 
 def _owned_work(
@@ -594,34 +627,36 @@ def _owned_work(
         .where(ResearchWorkItem.id == claim.work_item_id)
         .with_for_update()
     )
-    if work is None or work.status not in expected or work.lease_owner != claim.worker_id:
+    if (
+        work is None
+        or work.status not in expected
+        or work.lease_owner != claim.worker_id
+        or work.lease_token != claim.lease_token
+        or work.current_attempt_id != claim.attempt_id
+    ):
         raise RuntimeError("研究 work item 租约已丢失")
     return work
 
 
-def _latest_active_run(db: Session, formal_research_id: str) -> ResearchRun | None:
+def _run_for_attempt(
+    db: Session,
+    formal_research_id: str,
+    attempt_id: str | None,
+) -> ResearchRun | None:
+    if attempt_id is None:
+        return None
     return db.scalar(
         select(ResearchRun)
         .where(
             ResearchRun.formal_research_id == formal_research_id,
-            ResearchRun.status == "running",
+            ResearchRun.orchestration_attempt_id == attempt_id,
         )
-        .order_by(ResearchRun.started_at.desc(), ResearchRun.run_id.desc())
-        .limit(1)
-    )
-
-
-def _latest_run(db: Session, formal_research_id: str) -> ResearchRun | None:
-    return db.scalar(
-        select(ResearchRun)
-        .where(ResearchRun.formal_research_id == formal_research_id)
-        .order_by(ResearchRun.started_at.desc(), ResearchRun.run_id.desc())
-        .limit(1)
     )
 
 
 def _release_lease(work: ResearchWorkItem, at: datetime) -> None:
     work.lease_owner = None
+    work.lease_token = None
     work.lease_expires_at = None
     work.heartbeat_at = at
     work.updated_at = at
@@ -638,17 +673,19 @@ def _block_exhausted_work(db: Session, now: datetime) -> None:
                     ResearchWorkItem.lease_expires_at < now,
                 ),
             ),
-        )
+        ).with_for_update(skip_locked=True)
     ).all()
     for work in exhausted:
-        run = _latest_active_run(db, work.formal_research_id)
-        if run is not None:
+        run = _run_for_attempt(db, work.formal_research_id, work.current_attempt_id)
+        if run is not None and run.status == "running":
             run.status = "interrupted"
             run.error = "RetryBudgetExhausted: 最后一次尝试的 Worker 租约已过期"
             run.finished_at = now
             run.heartbeat_at = now
             work.current_run_id = run.run_id
             work.resume_run_id = run.run_id
+        elif run is not None:
+            work.current_run_id = run.run_id
         work.status = "failed"
         work.last_error_kind = "RetryBudgetExhausted"
         work.last_error = "研究重试预算已耗尽"
@@ -674,10 +711,10 @@ def _reconcile_expired_terminal_runs(db: Session, now: datetime) -> None:
             ResearchWorkItem.status.in_(("leased", "running")),
             ResearchWorkItem.stop_requested_at.is_(None),
             ResearchWorkItem.lease_expires_at < now,
-        )
+        ).with_for_update(skip_locked=True)
     ).all()
     for work in expired:
-        run = _latest_run(db, work.formal_research_id)
+        run = _run_for_attempt(db, work.formal_research_id, work.current_attempt_id)
         if run is None or run.status not in {"succeeded", "failed"}:
             continue
         orchestration = db.get(ResearchOrchestration, work.orchestration_id)
@@ -720,17 +757,19 @@ def _finalize_expired_stops(db: Session, now: datetime) -> None:
             ResearchWorkItem.status.in_(("leased", "running")),
             ResearchWorkItem.stop_requested_at.is_not(None),
             ResearchWorkItem.lease_expires_at < now,
-        )
+        ).with_for_update(skip_locked=True)
     ).all()
     for work in stopped:
-        run = _latest_active_run(db, work.formal_research_id)
-        if run is not None:
+        run = _run_for_attempt(db, work.formal_research_id, work.current_attempt_id)
+        if run is not None and run.status == "running":
             run.status = "interrupted"
             run.error = "ResearchStopRequested: Worker 失联后由过期租约落实停止"
             run.finished_at = now
             run.heartbeat_at = now
             work.current_run_id = run.run_id
             work.resume_run_id = run.run_id
+        elif run is not None:
+            work.current_run_id = run.run_id
         work.status = "interrupted"
         work.last_error_kind = "ResearchStopRequested"
         work.last_error = "Worker 失联后由过期租约落实停止"

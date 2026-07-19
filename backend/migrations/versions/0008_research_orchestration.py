@@ -17,6 +17,16 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.add_column(
+        "research_runs",
+        sa.Column("orchestration_attempt_id", sa.Uuid(as_uuid=False), nullable=True),
+    )
+    op.create_index(
+        "uq_research_runs_orchestration_attempt",
+        "research_runs",
+        ["orchestration_attempt_id"],
+        unique=True,
+    )
     op.create_table(
         "research_orchestrations",
         sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
@@ -71,8 +81,10 @@ def upgrade() -> None:
         sa.Column("max_attempts", sa.Integer(), nullable=False, server_default="3"),
         sa.Column("next_attempt_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("lease_owner", sa.String(length=128), nullable=True),
+        sa.Column("lease_token", sa.Uuid(as_uuid=False), nullable=True),
         sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("heartbeat_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("current_attempt_id", sa.Uuid(as_uuid=False), nullable=True),
         sa.Column("current_run_id", sa.String(length=36), nullable=True),
         sa.Column("resume_run_id", sa.String(length=36), nullable=True),
         sa.Column("stop_requested_at", sa.DateTime(timezone=True), nullable=True),
@@ -93,10 +105,14 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint(
             "((status in ('leased', 'running') and lease_owner is not null and "
-            "lease_expires_at is not null) or "
+            "lease_token is not null and lease_expires_at is not null) or "
             "(status not in ('leased', 'running') and lease_owner is null and "
-            "lease_expires_at is null))",
+            "lease_token is null and lease_expires_at is null))",
             name="ck_research_work_items_lease_shape",
+        ),
+        sa.CheckConstraint(
+            "status not in ('leased', 'running') or current_attempt_id is not null",
+            name="ck_research_work_items_active_attempt",
         ),
         sa.ForeignKeyConstraint(
             ["orchestration_id"], ["research_orchestrations.id"], ondelete="RESTRICT"
@@ -130,6 +146,8 @@ def downgrade() -> None:
     op.drop_index("ix_research_orchestrations_state_updated", table_name="research_orchestrations")
     op.drop_index("ix_research_orchestrations_issue_created", table_name="research_orchestrations")
     op.drop_table("research_orchestrations")
+    op.drop_index("uq_research_runs_orchestration_attempt", table_name="research_runs")
+    op.drop_column("research_runs", "orchestration_attempt_id")
 
 
 def _create_consistency_triggers() -> None:
@@ -174,12 +192,14 @@ def _create_consistency_triggers() -> None:
                 SELECT 1 FROM research_runs run
                 WHERE run.run_id = NEW.current_run_id
                   AND run.formal_research_id = NEW.formal_research_id
+                  AND run.orchestration_attempt_id = NEW.current_attempt_id
               )
             ) OR (
               NEW.resume_run_id IS NOT NULL AND NOT EXISTS (
                 SELECT 1 FROM research_runs run
                 WHERE run.run_id = NEW.resume_run_id
                   AND run.formal_research_id = NEW.formal_research_id
+                  AND run.orchestration_attempt_id = NEW.current_attempt_id
               )
             ) THEN
               RAISE EXCEPTION 'research orchestration relation mismatch: %', TG_TABLE_NAME;

@@ -157,6 +157,7 @@ def run_quant_research(
     capacity_policy: SnapshotCapacityPolicy | None = None,
     interrupt_after_stage: str | None = None,
     formal_research_id: str | None = None,
+    orchestration_attempt_id: str | None = None,
     should_stop: Callable[[], bool] | None = None,
 ) -> ResearchRunResult:
     _validate_interrupt_stage(interrupt_after_stage)
@@ -182,6 +183,7 @@ def run_quant_research(
     run = ResearchRun(
         run_id=run_id,
         formal_research_id=formal_research_id,
+        orchestration_attempt_id=orchestration_attempt_id,
         reproducibility_key=None,
         strategy_id=normalized["strategyId"],
         status="running",

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import os
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -409,7 +410,7 @@ class ResearchOrchestrationTest(unittest.TestCase):
         self.assertEqual(result.state, "blocked")
         self.assertFalse(result.approval_found)
 
-    def test_summary_edit_before_approval_remains_pending(self) -> None:
+    def test_summary_edit_before_approval_invalidates_reused_plan(self) -> None:
         payload = valid_plan_payload()
         prepared = prepare(payload)
         original = IssueSnapshot(number=90314, state="OPEN", body=issue_body(payload))
@@ -431,7 +432,7 @@ class ResearchOrchestrationTest(unittest.TestCase):
             body=original.body.replace("固定研究计划。", "批准前补充的中文摘要。"),
         )
         with self.Session.begin() as db:
-            second = apply_issue_plan(
+            edited_result = apply_issue_plan(
                 db,
                 edited,
                 [],
@@ -441,9 +442,29 @@ class ResearchOrchestrationTest(unittest.TestCase):
                 authorization_write_confirmed=False,
                 now=NOW + timedelta(minutes=1),
             )
-        self.assertEqual(second.state, "pending_approval")
+        self.assertEqual(edited_result.state, "blocked")
+        approval = CommentSnapshot(
+            id=9031400,
+            author_login="Jettlin927",
+            body=prepared.approval_comment,
+        )
+        with self.Session.begin() as db:
+            reused_approval = apply_issue_plan(
+                db,
+                edited,
+                [approval],
+                prepared,
+                app_git_commit=APP_COMMIT,
+                app_git_ref="refs/heads/main",
+                authorization_write_confirmed=True,
+                now=NOW + timedelta(minutes=2),
+            )
+        self.assertEqual(reused_approval.state, "blocked")
+        self.assertFalse(reused_approval.queue_created)
+        self.assertIn("永久失效", reused_approval.reason)
         with self.Session() as db:
-            self.assertFalse(db.scalar(select(ResearchOrchestration.approval_invalidated)))
+            self.assertTrue(db.scalar(select(ResearchOrchestration.approval_invalidated)))
+            self.assertIsNone(db.scalar(select(ResearchWorkItem.id)))
 
     def test_editing_chinese_summary_invalidates_same_machine_plan(self) -> None:
         payload = valid_plan_payload()
@@ -751,12 +772,14 @@ class ResearchOrchestrationTest(unittest.TestCase):
     def test_latest_resume_comment_requeues_same_interrupted_run(self) -> None:
         prepared, issue, comments, _ = approved_issue_graph(self.Session, issue_number=908)
         run_id = "20000000-0000-0000-0000-000000000008"
+        attempt_id = "30000000-0000-0000-0000-000000000008"
         with self.Session.begin() as db:
             formal = db.scalar(select(FormalResearch))
             db.add(
                 ResearchRun(
                     run_id=run_id,
                     formal_research_id=formal.id,
+                    orchestration_attempt_id=attempt_id,
                     strategy_id=prepared.normalized["strategy"]["id"],
                     status="interrupted",
                     stage="simulation",
@@ -771,6 +794,7 @@ class ResearchOrchestrationTest(unittest.TestCase):
             )
             work = db.scalar(select(ResearchWorkItem))
             work.status = "interrupted"
+            work.current_attempt_id = attempt_id
             work.current_run_id = run_id
             work.resume_run_id = run_id
             work.stop_requested_at = NOW + timedelta(minutes=1)
@@ -1051,7 +1075,7 @@ class ResearchWorkerTest(unittest.TestCase):
         self.assertEqual(research_worker._mark_work_running(claim, self.Session, NOW), "running")
         outcome = research_worker.fail_research_work(
             claim,
-            research_worker.TransientResearchError("临时网络错误"),
+            TimeoutError("临时网络错误"),
             transient=True,
             session_factory=self.Session,
             now=NOW,
@@ -1075,7 +1099,7 @@ class ResearchWorkerTest(unittest.TestCase):
             )
             outcome = research_worker.fail_research_work(
                 next_claim,
-                research_worker.TransientResearchError("临时网络错误"),
+                TimeoutError("临时网络错误"),
                 transient=True,
                 session_factory=self.Session,
                 now=NOW + timedelta(seconds=10 * attempt),
@@ -1091,7 +1115,7 @@ class ResearchWorkerTest(unittest.TestCase):
     def test_expired_lease_recovers_same_interrupted_run(self) -> None:
         prepared, _issue, _comments, _ = approved_issue_graph(self.Session, issue_number=911)
         first = research_worker.claim_next_research_work(
-            "worker-before-crash",
+            "worker-reused-after-crash",
             github_available=True,
             session_factory=self.Session,
             now=NOW,
@@ -1102,6 +1126,7 @@ class ResearchWorkerTest(unittest.TestCase):
                 ResearchRun(
                     run_id="20000000-0000-0000-0000-000000000011",
                     formal_research_id=first.formal_research_id,
+                    orchestration_attempt_id=first.attempt_id,
                     strategy_id=prepared.normalized["strategy"]["id"],
                     status="running",
                     stage="simulation",
@@ -1117,7 +1142,7 @@ class ResearchWorkerTest(unittest.TestCase):
                 )
             )
         recovered = research_worker.claim_next_research_work(
-            "worker-after-crash",
+            "worker-reused-after-crash",
             github_available=True,
             session_factory=self.Session,
             now=NOW + timedelta(seconds=11),
@@ -1125,6 +1150,17 @@ class ResearchWorkerTest(unittest.TestCase):
         )
         self.assertEqual(recovered.resume_run_id, "20000000-0000-0000-0000-000000000011")
         self.assertEqual(recovered.attempt_count, 2)
+        self.assertEqual(recovered.attempt_id, first.attempt_id)
+        self.assertNotEqual(recovered.lease_token, first.lease_token)
+        self.assertEqual(
+            research_worker.heartbeat_research_work(
+                first,
+                session_factory=self.Session,
+                now=NOW + timedelta(seconds=12),
+                lease_seconds=30,
+            ),
+            "lease_lost",
+        )
         with self.Session() as db:
             run = db.get(ResearchRun, recovered.resume_run_id)
             self.assertEqual(run.status, "interrupted")
@@ -1146,6 +1182,7 @@ class ResearchWorkerTest(unittest.TestCase):
                 ResearchRun(
                     run_id=run_id,
                     formal_research_id=claim.formal_research_id,
+                    orchestration_attempt_id=claim.attempt_id,
                     strategy_id=prepared.normalized["strategy"]["id"],
                     status="succeeded",
                     stage="finalize",
@@ -1195,6 +1232,7 @@ class ResearchWorkerTest(unittest.TestCase):
                 ResearchRun(
                     run_id=run_id,
                     formal_research_id=claim.formal_research_id,
+                    orchestration_attempt_id=claim.attempt_id,
                     strategy_id=prepared.normalized["strategy"]["id"],
                     status="failed",
                     stage="simulation",
@@ -1228,9 +1266,154 @@ class ResearchWorkerTest(unittest.TestCase):
             self.assertEqual(db.scalar(select(func.count()).select_from(ResearchRun)), 1)
 
     def test_heartbeat_failure_retries_instead_of_becoming_user_stop(self) -> None:
-        approved_issue_graph(self.Session, issue_number=9113)
+        prepared, _issue, _comments, _ = approved_issue_graph(
+            self.Session,
+            issue_number=9113,
+        )
         claim = research_worker.claim_next_research_work(
             "worker-heartbeat-failure",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW,
+            lease_seconds=30,
+        )
+        run_id = "20000000-0000-0000-0000-000000001113"
+
+        def wait_for_heartbeat(_claim, stop_event):
+            self.assertTrue(stop_event.wait(timeout=1))
+            with self.Session.begin() as db:
+                db.add(
+                    ResearchRun(
+                        run_id=run_id,
+                        formal_research_id=claim.formal_research_id,
+                        orchestration_attempt_id=claim.attempt_id,
+                        strategy_id=prepared.normalized["strategy"]["id"],
+                        status="interrupted",
+                        stage="simulation",
+                        config=prepared.normalized["runConfig"],
+                        config_sha256="d" * 64,
+                        code_commit=APP_COMMIT,
+                        environment_sha256="e" * 64,
+                        random_seed=7,
+                        metrics={},
+                        artifact_root=f"outputs/research-runs/runs/.{run_id}.tmp",
+                        started_at=NOW,
+                        heartbeat_at=NOW,
+                        finished_at=NOW + timedelta(seconds=1),
+                    )
+                )
+            raise research_worker.ResearchStopRequested("在安全点停止")
+
+        with patch.object(
+            research_worker,
+            "heartbeat_research_work",
+            side_effect=TimeoutError("临时数据库断连"),
+        ):
+            outcome = research_worker.execute_claimed_research_work(
+                claim,
+                executor=wait_for_heartbeat,
+                session_factory=self.Session,
+                heartbeat_interval_seconds=0.01,
+                lease_seconds=30,
+            )
+        self.assertEqual(outcome, "retrying")
+        with self.Session() as db:
+            work = db.get(ResearchWorkItem, claim.work_item_id)
+            self.assertEqual(work.status, "queued")
+            self.assertEqual(work.current_run_id, run_id)
+            self.assertEqual(work.resume_run_id, run_id)
+            self.assertEqual(
+                db.get(ResearchOrchestration, claim.orchestration_id).state,
+                "queued",
+            )
+
+    def test_failed_resume_clears_pointer_before_transient_retry(self) -> None:
+        prepared, _issue, _comments, _ = approved_issue_graph(
+            self.Session,
+            issue_number=9117,
+        )
+        first = research_worker.claim_next_research_work(
+            "worker-first-interruption",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW,
+            lease_seconds=30,
+        )
+        run_id = "20000000-0000-0000-0000-000000001117"
+        with self.Session.begin() as db:
+            db.add(
+                ResearchRun(
+                    run_id=run_id,
+                    formal_research_id=first.formal_research_id,
+                    orchestration_attempt_id=first.attempt_id,
+                    strategy_id=prepared.normalized["strategy"]["id"],
+                    status="interrupted",
+                    stage="simulation",
+                    config=prepared.normalized["runConfig"],
+                    config_sha256="d" * 64,
+                    code_commit=APP_COMMIT,
+                    environment_sha256="e" * 64,
+                    random_seed=7,
+                    metrics={},
+                    artifact_root=f"outputs/research-runs/runs/.{run_id}.tmp",
+                    started_at=NOW,
+                    heartbeat_at=NOW,
+                    finished_at=NOW + timedelta(seconds=1),
+                )
+            )
+        self.assertEqual(
+            research_worker.fail_research_work(
+                first,
+                TimeoutError("首次心跳超时"),
+                transient=True,
+                session_factory=self.Session,
+                now=NOW + timedelta(seconds=1),
+            ),
+            "retrying",
+        )
+        resumed = research_worker.claim_next_research_work(
+            "worker-resume-failed-run",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW + timedelta(seconds=5),
+            lease_seconds=30,
+        )
+        self.assertEqual(resumed.resume_run_id, run_id)
+        self.assertEqual(resumed.attempt_id, first.attempt_id)
+        with self.Session.begin() as db:
+            run = db.get(ResearchRun, run_id)
+            run.status = "failed"
+            run.error = "TimeoutError: 恢复期间基础设施超时"
+            run.finished_at = NOW + timedelta(seconds=6)
+
+        self.assertEqual(
+            research_worker.fail_research_work(
+                resumed,
+                TimeoutError("恢复期间基础设施超时"),
+                transient=True,
+                session_factory=self.Session,
+                now=NOW + timedelta(seconds=6),
+            ),
+            "retrying",
+        )
+        with self.Session() as db:
+            work = db.get(ResearchWorkItem, first.work_item_id)
+            self.assertIsNone(work.resume_run_id)
+
+        fresh = research_worker.claim_next_research_work(
+            "worker-fresh-after-failed-resume",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW + timedelta(seconds=12),
+            lease_seconds=30,
+        )
+        self.assertIsNone(fresh.resume_run_id)
+        self.assertNotEqual(fresh.attempt_id, resumed.attempt_id)
+
+    def test_unexpected_heartbeat_error_blocks_without_retry(self) -> None:
+        approved_issue_graph(self.Session, issue_number=9114)
+        claim = research_worker.claim_next_research_work(
+            "worker-heartbeat-programming-error",
             github_available=True,
             session_factory=self.Session,
             now=NOW,
@@ -1244,7 +1427,7 @@ class ResearchWorkerTest(unittest.TestCase):
         with patch.object(
             research_worker,
             "heartbeat_research_work",
-            side_effect=RuntimeError("临时数据库断连"),
+            side_effect=ValueError("确定性程序错误"),
         ):
             outcome = research_worker.execute_claimed_research_work(
                 claim,
@@ -1253,13 +1436,170 @@ class ResearchWorkerTest(unittest.TestCase):
                 heartbeat_interval_seconds=0.01,
                 lease_seconds=30,
             )
-        self.assertEqual(outcome, "retrying")
+        self.assertEqual(outcome, "blocked")
         with self.Session() as db:
-            self.assertEqual(db.get(ResearchWorkItem, claim.work_item_id).status, "queued")
-            self.assertEqual(
-                db.get(ResearchOrchestration, claim.orchestration_id).state,
-                "queued",
+            work = db.get(ResearchWorkItem, claim.work_item_id)
+            orchestration = db.get(ResearchOrchestration, claim.orchestration_id)
+            self.assertEqual(work.status, "failed")
+            self.assertEqual(work.last_error_kind, "ResearchHeartbeatError")
+            self.assertEqual(orchestration.state, "blocked")
+
+    def test_terminal_success_waits_for_lease_reconciliation_after_heartbeat_failure(self) -> None:
+        prepared, _issue, _comments, _ = approved_issue_graph(
+            self.Session,
+            issue_number=9115,
+        )
+        claim = research_worker.claim_next_research_work(
+            "worker-terminal-heartbeat-race",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW,
+            lease_seconds=30,
+        )
+        run_id = "20000000-0000-0000-0000-000000001115"
+
+        with TemporaryDirectory() as artifact_root:
+
+            def finish_after_heartbeat_failure(_claim, stop_event):
+                self.assertTrue(stop_event.wait(timeout=1))
+                with self.Session.begin() as db:
+                    db.add(
+                        ResearchRun(
+                            run_id=run_id,
+                            formal_research_id=claim.formal_research_id,
+                            orchestration_attempt_id=claim.attempt_id,
+                            strategy_id=prepared.normalized["strategy"]["id"],
+                            status="succeeded",
+                            stage="finalize",
+                            config=prepared.normalized["runConfig"],
+                            config_sha256="d" * 64,
+                            code_commit=APP_COMMIT,
+                            environment_sha256="e" * 64,
+                            random_seed=7,
+                            metrics={},
+                            result_fingerprint="f" * 64,
+                            artifact_root=artifact_root,
+                            started_at=NOW,
+                            heartbeat_at=NOW,
+                            finished_at=NOW + timedelta(seconds=1),
+                        )
+                    )
+                return research_worker.ResearchRunResult(
+                    run_id=run_id,
+                    path=Path(artifact_root),
+                    manifest={},
+                )
+
+            with patch.object(
+                research_worker,
+                "heartbeat_research_work",
+                side_effect=TimeoutError("收尾心跳失败"),
+            ):
+                outcome = research_worker.execute_claimed_research_work(
+                    claim,
+                    executor=finish_after_heartbeat_failure,
+                    session_factory=self.Session,
+                    heartbeat_interval_seconds=0.01,
+                    lease_seconds=30,
+                )
+
+        self.assertEqual(outcome, "awaiting_lease_reconciliation")
+        with self.Session() as db:
+            work = db.get(ResearchWorkItem, claim.work_item_id)
+            self.assertEqual(work.status, "running")
+            reconcile_at = work.lease_expires_at + timedelta(seconds=1)
+
+        duplicate = research_worker.claim_next_research_work(
+            "worker-after-terminal-heartbeat-race",
+            github_available=True,
+            session_factory=self.Session,
+            now=reconcile_at,
+            lease_seconds=30,
+        )
+        self.assertIsNone(duplicate)
+        with self.Session() as db:
+            work = db.get(ResearchWorkItem, claim.work_item_id)
+            formal = db.get(FormalResearch, claim.formal_research_id)
+            self.assertEqual(work.status, "succeeded")
+            self.assertEqual(work.current_run_id, run_id)
+            self.assertEqual(formal.phase, "evaluating")
+            self.assertEqual(db.scalar(select(func.count()).select_from(ResearchRun)), 1)
+
+    def test_expired_new_attempt_does_not_reconcile_previous_terminal_run(self) -> None:
+        prepared, _issue, _comments, _ = approved_issue_graph(
+            self.Session,
+            issue_number=9116,
+        )
+        first = research_worker.claim_next_research_work(
+            "worker-reused-identity",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW,
+            lease_seconds=10,
+        )
+        old_run_id = "20000000-0000-0000-0000-000000001116"
+        with self.Session.begin() as db:
+            db.add(
+                ResearchRun(
+                    run_id=old_run_id,
+                    formal_research_id=first.formal_research_id,
+                    orchestration_attempt_id=first.attempt_id,
+                    strategy_id=prepared.normalized["strategy"]["id"],
+                    status="succeeded",
+                    stage="finalize",
+                    config=prepared.normalized["runConfig"],
+                    config_sha256="d" * 64,
+                    code_commit=APP_COMMIT,
+                    environment_sha256="e" * 64,
+                    random_seed=7,
+                    metrics={},
+                    result_fingerprint="f" * 64,
+                    artifact_root=f"outputs/research-runs/runs/{old_run_id}",
+                    started_at=NOW,
+                    heartbeat_at=NOW,
+                    finished_at=NOW + timedelta(seconds=1),
+                )
             )
+            work = db.get(ResearchWorkItem, first.work_item_id)
+            work.status = "queued"
+            work.current_run_id = old_run_id
+            work.lease_owner = None
+            work.lease_token = None
+            work.lease_expires_at = None
+            work.next_attempt_at = NOW + timedelta(seconds=1)
+
+        second = research_worker.claim_next_research_work(
+            "worker-reused-identity",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW + timedelta(seconds=2),
+            lease_seconds=10,
+        )
+        self.assertNotEqual(second.attempt_id, first.attempt_id)
+        self.assertEqual(
+            research_worker.heartbeat_research_work(
+                first,
+                session_factory=self.Session,
+                now=NOW + timedelta(seconds=3),
+                lease_seconds=30,
+            ),
+            "lease_lost",
+        )
+        recovered = research_worker.claim_next_research_work(
+            "worker-reused-identity",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW + timedelta(seconds=13),
+            lease_seconds=30,
+        )
+        self.assertIsNotNone(recovered)
+        self.assertEqual(recovered.attempt_count, 3)
+        self.assertNotEqual(recovered.attempt_id, first.attempt_id)
+        with self.Session() as db:
+            work = db.get(ResearchWorkItem, first.work_item_id)
+            formal = db.get(FormalResearch, first.formal_research_id)
+            self.assertEqual(work.status, "leased")
+            self.assertEqual(formal.phase, "approved")
 
     def test_expired_final_attempt_becomes_blocked_instead_of_sticking(self) -> None:
         payload = valid_plan_payload()
@@ -1307,6 +1647,7 @@ class ResearchWorkerTest(unittest.TestCase):
                 ResearchRun(
                     run_id=run_id,
                     formal_research_id=claim.formal_research_id,
+                    orchestration_attempt_id=claim.attempt_id,
                     strategy_id=prepared.normalized["strategy"]["id"],
                     status="succeeded",
                     stage="finalize",
@@ -1403,8 +1744,10 @@ class ResearchWorkerPostgresTest(unittest.TestCase):
 
     def setUp(self) -> None:
         with self.Session.begin() as db:
-            for table in reversed(Base.metadata.sorted_tables):
-                db.execute(table.delete())
+            table_names = ", ".join(
+                f'"{table.name}"' for table in Base.metadata.sorted_tables
+            )
+            db.execute(text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE"))
 
     def test_postgres_advisory_lock_keeps_global_concurrency_at_one(self) -> None:
         approved_issue_graph(self.Session, issue_number=920)
@@ -1465,6 +1808,41 @@ class ResearchWorkerPostgresTest(unittest.TestCase):
             )
         self.assertEqual(active, 1)
         self.assertEqual(queued, 1)
+
+    def test_expiry_recovery_skips_row_locked_by_live_heartbeat(self) -> None:
+        approved_issue_graph(self.Session, issue_number=922)
+        claim = research_worker.claim_next_research_work(
+            "worker-live-heartbeat",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW,
+            lease_seconds=10,
+        )
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with self.Session.begin() as heartbeat_db:
+                work = heartbeat_db.scalar(
+                    select(ResearchWorkItem)
+                    .where(ResearchWorkItem.id == claim.work_item_id)
+                    .with_for_update()
+                )
+                work.heartbeat_at = NOW + timedelta(seconds=11)
+                work.lease_expires_at = NOW + timedelta(seconds=41)
+                contender = executor.submit(
+                    research_worker.claim_next_research_work,
+                    "worker-expiry-contender",
+                    github_available=True,
+                    session_factory=self.Session,
+                    now=NOW + timedelta(seconds=11),
+                    lease_seconds=30,
+                )
+                self.assertIsNone(contender.result(timeout=2))
+
+        with self.Session() as db:
+            work = db.get(ResearchWorkItem, claim.work_item_id)
+            self.assertEqual(work.status, "leased")
+            self.assertEqual(work.lease_owner, claim.worker_id)
+            self.assertEqual(work.lease_expires_at, NOW + timedelta(seconds=41))
 
 
 if __name__ == "__main__":
