@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
+from datetime import datetime, timedelta, timezone
 import json
-import math
 import os
 import signal
 import socket
@@ -17,6 +15,7 @@ from sqlalchemy import and_, or_, select, update
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal, assert_schema_revision_at_head, engine
+from .json_safety import json_safe_value
 from .models import DataSyncJob, SyncWorkerHeartbeat
 
 
@@ -445,23 +444,6 @@ def sync_result_message(action: str, status: str, result: Any) -> str:
     if isinstance(result, dict) and result.get("message"):
         return str(result["message"])[:1000]
     return f"{action} {status}"[:1000]
-
-
-def json_safe_value(value: Any) -> Any:
-    if value is None or isinstance(value, (str, int, bool)):
-        return value
-    if isinstance(value, (date, datetime)):
-        return value.isoformat()
-    if isinstance(value, Decimal):
-        number = float(value)
-        return number if math.isfinite(number) else None
-    if isinstance(value, float):
-        return value if math.isfinite(value) else None
-    if isinstance(value, dict):
-        return {str(key): json_safe_value(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set)):
-        return [json_safe_value(item) for item in value]
-    return str(value)
 
 
 def positive_int_env(name: str, default: int) -> int:
