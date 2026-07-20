@@ -124,13 +124,60 @@ def validate_research_pass_policy(
     policy: Any,
     base_config: Mapping[str, Any],
 ) -> dict[str, Any]:
-    if not isinstance(policy, dict) or set(policy) != {
+    required_policy_fields = {
+        "oosPerformance",
+        "risk",
+        "walkForward",
+        "costStress",
+        "multipleTesting",
         "parameterNeighborhood",
         "capacity",
-    }:
+    }
+    if not isinstance(policy, dict) or set(policy) != required_policy_fields:
         raise ValueError(
-            "researchPassPolicy 必须冻结 parameterNeighborhood 与 capacity"
+            "researchPassPolicy 必须冻结 OOS、风险、walk-forward、成本压力、"
+            "多重检验、参数邻域与容量门槛"
         )
+    oos_performance, _oos_values = _normalize_decimal_thresholds(
+        policy["oosPerformance"],
+        ("minimumTotalReturn", "minimumExcessTotalReturn"),
+        "researchPassPolicy.oosPerformance",
+    )
+    risk, risk_values = _normalize_decimal_thresholds(
+        policy["risk"],
+        (
+            "maximumAbsoluteMaxDrawdown",
+            "maximumEs95",
+            "maximumMaxSingleWeight",
+            "maximumHhi",
+        ),
+        "researchPassPolicy.risk",
+    )
+    if any(value <= 0 or value > 1 for value in risk_values.values()):
+        raise ValueError("研究通过风险上限必须位于 (0, 1]")
+    walk_forward, walk_forward_values = _normalize_decimal_thresholds(
+        policy["walkForward"],
+        ("minimumWindowTotalReturn", "minimumPositiveWindowRate"),
+        "researchPassPolicy.walkForward",
+    )
+    if not 0 <= walk_forward_values["minimumPositiveWindowRate"] <= 1:
+        raise ValueError("walk-forward 正收益窗口比例门槛必须位于 [0, 1]")
+    cost_stress, cost_stress_values = _normalize_decimal_thresholds(
+        policy["costStress"],
+        ("minimumStressedTotalReturn", "maximumAbsoluteReturnDifference"),
+        "researchPassPolicy.costStress",
+    )
+    if cost_stress_values["maximumAbsoluteReturnDifference"] < 0:
+        raise ValueError("成本压力最大收益差不得小于 0")
+    multiple_testing, multiple_testing_values = _normalize_decimal_thresholds(
+        policy["multipleTesting"],
+        ("minimumDsrProbability", "maximumPboProbability"),
+        "researchPassPolicy.multipleTesting",
+    )
+    if any(
+        not 0 <= value <= 1 for value in multiple_testing_values.values()
+    ):
+        raise ValueError("DSR/PBO 概率门槛必须位于 [0, 1]")
     parameter_policy = policy["parameterNeighborhood"]
     if not isinstance(parameter_policy, dict) or set(parameter_policy) != {
         "variants",
@@ -191,7 +238,9 @@ def validate_research_pass_policy(
             base_seen = True
         elif not normalized_changes:
             raise ValueError("非 base 参数邻域配置必须包含改动")
-        identity = canonical_sha256(candidate_parameters)
+        identity = canonical_sha256(
+            _normalize_parameter_semantics(candidate_parameters)
+        )
         if identity in result_identities:
             raise ValueError("参数邻域配置必须产生不同的实际参数")
         result_identities.add(identity)
@@ -271,6 +320,11 @@ def validate_research_pass_policy(
     if impact_coefficient <= 0:
         raise ValueError("容量线性冲击系数必须大于 0")
     return {
+        "oosPerformance": oos_performance,
+        "risk": risk,
+        "walkForward": walk_forward,
+        "costStress": cost_stress,
+        "multipleTesting": multiple_testing,
         "parameterNeighborhood": {
             "variants": normalized_variants,
             "maximumAbsoluteOosReturnDifference": str(
@@ -488,6 +542,46 @@ def _decimal_text(value: Any, field: str) -> Decimal:
     if not parsed.is_finite():
         raise ValueError(f"{field} 必须是有限数")
     return parsed
+
+
+def _normalize_decimal_thresholds(
+    value: Any,
+    fields: tuple[str, ...],
+    label: str,
+) -> tuple[dict[str, str], dict[str, Decimal]]:
+    if not isinstance(value, dict) or set(value) != set(fields):
+        raise ValueError(f"{label} 字段无效")
+    parsed = {
+        field: _decimal_text(value[field], f"{label}.{field}")
+        for field in fields
+    }
+    return ({field: str(value[field]) for field in fields}, parsed)
+
+
+def _normalize_parameter_semantics(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _normalize_parameter_semantics(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, bool):
+        return {"type": "boolean", "value": value}
+    if isinstance(value, int):
+        return {"type": "number", "value": str(value)}
+    if isinstance(value, str):
+        try:
+            parsed = Decimal(value)
+        except Exception:
+            return {"type": "string", "value": value}
+        if parsed.is_finite():
+            text = format(parsed, "f")
+            if "." in text:
+                text = text.rstrip("0").rstrip(".")
+            if text in {"-0", ""}:
+                text = "0"
+            return {"type": "number", "value": text}
+        return {"type": "string", "value": value}
+    return value
 
 
 def build_reproducibility_key(

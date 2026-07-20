@@ -85,6 +85,28 @@ def valid_plan_payload() -> dict:
         "minPeriods": 20,
     }
     research_pass_policy = {
+        "oosPerformance": {
+            "minimumTotalReturn": "0.00",
+            "minimumExcessTotalReturn": "0.00",
+        },
+        "risk": {
+            "maximumAbsoluteMaxDrawdown": "0.20",
+            "maximumEs95": "0.10",
+            "maximumMaxSingleWeight": "0.80",
+            "maximumHhi": "0.70",
+        },
+        "walkForward": {
+            "minimumWindowTotalReturn": "-0.10",
+            "minimumPositiveWindowRate": "0.50",
+        },
+        "costStress": {
+            "minimumStressedTotalReturn": "-0.05",
+            "maximumAbsoluteReturnDifference": "0.05",
+        },
+        "multipleTesting": {
+            "minimumDsrProbability": "0.95",
+            "maximumPboProbability": "0.20",
+        },
         "parameterNeighborhood": {
             "variants": [
                 {"id": "base", "changes": []},
@@ -281,6 +303,13 @@ class ResearchPlanContractTest(unittest.TestCase):
         self.assertNotEqual(
             first.plan_sha256, prepare(changed_capacity).plan_sha256
         )
+        changed_oos_gate = deepcopy(payload)
+        changed_oos_gate["reportContract"]["researchPassPolicy"][
+            "oosPerformance"
+        ]["minimumTotalReturn"] = "0.01"
+        self.assertNotEqual(
+            first.plan_sha256, prepare(changed_oos_gate).plan_sha256
+        )
 
     def test_float_and_over_budget_plan_are_rejected(self) -> None:
         floating = valid_plan_payload()
@@ -339,6 +368,18 @@ class ResearchPlanContractTest(unittest.TestCase):
         payload["reportContract"]["researchPassPolicy"][
             "parameterNeighborhood"
         ]["variants"][1]["changes"][0]["value"] = "1"
+        with self.assertRaisesRegex(ResearchPlanError, "不同的实际参数"):
+            prepare(payload)
+
+        payload = valid_plan_payload()
+        payload["reportContract"]["researchPassPolicy"][
+            "parameterNeighborhood"
+        ]["variants"][2]["changes"] = [
+            {
+                "path": "featureParameters.exposurePower",
+                "value": "0.50",
+            }
+        ]
         with self.assertRaisesRegex(ResearchPlanError, "不同的实际参数"):
             prepare(payload)
 

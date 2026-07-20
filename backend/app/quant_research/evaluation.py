@@ -87,10 +87,10 @@ def build_capacity_evidence(
     valid_amounts = bars["amount"].dropna()
     if (
         bars.duplicated(["ts_code", "trade_date"]).any()
-        or (valid_amounts <= 0).any()
+        or (valid_amounts < 0).any()
         or not valid_amounts.map(math.isfinite).all()
     ):
-        raise ValueError("容量市场成交额必须按标的/日期唯一且为正数")
+        raise ValueError("容量市场成交额必须按标的/日期唯一且为非负有限数")
     expected_capital = float(policy["expectedCapital"])
     amount_scale = float(policy["marketAmountScale"])
     lookback = int(policy["advLookbackPeriods"])
@@ -109,6 +109,11 @@ def build_capacity_evidence(
             )
             continue
         adv = float(history["amount"].mean()) * amount_scale
+        if adv <= 0:
+            uncovered.append(
+                f"{request.execution_date.date().isoformat()}:{request.ts_code}:ADV为零"
+            )
+            continue
         participation = expected_capital * float(request.requested_change) / adv
         modeled_impact = coefficient * participation
         if not math.isfinite(participation) or not math.isfinite(modeled_impact):
@@ -480,6 +485,7 @@ def validate_oos_metrics_contract(
         "blockedCount",
         "independentTradeCount",
         "totalReturn",
+        "excessTotalReturn",
         "annualizedVolatility",
         "maxDrawdown",
         "benchmarkTotalReturn",
@@ -492,6 +498,7 @@ def validate_oos_metrics_contract(
         "averageNetExposure",
         "endingNetExposure",
         "averageHhi",
+        "maxHhi",
         "endingHhi",
         "var95",
         "es95",
@@ -552,6 +559,17 @@ def validate_oos_metrics_contract(
         or isinstance(walk_forward.get("testObservationCount"), bool)
         or not isinstance(walk_forward.get("testObservationCount"), int)
         or walk_forward["testObservationCount"] <= 0
+        or any(
+            isinstance(walk_forward.get(field), bool)
+            or not isinstance(walk_forward.get(field), (int, float))
+            or not math.isfinite(float(walk_forward[field]))
+            for field in (
+                "minimumWindowTotalReturn",
+                "medianWindowTotalReturn",
+                "positiveWindowRate",
+            )
+        )
+        or not 0 <= float(walk_forward["positiveWindowRate"]) <= 1
     ):
         raise ValueError("OOS 指标缺少结构化 walk-forward 证据")
     research_pass_policy = config.get("researchPassPolicy")
