@@ -1,0 +1,25 @@
+services:
+  api:
+    image: python:3.12-alpine
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        mkdir -p /tmp/mock-api/api
+        printf '{"status":"ok"}\n' > /tmp/mock-api/api/health
+        exec python -m http.server 8000 --directory /tmp/mock-api
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).read()
+      interval: 1s
+      timeout: 3s
+      retries: 10
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?必须设置 FRONTEND_IMAGE}
+    depends_on:
+      api:
+        condition: service_healthy

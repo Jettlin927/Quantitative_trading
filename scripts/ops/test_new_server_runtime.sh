@@ -4,11 +4,22 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SERVER_COMPOSE_FILE="$REPO_ROOT/docker-compose.server.example.yml"
+FRONTEND_DOCKERFILE="$REPO_ROOT/frontend/Dockerfile"
+FRONTEND_NGINX_CONFIG="$REPO_ROOT/frontend/nginx.conf"
 
 if [[ ! -f "$SERVER_COMPOSE_FILE" ]]; then
   echo "缺少新服务器 Compose 模板：$SERVER_COMPOSE_FILE" >&2
   exit 1
 fi
+
+if grep -Fq 'npm run dev' "$FRONTEND_DOCKERFILE"; then
+  echo "前端最终镜像仍运行 Vite 开发服务器" >&2
+  exit 1
+fi
+grep -Fq 'FROM nginx:stable-alpine' "$FRONTEND_DOCKERFILE"
+grep -Fq 'npm run build' "$FRONTEND_DOCKERFILE"
+grep -Fq 'listen 5173;' "$FRONTEND_NGINX_CONFIG"
+grep -Fq 'proxy_pass http://api:8000;' "$FRONTEND_NGINX_CONFIG"
 
 if POSTGRES_PASSWORD= docker compose \
   --profile research-automation \

@@ -6,6 +6,7 @@
 
 - Docker Engine 只从 [Docker 官方 Ubuntu apt 仓库](https://docs.docker.com/engine/install/ubuntu/)安装；不使用 convenience script。
 - PostgreSQL、API 与前端宿主端口只绑定 `127.0.0.1`。Docker 发布端口可能绕过 UFW，因此不能用防火墙替代 Compose 的 host IP 约束。
+- 前端镜像必须在构建阶段生成并验证 Vite `dist`，最终运行时只使用 Nginx 静态服务和同源 `/api/` 反代；不得运行 Vite 开发或预览服务器，也不得挂载宿主源码。
 - Docker daemon 只使用本机 Unix socket，不监听 `2375/2376` TCP。
 - 服务器 `.env` 必须显式提供非默认 `POSTGRES_PASSWORD`；模板拒绝空值。真实凭据不得进入 Git、文档或命令输出。
 - 本阶段不创建数据库、不拉取生产备份、不运行 migration、不启动应用容器。
@@ -66,6 +67,7 @@ POSTGRES_PASSWORD=compose-config-only docker compose \
 
 ```bash
 scripts/ops/test_new_server_runtime.sh
+scripts/ops/test_frontend_production_image.sh
 bash -n scripts/ops/bootstrap_new_server_runtime.sh
 ```
 
