@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import redirect_stdout
 from io import StringIO
+import json
 import os
 from pathlib import Path
 import re
@@ -303,6 +304,7 @@ class PostgresSchemaMigrationIntegrationTest(unittest.TestCase):
                         "trg_research_plan_approvals_consistent",
                         "trg_formal_researches_consistent",
                         "trg_research_runs_consistent",
+                        "trg_research_runs_historical_consistent",
                         "trg_research_events_consistent",
                         "trg_research_evaluations_consistent",
                         "trg_research_evaluation_runs_consistent",
@@ -313,10 +315,37 @@ class PostgresSchemaMigrationIntegrationTest(unittest.TestCase):
                         "trg_research_evidence_refs_published_immutable",
                     }.issubset(trigger_names)
                 )
+                approval_columns = {
+                    row.column_name: row.is_nullable
+                    for row in connection.execute(
+                        text(
+                            "SELECT column_name, is_nullable FROM information_schema.columns "
+                            "WHERE table_schema = 'public' "
+                            "AND table_name = 'research_plan_approvals'"
+                        )
+                    )
+                }
+                self.assertEqual(approval_columns["comment_id"], "YES")
+                self.assertEqual(approval_columns["source_uri"], "YES")
+                self.assertEqual(
+                    connection.execute(
+                        text(
+                            "SELECT column_default FROM information_schema.columns "
+                            "WHERE table_schema = 'public' AND table_name = 'formal_researches' "
+                            "AND column_name = 'origin'"
+                        )
+                    ).scalar_one(),
+                    "'native'::character varying",
+                )
 
             with engine.begin() as connection:
                 first = self._insert_research_graph(connection, "a", 901, publish=True)
                 second = self._insert_research_graph(connection, "b", 902, publish=False)
+                historical = self._insert_historical_research_graph(connection)
+                historical_native = self._insert_native_research_for_strategy(
+                    connection,
+                    historical["strategy_id"],
+                )
                 connection.execute(
                     text(
                         "INSERT INTO research_evaluations "
@@ -415,6 +444,85 @@ class PostgresSchemaMigrationIntegrationTest(unittest.TestCase):
                     with self.assertRaisesRegex(DBAPIError, "research relation mismatch"):
                         with engine.begin() as connection:
                             connection.execute(text(statement), parameters)
+
+            with self.assertRaisesRegex(DBAPIError, "research origin or relation mismatch"):
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "INSERT INTO formal_researches "
+                            "(id, plan_id, approval_id, origin, phase) VALUES "
+                            "('d0000000-0000-0000-0000-000000000004', :plan_id, "
+                            ":approval_id, 'native', 'published')"
+                        ),
+                        historical,
+                    )
+
+            with self.assertRaisesRegex(
+                DBAPIError,
+                "ck_formal_researches_historical_phase",
+            ):
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "INSERT INTO formal_researches "
+                            "(id, plan_id, approval_id, origin, phase) VALUES "
+                            "('d0000000-0000-0000-0000-000000000005', :plan_id, "
+                            ":approval_id, 'historical_import', 'active')"
+                        ),
+                        historical,
+                    )
+
+            with self.assertRaisesRegex(
+                DBAPIError,
+                "historical research cannot authorize new or mismatched run",
+            ):
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "INSERT INTO research_runs "
+                            "(run_id, formal_research_id, reproducibility_key, strategy_id, status, "
+                            "stage, config, config_sha256, code_commit, environment_sha256, "
+                            "random_seed, metrics, result_fingerprint, artifact_root) VALUES "
+                            "('d0000000-0000-0000-0000-000000000006', :formal_id, :sha, "
+                            ":strategy_id, 'succeeded', 'finalized', '{}'::json, :sha, :code, :sha, "
+                            "1, '{}'::json, :sha, 'artifacts://history-new-run')"
+                        ),
+                        {**historical, "sha": "d" * 64, "code": "c" * 40},
+                    )
+
+            for statement, parameters in (
+                (
+                    "UPDATE research_runs SET formal_research_id = NULL "
+                    "WHERE run_id = :run_id",
+                    historical,
+                ),
+                (
+                    "UPDATE research_runs SET formal_research_id = :new_formal_id "
+                    "WHERE run_id = :run_id",
+                    {**historical, "new_formal_id": historical_native["formal_id"]},
+                ),
+            ):
+                with self.subTest(history_run_update=statement):
+                    with self.assertRaisesRegex(
+                        DBAPIError,
+                        "historical research run is immutable",
+                    ):
+                        with engine.begin() as connection:
+                            connection.execute(text(statement), parameters)
+
+            with self.assertRaisesRegex(DBAPIError, "formal research identity is immutable"):
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "UPDATE formal_researches SET plan_id = :new_plan_id, "
+                            "approval_id = :new_approval_id WHERE id = :formal_id"
+                        ),
+                        {
+                            **historical,
+                            "new_plan_id": first["plan_id"],
+                            "new_approval_id": first["approval_id"],
+                        },
+                    )
 
             with self.assertRaisesRegex(DBAPIError, "published evaluation is immutable"):
                 with engine.begin() as connection:
@@ -543,6 +651,137 @@ class PostgresSchemaMigrationIntegrationTest(unittest.TestCase):
                     "issue_number": issue_number,
                 },
             )
+        return ids
+
+    @staticmethod
+    def _insert_historical_research_graph(connection):
+        ids = {
+            "strategy_id": "migration-history",
+            "plan_id": "d0000000-0000-0000-0000-000000000001",
+            "approval_id": "d0000000-0000-0000-0000-000000000002",
+            "formal_id": "d0000000-0000-0000-0000-000000000003",
+            "run_id": "d0000000-0000-0000-0000-000000000004",
+        }
+        connection.execute(
+            text(
+                "INSERT INTO strategy_definitions "
+                "(strategy_id, display_name, lifecycle_status, economic_thesis, registry_version, "
+                "code_commit, metadata_json) VALUES "
+                "(:strategy_id, :strategy_id, '已归档', '历史导入哨兵', 'history-import-v1', "
+                ":code, '{}'::json)"
+            ),
+            {**ids, "code": "c" * 40},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO frozen_research_plans "
+                "(id, strategy_id, issue_number, version, schema_version, plan_sha256, "
+                "code_commit, plan_json) VALUES "
+                "(:plan_id, :strategy_id, 903, 1, 'history-import-v1', :sha, :code, "
+                "CAST(:plan_json AS json))"
+            ),
+            {
+                **ids,
+                "sha": "d" * 64,
+                "code": "c" * 40,
+                "plan_json": json.dumps(
+                    {
+                        "runIdentities": [
+                            {
+                                "runId": ids["run_id"],
+                                "strategyId": ids["strategy_id"],
+                                "codeCommit": "c" * 40,
+                                "reproducibilityKey": "d" * 64,
+                                "resultFingerprint": "f" * 64,
+                            }
+                        ]
+                    }
+                ),
+            },
+        )
+        connection.execute(
+            text(
+                "INSERT INTO research_plan_approvals "
+                "(id, plan_id, action, actor_login, comment_id, source_uri, comment_body, "
+                "plan_sha256) VALUES (:approval_id, :plan_id, 'historical_import', "
+                "'history-migration-v1', NULL, 'repo://history.json', '历史导入', :sha)"
+            ),
+            {**ids, "sha": "d" * 64},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO research_runs "
+                "(run_id, formal_research_id, reproducibility_key, strategy_id, status, stage, "
+                "config, config_sha256, code_commit, environment_sha256, random_seed, metrics, "
+                "result_fingerprint, artifact_root, started_at) VALUES "
+                "(:run_id, NULL, :reproducibility_key, :strategy_id, 'succeeded', 'finalized', "
+                "'{}'::json, :config_sha256, :code, :environment_sha256, 1, '{}'::json, "
+                ":result_fingerprint, 'artifacts://history-existing-run', "
+                "'2026-01-01 00:00:00+00')"
+            ),
+            {
+                **ids,
+                "reproducibility_key": "d" * 64,
+                "config_sha256": "a" * 64,
+                "code": "c" * 40,
+                "environment_sha256": "e" * 64,
+                "result_fingerprint": "f" * 64,
+            },
+        )
+        connection.execute(
+            text(
+                "INSERT INTO formal_researches "
+                "(id, plan_id, approval_id, origin, phase) VALUES "
+                "(:formal_id, :plan_id, :approval_id, 'historical_import', 'stopped')"
+            ),
+            ids,
+        )
+        connection.execute(
+            text(
+                "UPDATE research_runs SET formal_research_id = :formal_id "
+                "WHERE run_id = :run_id"
+            ),
+            ids,
+        )
+        return ids
+
+    @staticmethod
+    def _insert_native_research_for_strategy(connection, strategy_id: str):
+        ids = {
+            "strategy_id": strategy_id,
+            "plan_id": "d0000000-0000-0000-0000-000000000010",
+            "approval_id": "d0000000-0000-0000-0000-000000000011",
+            "formal_id": "d0000000-0000-0000-0000-000000000012",
+        }
+        connection.execute(
+            text(
+                "INSERT INTO frozen_research_plans "
+                "(id, strategy_id, issue_number, version, schema_version, plan_sha256, "
+                "code_commit, plan_json) VALUES "
+                "(:plan_id, :strategy_id, 904, 1, '1', :sha, :code, '{}'::json)"
+            ),
+            {**ids, "sha": "e" * 64, "code": "c" * 40},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO research_plan_approvals "
+                "(id, plan_id, action, actor_login, comment_id, comment_body, plan_sha256) "
+                "VALUES (:approval_id, :plan_id, 'approved', 'Jettlin927', 9040, "
+                ":comment_body, :sha)"
+            ),
+            {
+                **ids,
+                "comment_body": f"批准研究 {'e' * 64}",
+                "sha": "e" * 64,
+            },
+        )
+        connection.execute(
+            text(
+                "INSERT INTO formal_researches (id, plan_id, approval_id, origin, phase) "
+                "VALUES (:formal_id, :plan_id, :approval_id, 'native', 'stopped')"
+            ),
+            ids,
+        )
         return ids
 
     @staticmethod

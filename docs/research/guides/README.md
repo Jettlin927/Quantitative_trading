@@ -11,3 +11,5 @@
 5. 失败运行和反对证据同样发布，不只展示胜出结果。
 
 评价顺序和最低证据见[策略画像与评价规范](../contracts/strategy-evaluation-standard.md)。
+
+历史兼容流程见[研究历史迁移](history-migration.md)；该流程的 `historical_import` 来源身份不等于用户批准。

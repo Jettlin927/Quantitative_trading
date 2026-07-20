@@ -110,6 +110,7 @@ def get_formal_research_detail(db: Session, research_id: str) -> FormalResearchD
     )
     return FormalResearchDetailOut(
         id=research.id,
+        origin=research.origin,
         phase=research.phase,
         plan=_plan_out(plan),
         approval=_approval_out(approval),
@@ -168,6 +169,7 @@ def _formal_research_summary(db: Session, research: FormalResearch) -> FormalRes
     return FormalResearchSummaryOut(
         id=research.id,
         plan_id=research.plan_id,
+        origin=research.origin,
         phase=research.phase,
         run_count=run_count,
         latest_publication_id=latest_publication.id if latest_publication else None,
@@ -226,6 +228,7 @@ def _approval_out(approval: ResearchPlanApproval) -> ResearchPlanApprovalOut:
         action=approval.action,
         actor_login=approval.actor_login,
         comment_id=approval.comment_id,
+        source_uri=approval.source_uri,
         comment_body=approval.comment_body,
         plan_sha256=approval.plan_sha256,
         created_at=approval.created_at,
