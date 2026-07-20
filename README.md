@@ -24,7 +24,7 @@
 
 ## 系统组成
 
-- `frontend`：React + Vite 的只读研究与数据界面。
+- `frontend`：React + Vite 构建、Nginx 静态服务的只读研究与数据界面。
 - `api`：FastAPI + SQLAlchemy 2.0 的数据、研究和运维接口。
 - `worker`：执行持久化数据同步任务，与 API 请求进程分离。
 - `db`：PostgreSQL 16，保存市场数据、任务和结构化研究事实。
@@ -81,7 +81,7 @@ scripts/ops/test_postgres_integration.sh
 前端与 Compose：
 
 ```bash
-docker compose run --rm frontend npm run build
+scripts/ops/test_frontend_production_image.sh
 docker compose config
 ```
 

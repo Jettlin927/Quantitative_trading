@@ -3801,7 +3801,15 @@ class ResearchPublicationGitHubClientTest(unittest.TestCase):
     def test_compose_readback_is_wired_through_frontend_proxy(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         compose = (repo_root / "docker-compose.yml").read_text(encoding="utf-8")
-        vite = (repo_root / "frontend" / "vite.config.js").read_text(encoding="utf-8")
+        dockerfile = (repo_root / "frontend" / "Dockerfile").read_text(
+            encoding="utf-8"
+        )
+        nginx = (repo_root / "frontend" / "nginx.conf").read_text(
+            encoding="utf-8"
+        )
+        frontend_compose = compose.split("\n  frontend:\n", 1)[1].split(
+            "\nvolumes:\n", 1
+        )[0]
         self.assertIn(
             "RESEARCH_READBACK_BASE_URL: ${RESEARCH_READBACK_BASE_URL:-http://frontend:5173}",
             compose,
@@ -3810,10 +3818,15 @@ class ResearchPublicationGitHubClientTest(unittest.TestCase):
             "RESEARCH_PUBLIC_BASE_URL: ${RESEARCH_PUBLIC_BASE_URL:-http://127.0.0.1:15173}",
             compose,
         )
-        self.assertIn("VITE_API_PROXY_TARGET: http://api:8000", compose)
-        self.assertIn(
-            'target: env.VITE_API_PROXY_TARGET || "http://127.0.0.1:18000"', vite
-        )
+        self.assertIn("npm run build", dockerfile)
+        self.assertIn("FROM nginx:stable-alpine", dockerfile)
+        self.assertNotIn('CMD ["npm", "run", "dev"', dockerfile)
+        self.assertIn("condition: service_healthy", frontend_compose)
+        self.assertNotIn("VITE_API_", frontend_compose)
+        self.assertNotIn("volumes:", frontend_compose)
+        self.assertIn("listen 5173;", nginx)
+        self.assertIn("location /api/", nginx)
+        self.assertIn("proxy_pass http://api:8000;", nginx)
 
 
 @unittest.skipUnless(

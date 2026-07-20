@@ -170,8 +170,8 @@ scripts/ops/test_postgres_integration.sh
 
 前端：
 
-```powershell
-docker compose run --rm frontend npm run build
+```bash
+scripts/ops/test_frontend_production_image.sh
 ```
 
 Compose：
