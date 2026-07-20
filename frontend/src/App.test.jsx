@@ -7,6 +7,7 @@ import { App } from './main.jsx'
 const RESEARCH_ID = '11111111-1111-4111-8111-111111111111'
 const PUBLICATION_ID = '22222222-2222-4222-8222-222222222222'
 const EVALUATION_ID = '55555555-5555-4555-8555-555555555555'
+const PROPOSAL_ID = '77777777-7777-4777-8777-777777777777'
 
 const coreResponses = {
   '/api/health?include_counts=false': {
@@ -17,9 +18,9 @@ const coreResponses = {
   '/api/research/readiness?scope=etf_time_series': { level: 'inventory', status: 'inventory_available', blockers: [] },
   '/api/db/overview': { aShare: {} },
   '/api/stocks/screen?limit=50&offset=0': { items: [], total: 0, limit: 50, offset: 0 },
-  '/api/indices?limit=80': [],
-  '/api/funds?limit=80': [],
-  '/api/industries?limit=80': [],
+  '/api/indices?limit=1000': [],
+  '/api/funds?limit=1000': [],
+  '/api/industries?limit=1000': [],
   '/api/us-research/db-overview': { counts: { assets: 1, assetDailyPrices: 1 }, assets: [{ symbol: 'SAMPLE', name: '样例资产', instrumentType: 'sample' }] },
 }
 
@@ -30,7 +31,8 @@ const strategySummary = {
 
 const strategyProfile = {
   ...strategySummary,
-  economic_thesis: '收益延续可能在有限持有期内存在。', metadata_json: {}, follow_up_proposals: [],
+  economic_thesis: '收益延续可能在有限持有期内存在。', metadata_json: {},
+  follow_up_proposals: [{ id: PROPOSAL_ID, title: '扩大市场环境复核', rationale: '补足极端环境证据。', status: 'proposed', created_at: '2026-07-20T00:45:00Z' }],
   formal_researches: [{ id: RESEARCH_ID, plan_id: '33333333-3333-4333-8333-333333333333', origin: 'native', phase: 'published', run_count: 1, latest_publication_status: 'published', latest_publication_conclusion: '研究通过' }],
 }
 
@@ -38,10 +40,14 @@ const researchDetail = {
   id: RESEARCH_ID, origin: 'native', phase: 'published', created_at: '2026-07-20T00:00:00Z', completed_at: '2026-07-20T01:00:00Z',
   plan: { id: '33333333-3333-4333-8333-333333333333', strategy_id: 'momentum-v1', issue_number: 37, version: 1, schema_version: '1', plan_sha256: 'b'.repeat(64), code_commit: 'a'.repeat(40), plan_json: {} },
   approval: { action: 'approved', actor_login: 'Jettlin927', created_at: '2026-07-20T00:01:00Z' },
-  runs: [{ run_id: 'run-001', status: 'succeeded', stage: 'completed', result_fingerprint: 'c'.repeat(64), finished_at: '2026-07-20T00:30:00Z' }],
+  runs: [
+    { run_id: 'run-001', status: 'succeeded', stage: 'completed', result_fingerprint: 'c'.repeat(64), finished_at: '2026-07-20T00:30:00Z', error: null },
+    { run_id: 'run-000', status: 'failed', stage: 'simulation', result_fingerprint: null, finished_at: '2026-07-20T00:20:00Z', error: '冻结输入缺失' },
+  ],
   events: [{ id: '44444444-4444-4444-8444-444444444444', sequence_no: 1, event_type: 'run_succeeded', payload_json: { summary: '执行完成' }, occurred_at: '2026-07-20T00:30:00Z' }],
   evaluations: [{ id: EVALUATION_ID, version: 1, conclusion: '研究通过', supporting_evidence: [{ statement: 'OOS 净收益通过' }], opposing_evidence: [], missing_evidence: [], limitations: [{ statement: '仅覆盖既定区间' }], follow_up_recommendations: [] }],
-  publications: [{ id: PUBLICATION_ID, evaluation_id: EVALUATION_ID, version: 1, status: 'published' }], follow_up_proposals: [],
+  publications: [{ id: PUBLICATION_ID, evaluation_id: EVALUATION_ID, version: 1, status: 'published', created_at: '2026-07-20T00:40:00Z', published_at: '2026-07-20T00:41:00Z' }],
+  follow_up_proposals: [{ id: PROPOSAL_ID, title: '扩大市场环境复核', rationale: '补足极端环境证据。', status: 'proposed', created_at: '2026-07-20T00:45:00Z' }],
 }
 
 function ok(data) {
@@ -69,7 +75,7 @@ function installFetch(options = {}) {
     if (path === '/api/research/strategies/momentum-v1') return ok(strategyProfile)
     if (path === `/api/research/formal-researches/${RESEARCH_ID}`) return ok(detail)
     if (path === `/api/research/publications/${PUBLICATION_ID}`) {
-      return ok({ status: 'published', conclusion: '研究通过', evaluation_id: EVALUATION_ID, evaluation_version: 1, report_url: '/api/research/evaluations/report' })
+      return ok({ status: 'published', conclusion: '研究通过', evaluation_id: EVALUATION_ID, evaluation_version: 1, published_at: '2026-07-20T00:41:00Z', report_url: '/api/research/evaluations/report' })
     }
     return ok(coreOverrides[path] ?? coreResponses[path] ?? {})
   })
@@ -109,6 +115,8 @@ describe('研究驾驶舱', () => {
 
     expect(screen.getByRole('heading', { name: '运行事实' })).toBeInTheDocument()
     expect(screen.getAllByText('研究通过').length).toBeGreaterThan(0)
+    expect(screen.getByText('冻结输入缺失')).toBeInTheDocument()
+    expect(screen.getByText('扩大市场环境复核')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /打开原始 HTML 证据/ })).toHaveAttribute('href', '/api/research/evaluations/report')
   })
 
@@ -173,6 +181,11 @@ describe('研究驾驶舱', () => {
     oldDetail.resolve(new Response(JSON.stringify({ listing: { listStatus: '甲股旧状态' }, valuation_history: [], financial_history: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     await waitFor(() => expect(screen.queryByText('甲股旧状态')).not.toBeInTheDocument())
     expect(screen.getByText('乙股状态')).toBeInTheDocument()
+
+    const fetchMock = vi.mocked(globalThis.fetch)
+    const detailCallsBeforeRefresh = fetchMock.mock.calls.filter(([path]) => path === '/api/stocks/000002.SZ/detail').length
+    fireEvent.click(screen.getByRole('button', { name: /全局刷新/ }))
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([path]) => path === '/api/stocks/000002.SZ/detail').length).toBeGreaterThan(detailCallsBeforeRefresh))
   })
 
   it('指数、ETF 与行业目录可读取历史和当前成员，单域失败不阻断页面', async () => {
@@ -181,7 +194,12 @@ describe('研究驾驶舱', () => {
     const industries = [{ indexCode: '801081.SI', industryName: '半导体', level: 'L2' }]
     let failIndustry = false
     installFetch({
-      coreOverrides: { '/api/indices?limit=80': indices, '/api/funds?limit=80': funds, '/api/industries?limit=80': industries },
+      coreOverrides: {
+        '/api/indices?limit=1000': indices,
+        '/api/funds?limit=1000': funds,
+        '/api/industries?limit=1000': industries,
+        '/api/tushare/sync-progress?include_coverage=false': { runs: [{ id: 9, target: 'fund_daily', status: 'partial', message: '2 个标的失败', createdAt: '2026-07-20T00:00:00Z' }] },
+      },
       route: (path) => {
         if (path.startsWith('/api/indices/000001.SH/daily-bars?')) return ok([{ tradeDate: '2026-07-18', close: 3210.12, pctChg: 0.5, amount: 100000 }])
         if (path.startsWith('/api/funds/510300.SH/daily-bars?')) return ok([{ tradeDate: '2026-07-18', close: 4.56, pctChg: -0.4, amount: 80000 }])
@@ -196,6 +214,7 @@ describe('研究驾驶舱', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
     await screen.findByText('3,210.12')
+    expect(screen.getByText('2 个标的失败')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /沪深 300 ETF.*510300.SH/ }))
     await screen.findByText('1.23')
