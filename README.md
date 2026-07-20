@@ -62,6 +62,8 @@ docker compose run --rm api alembic upgrade head
 
 默认本机入口为前端 `http://localhost:15173`、API 文档 `http://localhost:18000/docs` 和 PostgreSQL `localhost:5432`。生产监听与访问方式必须以现场配置为准，不能从 README 推断。
 
+当前远程访问只使用 SSH 隧道：通过本机 SSH 配置连接服务器，把远端 loopback 前端映射到本机后访问 `http://127.0.0.1:15173`。本项目不为此购买或申请域名，不部署 Cloudflare/Tailscale 入口，也不开放公网 IP 端口；完整决定见[远程访问决策](docs/operations/private-https-authentication-decision.md)。
+
 ## 开发验证
 
 后端快速门禁：
