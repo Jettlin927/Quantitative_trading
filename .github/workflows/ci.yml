@@ -62,10 +62,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: 构建正式前端镜像
-        run: docker build --file frontend/Dockerfile --tag quant-frontend-ci .
-      - name: TypeScript、ESLint 与生产构建
-        run: docker run --rm quant-frontend-ci sh -lc 'npm run typecheck && npm run lint && npm run build'
+      - name: 前端生产镜像、静态读回与 API 反代
+        run: scripts/ops/test_frontend_production_image.sh quant-frontend-ci
 
   repository-gates:
     name: Compose、Shell 与差异检查
