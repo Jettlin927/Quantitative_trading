@@ -21,6 +21,7 @@ Environment:
   COMPOSE_SERVER_FILE=docker-compose.server.yml
   SKIP_GIT_PULL=1
   APP_GIT_COMMIT=<required when deployment directory has no .git>
+  APP_GIT_REF=<required as refs/heads/main for no-.git formal-research builds>
 EOF
 }
 
@@ -113,9 +114,19 @@ compose_cmd() {
 
 set_deploy_identity() {
   local resolved_commit=""
+  local resolved_ref="${APP_GIT_REF:-refs/unverified}"
+  local worktree_status=""
 
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     resolved_commit="$(git rev-parse HEAD)"
+    worktree_status="$(git status --porcelain --untracked-files=all)"
+    if [[ -z "$worktree_status" ]] \
+      && git rev-parse --verify refs/remotes/origin/main >/dev/null 2>&1 \
+      && git merge-base --is-ancestor "$resolved_commit" refs/remotes/origin/main; then
+      resolved_ref="refs/heads/main"
+    else
+      resolved_ref="refs/unverified"
+    fi
   elif [[ -n "${APP_GIT_COMMIT:-}" ]]; then
     resolved_commit="$APP_GIT_COMMIT"
   fi
@@ -125,6 +136,7 @@ set_deploy_identity() {
     return 1
   fi
   export APP_GIT_COMMIT="$resolved_commit"
+  export APP_GIT_REF="$resolved_ref"
 }
 
 wait_for_http() {
