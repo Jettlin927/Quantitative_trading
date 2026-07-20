@@ -71,13 +71,14 @@ export function App() {
   const selectedCatalogRef = useRef({ kind: '', code: '' })
   const selectedStrategyIdRef = useRef('')
   const selectedResearchIdRef = useRef('')
+  const submittedStockQueryRef = useRef('')
 
   async function refreshAll(refreshCoverage = false) {
     setLoading(true)
     setResearchLoading(true)
     setGlobalError('')
     setResearchError('')
-    const stockPageRequest = beginStockPageRequest(buildStockScreenPath(query, 0))
+    const stockPageRequest = beginStockPageRequest(buildStockScreenPath(submittedStockQueryRef.current, 0))
     const requests = [
       ['health', '/api/health?include_counts=false'],
       ['progress', '/api/tushare/sync-progress?include_coverage=false'],
@@ -312,8 +313,14 @@ export function App() {
     return loadResearchDetailData(profileResult.researchId)
   }
 
-  async function loadStocks(offset = 0) {
-    const request = beginStockPageRequest(buildStockScreenPath(query, offset))
+  async function submitStockSearch() {
+    const submittedQuery = query.trim()
+    submittedStockQueryRef.current = submittedQuery
+    await loadStocks(0, submittedQuery)
+  }
+
+  async function loadStocks(offset = 0, submittedQuery = submittedStockQueryRef.current) {
+    const request = beginStockPageRequest(buildStockScreenPath(submittedQuery, offset))
     setStockListError('')
     try {
       const page = await fetchJson(request.path)
@@ -432,7 +439,7 @@ export function App() {
               stockPage={stockPage}
               query={query}
               setQuery={setQuery}
-              onSearch={() => loadStocks(0)}
+              onSearch={submitStockSearch}
               onPage={loadStocks}
               selectedCode={selectedCode}
               setSelectedCode={selectStock}
