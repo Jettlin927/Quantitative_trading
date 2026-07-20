@@ -1978,6 +1978,35 @@ button:disabled {
   grid-column: 1 / -1;
 }
 
+.research-publications-panel {
+  grid-column: 1 / -1;
+}
+
+.publication-proposal-grid,
+.quality-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.publication-proposal-grid > *:first-child,
+.quality-detail-grid > *:first-child {
+  border-right: 1px solid var(--line);
+}
+
+.quality-detail-grid > .table-scroll {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--line);
+}
+
+.table-note {
+  display: block;
+  max-width: 520px;
+  margin-top: 3px;
+  color: var(--ink-faint);
+  font-size: 9px;
+  white-space: normal;
+}
+
 .research-timeline {
   max-height: 340px;
   overflow: auto;
@@ -2300,6 +2329,8 @@ button:disabled {
   .operations-grid,
   .research-facts,
   .limits-grid,
+  .publication-proposal-grid,
+  .quality-detail-grid,
   .evidence-matrix { grid-template-columns: 1fr; }
   .cockpit-metrics .summary-metric,
   .inventory-strip .summary-metric { border-right: 0; border-bottom: 1px solid var(--line); }
