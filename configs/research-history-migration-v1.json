@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "issueNumber": 21,
+  "expectedSourceRunCount": 50,
+  "sourceManifest": "docs/research/strategy-results/manifest.json",
+  "reproductionEvidence": "docs/research/strategy-results/reproduction-evidence-20260719.json",
+  "currentResearch": [
+    {
+      "strategyId": "etf_volatility_managed",
+      "displayName": "沪深300 ETF 波动率管理",
+      "resultSetId": "etf-volatility-managed-20260713",
+      "issueVersion": 1,
+      "runIdentityPath": ["reproduction"],
+      "evaluationPath": [],
+      "economicThesisPath": ["strategyProfile", "economicHypothesis"],
+      "supportingEvidencePaths": [["supportingEvidence"]],
+      "opposingEvidencePaths": [["opposingEvidence"]],
+      "missingEvidencePaths": [["missingEvidence"]],
+      "limitationPaths": [["strategyProfile", "failureMechanisms"]],
+      "followUpRecommendationPaths": [["optimizationDirections"]],
+      "expectedConclusion": "不通过"
+    },
+    {
+      "strategyId": "etf_low_volatility_gate",
+      "displayName": "沪深300 ETF 低波动准入",
+      "resultSetId": "etf-volatility-managed-20260713",
+      "issueVersion": 2,
+      "runIdentityPath": ["lowVolatilityGateFollowup", "reproduction"],
+      "evaluationPath": ["lowVolatilityGateFollowup"],
+      "economicThesisPath": ["lowVolatilityGateFollowup", "rule"],
+      "supportingEvidencePaths": [["lowVolatilityGateFollowup", "supportingEvidence"]],
+      "opposingEvidencePaths": [["lowVolatilityGateFollowup", "opposingEvidence"]],
+      "missingEvidencePaths": [["lowVolatilityGateFollowup", "missingEvidence"]],
+      "limitationPaths": [["lowVolatilityGateFollowup", "interpretation"]],
+      "followUpRecommendationPaths": [],
+      "expectedConclusion": "不通过"
+    },
+    {
+      "strategyId": "etf_trend_120d",
+      "displayName": "沪深300 ETF 120 日均线趋势",
+      "resultSetId": "etf-trend-120d-long-history-20260713",
+      "issueVersion": 3,
+      "runIdentityPath": ["runIdentities"],
+      "evaluationPath": [],
+      "economicThesisPath": ["strategyProfile", "rule"],
+      "supportingEvidencePaths": [["evidence", "supports"]],
+      "opposingEvidencePaths": [["evidence", "against"]],
+      "missingEvidencePaths": [["evidence", "missing"]],
+      "limitationPaths": [["nextStep", "stop"], ["nextStep", "boundary"]],
+      "followUpRecommendationPaths": [["nextStep"]],
+      "expectedConclusion": "不通过"
+    },
+    {
+      "strategyId": "a_share_b1_trend_pullback",
+      "displayName": "A 股 B1 趋势回调公开规则近似复现",
+      "resultSetId": "a-share-b1-trend-pullback-20260713",
+      "issueVersion": 4,
+      "runIdentityPath": ["runIdentities"],
+      "evaluationPath": [],
+      "economicThesisPath": ["strategyProfile", "economicHypothesis"],
+      "supportingEvidencePaths": [["supportingEvidence"]],
+      "opposingEvidencePaths": [["opposingEvidence"]],
+      "missingEvidencePaths": [["missingEvidence"]],
+      "limitationPaths": [["strategyProfile", "failureModes"], ["stopConditions"]],
+      "followUpRecommendationPaths": [["optimization"]],
+      "expectedConclusion": "不通过"
+    }
+  ],
+  "legacyArchives": [
+    {
+      "strategyId": "legacy_b1_standard_phased",
+      "displayName": "B1 标准分阶段回测（历史档案）",
+      "resultSetId": "b1-standard-phased-backtest-20260627"
+    },
+    {
+      "strategyId": "legacy_ma_trend_reversal",
+      "displayName": "均线趋势与趋势反转（历史档案）",
+      "resultSetId": "ma-trend-reversal-20260629"
+    },
+    {
+      "strategyId": "legacy_value_sector_stopfall",
+      "displayName": "低估质量与行业止跌（历史档案）",
+      "resultSetId": "value-sector-stopfall-20260629"
+    }
+  ]
+}
