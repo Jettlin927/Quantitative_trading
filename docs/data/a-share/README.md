@@ -14,6 +14,10 @@
 ## 验证入口
 
 - 数据覆盖：`GET /api/db/overview`
+- 股票筛选与分页：`GET /api/stocks/screen`
+- 股票聚合详情：`GET /api/stocks/{ts_code}/detail`
+- 估值与财务历史：`GET /api/stocks/{ts_code}/valuation-history`、`GET /api/stocks/{ts_code}/financial-history`
+- 指数、ETF 与行业目录：`GET /api/indices`、`GET /api/funds`、`GET /api/industries`
 - 同步进度：`GET /api/tushare/sync-progress`
 - 研究 readiness：`GET /api/research/readiness`
 - 数据质量与研究合同：[量化研究可信合同](../../research/contracts/quant-foundation-trust-contract.md)

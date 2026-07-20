@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "lint:file": "eslint",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "preview": "vite preview --host 0.0.0.0"
   },
@@ -18,14 +19,18 @@
     "react": "latest",
     "react-dom": "latest",
     "typescript": "latest",
-    "vite": "latest"
+    "vite": "^8.1.5"
   },
   "devDependencies": {
     "@eslint/js": "latest",
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
     "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
-    "globals": "latest"
+    "globals": "latest",
+    "jsdom": "latest",
+    "vitest": "latest"
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-arm64-musl": "^1.0.2",

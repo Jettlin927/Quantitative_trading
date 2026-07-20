@@ -1,259 +1,466 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   Activity,
-  AlertTriangle,
   BarChart3,
-  CheckCircle2,
+  BookOpenCheck,
   ChevronRight,
   Clock3,
   Database,
-  DownloadCloud,
-  Gauge,
-  History,
+  Globe2,
   ListChecks,
   RefreshCw,
-  Search,
   Server,
   ShieldCheck,
-  Table2,
-  XCircle,
 } from 'lucide-react'
-import {
-  CandlestickSeries,
-  HistogramSeries,
-  LineSeries,
-  createChart,
-} from 'lightweight-charts'
+import { AShareDataView } from './AShareDataView.jsx'
+import { OperationsView } from './OperationsView.jsx'
+import { ResearchCockpitView } from './ResearchCockpitView.jsx'
+import { USDataBoundaryView } from './USDataBoundaryView.jsx'
+import { Notice, isInventoryAvailable, translateStatus } from './viewSupport.jsx'
 import './styles.css'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
-
-const TERMINAL_JOB_STATUSES = new Set(['ok', 'partial', 'failed'])
-const CHART_RANGES = [
-  { id: 'recent', label: '近 180 日' },
-  { id: '1y', label: '近 1 年' },
-  { id: '3y', label: '近 3 年' },
-  { id: '5y', label: '近 5 年' },
-  { id: 'all', label: '全部历史' },
-]
+const STOCK_PAGE_SIZE = 50
 
 const NAV_ITEMS = [
-  { id: 'overview', label: '研究总览', eyebrow: 'OVERVIEW', icon: Gauge },
-  { id: 'data', label: '数据资产', eyebrow: 'DATA ASSETS', icon: Database },
-  { id: 'stocks', label: '标的研究', eyebrow: 'SECURITY LAB', icon: BarChart3 },
-  { id: 'runs', label: '运行记录', eyebrow: 'RUN LOG', icon: History },
+  { id: 'research', label: '研究驾驶舱', eyebrow: '结构化研究', icon: BookOpenCheck },
+  { id: 'a-share', label: 'A 股数据', eyebrow: '实际市场数据', icon: BarChart3 },
+  { id: 'us-data', label: '美股数据', eyebrow: '数据边界', icon: Globe2 },
+  { id: 'operations', label: '系统运维', eyebrow: '只读运行事实', icon: Server },
 ]
 
-function App() {
-  const [activeView, setActiveView] = useState('overview')
+export function App() {
+  const [activeView, setActiveView] = useState('research')
   const [health, setHealth] = useState(null)
   const [overview, setOverview] = useState(null)
   const [syncProgress, setSyncProgress] = useState(null)
   const [readiness, setReadiness] = useState({ stocks: null, etf: null })
-  const [stocks, setStocks] = useState([])
+  const [stockPage, setStockPage] = useState({ items: [], total: 0, limit: STOCK_PAGE_SIZE, offset: 0 })
+  const [catalogs, setCatalogs] = useState({ indices: [], funds: [], industries: [] })
+  const [selectedCatalog, setSelectedCatalog] = useState({ kind: '', code: '' })
+  const [catalogDetail, setCatalogDetail] = useState({ kind: '', code: '', bars: [], adjustments: [], members: [] })
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [catalogError, setCatalogError] = useState('')
   const [usDb, setUsDb] = useState(null)
+  const [strategies, setStrategies] = useState([])
+  const [selectedStrategyId, setSelectedStrategyId] = useState('')
+  const [strategyProfile, setStrategyProfile] = useState(null)
+  const [selectedResearchId, setSelectedResearchId] = useState('')
+  const [researchDetail, setResearchDetail] = useState(null)
+  const [publication, setPublication] = useState(null)
   const [query, setQuery] = useState('')
   const [selectedCode, setSelectedCode] = useState('')
   const [stockBars, setStockBars] = useState([])
-  const [fundamentals, setFundamentals] = useState(null)
+  const [stockDetail, setStockDetail] = useState(null)
+  const [stockDataCode, setStockDataCode] = useState('')
   const [loading, setLoading] = useState(false)
+  const [researchLoading, setResearchLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [actionJobs, setActionJobs] = useState({})
-  const [actionResult, setActionResult] = useState(null)
-  const [error, setError] = useState('')
+  const [globalError, setGlobalError] = useState('')
+  const [researchError, setResearchError] = useState('')
+  const [stockListError, setStockListError] = useState('')
+  const [stockDetailError, setStockDetailError] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
-  const pollingJobsRef = useRef(new Set())
+  const stockRequestId = useRef(0)
+  const catalogRequestId = useRef(0)
+  const strategyRequestId = useRef(0)
+  const researchRequestId = useRef(0)
+  const stockPageRequestRef = useRef({ id: 0, path: '' })
+  const selectedCodeRef = useRef('')
+  const selectedCatalogRef = useRef({ kind: '', code: '' })
+  const selectedStrategyIdRef = useRef('')
+  const selectedResearchIdRef = useRef('')
+  const appliedStockQueryRef = useRef('')
 
   async function refreshAll(refreshCoverage = false) {
     setLoading(true)
-    setError('')
-    try {
-      const q = query.trim()
-      const [healthRes, progressRes, stockReadyRes, etfReadyRes, stockListRes, usDbRes, jobsRes] = await Promise.all([
-        fetchJson('/api/health?include_counts=false'),
-        fetchJson('/api/tushare/sync-progress?include_coverage=false'),
-        fetchJson('/api/research/readiness?scope=a_share_cross_section'),
-        fetchJson('/api/research/readiness?scope=etf_time_series'),
-        fetchJson(`/api/stocks?limit=120${q ? `&q=${encodeURIComponent(q)}` : ''}`),
-        fetchJson('/api/us-research/db-overview'),
-        fetchJson('/api/sync-jobs?limit=50'),
-      ])
-      setHealth(healthRes)
-      setSyncProgress(progressRes)
-      setReadiness({ stocks: stockReadyRes, etf: etfReadyRes })
-      setStocks(stockListRes)
-      setUsDb(usDbRes)
-      setActionJobs(latestJobsByAction(jobsRes))
-      setLastUpdated(new Date())
-      if (!selectedCode && stockListRes[0]) setSelectedCode(stockListRes[0].ts_code)
-      for (const job of jobsRes) {
-        if (isActiveJob(job)) void pollSyncJob(job.action, job.id)
+    setResearchLoading(true)
+    setGlobalError('')
+    setResearchError('')
+    const stockPageRequest = beginStockPageRequest(buildStockScreenPath(appliedStockQueryRef.current, 0))
+    const requests = [
+      ['health', '/api/health?include_counts=false'],
+      ['progress', '/api/tushare/sync-progress?include_coverage=false'],
+      ['stockReadiness', '/api/research/readiness?scope=a_share_cross_section'],
+      ['etfReadiness', '/api/research/readiness?scope=etf_time_series'],
+      ['overview', `/api/db/overview${refreshCoverage ? '?refresh=true' : ''}`],
+      ['stocks', stockPageRequest.path],
+      ['indices', '/api/indices?limit=1000'],
+      ['funds', '/api/funds?limit=1000'],
+      ['industries', '/api/industries?limit=1000'],
+      ['usDb', '/api/us-research/db-overview'],
+      ['strategies', '/api/research/strategies'],
+    ]
+    const results = await Promise.allSettled(requests.map(([, path]) => fetchJson(path)))
+    const failures = []
+    let stockPageRefreshed = true
+    results.forEach((result, index) => {
+      const key = requests[index][0]
+      if (key === 'stocks' && !isCurrentStockPageRequest(stockPageRequest)) {
+        stockPageRefreshed = false
+        return
       }
-      void fetchJson(`/api/db/overview${refreshCoverage ? '?refresh=true' : ''}`)
-        .then((overviewRes) => setOverview(overviewRes))
-        .catch((err) => setError(errorMessage(err)))
-      void fetchJson(`/api/stocks/screen?limit=120${q ? `&q=${encodeURIComponent(q)}` : ''}`)
-        .then((stocksRes) => setStocks(stocksRes))
-        .catch((err) => setError(errorMessage(err)))
+      if (result.status === 'rejected') {
+        if (key === 'stocks') setStockListError(errorMessage(result.reason))
+        if (key === 'strategies') {
+          setResearchError(errorMessage(result.reason))
+          setResearchLoading(false)
+        }
+        failures.push(`${key}: ${errorMessage(result.reason)}`)
+        return
+      }
+      const value = result.value
+      if (key === 'health') setHealth(value)
+      if (key === 'progress') setSyncProgress(value)
+      if (key === 'stockReadiness') setReadiness((current) => ({ ...current, stocks: value }))
+      if (key === 'etfReadiness') setReadiness((current) => ({ ...current, etf: value }))
+      if (key === 'overview') setOverview(value)
+      if (key === 'stocks') {
+        setStockListError('')
+        applyStockPage(value)
+      }
+      if (key === 'indices') {
+        setCatalogs((current) => ({ ...current, indices: value }))
+        if (!selectedCatalogRef.current.code && value.length) selectCatalog('index', value[0].tsCode)
+      }
+      if (key === 'funds') {
+        setCatalogs((current) => ({ ...current, funds: value }))
+        if (!selectedCatalogRef.current.code && value.length) selectCatalog('fund', value[0].tsCode)
+      }
+      if (key === 'industries') {
+        setCatalogs((current) => ({ ...current, industries: value }))
+        if (!selectedCatalogRef.current.code && value.length) selectCatalog('industry', value[0].indexCode)
+      }
+      if (key === 'usDb') setUsDb(value)
+      if (key === 'strategies') {
+        setStrategies(value)
+        const current = selectedStrategyIdRef.current
+        const next = value.some((item) => item.strategy_id === current) ? current : value[0]?.strategy_id || ''
+        if (next !== current) selectStrategy(next)
+        if (!value.length) {
+          setResearchLoading(false)
+          setStrategyProfile(null)
+          setResearchDetail(null)
+          setPublication(null)
+        }
+      }
+    })
+    const detailResults = refreshCoverage ? await Promise.all([
+      Promise.resolve(stockPageRefreshed),
+      selectedCodeRef.current ? loadSelectedStockData(selectedCodeRef.current) : Promise.resolve(true),
+      selectedCatalogRef.current.code ? loadSelectedCatalogData(selectedCatalogRef.current) : Promise.resolve(true),
+      refreshSelectedResearchData(selectedStrategyIdRef.current),
+    ]) : [true]
+    if (failures.length) setGlobalError(`部分只读数据读取失败：${failures.join('；')}`)
+    if (refreshCoverage && !failures.length && detailResults.every(Boolean)) setLastUpdated(new Date())
+    setResearchLoading(false)
+    setLoading(false)
+  }
+
+  function applyStockPage(page) {
+    setStockPage(page)
+    const current = selectedCodeRef.current
+    const nextCode = page.items.some((item) => item.ts_code === current) ? current : page.items[0]?.ts_code || ''
+    selectStock(nextCode)
+  }
+
+  function selectStock(tsCode) {
+    if (tsCode === selectedCodeRef.current) {
+      if (!tsCode) setDetailLoading(false)
+      return
+    }
+    selectedCodeRef.current = tsCode
+    stockRequestId.current += 1
+    setSelectedCode(tsCode)
+    setStockDataCode('')
+    setStockBars([])
+    setStockDetail(null)
+    setStockDetailError('')
+    if (!tsCode) setDetailLoading(false)
+  }
+
+  function selectCatalog(kind, code) {
+    if (selectedCatalogRef.current.kind === kind && selectedCatalogRef.current.code === code) return
+    const next = { kind, code }
+    selectedCatalogRef.current = next
+    catalogRequestId.current += 1
+    setSelectedCatalog(next)
+    setCatalogDetail({ ...next, bars: [], adjustments: [], members: [] })
+    setCatalogError('')
+  }
+
+  const loadSelectedStockData = useCallback(async (requestedCode) => {
+    const requestId = stockRequestId.current + 1
+    stockRequestId.current = requestId
+    setDetailLoading(true)
+    setStockDataCode('')
+    setStockBars([])
+    setStockDetail(null)
+    try {
+      const [barsRes, detailRes] = await Promise.all([
+        fetchJson(`/api/daily-bars?ts_code=${encodeURIComponent(requestedCode)}`),
+        fetchJson(`/api/stocks/${encodeURIComponent(requestedCode)}/detail`),
+      ])
+      if (requestId !== stockRequestId.current || requestedCode !== selectedCodeRef.current) return false
+      setStockDataCode(requestedCode)
+      setStockBars(barsRes)
+      setStockDetail(detailRes)
+      setStockDetailError('')
+      return true
     } catch (err) {
-      setError(errorMessage(err))
+      if (requestId === stockRequestId.current) setStockDetailError(errorMessage(err))
+      return false
     } finally {
-      setLoading(false)
+      if (requestId === stockRequestId.current) setDetailLoading(false)
+    }
+  }, [])
+
+  const loadSelectedCatalogData = useCallback(async (requested) => {
+    const requestId = catalogRequestId.current + 1
+    catalogRequestId.current = requestId
+    setCatalogLoading(true)
+    setCatalogError('')
+    setCatalogDetail({ ...requested, bars: [], adjustments: [], members: [] })
+    try {
+      const { startDate, endDate } = recentCatalogRange()
+      let detail
+      if (requested.kind === 'index') {
+        const bars = await fetchJson(`/api/indices/${encodeURIComponent(requested.code)}/daily-bars?start_date=${startDate}&end_date=${endDate}`)
+        detail = { ...requested, bars, adjustments: [], members: [] }
+      } else if (requested.kind === 'fund') {
+        const [bars, adjustments] = await Promise.all([
+          fetchJson(`/api/funds/${encodeURIComponent(requested.code)}/daily-bars?start_date=${startDate}&end_date=${endDate}`),
+          fetchJson(`/api/funds/${encodeURIComponent(requested.code)}/adjust-factors?start_date=${startDate}&end_date=${endDate}`),
+        ])
+        detail = { ...requested, bars, adjustments, members: [] }
+      } else {
+        const members = await fetchJson(`/api/industries/${encodeURIComponent(requested.code)}/members?trade_date=${endDate}`)
+        detail = { ...requested, bars: [], adjustments: [], members }
+      }
+      const isCurrent = requestId === catalogRequestId.current
+        && requested.kind === selectedCatalogRef.current.kind
+        && requested.code === selectedCatalogRef.current.code
+      if (isCurrent) setCatalogDetail(detail)
+      return isCurrent
+    } catch (err) {
+      if (requestId === catalogRequestId.current) setCatalogError(errorMessage(err))
+      return false
+    } finally {
+      if (requestId === catalogRequestId.current) setCatalogLoading(false)
+    }
+  }, [])
+
+  const loadStrategyProfileData = useCallback(async (strategyId) => {
+    const requestId = strategyRequestId.current + 1
+    strategyRequestId.current = requestId
+    try {
+      const profile = await fetchJson(`/api/research/strategies/${encodeURIComponent(strategyId)}`)
+      if (requestId !== strategyRequestId.current || strategyId !== selectedStrategyIdRef.current) return { ok: false, researchId: '' }
+      setResearchError('')
+      setStrategyProfile(profile)
+      const currentResearchId = selectedResearchIdRef.current
+      const nextResearchId = profile.formal_researches.some((item) => item.id === currentResearchId)
+        ? currentResearchId
+        : profile.formal_researches[0]?.id || ''
+      if (nextResearchId !== currentResearchId) {
+        selectedResearchIdRef.current = nextResearchId
+        researchRequestId.current += 1
+        setSelectedResearchId(nextResearchId)
+        setResearchDetail(null)
+        setPublication(null)
+      }
+      if (!profile.formal_researches.length) {
+        setResearchDetail(null)
+        setPublication(null)
+      }
+      return { ok: true, researchId: nextResearchId }
+    } catch (err) {
+      if (requestId === strategyRequestId.current) setResearchError(errorMessage(err))
+      return { ok: false, researchId: '' }
+    } finally {
+      if (requestId === strategyRequestId.current) setResearchLoading(false)
+    }
+  }, [])
+
+  const loadResearchDetailData = useCallback(async (researchId) => {
+    const requestId = researchRequestId.current + 1
+    researchRequestId.current = requestId
+    try {
+      const detail = await fetchJson(`/api/research/formal-researches/${encodeURIComponent(researchId)}`)
+      if (requestId !== researchRequestId.current || researchId !== selectedResearchIdRef.current) return false
+      const latest = [...detail.publications]
+        .filter((item) => item.status === 'published')
+        .sort((left, right) => right.version - left.version)[0]
+      const projection = latest ? await fetchJson(`/api/research/publications/${encodeURIComponent(latest.id)}`) : null
+      if (requestId !== researchRequestId.current || researchId !== selectedResearchIdRef.current) return false
+      setResearchError('')
+      setResearchDetail(detail)
+      setPublication(projection)
+      return true
+    } catch (err) {
+      if (requestId === researchRequestId.current) setResearchError(errorMessage(err))
+      return false
+    } finally {
+      if (requestId === researchRequestId.current) setResearchLoading(false)
+    }
+  }, [])
+
+  async function refreshSelectedResearchData(strategyId) {
+    if (!strategyId) return true
+    const profileResult = await loadStrategyProfileData(strategyId)
+    if (!profileResult.ok || !profileResult.researchId) return profileResult.ok
+    return loadResearchDetailData(profileResult.researchId)
+  }
+
+  async function submitStockSearch() {
+    await loadStocks(0, query.trim(), true)
+  }
+
+  async function loadStocks(offset = 0, requestedQuery = appliedStockQueryRef.current, applyQueryOnSuccess = false) {
+    const request = beginStockPageRequest(buildStockScreenPath(requestedQuery, offset))
+    setStockListError('')
+    try {
+      const page = await fetchJson(request.path)
+      if (isCurrentStockPageRequest(request)) {
+        if (applyQueryOnSuccess) appliedStockQueryRef.current = requestedQuery
+        applyStockPage(page)
+      }
+    } catch (err) {
+      if (isCurrentStockPageRequest(request)) setStockListError(errorMessage(err))
     }
   }
 
-  async function searchStocks() {
-    setLoading(true)
-    setError('')
-    try {
-      const q = query.trim()
-      const result = await fetchJson(`/api/stocks/screen?limit=120${q ? `&q=${encodeURIComponent(q)}` : ''}`)
-      setStocks(result)
-      if (result[0] && !result.some((item) => item.ts_code === selectedCode)) setSelectedCode(result[0].ts_code)
-    } catch (err) {
-      setError(errorMessage(err))
-    } finally {
-      setLoading(false)
-    }
+  function beginStockPageRequest(path) {
+    const request = { id: stockPageRequestRef.current.id + 1, path }
+    stockPageRequestRef.current = request
+    return request
   }
 
-  async function runDataAction(actionId) {
-    setActionResult(null)
-    setError('')
-    try {
-      const request = buildSyncJobRequest(actionId)
-      const job = await fetchJson('/api/sync-jobs', { method: 'POST', body: JSON.stringify(request) })
-      setActionJobs((current) => ({ ...current, [actionId]: job }))
-      void pollSyncJob(actionId, job.id)
-    } catch (err) {
-      setError(errorMessage(err))
-    }
+  function isCurrentStockPageRequest(request) {
+    return request.id === stockPageRequestRef.current.id && request.path === stockPageRequestRef.current.path
   }
 
-  async function pollSyncJob(actionId, jobId) {
-    if (!jobId || pollingJobsRef.current.has(jobId)) return
-    pollingJobsRef.current.add(jobId)
-    try {
-      let job
-      do {
-        await delay(1500)
-        job = await fetchJson(`/api/sync-jobs/${encodeURIComponent(jobId)}`)
-        setActionJobs((current) => ({ ...current, [actionId]: job }))
-      } while (!TERMINAL_JOB_STATUSES.has(String(job.status).toLowerCase()))
-      setActionResult(job)
-      await refreshAll(true)
-    } catch (err) {
-      setActionJobs((current) => ({
-        ...current,
-        [actionId]: { ...current[actionId], status: 'poll-error', message: `任务状态读取失败：${errorMessage(err)}` },
-      }))
-      setError(errorMessage(err))
-    } finally {
-      pollingJobsRef.current.delete(jobId)
-    }
+  function selectStrategy(strategyId) {
+    if (strategyId === selectedStrategyIdRef.current) return
+    selectedStrategyIdRef.current = strategyId
+    selectedResearchIdRef.current = ''
+    strategyRequestId.current += 1
+    researchRequestId.current += 1
+    setResearchLoading(true)
+    setResearchError('')
+    setStrategyProfile(null)
+    setSelectedResearchId('')
+    setResearchDetail(null)
+    setPublication(null)
+    setSelectedStrategyId(strategyId)
+  }
+
+  function selectResearch(researchId) {
+    if (researchId === selectedResearchIdRef.current) return
+    selectedResearchIdRef.current = researchId
+    researchRequestId.current += 1
+    setResearchLoading(true)
+    setResearchError('')
+    setResearchDetail(null)
+    setPublication(null)
+    setSelectedResearchId(researchId)
   }
 
   useEffect(() => {
-    refreshAll()
+    const timer = window.setTimeout(() => refreshAll(), 0)
+    return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     if (!selectedCode) return undefined
-    let ignore = false
-    async function loadSelectedStock() {
-      setDetailLoading(true)
-      try {
-        const [barsRes, fundamentalsRes] = await Promise.all([
-          fetchJson(`/api/daily-bars?ts_code=${encodeURIComponent(selectedCode)}`),
-          fetchJson(`/api/stocks/${encodeURIComponent(selectedCode)}/fundamentals`),
-        ])
-        if (!ignore) {
-          setStockBars(barsRes)
-          setFundamentals(fundamentalsRes)
-        }
-      } catch (err) {
-        if (!ignore) setError(errorMessage(err))
-      } finally {
-        if (!ignore) setDetailLoading(false)
-      }
-    }
-    loadSelectedStock()
-    return () => {
-      ignore = true
-    }
-  }, [selectedCode, stocks])
+    loadSelectedStockData(selectedCode)
+    return () => { stockRequestId.current += 1 }
+  }, [loadSelectedStockData, selectedCode])
 
+  useEffect(() => {
+    if (!selectedCatalog.code) return undefined
+    loadSelectedCatalogData(selectedCatalog)
+    return () => { catalogRequestId.current += 1 }
+  }, [loadSelectedCatalogData, selectedCatalog])
+
+  useEffect(() => {
+    if (!selectedStrategyId) return undefined
+    const timer = window.setTimeout(() => loadStrategyProfileData(selectedStrategyId), 0)
+    return () => {
+      window.clearTimeout(timer)
+      strategyRequestId.current += 1
+    }
+  }, [loadStrategyProfileData, selectedStrategyId])
+
+  useEffect(() => {
+    if (!selectedResearchId) return undefined
+    const timer = window.setTimeout(() => loadResearchDetailData(selectedResearchId), 0)
+    return () => {
+      window.clearTimeout(timer)
+      researchRequestId.current += 1
+    }
+  }, [loadResearchDetailData, selectedResearchId])
+
+  const stocks = stockPage.items
   const coverageRows = useMemo(() => buildCoverageRows(overview), [overview])
   const syncRuns = useMemo(() => syncProgress?.runs || [], [syncProgress])
-  const auditItems = useMemo(() => buildAuditItems(readiness, syncRuns), [readiness, syncRuns])
   const selectedStock = stocks.find((stock) => stock.ts_code === selectedCode) || stocks[0] || null
-  const selectedLatestBar = stockBars[stockBars.length - 1] || selectedStock || null
+  const selectedStockBars = stockDataCode === selectedCode ? stockBars : []
+  const selectedStockDetail = stockDataCode === selectedCode ? stockDetail : null
+  const selectedLatestBar = selectedStockBars[selectedStockBars.length - 1] || selectedStock || null
 
   return (
     <div className="app-frame">
       <Sidebar activeView={activeView} onNavigate={setActiveView} readiness={readiness} />
-
       <div className="workspace">
-        <Topbar
-          activeView={activeView}
-          health={health}
-          loading={loading}
-          lastUpdated={lastUpdated}
-          onRefresh={() => refreshAll(true)}
-        />
-
+        <Topbar activeView={activeView} health={health} loading={loading} lastUpdated={lastUpdated} onRefresh={() => refreshAll(true)} />
         <main className="workspace-main">
-          {error ? <Notice tone="error" title="操作未完成" text={error} /> : null}
-          {actionResult ? (
-            <Notice
-              tone={actionResult.status === 'ok' ? 'success' : actionResult.status === 'failed' ? 'error' : 'warning'}
-              title={actionResult.status === 'ok' ? '同步任务已完成' : actionResult.status === 'failed' ? '同步任务失败' : '同步任务部分完成'}
-              text={actionResult.message || `写入 ${formatInt(actionResult.rowsUpserted)} 行；覆盖与 readiness 已刷新。`}
+          {globalError ? <Notice tone="warning" title="部分数据暂不可用" text={globalError} /> : null}
+          {activeView === 'research' ? (
+            <ResearchCockpitView
+              strategies={strategies}
+              selectedStrategyId={selectedStrategyId}
+              setSelectedStrategyId={selectStrategy}
+              strategyProfile={strategyProfile}
+              selectedResearchId={selectedResearchId}
+              setSelectedResearchId={selectResearch}
+              researchDetail={researchDetail}
+              publication={publication}
+              loading={researchLoading}
+              error={researchError}
             />
           ) : null}
-
-          {activeView === 'overview' ? (
-            <OverviewView
+          {activeView === 'a-share' ? (
+            <AShareDataView
+              coverageRows={coverageRows}
               readiness={readiness}
-              coverageRows={coverageRows}
-              auditItems={auditItems}
-              syncRuns={syncRuns}
-              overview={overview}
-              onOpenData={() => setActiveView('data')}
-              onOpenStocks={() => setActiveView('stocks')}
-            />
-          ) : null}
-
-          {activeView === 'data' ? (
-            <DataAssetsView
-              coverageRows={coverageRows}
-              syncRuns={syncRuns}
-              actionJobs={actionJobs}
-              onRunAction={runDataAction}
-            />
-          ) : null}
-
-          {activeView === 'stocks' ? (
-            <StockLabView
               stocks={stocks}
+              stockPage={stockPage}
               query={query}
               setQuery={setQuery}
-              onSearch={searchStocks}
+              onSearch={submitStockSearch}
+              onPage={loadStocks}
               selectedCode={selectedCode}
-              setSelectedCode={setSelectedCode}
+              setSelectedCode={selectStock}
               selectedStock={selectedStock}
               selectedLatestBar={selectedLatestBar}
-              stockBars={stockBars}
-              fundamentals={fundamentals}
+              stockBars={selectedStockBars}
+              stockDetail={selectedStockDetail}
+              catalogs={catalogs}
+              selectedCatalog={selectedCatalog}
+              setSelectedCatalog={selectCatalog}
+              catalogDetail={catalogDetail}
+              catalogLoading={catalogLoading}
+              catalogError={catalogError}
+              syncRuns={syncRuns}
               detailLoading={detailLoading}
+              error={[stockListError, stockDetailError].filter(Boolean).join('；')}
             />
           ) : null}
-
-          {activeView === 'runs' ? (
-            <RunLogView syncRuns={syncRuns} usDb={usDb} actionJobs={actionJobs} onRunAction={runDataAction} />
-          ) : null}
+          {activeView === 'us-data' ? <USDataBoundaryView usDb={usDb} /> : null}
+          {activeView === 'operations' ? <OperationsView health={health} readiness={readiness} coverageRows={coverageRows} syncRuns={syncRuns} /> : null}
         </main>
       </div>
     </div>
@@ -266,35 +473,21 @@ function Sidebar({ activeView, onNavigate, readiness }) {
     <aside className="sidebar">
       <div className="brand-lockup">
         <span className="brand-mark"><Activity size={18} /></span>
-        <div>
-          <b>QUANT RESEARCH</b>
-          <small>量化研究工作台</small>
-        </div>
+        <div><b>量化研究</b><small>量化研究工作台</small></div>
       </div>
-
       <nav className="side-nav" aria-label="主导航">
         {NAV_ITEMS.map(({ id, label, eyebrow, icon: Icon }) => (
-          <button
-            className={activeView === id ? 'active' : ''}
-            key={id}
-            onClick={() => onNavigate(id)}
-            aria-current={activeView === id ? 'page' : undefined}
-          >
-            <Icon size={18} />
-            <span><small>{eyebrow}</small>{label}</span>
-            <ChevronRight size={14} />
+          <button className={activeView === id ? 'active' : ''} key={id} onClick={() => onNavigate(id)} aria-current={activeView === id ? 'page' : undefined}>
+            <Icon size={18} /><span><small>{eyebrow}</small>{label}</span><ChevronRight size={14} />
           </button>
         ))}
       </nav>
-
       <div className="sidebar-foot">
         <div className="sidebar-readiness">
-          <span><ShieldCheck size={15} /> 数据库存</span>
-          <strong>{inventoryCount}/2 AVAILABLE</strong>
+          <span><ShieldCheck size={15} /> 数据库存</span><strong>{inventoryCount}/2 可用</strong>
           <div className="mini-track"><i style={{ width: `${inventoryCount * 50}%` }} /></div>
         </div>
-        <p><i /> RESEARCH ONLY</p>
-        <small>无券商连接 · 无真实交易</small>
+        <p><i /> 仅限研究</p><small>无券商连接 · 无真实交易</small>
       </div>
     </aside>
   )
@@ -302,512 +495,23 @@ function Sidebar({ activeView, onNavigate, readiness }) {
 
 function Topbar({ activeView, health, loading, lastUpdated, onRefresh }) {
   const current = NAV_ITEMS.find((item) => item.id === activeView) || NAV_ITEMS[0]
-  const healthy = health?.status === 'ok'
   return (
     <header className="topbar">
-      <div className="page-identity">
-        <span>{current.eyebrow}</span>
-        <h1>{current.label}</h1>
-      </div>
+      <div className="page-identity"><span>{current.eyebrow}</span><h1>{current.label}</h1></div>
       <div className="system-strip" aria-label="系统状态">
-        <SystemState label="API" value={health?.status || 'UNKNOWN'} healthy={healthy} icon={Server} />
-        <SystemState label="PostgreSQL" value={health?.database || 'UNKNOWN'} healthy={['connected', 'ok'].includes(health?.database)} icon={Database} />
-        <SystemState
-          label="Worker"
-          value={health?.worker ? `${health.worker.status} · ${health.worker.ageSeconds ?? '-'}s` : 'UNKNOWN'}
-          healthy={health?.worker?.status === 'ok' && !health.worker.stale}
-          icon={Activity}
-        />
-        <SystemState
-          label="Queue"
-          value={health?.queue ? `${health.queue.active} ACTIVE` : 'UNKNOWN'}
-          healthy={Boolean(health?.queue) && health.queue.status !== 'stalled'}
-          icon={ListChecks}
-        />
+        <SystemState label="API" value={translateStatus(health?.status)} healthy={health?.status === 'ok'} icon={Server} />
+        <SystemState label="PostgreSQL" value={translateStatus(health?.database)} healthy={['connected', 'ok'].includes(health?.database)} icon={Database} />
+        <SystemState label="同步 Worker" value={health?.worker ? `${translateStatus(health.worker.status)} · ${health.worker.ageSeconds ?? '-'} 秒` : '未知'} healthy={health?.worker?.status === 'ok' && !health.worker.stale} icon={Activity} />
+        <SystemState label="同步队列" value={health?.queue ? `${health.queue.active} 个运行中` : '未知'} healthy={Boolean(health?.queue) && health.queue.status !== 'stalled'} icon={ListChecks} />
         <span className="updated-at"><Clock3 size={14} /> {lastUpdated ? lastUpdated.toLocaleTimeString() : '尚未刷新'}</span>
-        <button className="primary-action" onClick={onRefresh} disabled={loading}>
-          <RefreshCw size={15} className={loading ? 'spin' : ''} />
-          全局刷新
-        </button>
+        <button className="primary-action" onClick={onRefresh} disabled={loading}><RefreshCw size={15} className={loading ? 'spin' : ''} />全局刷新</button>
       </div>
     </header>
   )
 }
 
 function SystemState({ label, value, healthy, icon: Icon }) {
-  return (
-    <span className="system-state">
-      <Icon size={14} />
-      <b>{label}</b>
-      <i className={healthy ? 'good' : 'bad'} />
-      {String(value).toUpperCase()}
-    </span>
-  )
-}
-
-function OverviewView({ readiness, coverageRows, auditItems, syncRuns, overview, onOpenData, onOpenStocks }) {
-  const aShare = overview?.aShare || {}
-  return (
-    <div className="view-stack enter">
-      <section className="readiness-grid">
-        <ReadinessCard
-          title="A股横截面"
-          eyebrow="CROSS-SECTION"
-          data={readiness.stocks}
-          accent="cyan"
-          onAction={onOpenData}
-        />
-        <ReadinessCard
-          title="ETF 时序"
-          eyebrow="TIME-SERIES"
-          data={readiness.etf}
-          accent="amber"
-          onAction={onOpenData}
-        />
-        <AuditCard items={auditItems} />
-      </section>
-
-      <section className="overview-grid">
-        <Panel title="数据覆盖矩阵" eyebrow="DATA COVERAGE" action="查看全部" onAction={onOpenData} className="coverage-panel">
-          <CoverageMatrix rows={coverageRows.slice(0, 8)} />
-        </Panel>
-        <Panel title="最近同步任务" eyebrow="SYNC QUEUE" action="运行记录" onAction={onOpenData} className="queue-panel">
-          <RunTable runs={syncRuns.slice(0, 7)} compact />
-        </Panel>
-      </section>
-
-      <section className="summary-ribbon" aria-label="数据库摘要">
-        <SummaryMetric label="A股标的" value={formatInt(aShare.stocks)} detail="stocks" />
-        <SummaryMetric label="日线记录" value={formatCompact(aShare.dailyBars?.rows)} detail={dateRange(aShare.dailyBars)} />
-        <SummaryMetric label="复权因子" value={formatCompact(aShare.adjustFactors?.rows)} detail={`${formatInt(aShare.adjustFactors?.symbols)} symbols`} />
-        <SummaryMetric label="指数日线" value={formatCompact(aShare.indexDailyBars?.rows)} detail={`${formatInt(aShare.indices?.rows)} indices`} />
-        <SummaryMetric label="ETF 日线" value={formatCompact(aShare.fundDailyBars?.rows)} detail={`${formatInt(aShare.funds?.rows)} funds`} />
-        <button className="summary-cta" onClick={onOpenStocks}>
-          进入标的研究 <ChevronRight size={16} />
-        </button>
-      </section>
-    </div>
-  )
-}
-
-function ReadinessCard({ title, eyebrow, data, accent, onAction }) {
-  const available = isInventoryAvailable(data)
-  const required = data?.requiredTables?.length || 0
-  const blockers = data?.blockers?.length || 0
-  const progress = required ? Math.round(((required - blockers) / required) * 100) : 0
-  const issues = [...(data?.missingTables || []), ...(data?.emptyTables || [])]
-  return (
-    <article className={`readiness-card ${accent} ${available ? 'ready' : 'blocked'}`}>
-      <header>
-        <div className="readiness-icon">{available ? <CheckCircle2 size={23} /> : <AlertTriangle size={23} />}</div>
-        <div><span>{eyebrow}</span><h2>{title}</h2></div>
-        <Badge value={available ? 'INVENTORY OK' : 'INCOMPLETE'} />
-      </header>
-      <div className="readiness-progress">
-        <div><span>数据门禁完成度</span><strong>{progress}%</strong></div>
-        <div className="progress-track"><i style={{ width: `${progress}%` }} /></div>
-      </div>
-      <div className="readiness-detail">
-        <span>{available ? '基础表库存可用；研究级仍需质量运行' : `发现 ${issues.length} 个库存缺口`}</span>
-        <ul>
-          {(issues.length ? issues : ['仅证明关键表存在且非空']).slice(0, 3).map((item) => (
-            <li key={item}><i /> {formatTableName(item)}</li>
-          ))}
-        </ul>
-      </div>
-      <button className="card-action" onClick={onAction}>
-        {available ? '检查覆盖明细' : '补齐基础数据'} <ChevronRight size={15} />
-      </button>
-    </article>
-  )
-}
-
-function AuditCard({ items }) {
-  const problems = items.filter((item) => item.tone !== 'good')
-  return (
-    <article className="audit-card">
-      <header><div><span>AUDIT & ANOMALY</span><h2>异常与审计</h2></div><Badge value={problems.length ? `${problems.length} ISSUES` : 'CLEAR'} /></header>
-      <div className="audit-list">
-        {items.slice(0, 5).map((item) => (
-          <div className={`audit-item ${item.tone}`} key={item.id}>
-            {item.tone === 'good' ? <CheckCircle2 size={15} /> : item.tone === 'bad' ? <XCircle size={15} /> : <AlertTriangle size={15} />}
-            <span><b>{item.title}</b><small>{item.detail}</small></span>
-          </div>
-        ))}
-      </div>
-    </article>
-  )
-}
-
-function DataAssetsView({ coverageRows, syncRuns, actionJobs, onRunAction }) {
-  return (
-    <div className="view-stack enter">
-      <section className="section-heading">
-        <div><span>DATA OPERATIONS</span><h2>数据资产与同步控制</h2><p>先补齐门禁数据，再开始研究。按钮使用服务器环境中的 Tushare token，不会在浏览器中读取凭据。</p></div>
-      </section>
-
-      <section className="action-grid">
-        <SyncAction
-          id="trade_calendar"
-          title="刷新交易日历"
-          detail="同步最近 3 个月交易日，校准所有研究时间轴。"
-          icon={Clock3}
-          job={actionJobs.trade_calendar}
-          onRun={onRunAction}
-        />
-        <SyncAction
-          id="stock_listings"
-          title="刷新历史上市状态"
-          detail="同步 L / D / P / G，避免只看当前上市股票。"
-          icon={ListChecks}
-          job={actionJobs.stock_listings}
-          onRun={onRunAction}
-        />
-        <SyncAction
-          id="market_bundle"
-          title="补齐近 10 日市场数据"
-          detail="批量补日线、涨跌停价格和停复牌事件。"
-          icon={Activity}
-          job={actionJobs.market_bundle}
-          onRun={onRunAction}
-        />
-      </section>
-
-      <section className="data-detail-grid">
-        <Panel title="全部数据覆盖" eyebrow="POSTGRESQL TABLES" className="full-coverage">
-          <CoverageMatrix rows={coverageRows} detailed />
-        </Panel>
-        <Panel title="同步执行记录" eyebrow="RECENT WRITES" className="full-runs">
-          <RunTable runs={syncRuns} />
-        </Panel>
-      </section>
-    </div>
-  )
-}
-
-function SyncAction({ id, title, detail, icon: Icon, job, onRun }) {
-  const running = isActiveJob(job)
-  return (
-    <article className={`sync-action ${running ? 'running' : ''}`}>
-      <span className="sync-icon"><Icon size={20} /></span>
-      <div><h3>{title}</h3><p>{detail}</p></div>
-      {job ? (
-        <div className="sync-job-state">
-          <Badge value={job.status} />
-          <span>{job.message || (job.status === 'queued' ? '任务已进入后台队列' : `最近写入 ${formatInt(job.rowsUpserted)} 行`)}</span>
-        </div>
-      ) : null}
-      <button onClick={() => onRun(id)} disabled={running}>
-        <RefreshCw size={14} className={running ? 'spin' : ''} /> {jobButtonText(job)}
-      </button>
-    </article>
-  )
-}
-
-function StockLabView({
-  stocks,
-  query,
-  setQuery,
-  onSearch,
-  selectedCode,
-  setSelectedCode,
-  selectedStock,
-  selectedLatestBar,
-  stockBars,
-  fundamentals,
-  detailLoading,
-}) {
-  const historyStart = stockBars[0]?.trade_date
-  const historyEnd = stockBars[stockBars.length - 1]?.trade_date
-  return (
-    <div className="stock-lab enter">
-      <aside className="security-browser">
-        <header><div><span>SECURITY UNIVERSE</span><h2>股票浏览</h2></div><b>{formatInt(stocks.length)}</b></header>
-        <label className="security-search">
-          <Search size={15} />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => event.key === 'Enter' && onSearch()}
-            placeholder="代码 / 名称 / 拼音"
-          />
-          <button onClick={onSearch}>查询</button>
-        </label>
-        <div className="security-list">
-          {stocks.map((stock) => (
-            <button
-              className={stock.ts_code === selectedCode ? 'active' : ''}
-              key={stock.ts_code}
-              onClick={() => setSelectedCode(stock.ts_code)}
-            >
-              <span><b>{stock.symbol || stock.ts_code}</b><small>{stock.name}</small></span>
-              <span className={priceTone(stock.pct_chg)}>{formatNumber(stock.close)}<small>{formatSignedPercent(stock.pct_chg)}</small></span>
-            </button>
-          ))}
-          {!stocks.length ? <div className="empty-state">没有匹配的股票</div> : null}
-        </div>
-      </aside>
-
-      <section className="market-chart-panel">
-        <header className="security-title">
-          <div><span>{selectedStock?.ts_code || 'NO SECURITY'}</span><h2>{selectedStock?.name || '请选择股票'}</h2></div>
-          <div className="security-quote">
-            <strong className={priceTone(selectedLatestBar?.pct_chg)}>{formatNumber(selectedLatestBar?.close)}</strong>
-            <span className={priceTone(selectedLatestBar?.pct_chg)}>{formatSignedPercent(selectedLatestBar?.pct_chg)}</span>
-          </div>
-          <div className="security-meta">
-            <span>行业 <b>{selectedStock?.industry || '-'}</b></span>
-            <span>市场 <b>{selectedStock?.market || '-'}</b></span>
-            <span>交易日 <b>{detailLoading ? '加载中' : formatInt(stockBars.length)}</b></span>
-            <span>完整区间 <b>{historyStart && historyEnd ? `${historyStart} → ${historyEnd}` : '-'}</b></span>
-          </div>
-        </header>
-        <TechnicalChart bars={stockBars} />
-      </section>
-
-      <aside className="facts-panel">
-        <header><span>POINT-IN-TIME FACTS</span><h2>估值与财务</h2></header>
-        <FactGroup title={selectedLatestBar?.trade_date || selectedStock?.latest_date || '最新行情'}>
-          <Fact label="开 / 高" value={`${formatNumber(selectedLatestBar?.open)} / ${formatNumber(selectedLatestBar?.high)}`} />
-          <Fact label="低 / 收" value={`${formatNumber(selectedLatestBar?.low)} / ${formatNumber(selectedLatestBar?.close)}`} strong />
-          <Fact label="成交额" value={formatDailyAmount(selectedLatestBar?.amount)} />
-        </FactGroup>
-        <FactGroup title="估值">
-          <Fact label="总市值" value={formatWanYi(fundamentals?.valuation?.totalMv)} />
-          <Fact label="PE TTM" value={formatNumber(fundamentals?.valuation?.peTtm)} />
-          <Fact label="PB" value={formatNumber(fundamentals?.valuation?.pb)} />
-          <Fact label="换手率" value={formatPercent(fundamentals?.valuation?.turnoverRate)} />
-        </FactGroup>
-        <FactGroup title="财务（公告后可见）">
-          <Fact label="公告日" value={fundamentals?.financial?.annDate || '-'} />
-          <Fact label="ROE" value={formatPercent(fundamentals?.financial?.roe)} />
-          <Fact label="毛利率" value={formatPercent(fundamentals?.financial?.grossprofitMargin)} />
-          <Fact label="营收同比" value={formatPercent(fundamentals?.financial?.trYoy)} />
-          <Fact label="净利同比" value={formatPercent(fundamentals?.financial?.netprofitYoy)} />
-        </FactGroup>
-      </aside>
-    </div>
-  )
-}
-
-function RunLogView({ syncRuns, usDb, actionJobs, onRunAction }) {
-  const usAssets = usDb?.assets || []
-  const counts = usDb?.counts || {}
-  const usJob = actionJobs.us_sample
-  const usJobRunning = isActiveJob(usJob)
-  return (
-    <div className="view-stack enter">
-      <section className="section-heading run-heading">
-        <div><span>RUN HISTORY</span><h2>同步与样本运行记录</h2><p>这里记录数据写入事实，不展示策略评级、收益承诺或真实账户。</p></div>
-        <div className="run-job-action">
-          {usJob ? <span><Badge value={usJob.status} /> {usJob.message || `最近写入 ${formatInt(usJob.rowsUpserted)} 行`}</span> : null}
-          <button className="primary-action" onClick={() => onRunAction('us_sample')} disabled={usJobRunning}>
-            <DownloadCloud size={15} /> {usJobRunning ? jobButtonText(usJob) : '导入美股 sample'}
-          </button>
-        </div>
-      </section>
-      <Panel title="最近 20 次同步" eyebrow="DATA SYNC RUNS"><RunTable runs={syncRuns} /></Panel>
-      <Panel title="美股 Sample 资产" eyebrow={`${formatInt(counts.assets)} ASSETS · ${formatInt(counts.assetDailyPrices)} PRICES`}>
-        <div className="table-scroll">
-          <table className="data-table">
-            <thead><tr><th>SYMBOL</th><th>名称</th><th>类型</th><th>风险标签</th><th>最新收盘</th></tr></thead>
-            <tbody>
-              {usAssets.map((asset) => (
-                <tr key={asset.naturalKey || asset.symbol}>
-                  <td className="mono strong">{asset.symbol}</td><td>{asset.name || '-'}</td><td>{asset.instrumentType || '-'}</td><td>{asset.riskTag || '-'}</td><td>{formatNumber(asset.latestPrice?.close)}</td>
-                </tr>
-              ))}
-              {!usAssets.length ? <EmptyRow colSpan={5} /> : null}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
-    </div>
-  )
-}
-
-function TechnicalChart({ bars }) {
-  const priceRef = useRef(null)
-  const volumeRef = useRef(null)
-  const [range, setRange] = useState('recent')
-  const series = useMemo(() => buildTechnicalSeries(bars), [bars])
-
-  useEffect(() => {
-    if (!series.candles.length) return undefined
-    const charts = [renderPriceChart(priceRef.current, series), renderVolumeChart(volumeRef.current, series)].filter(Boolean)
-    applyChartRange(charts, series.candles, range)
-    synchronizeChartRanges(charts)
-    const resize = () => charts.forEach(({ chart, element }) => chart.applyOptions({ width: element.clientWidth }))
-    window.addEventListener('resize', resize)
-    return () => {
-      window.removeEventListener('resize', resize)
-      charts.forEach(({ chart }) => chart.remove())
-    }
-  }, [range, series])
-
-  if (!series.candles.length) return <div className="chart-empty">暂无可绘制的日线数据</div>
-  return (
-    <div className="chart-stack">
-      <div className="chart-toolbar">
-        <div className="chart-legend"><span><i className="ma10" />MA10</span><span><i className="ma20" />MA20</span><span><i className="volume" />成交量</span></div>
-        <div className="chart-ranges" aria-label="行情显示区间">
-          {CHART_RANGES.map((item) => (
-            <button className={range === item.id ? 'active' : ''} key={item.id} onClick={() => setRange(item.id)}>{item.label}</button>
-          ))}
-        </div>
-      </div>
-      <div className="chart-pane price" ref={priceRef} />
-      <div className="chart-pane volume" ref={volumeRef} />
-    </div>
-  )
-}
-
-function renderPriceChart(element, series) {
-  if (!element) return null
-  element.replaceChildren()
-  const chart = createBaseChart(element, 430)
-  chart.addSeries(CandlestickSeries, {
-    upColor: '#d84b4b', downColor: '#078761', borderUpColor: '#d84b4b', borderDownColor: '#078761', wickUpColor: '#d84b4b', wickDownColor: '#078761',
-  }).setData(series.candles)
-  chart.addSeries(LineSeries, { color: '#087ea4', lineWidth: 2, priceLineVisible: false }).setData(series.ma10)
-  chart.addSeries(LineSeries, { color: '#d78a17', lineWidth: 2, priceLineVisible: false }).setData(series.ma20)
-  return { chart, element }
-}
-
-function renderVolumeChart(element, series) {
-  if (!element) return null
-  element.replaceChildren()
-  const chart = createBaseChart(element, 125)
-  chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceLineVisible: false }).setData(series.volume)
-  return { chart, element }
-}
-
-function applyChartRange(charts, candles, range) {
-  if (!candles.length) return
-  if (range === 'all') {
-    charts.forEach(({ chart }) => chart.timeScale().fitContent())
-    return
-  }
-  const years = { '1y': 1, '3y': 3, '5y': 5 }[range]
-  let from = Math.max(0, candles.length - 180)
-  if (years) {
-    const cutoff = new Date(`${candles[candles.length - 1].time}T00:00:00`)
-    cutoff.setFullYear(cutoff.getFullYear() - years)
-    const cutoffText = cutoff.toISOString().slice(0, 10)
-    const firstVisible = candles.findIndex((bar) => bar.time >= cutoffText)
-    from = firstVisible < 0 ? 0 : firstVisible
-  }
-  const visibleRange = { from: Math.max(-0.5, from - 0.5), to: candles.length - 0.5 }
-  charts.forEach(({ chart }) => chart.timeScale().setVisibleLogicalRange(visibleRange))
-}
-
-function synchronizeChartRanges(charts) {
-  if (charts.length < 2) return
-  let syncing = false
-  for (const source of charts) {
-    source.chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-      if (!range || syncing) return
-      syncing = true
-      for (const target of charts) {
-        if (target !== source) target.chart.timeScale().setVisibleLogicalRange(range)
-      }
-      syncing = false
-    })
-  }
-}
-
-function createBaseChart(element, height) {
-  return createChart(element, {
-    width: element.clientWidth,
-    height,
-    layout: { background: { color: '#f8fafb' }, textColor: '#61707c', fontFamily: 'IBM Plex Mono, Consolas, monospace', fontSize: 11 },
-    grid: { vertLines: { color: '#e9eef1' }, horzLines: { color: '#e3e9ed' } },
-    rightPriceScale: { borderColor: '#ccd5db', scaleMargins: { top: 0.08, bottom: 0.08 } },
-    timeScale: { borderColor: '#ccd5db', timeVisible: false },
-    crosshair: { mode: 1 },
-  })
-}
-
-function Panel({ title, eyebrow, action = '', onAction = undefined, className = '', children }) {
-  return (
-    <section className={`panel ${className}`}>
-      <header className="panel-head">
-        <div><span>{eyebrow}</span><h2>{title}</h2></div>
-        {action ? <button onClick={onAction}>{action}<ChevronRight size={14} /></button> : null}
-      </header>
-      {children}
-    </section>
-  )
-}
-
-function CoverageMatrix({ rows, detailed = false }) {
-  return (
-    <div className="table-scroll">
-      <table className="data-table coverage-table">
-        <thead><tr><th>数据集</th><th>状态</th><th>记录</th><th>标的</th><th>日期范围</th>{detailed ? <th>研究用途</th> : null}</tr></thead>
-        <tbody>
-          {rows.length ? rows.map((row) => (
-            <tr key={row.name}>
-              <td><span className="dataset-name"><Table2 size={14} /><b>{row.label}</b><small>{row.name}</small></span></td>
-              <td><Badge value={row.status} /></td>
-              <td className="mono">{formatInt(row.rows)}</td>
-              <td className="mono">{formatInt(row.symbols)}</td>
-              <td className="mono date-cell">{row.range}</td>
-              {detailed ? <td>{row.purpose}</td> : null}
-            </tr>
-          )) : <tr><td className="empty-cell" colSpan={detailed ? 6 : 5}>正在读取 PostgreSQL 精确覆盖统计…</td></tr>}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function RunTable({ runs, compact = false }) {
-  return (
-    <div className="table-scroll">
-      <table className={`data-table ${compact ? 'compact' : ''}`}>
-        <thead><tr><th>目标</th><th>状态</th><th>写入行</th><th>数据范围</th><th>执行时间</th></tr></thead>
-        <tbody>
-          {runs.map((run) => (
-            <tr key={run.id || `${run.target}-${run.createdAt}`}>
-              <td className="mono strong">{run.target}</td><td><Badge value={run.status} /></td><td className="mono">{formatInt(run.rowsUpserted)}</td><td className="mono date-cell">{[run.startDate, run.endDate].filter(Boolean).join(' → ') || '-'}</td><td>{formatDateTime(run.createdAt)}</td>
-            </tr>
-          ))}
-          {!runs.length ? <EmptyRow colSpan={5} /> : null}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function SummaryMetric({ label, value, detail }) {
-  return <div className="summary-metric"><span>{label}</span><strong>{value}</strong><small>{detail || '-'}</small></div>
-}
-
-function FactGroup({ title, children }) {
-  return <section className="fact-group"><h3>{title}</h3><dl>{children}</dl></section>
-}
-
-function Fact({ label, value, strong = false }) {
-  return <><dt>{label}</dt><dd className={strong ? 'strong' : ''}>{value || '-'}</dd></>
-}
-
-function Badge({ value }) {
-  const text = String(value || 'UNKNOWN').toUpperCase()
-  const tone = ['READY', 'OK', 'SUCCESS', 'CONNECTED', 'AVAILABLE'].includes(text)
-    ? 'good'
-    : ['BLOCKED', 'FAILED', 'FAIL', 'ERROR', 'EMPTY'].includes(text)
-      ? 'bad'
-      : 'warn'
-  return <span className={`badge ${tone}`}><i />{text}</span>
-}
-
-function Notice({ tone, title, text }) {
-  return <div className={`notice ${tone}`}>{tone === 'success' ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}<span><b>{title}</b><small>{text}</small></span></div>
-}
-
-function EmptyRow({ colSpan }) {
-  return <tr><td className="empty-cell" colSpan={colSpan}>暂无记录</td></tr>
+  return <span className="system-state"><Icon size={14} /><b>{label}</b><i className={healthy ? 'good' : 'bad'} />{String(value)}</span>
 }
 
 async function fetchJson(path, options = {}) {
@@ -820,54 +524,6 @@ async function fetchJson(path, options = {}) {
     throw new Error(body?.detail || `${path} 返回 ${response.status}`)
   }
   return response.json()
-}
-
-function buildSyncJobRequest(action) {
-  const endDate = todayString()
-  if (action === 'stock_listings') {
-    return { action, payload: { statuses: ['L', 'D', 'P', 'G'] } }
-  }
-  if (action === 'trade_calendar') {
-    return { action, payload: { start_date: dateMonthsBefore(endDate, 3), end_date: endDate, exchange: '' } }
-  }
-  if (action === 'market_bundle') {
-    return {
-      action,
-      payload: {
-        start_date: dateDaysBefore(endDate, 10),
-        end_date: endDate,
-        skip_existing: true,
-        min_existing_rows: 4000,
-        max_trade_dates: 10,
-      },
-    }
-  }
-  if (action === 'us_sample') return { action, payload: {} }
-  throw new Error(`未知同步动作：${action}`)
-}
-
-function latestJobsByAction(jobs) {
-  const latest = {}
-  for (const job of jobs || []) {
-    const current = latest[job.action]
-    if (!current || String(job.createdAt || '') > String(current.createdAt || '')) latest[job.action] = job
-  }
-  return latest
-}
-
-function isActiveJob(job) {
-  return ['queued', 'running'].includes(String(job?.status || '').toLowerCase())
-}
-
-function jobButtonText(job) {
-  const status = String(job?.status || '').toLowerCase()
-  if (status === 'queued') return '已排队'
-  if (status === 'running') return '后台同步中'
-  return '立即执行'
-}
-
-function delay(milliseconds) {
-  return new Promise((resolve) => window.setTimeout(resolve, milliseconds))
 }
 
 function buildCoverageRows(overview) {
@@ -891,70 +547,7 @@ function buildCoverageRows(overview) {
 
 function coverage(name, label, value, purpose, mayBeEmpty = false) {
   const rows = Number(value?.rows || 0)
-  return {
-    name,
-    label,
-    rows,
-    symbols: value?.symbols,
-    range: dateRange(value),
-    status: rows > 0 || mayBeEmpty ? 'available' : 'empty',
-    purpose,
-  }
-}
-
-function buildAuditItems(readiness, syncRuns) {
-  const items = []
-  for (const [scope, data] of [['A股横截面', readiness.stocks], ['ETF 时序', readiness.etf]]) {
-    if (!data) continue
-    if (isInventoryAvailable(data)) {
-      items.push({ id: `${scope}-inventory`, title: `${scope}库存可用`, detail: '仅验证关键表；研究就绪需指定 quality run', tone: 'warn' })
-    } else {
-      for (const blocker of (data.blockers || []).slice(0, 3)) {
-        items.push({ id: `${scope}-${blocker}`, title: `${scope}被阻断`, detail: blocker.replace(':', ' · '), tone: 'warn' })
-      }
-    }
-  }
-  const latestByTarget = new Map()
-  for (const run of syncRuns) {
-    if (!latestByTarget.has(run.target)) latestByTarget.set(run.target, run)
-  }
-  const failed = [...latestByTarget.values()].filter((run) => !['ok', 'success'].includes(String(run.status).toLowerCase()))
-  if (failed.length) items.push({ id: 'sync-failed', title: '存在非成功同步', detail: `${failed.length} 个最近任务需要检查`, tone: 'bad' })
-  if (!items.length) items.push({ id: 'waiting', title: '等待数据检查', detail: '刷新后生成审计结果', tone: 'warn' })
-  return items
-}
-
-function isInventoryAvailable(data) {
-  return data?.level === 'inventory' && data?.status === 'inventory_available'
-}
-
-function buildTechnicalSeries(bars) {
-  const candles = bars
-    .filter((bar) => [bar.open, bar.high, bar.low, bar.close].every((value) => Number.isFinite(Number(value))))
-    .map((bar) => ({ time: bar.trade_date, open: Number(bar.open), high: Number(bar.high), low: Number(bar.low), close: Number(bar.close) }))
-  const closes = candles.map((bar) => bar.close)
-  return {
-    candles,
-    ma10: calcSma(candles, closes, 10),
-    ma20: calcSma(candles, closes, 20),
-    volume: bars.map((bar, index) => ({ time: bar.trade_date, value: Number(bar.vol || 0), color: candles[index]?.close >= candles[index]?.open ? '#d84b4b99' : '#07876199' })),
-  }
-}
-
-function calcSma(candles, values, period) {
-  return values.map((_, index) => {
-    if (index + 1 < period) return null
-    const slice = values.slice(index + 1 - period, index + 1)
-    return { time: candles[index].time, value: slice.reduce((sum, value) => sum + value, 0) / period }
-  }).filter(Boolean)
-}
-
-function formatTableName(value) {
-  const labels = {
-    stock_listings: '历史上市状态', stock_limit_prices: '每日涨跌停', stock_suspend_events: '停复牌事件',
-    stock_adjust_factors: '股票复权因子', fund_adjust_factors: 'ETF 复权因子', index_daily_bars: '指数基准日线',
-  }
-  return labels[value] || String(value).replaceAll('_', ' ')
+  return { name, label, rows, symbols: value?.symbols, range: dateRange(value), status: rows > 0 || mayBeEmpty ? 'available' : 'empty', purpose }
 }
 
 function dateRange(value) {
@@ -962,70 +555,17 @@ function dateRange(value) {
   return `${value.minDate || '?'} → ${value.maxDate || '?'}`
 }
 
-function todayString() {
-  return new Date().toISOString().slice(0, 10)
+function buildStockScreenPath(query, offset) {
+  const params = new URLSearchParams({ limit: String(STOCK_PAGE_SIZE), offset: String(Math.max(0, offset)) })
+  if (query.trim()) params.set('q', query.trim())
+  return `/api/stocks/screen?${params.toString()}`
 }
 
-function dateMonthsBefore(dateText, months) {
-  const date = new Date(`${dateText}T00:00:00`)
-  date.setMonth(date.getMonth() - months)
-  return date.toISOString().slice(0, 10)
-}
-
-function dateDaysBefore(dateText, days) {
-  const date = new Date(`${dateText}T00:00:00`)
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
-}
-
-function formatInt(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
-  return Number(value).toLocaleString('zh-CN')
-}
-
-function formatCompact(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
-  return new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value))
-}
-
-function formatNumber(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
-  return Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
-}
-
-function formatPercent(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
-  return `${Number(value).toFixed(2)}%`
-}
-
-function formatSignedPercent(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
-  const number = Number(value)
-  return `${number > 0 ? '+' : ''}${number.toFixed(2)}%`
-}
-
-function priceTone(value) {
-  const number = Number(value)
-  return number > 0 ? 'price-up' : number < 0 ? 'price-down' : ''
-}
-
-function formatWanYi(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
-  const number = Number(value)
-  if (Math.abs(number) >= 10000) return `${(number / 10000).toFixed(2)}亿`
-  return `${number.toFixed(2)}万`
-}
-
-function formatDailyAmount(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
-  const number = Number(value)
-  if (Math.abs(number) >= 100000) return `${(number / 100000).toFixed(2)}亿`
-  return `${(number / 10).toFixed(0)}万`
-}
-
-function formatDateTime(value) {
-  if (!value) return '-'
-  return new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+function recentCatalogRange() {
+  const end = new Date()
+  const start = new Date(end)
+  start.setUTCFullYear(start.getUTCFullYear() - 1)
+  return { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) }
 }
 
 function errorMessage(error) {
@@ -1033,6 +573,8 @@ function errorMessage(error) {
 }
 
 const rootElement = document.getElementById('root')
-const appRoot = Reflect.get(window, '__quantResearchRoot') || createRoot(rootElement)
-Reflect.set(window, '__quantResearchRoot', appRoot)
-appRoot.render(<App />)
+if (rootElement) {
+  const appRoot = Reflect.get(window, '__quantResearchRoot') || createRoot(rootElement)
+  Reflect.set(window, '__quantResearchRoot', appRoot)
+  appRoot.render(<App />)
+}
