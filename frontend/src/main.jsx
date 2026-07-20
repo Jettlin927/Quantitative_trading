@@ -71,14 +71,14 @@ export function App() {
   const selectedCatalogRef = useRef({ kind: '', code: '' })
   const selectedStrategyIdRef = useRef('')
   const selectedResearchIdRef = useRef('')
-  const submittedStockQueryRef = useRef('')
+  const appliedStockQueryRef = useRef('')
 
   async function refreshAll(refreshCoverage = false) {
     setLoading(true)
     setResearchLoading(true)
     setGlobalError('')
     setResearchError('')
-    const stockPageRequest = beginStockPageRequest(buildStockScreenPath(submittedStockQueryRef.current, 0))
+    const stockPageRequest = beginStockPageRequest(buildStockScreenPath(appliedStockQueryRef.current, 0))
     const requests = [
       ['health', '/api/health?include_counts=false'],
       ['progress', '/api/tushare/sync-progress?include_coverage=false'],
@@ -314,17 +314,18 @@ export function App() {
   }
 
   async function submitStockSearch() {
-    const submittedQuery = query.trim()
-    submittedStockQueryRef.current = submittedQuery
-    await loadStocks(0, submittedQuery)
+    await loadStocks(0, query.trim(), true)
   }
 
-  async function loadStocks(offset = 0, submittedQuery = submittedStockQueryRef.current) {
-    const request = beginStockPageRequest(buildStockScreenPath(submittedQuery, offset))
+  async function loadStocks(offset = 0, requestedQuery = appliedStockQueryRef.current, applyQueryOnSuccess = false) {
+    const request = beginStockPageRequest(buildStockScreenPath(requestedQuery, offset))
     setStockListError('')
     try {
       const page = await fetchJson(request.path)
-      if (isCurrentStockPageRequest(request)) applyStockPage(page)
+      if (isCurrentStockPageRequest(request)) {
+        if (applyQueryOnSuccess) appliedStockQueryRef.current = requestedQuery
+        applyStockPage(page)
+      }
     } catch (err) {
       if (isCurrentStockPageRequest(request)) setStockListError(errorMessage(err))
     }

@@ -336,7 +336,7 @@ describe('研究驾驶舱', () => {
   it('分页沿用已提交查询，不使用输入框中的未提交草稿', async () => {
     const firstPage = {
       items: [{ ts_code: '000001.SZ', symbol: '000001', name: '第一页股票', close: 10, pct_chg: 0 }],
-      total: 51,
+      total: 101,
       limit: 50,
       offset: 0,
     }
@@ -344,10 +344,16 @@ describe('研究驾驶舱', () => {
       coreOverrides: { '/api/stocks/screen?limit=50&offset=0': firstPage },
       route: (path) => {
         if (path === '/api/stocks/screen?limit=50&offset=50') {
-          return ok({ items: [{ ts_code: '000002.SZ', symbol: '000002', name: '第二页股票', close: 20, pct_chg: 1 }], total: 51, limit: 50, offset: 50 })
+          return ok({ items: [{ ts_code: '000002.SZ', symbol: '000002', name: '第二页股票', close: 20, pct_chg: 1 }], total: 101, limit: 50, offset: 50 })
+        }
+        if (path === '/api/stocks/screen?limit=50&offset=100') {
+          return ok({ items: [{ ts_code: '000004.SZ', symbol: '000004', name: '第三页股票', close: 40, pct_chg: 3 }], total: 101, limit: 50, offset: 100 })
         }
         if (path === '/api/stocks/screen?limit=50&offset=0&q=draft') {
           return ok({ items: [{ ts_code: '000003.SZ', symbol: '000003', name: '草稿查询首页', close: 30, pct_chg: 2 }], total: 1, limit: 50, offset: 0 })
+        }
+        if (path === '/api/stocks/screen?limit=50&offset=0&q=failure') {
+          return Promise.resolve(new Response(JSON.stringify({ detail: '新查询暂不可用' }), { status: 503, headers: { 'Content-Type': 'application/json' } }))
         }
         if (path.startsWith('/api/daily-bars?ts_code=')) return ok([])
         if (path.match(/^\/api\/stocks\/[^/]+\/detail$/)) return ok({ listing: {}, valuation_history: [], financial_history: [] })
@@ -364,6 +370,15 @@ describe('研究驾驶舱', () => {
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/stocks/screen?limit=50&offset=50', expect.anything())
     expect(globalThis.fetch).not.toHaveBeenCalledWith('/api/stocks/screen?limit=50&offset=50&q=draft', expect.anything())
 
+    fireEvent.change(screen.getByPlaceholderText('代码 / 名称 / 拼音'), { target: { value: 'failure' } })
+    fireEvent.click(screen.getByRole('button', { name: '查询' }))
+    await screen.findByText('新查询暂不可用')
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }))
+    await screen.findByRole('button', { name: /000004.*第三页股票/ })
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/stocks/screen?limit=50&offset=100', expect.anything())
+    expect(globalThis.fetch).not.toHaveBeenCalledWith('/api/stocks/screen?limit=50&offset=100&q=failure', expect.anything())
+
+    fireEvent.change(screen.getByPlaceholderText('代码 / 名称 / 拼音'), { target: { value: 'draft' } })
     fireEvent.click(screen.getByRole('button', { name: '查询' }))
     await screen.findByRole('button', { name: /000003.*草稿查询首页/ })
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/stocks/screen?limit=50&offset=0&q=draft', expect.anything())
