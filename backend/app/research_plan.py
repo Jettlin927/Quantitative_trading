@@ -10,15 +10,17 @@ import re
 from typing import Any
 
 from .quant_research.run_config import (
+    build_parameter_neighborhood_configs,
     canonical_json_bytes,
     canonical_sha256,
     validate_evaluation_policy,
+    validate_research_pass_policy,
     validate_run_config,
 )
 from .quant_research.strategy_registry import resolve_strategy_definition
 
 
-PLAN_SCHEMA_VERSION = "research-plan/v2"
+PLAN_SCHEMA_VERSION = "research-plan/v3"
 PLAN_START_MARKER = "<!-- research-plan-json:start -->"
 PLAN_END_MARKER = "<!-- research-plan-json:end -->"
 COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40,64}$")
@@ -168,15 +170,27 @@ def normalize_research_plan(
     gates = _normalize_string_set(payload["gates"], "gates")
     stop_rules = _normalize_string_set(payload["stopRules"], "stopRules")
     resource_budget = _normalize_resource_budget(payload["resourceBudget"], limits)
-    report_contract = _normalize_report_contract(payload["reportContract"])
+    report_contract = _normalize_report_contract(
+        payload["reportContract"], run_config
+    )
+    if run_config.get("riskPolicy", {}).get("mode") == "none":
+        raise ResearchPlanError("正式研究必须启用冻结风险暴露与风险贡献策略")
     run_config = validate_run_config(
         {
             **run_config,
             "evaluationSampleSplits": sample_splits,
             "evaluationPolicy": report_contract["evaluationPolicy"],
+            "researchPassPolicy": report_contract["researchPassPolicy"],
         },
         verify_universe_source=False,
     )
+    try:
+        for _variant_id, candidate in build_parameter_neighborhood_configs(
+            run_config
+        ):
+            resolve_strategy_definition(candidate)
+    except (TypeError, ValueError) as exc:
+        raise ResearchPlanError(f"冻结参数邻域无效：{exc}") from exc
 
     return {
         "schemaVersion": PLAN_SCHEMA_VERSION,
@@ -333,12 +347,15 @@ def _normalize_resource_budget(value: Any, limits: ResearchServerLimits) -> dict
     }
 
 
-def _normalize_report_contract(value: Any) -> dict[str, Any]:
+def _normalize_report_contract(
+    value: Any, run_config: dict[str, Any]
+) -> dict[str, Any]:
     expected = {
         "language",
         "requiredArtifacts",
         "conclusionValues",
         "evaluationPolicy",
+        "researchPassPolicy",
     }
     if not isinstance(value, dict) or set(value) != expected:
         raise ResearchPlanError("reportContract 字段不完整或含未知字段")
@@ -346,10 +363,18 @@ def _normalize_report_contract(value: Any) -> dict[str, Any]:
         raise ResearchPlanError("reportContract.language 必须是 zh-CN")
     artifacts = _normalize_string_set(value["requiredArtifacts"], "reportContract.requiredArtifacts")
     required = {
+        "benchmark_nav.csv.gz",
         "manifest.json",
         "metrics.json",
         "oos_metrics.json",
+        "positions.csv.gz",
+        "rebalance_executions.csv.gz",
+        "rebalance_requests.csv.gz",
         "report.html",
+        "risk_contributions.csv.gz",
+        "risk_exposures.csv.gz",
+        "walk_forward_metrics.csv.gz",
+        "walk_forward_windows.csv.gz",
     }
     if not required.issubset(artifacts):
         raise ResearchPlanError("reportContract.requiredArtifacts 缺少基础证据工件")
@@ -359,15 +384,19 @@ def _normalize_report_contract(value: Any) -> dict[str, Any]:
         raise ResearchPlanError("reportContract.conclusionValues 必须固定为五种研究结论")
     try:
         evaluation_policy = validate_evaluation_policy(value["evaluationPolicy"])
+        research_pass_policy = validate_research_pass_policy(
+            value["researchPassPolicy"], run_config
+        )
     except (TypeError, ValueError) as exc:
         raise ResearchPlanError(
-            f"reportContract.evaluationPolicy 无效：{exc}"
+            f"reportContract 研究评价策略无效：{exc}"
         ) from exc
     return {
         "language": "zh-CN",
         "requiredArtifacts": artifacts,
         "conclusionValues": conclusions,
         "evaluationPolicy": evaluation_policy,
+        "researchPassPolicy": research_pass_policy,
     }
 
 

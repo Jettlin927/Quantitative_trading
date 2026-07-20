@@ -125,8 +125,8 @@ def build_research_manifest(
     artifact_schema_version: int = 1,
     generated_at: datetime | None = None,
 ) -> dict[str, Any]:
-    if artifact_schema_version not in {1, 2, 3, 4}:
-        raise ValueError("artifact_schema_version 只允许 1、2、3 或 4")
+    if artifact_schema_version not in {1, 2, 3, 4, 5}:
+        raise ValueError("artifact_schema_version 只允许 1、2、3、4 或 5")
     generated = generated_at or datetime.now(timezone.utc)
     result_fingerprint = build_result_fingerprint(artifact_hashes)
     return {
