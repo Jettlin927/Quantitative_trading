@@ -25,7 +25,7 @@ Issue 模板位于 [正式研究计划](../../.github/ISSUE_TEMPLATE/正式研�
 <!-- research-plan-json:end -->
 ````
 
-编排器拒绝未知字段、JSON 浮点数、未排序或重复的集合、非 ISO 日期、非字符串十进制定点、缺失 train/validation/test_oos、非下一交易日执行、非 point-in-time 数据、非单一冻结批次和超服务器上限的预算。规范化 JSON 使用 UTF-8、稳定键序和紧凑分隔符计算 SHA-256。
+当前机器计划 schema 为 `research-plan/v2`。编排器拒绝未知字段、JSON 浮点数、未排序或重复的集合、非 ISO 日期、非字符串十进制定点、缺失 train/validation/test_oos、未启用 walk-forward、非下一交易日执行、非 point-in-time 数据、非单一冻结批次和超服务器上限的预算。`reportContract` 必须冻结市场环境分类与成本压力评价策略，并列出模板中的账本、全周期/OOS 指标、匹配基准、walk-forward 和风险 canonical 工件。规范化 JSON 使用 UTF-8、稳定键序和紧凑分隔符计算 SHA-256；任一 OOS 边界或评价策略变化都会形成新哈希并要求重新批准。
 
 初期 `RESEARCH_MAX_TRIALS=1`，即每张冻结计划只执行一个明确批次。扩大试验预算必须修改服务器上限并形成新计划哈希，不能在同一 OOS 上临时扩张搜索空间。
 

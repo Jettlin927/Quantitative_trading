@@ -8,6 +8,7 @@ import gzip
 from hashlib import sha256
 from html import escape
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -23,11 +24,15 @@ from sqlalchemy.exc import OperationalError, TimeoutError as SQLAlchemyTimeoutEr
 from sqlalchemy.orm import Session
 
 from .github_research import (
-    HISTORICAL_RESEARCH_LABEL,
     GitHubIssueClient,
     GitHubPermissionError,
     GitHubResearchError,
     GitHubUnavailableError,
+)
+from .historical_publication_issues import (
+    EXPECTED_REPOSITORY,
+    resolve_historical_publication_issue,
+    validate_historical_publication_issue_snapshot,
 )
 from .json_safety import json_safe_value
 from .models import (
@@ -69,6 +74,8 @@ EVIDENCE_KINDS = frozenset(
     }
 )
 PUBLICATION_ARTIFACTS = frozenset({"manifest.json", "summary.json", "report.html"})
+MAX_GITHUB_ISSUE_COMMENT_BYTES = 32_000
+MAX_PUBLICATION_BASE_URL_CHARS = 2_048
 RESEARCH_PUBLICATION_ADVISORY_LOCK_KEY = 0x515452505542
 PUBLICATION_SUCCESS_EVENT_TYPES = frozenset(
     {"research_published", "research_publication_recovered"}
@@ -105,6 +112,8 @@ RESEARCH_PASS_REQUIRED_EVIDENCE_PATHS = {
             "metrics.json",
             "oos_metrics.json",
             "benchmark_nav.csv.gz",
+            "walk_forward_windows.csv.gz",
+            "walk_forward_metrics.csv.gz",
             "risk_exposures.csv.gz",
             "risk_contributions.csv.gz",
         }
@@ -351,9 +360,6 @@ def publish_research_evaluation(
     """将一份评价通过可恢复步骤发布到工件、Issue 与只读投影。"""
 
     with _publication_claim(session_factory):
-        _assert_github_publication_allowed(
-            session_factory, github, formal_research_id
-        )
         return _publish_research_evaluation_claimed(
             session_factory,
             github,
@@ -381,15 +387,39 @@ def _publish_research_evaluation_claimed(
     readback_client: PublicationReadbackClient | None,
     readback_base_url: str | None,
 ) -> ResearchPublicationProjectionOut:
-
-    resolved_public_base_url = _resolve_public_base_url(public_base_url)
-    resolved_readback_client = readback_client or HttpPublicationReadbackClient(
-        _resolve_readback_base_url(readback_base_url, resolved_public_base_url)
-    )
     published_at = now or datetime.now(timezone.utc)
     prepared: _PreparedPublication | None = None
     recover_published_failure = False
     try:
+        if existing_evaluation_id is not None:
+            with session_factory() as db:
+                published = db.scalar(
+                    select(ResearchPublication)
+                    .where(
+                        ResearchPublication.evaluation_id
+                        == existing_evaluation_id,
+                        ResearchPublication.status == "published",
+                    )
+                    .order_by(ResearchPublication.version.desc())
+                    .limit(1)
+                )
+            if published is not None:
+                prepared = _PreparedPublication(
+                    published.id, existing_evaluation_id, True
+                )
+                recover_published_failure = True
+        resolved_public_base_url = _resolve_public_base_url(public_base_url)
+        resolved_readback_client = readback_client or HttpPublicationReadbackClient(
+            _resolve_readback_base_url(
+                readback_base_url, resolved_public_base_url
+            )
+        )
+        _assert_github_publication_allowed(
+            session_factory,
+            github,
+            formal_research_id,
+            evaluation_id=existing_evaluation_id,
+        )
         prepared = _prepare_publication(
             session_factory,
             formal_research_id=formal_research_id,
@@ -398,6 +428,7 @@ def _publish_research_evaluation_claimed(
             existing_evaluation_id=existing_evaluation_id,
         )
         if prepared.already_published:
+            recover_published_failure = True
             with session_factory() as db:
                 publication = db.get(ResearchPublication, prepared.publication_id)
                 formal = (
@@ -407,16 +438,6 @@ def _publish_research_evaluation_claimed(
                 )
                 if publication is None or formal is None:
                     raise PublicationConflictError("已发布记录缺少正式研究")
-                issue_number = publication.issue_number
-                core_finalized = _publication_core_finalized(
-                    db, publication, formal
-                )
-                recover_published_failure = not core_finalized
-            if not recover_published_failure:
-                # GET 本身失败时无法证明 GitHub 已收敛，必须进入补偿。
-                recover_published_failure = True
-                issue = github.get_issue(issue_number)
-                recover_published_failure = not _github_issue_finalized(issue)
         summary = _ensure_publication_bundle(
             session_factory,
             prepared.publication_id,
@@ -577,31 +598,65 @@ def _assert_github_publication_allowed(
     session_factory: SessionFactory,
     github: GitHubIssueClient,
     formal_research_id: str,
+    *,
+    evaluation_id: str | None,
 ) -> None:
     with session_factory() as db:
         formal = db.get(FormalResearch, formal_research_id)
         if formal is None or formal.origin != "historical_import":
             return
-        _assert_historical_issue_mapping(db, github, formal)
+        publication = (
+            db.scalar(
+                select(ResearchPublication)
+                .where(ResearchPublication.evaluation_id == evaluation_id)
+                .order_by(ResearchPublication.version.desc())
+                .limit(1)
+            )
+            if evaluation_id is not None
+            else None
+        )
+        _assert_historical_issue_mapping(
+            db,
+            github,
+            formal,
+            allow_published_issue=(
+                publication is not None and publication.status == "published"
+            ),
+        )
 
 
 def _assert_historical_issue_mapping(
     db: Session,
     github: GitHubIssueClient,
     formal: FormalResearch,
+    *,
+    allow_published_issue: bool = False,
 ) -> None:
     mapping = db.get(ResearchPublicationIssueMapping, formal.id)
     if mapping is None:
         raise PublicationConflictError(
             "历史导入评价必须一对一映射独立的策略研究 Issue"
         )
-    issue = github.get_issue(mapping.issue_number)
-    labels = {str(item.get("name") or "") for item in issue.get("labels", [])}
-    if not {"类型:策略研究", HISTORICAL_RESEARCH_LABEL}.issubset(labels):
-        raise PublicationConflictError(
-            "历史导入评价尚未映射独立的策略研究 Issue，"
-            "禁止发布到工程迁移 Issue"
+    plan = db.get(FrozenResearchPlan, formal.plan_id)
+    if plan is None:
+        raise PublicationConflictError("历史导入评价缺少冻结研究计划")
+    try:
+        expected = resolve_historical_publication_issue(
+            plan.strategy_id, mapping.issue_number
         )
+    except ValueError as exc:
+        raise PublicationConflictError(f"历史研究 Issue 冻结映射无效：{exc}") from exc
+    if getattr(github, "repository", None) != EXPECTED_REPOSITORY:
+        raise PublicationConflictError("GitHub 仓库与历史研究 Issue 冻结映射不一致")
+    issue = github.get_issue(mapping.issue_number)
+    try:
+        validate_historical_publication_issue_snapshot(
+            issue, expected, allow_published=allow_published_issue
+        )
+    except ValueError as exc:
+        raise PublicationConflictError(
+            f"历史导入评价必须使用冻结映射中的独立的策略研究 Issue：{exc}"
+        ) from exc
 
 
 @contextmanager
@@ -715,7 +770,7 @@ def publish_next_pending_research_evaluation(
             ).all()
         )
         latest_by_evaluation: dict[str, ResearchPublication] = {}
-        latest_by_formal: dict[str, ResearchPublication] = {}
+        latest_published_by_formal: dict[str, ResearchPublication] = {}
         for publication in publications:
             evaluation_attempt = latest_by_evaluation.get(publication.evaluation_id)
             if (
@@ -723,32 +778,55 @@ def publish_next_pending_research_evaluation(
                 or publication.version > evaluation_attempt.version
             ):
                 latest_by_evaluation[publication.evaluation_id] = publication
-            formal_attempt = latest_by_formal.get(publication.formal_research_id)
-            if formal_attempt is None or publication.version > formal_attempt.version:
-                latest_by_formal[publication.formal_research_id] = publication
+            if publication.status == "published":
+                current = latest_published_by_formal.get(
+                    publication.formal_research_id
+                )
+                if current is None or publication.version > current.version:
+                    latest_published_by_formal[
+                        publication.formal_research_id
+                    ] = publication
         failure_states: dict[str, tuple[bool, datetime]] = {}
+        lifecycle_outcomes: dict[str, str] = {}
         for event in db.scalars(
             select(ResearchEvent)
-            .where(ResearchEvent.event_type == "research_publication_failed")
+            .where(
+                ResearchEvent.event_type.in_(PUBLICATION_LIFECYCLE_EVENT_TYPES)
+            )
             .order_by(ResearchEvent.formal_research_id, ResearchEvent.sequence_no)
         ).all():
             payload = event.payload_json
             if isinstance(payload, dict) and payload.get("publicationId"):
-                failure_states[str(payload["publicationId"])] = (
-                    payload.get("retryable") is True,
-                    event.occurred_at,
-                )
+                publication_id = str(payload["publicationId"])
+                lifecycle_outcomes[publication_id] = event.event_type
+                if event.event_type == "research_publication_failed":
+                    failure_states[publication_id] = (
+                        payload.get("retryable") is True,
+                        event.occurred_at,
+                    )
+        effective_published_by_formal: dict[str, ResearchPublication] = {}
+        for publication in publications:
+            if (
+                publication.status != "published"
+                or lifecycle_outcomes.get(publication.id)
+                not in PUBLICATION_SUCCESS_EVENT_TYPES
+            ):
+                continue
+            current = effective_published_by_formal.get(
+                publication.formal_research_id
+            )
+            if current is None or publication.version > current.version:
+                effective_published_by_formal[
+                    publication.formal_research_id
+                ] = publication
         candidate_id = None
-        published_candidates: list[tuple[str, int, bool]] = []
+        published_candidates: list[
+            tuple[str, str, int, bool, int | None]
+        ] = []
         for publication in latest_by_evaluation.values():
             formal = db.get(FormalResearch, publication.formal_research_id)
             if formal is None:
                 raise PublicationConflictError("发布记录缺少正式研究")
-            if formal.origin == "historical_import":
-                try:
-                    _assert_historical_issue_mapping(db, github, formal)
-                except PublicationConflictError:
-                    continue
             if publication.status == "pending":
                 candidate_id = publication.evaluation_id
                 break
@@ -762,17 +840,18 @@ def publish_next_pending_research_evaluation(
                 candidate_id = publication.evaluation_id
                 break
         if candidate_id is None:
-            for publication in latest_by_formal.values():
-                if publication.status != "published":
+            monitored_publication_ids: set[str] = set()
+            monitoring_order = [
+                *latest_published_by_formal.values(),
+                *effective_published_by_formal.values(),
+            ]
+            for publication in monitoring_order:
+                if publication.id in monitored_publication_ids:
                     continue
+                monitored_publication_ids.add(publication.id)
                 formal = db.get(FormalResearch, publication.formal_research_id)
                 if formal is None:
                     raise PublicationConflictError("发布记录缺少正式研究")
-                if formal.origin == "historical_import":
-                    try:
-                        _assert_historical_issue_mapping(db, github, formal)
-                    except PublicationConflictError:
-                        continue
                 core_finalized = _publication_core_finalized(db, publication, formal)
                 if not core_finalized and not _publication_retry_due(
                     failure_states.get(publication.id),
@@ -781,18 +860,30 @@ def publish_next_pending_research_evaluation(
                     allow_missing=True,
                 ):
                     continue
+                if formal.origin == "historical_import":
+                    try:
+                        _assert_historical_issue_mapping(
+                            db, github, formal, allow_published_issue=True
+                        )
+                    except PublicationConflictError:
+                        candidate_id = publication.evaluation_id
+                        break
                 published_candidates.append(
                     (
+                        publication.id,
                         publication.evaluation_id,
                         publication.issue_number,
                         core_finalized,
+                        publication.issue_comment_id,
                     )
                 )
     if candidate_id is None:
         for (
+            publication_id,
             evaluation_id,
             issue_number,
             core_finalized,
+            issue_comment_id,
         ) in published_candidates:
             if not core_finalized:
                 candidate_id = evaluation_id
@@ -805,6 +896,34 @@ def publish_next_pending_research_evaluation(
                 candidate_id = evaluation_id
                 break
             if not _github_issue_finalized(issue):
+                candidate_id = evaluation_id
+                break
+            try:
+                comments = github.list_comments(issue_number)
+            except Exception:
+                candidate_id = evaluation_id
+                break
+            try:
+                with session_factory() as verify_db:
+                    summary = _build_summary(verify_db, publication_id)
+                _verify_existing_bundle(
+                    _publication_directory(Path(artifact_root), evaluation_id),
+                    _publication_bundle_payloads(summary),
+                )
+                marker = _issue_comment_marker(summary)
+                expected_body = _issue_comment(
+                    summary,
+                    _resolve_public_base_url(public_base_url),
+                    marker,
+                )
+            except Exception:
+                candidate_id = evaluation_id
+                break
+            if not _github_comment_finalized(
+                comments,
+                comment_id=issue_comment_id,
+                expected_body=expected_body,
+            ):
                 candidate_id = evaluation_id
                 break
     if candidate_id is None:
@@ -843,6 +962,21 @@ def _github_issue_finalized(issue: Mapping[str, Any]) -> bool:
     return str(issue.get("state") or "").lower() == "closed" and "研究:已发布" in labels
 
 
+def _github_comment_finalized(
+    comments: list[dict[str, Any]],
+    *,
+    comment_id: int | None,
+    expected_body: str,
+) -> bool:
+    if comment_id is None:
+        return False
+    return any(
+        str(item.get("id")) == str(comment_id)
+        and str(item.get("body") or "") == expected_body
+        for item in comments
+    )
+
+
 def _ensure_issue_comment(
     session_factory: SessionFactory,
     github: GitHubIssueClient,
@@ -851,13 +985,30 @@ def _ensure_issue_comment(
     public_base_url: str,
 ) -> int:
     issue_number = int(summary["issueNumber"])
+    marker = _issue_comment_marker(summary)
+    expected_body = _issue_comment(summary, public_base_url, marker)
+    if len(expected_body.encode("utf-8")) > MAX_GITHUB_ISSUE_COMMENT_BYTES:
+        raise PublicationConflictError("GitHub 终态评论超过安全长度上限")
+    with session_factory() as db:
+        publication = db.get(ResearchPublication, publication_id)
+        if publication is None:
+            raise PublicationConflictError("待发布记录不存在")
+        publication_status = publication.status
+        stored_comment_id = publication.issue_comment_id
     comments = github.list_comments(issue_number)
-    marker = (
-        f"<!-- research-publication:evaluation:{summary['evaluation']['sha256']} -->"
-    )
+    if publication_status == "published":
+        if not _github_comment_finalized(
+            comments,
+            comment_id=stored_comment_id,
+            expected_body=expected_body,
+        ):
+            raise PublicationConflictError(
+                "已发布终态评论缺失或正文漂移；不可覆盖旧版本，需人工恢复原评论或发布更正版本"
+            )
+        return int(stored_comment_id)
     comment = github.ensure_comment(
         issue_number,
-        _issue_comment(summary, public_base_url, marker),
+        expected_body,
         comments,
         marker=marker,
     )
@@ -1391,7 +1542,6 @@ def _validate_and_normalize_draft(
         missing_evidence=missing_evidence,
         limitations=limitations,
         follow_up_recommendations=follow_up_recommendations,
-        require_complete=formal.origin == "native",
     )
     successful_run_ids = {
         item.run_id for item in runs if item.status == "succeeded"
@@ -1441,7 +1591,6 @@ def _validate_conclusion_evidence_contract(
     missing_evidence: list[dict[str, Any]],
     limitations: list[dict[str, Any]],
     follow_up_recommendations: list[dict[str, Any]],
-    require_complete: bool,
 ) -> None:
     required: dict[str, tuple[tuple[str, list[dict[str, Any]]], ...]] = {
         "有条件候选": (
@@ -1470,10 +1619,6 @@ def _validate_conclusion_evidence_contract(
         ),
     }
     contracts = required.get(conclusion, ())
-    if not require_complete and conclusion in {"研究通过", "不通过"}:
-        contracts = tuple(
-            item for item in contracts if item[0] != "后续建议"
-        )
     missing = [label for label, values in contracts if not values]
     if missing:
         raise PublicationConflictError(
@@ -1630,7 +1775,9 @@ def _validate_research_pass_report_contract(
         "yearly",
         "marketRegimes",
         "walkForward",
+        "parameterNeighborhood",
         "costStress",
+        "capacity",
     }
     for run in runs:
         if run.status != "succeeded":
@@ -1689,33 +1836,20 @@ def _validate_research_pass_report_contract(
             raise PublicationConflictError(
                 f"研究通过报告的 canonical OOS 指标无效：{exc}"
             ) from exc
-        regimes = metrics.get("marketRegimes")
-        coverage = regimes.get("coverage") if isinstance(regimes, Mapping) else None
-        direction_states = (
-            coverage.get("directionStates")
-            if isinstance(coverage, Mapping)
-            else None
+        _validate_research_pass_market_regimes(
+            metrics.get("marketRegimes"),
+            expected_observations=metrics.get("observations"),
         )
-        volatility_states = (
-            coverage.get("volatilityStates")
-            if isinstance(coverage, Mapping)
-            else None
-        )
-        if (
-            not isinstance(direction_states, list)
-            or len(set(direction_states)) < 2
-            or not isinstance(volatility_states, list)
-            or len(set(volatility_states)) < 2
-        ):
-            raise PublicationConflictError(
-                "研究通过报告的冻结 test/OOS 未覆盖至少两种方向与两种波动环境"
-            )
         missing_metrics = sorted(required_metrics - set(metrics))
         if missing_metrics:
             raise PublicationConflictError(
                 "研究通过报告缺少 canonical 指标："
                 + ", ".join(missing_metrics)
             )
+        _validate_research_pass_parameter_neighborhood(
+            metrics.get("parameterNeighborhood")
+        )
+        _validate_research_pass_capacity(metrics.get("capacity"))
         if not _read_canonical_benchmark_series(root, manifest):
             raise PublicationConflictError(
                 "研究通过报告缺少匹配基准的 canonical 净值路径"
@@ -1734,10 +1868,199 @@ def _validate_research_pass_report_contract(
             metrics = _read_canonical_json(
                 Path(run.artifact_root) / "oos_metrics.json", "oos_metrics.json"
             )
-            if "dsr" not in metrics or "pbo" not in metrics:
+            _validate_multiple_testing_metrics(metrics, max_trials=max_trials)
+
+
+def _validate_research_pass_parameter_neighborhood(value: Any) -> None:
+    if not isinstance(value, Mapping) or value.get("status") != "complete":
+        raise PublicationConflictError(
+            "研究通过报告必须冻结完整的 canonical 参数邻域证据"
+        )
+    evaluated = value.get("evaluatedConfigurations")
+    conclusion = value.get("conclusion")
+    if (
+        isinstance(evaluated, bool)
+        or not isinstance(evaluated, int)
+        or evaluated < 3
+        or not isinstance(conclusion, str)
+        or not conclusion.strip()
+    ):
+        raise PublicationConflictError(
+            "研究通过报告的参数邻域至少需要三个配置与明确结论"
+        )
+
+
+def _validate_research_pass_market_regimes(
+    value: Any, *, expected_observations: Any
+) -> None:
+    if not isinstance(value, Mapping) or not isinstance(
+        value.get("cells"), Mapping
+    ):
+        raise PublicationConflictError("研究通过报告缺少结构化市场环境单元")
+    required_fields = {
+        "startDate",
+        "endDate",
+        "observations",
+        "totalReturn",
+        "benchmarkTotalReturn",
+        "activeTotalReturn",
+        "annualizedVolatility",
+        "maxDrawdown",
+        "averageOneWayTurnover",
+        "cumulativeTransactionCostRate",
+        "blockedRequestRate",
+    }
+    directions: set[str] = set()
+    volatilities: set[str] = set()
+    total_observations = 0
+    for name, cell in value["cells"].items():
+        if not isinstance(cell, Mapping) or cell.get("status") != "available":
+            continue
+        observations = cell.get("observations")
+        if (
+            not isinstance(name, str)
+            or "_" not in name
+            or isinstance(observations, bool)
+            or not isinstance(observations, int)
+            or observations <= 0
+        ):
+            raise PublicationConflictError("研究通过报告包含无效市场环境单元")
+        missing = sorted(required_fields - set(cell))
+        if missing:
+            raise PublicationConflictError(
+                "研究通过报告的市场环境单元缺少指标：" + ", ".join(missing)
+            )
+        try:
+            cell_start = datetime.fromisoformat(str(cell["startDate"])).date()
+            cell_end = datetime.fromisoformat(str(cell["endDate"])).date()
+        except ValueError as exc:
+            raise PublicationConflictError(
+                f"研究通过报告的市场环境日期无效：{name}"
+            ) from exc
+        if cell_start > cell_end:
+            raise PublicationConflictError(
+                f"研究通过报告的市场环境日期倒置：{name}"
+            )
+        for field in required_fields - {"startDate", "endDate", "observations"}:
+            metric = cell[field]
+            if isinstance(metric, bool) or not isinstance(metric, (int, float)):
                 raise PublicationConflictError(
-                    "多次试验的研究通过报告必须冻结 DSR 与 PBO"
+                    f"研究通过报告的市场环境指标无效：{name}/{field}"
                 )
+            if not math.isfinite(float(metric)):
+                raise PublicationConflictError(
+                    f"研究通过报告的市场环境指标非有限：{name}/{field}"
+                )
+        direction, volatility = name.split("_", 1)
+        if direction not in {"上涨", "下跌", "震荡"} or volatility not in {
+            "高波",
+            "低波",
+        }:
+            raise PublicationConflictError("研究通过报告包含未知市场环境名称")
+        directions.add(direction)
+        volatilities.add(volatility)
+        total_observations += observations
+    coverage = value.get("coverage")
+    if (
+        len(directions) < 2
+        or len(volatilities) < 2
+        or not isinstance(coverage, Mapping)
+        or set(coverage.get("directionStates") or []) != directions
+        or set(coverage.get("volatilityStates") or []) != volatilities
+        or coverage.get("observations") != total_observations
+        or isinstance(expected_observations, bool)
+        or not isinstance(expected_observations, int)
+        or expected_observations != total_observations
+    ):
+        raise PublicationConflictError(
+            "研究通过报告的实际市场环境单元未覆盖至少两种方向与两种波动环境"
+        )
+
+
+def _validate_research_pass_capacity(value: Any) -> None:
+    if not isinstance(value, Mapping) or value.get("status") != "complete":
+        raise PublicationConflictError(
+            "研究通过报告必须冻结预期资金规模、ADV 参与率与冲击模型"
+        )
+    required_numbers = (
+        "expectedCapital",
+        "medianAdvParticipationRate",
+        "p95AdvParticipationRate",
+        "maxAdvParticipationRate",
+    )
+    numbers: dict[str, float] = {}
+    for field in required_numbers:
+        raw = value.get(field)
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            raise PublicationConflictError(f"研究通过报告的容量字段无效：{field}")
+        number = float(raw)
+        if not math.isfinite(number) or number < 0:
+            raise PublicationConflictError(f"研究通过报告的容量字段无效：{field}")
+        numbers[field] = number
+    if numbers["expectedCapital"] <= 0 or not (
+        numbers["medianAdvParticipationRate"]
+        <= numbers["p95AdvParticipationRate"]
+        <= numbers["maxAdvParticipationRate"]
+    ):
+        raise PublicationConflictError("研究通过报告的容量数值关系无效")
+    impact_model = value.get("impactModel")
+    if not isinstance(impact_model, str) or not impact_model.strip():
+        raise PublicationConflictError("研究通过报告缺少适用的冲击模型")
+
+
+def _validate_multiple_testing_metrics(
+    metrics: Mapping[str, Any], *, max_trials: int
+) -> None:
+    dsr = metrics.get("dsr")
+    pbo = metrics.get("pbo")
+    if not isinstance(dsr, Mapping) or not isinstance(pbo, Mapping):
+        raise PublicationConflictError(
+            "多次试验的研究通过报告必须冻结结构化 DSR 与 PBO"
+        )
+    for label, value in (("DSR", dsr), ("PBO", pbo)):
+        probability = value.get("probability")
+        if isinstance(probability, bool) or not isinstance(
+            probability, (int, float)
+        ):
+            raise PublicationConflictError(f"{label} 概率必须是 canonical 数值")
+        if not math.isfinite(float(probability)) or not 0 <= float(probability) <= 1:
+            raise PublicationConflictError(f"{label} 概率必须位于 [0,1]")
+    trial_count = dsr.get("trialCount")
+    if (
+        isinstance(trial_count, bool)
+        or not isinstance(trial_count, int)
+        or trial_count != max_trials
+    ):
+        raise PublicationConflictError("DSR 试验数与冻结预算不一致")
+    observations = dsr.get("observations")
+    monthly_observations = pbo.get("monthlyObservations")
+    combinations = pbo.get("combinations")
+    winner_counts = pbo.get("trainingWinnerCounts")
+    if (
+        isinstance(observations, bool)
+        or not isinstance(observations, int)
+        or observations < 2
+    ):
+        raise PublicationConflictError("DSR 缺少有效观察数")
+    if (
+        isinstance(monthly_observations, bool)
+        or not isinstance(monthly_observations, int)
+        or monthly_observations < 2
+        or not isinstance(winner_counts, Mapping)
+        or len(winner_counts) != max_trials
+        or any(
+            isinstance(count, bool) or not isinstance(count, int) or count < 0
+            for count in winner_counts.values()
+        )
+    ):
+        raise PublicationConflictError("PBO 候选身份与冻结试验预算不一致")
+    if (
+        isinstance(combinations, bool)
+        or not isinstance(combinations, int)
+        or combinations < 1
+        or sum(winner_counts.values()) != combinations
+    ):
+        raise PublicationConflictError("PBO 缺少有效组合数")
 
 
 def _validate_canonical_evidence_ref(
@@ -2098,7 +2421,12 @@ def _publication_issue_number(
         raise PublicationConflictError(
             "历史导入评价尚未一对一映射独立的策略研究 Issue"
         )
-    return mapping.issue_number
+    try:
+        return resolve_historical_publication_issue(
+            plan.strategy_id, mapping.issue_number
+        ).issue_number
+    except ValueError as exc:
+        raise PublicationConflictError(f"历史研究 Issue 冻结映射无效：{exc}") from exc
 
 
 def _validate_supersession(
@@ -2123,8 +2451,7 @@ def _validate_supersession(
     )
     if (
         latest_published is None
-        or _latest_publication_lifecycle_event_type(db, latest_published)
-        not in PUBLICATION_SUCCESS_EVENT_TYPES
+        or not _publication_finalized_event_exists(db, latest_published)
     ):
         raise PublicationConflictError("上一评价尚未发布，只能重试原评价，不能改写结论")
 
@@ -2504,6 +2831,7 @@ def _canonical_run_identity(
     canonical_metrics: dict[str, Any] = {}
     canonical_oos_metrics: dict[str, Any] = {}
     chart_series: dict[str, list[dict[str, Any]]] = {}
+    walk_forward_evidence: dict[str, Any] = {}
     manifest_contract: dict[str, Any] = {}
     if manifest:
         manifest_contract = {
@@ -2547,6 +2875,20 @@ def _canonical_run_identity(
             start_date=chart_start,
             end_date=chart_end,
         )
+        if (run_root / "walk_forward_windows.csv.gz").is_file() and (
+            run_root / "walk_forward_metrics.csv.gz"
+        ).is_file():
+            walk_forward_evidence = {
+                "summary": canonical_oos_metrics.get("walkForward"),
+                "windows": _read_canonical_csv_records(
+                    run_root / "walk_forward_windows.csv.gz",
+                    "walk_forward_windows.csv.gz",
+                ),
+                "metrics": _read_canonical_csv_records(
+                    run_root / "walk_forward_metrics.csv.gz",
+                    "walk_forward_metrics.csv.gz",
+                ),
+            }
     audit_identity = (
         _frozen_run_audit_identity(run)
         if not historical
@@ -2577,6 +2919,7 @@ def _canonical_run_identity(
         "manifestContract": manifest_contract,
         "metrics": canonical_metrics,
         "oosMetrics": canonical_oos_metrics,
+        "walkForwardEvidence": walk_forward_evidence,
         "chartSeries": chart_series,
     }
 
@@ -2589,6 +2932,17 @@ def _read_canonical_json(path: Path, label: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise PublicationArtifactError(f"canonical {label} 不是 JSON object")
     return json_safe_value(payload)
+
+
+def _read_canonical_csv_records(path: Path, label: str) -> list[dict[str, str]]:
+    try:
+        with gzip.open(path, "rt", encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+    except (OSError, UnicodeDecodeError, csv.Error) as exc:
+        raise PublicationArtifactError(f"canonical {label} 无法读取") from exc
+    if not rows or not rows[0]:
+        raise PublicationArtifactError(f"canonical {label} 不能为空")
+    return [{str(key): str(value) for key, value in row.items()} for row in rows]
 
 
 def _read_canonical_nav_series(
@@ -2850,6 +3204,9 @@ def _render_report(summary: dict[str, Any]) -> str:
         _run_robustness_html(item, plan_contract) for item in summary["runs"]
     )
     risk_sections = "".join(_run_risk_html(item) for item in summary["runs"])
+    reproducibility_sections = "".join(
+        _run_reproducibility_html(item) for item in summary["runs"]
+    )
     chart_sections = "".join(_run_chart_html(item) for item in summary["runs"])
     gate_rows = _gate_table(evaluation["supportingEvidence"], plan["gates"])
     evidence_sections = "".join(
@@ -2909,6 +3266,7 @@ def _render_report(summary: dict[str, Any]) -> str:
         '<section><h2>10. 复现身份与失败审计</h2><table><thead><tr>'
         "<th>运行 ID</th><th>状态</th><th>阶段</th><th>开始</th><th>结束</th>"
         f"<th>失败原因</th><th>结果指纹</th></tr></thead><tbody>{run_rows}</tbody></table>"
+        f"<h3>完整复现身份</h3>{reproducibility_sections or _not_available('无运行复现身份')}"
         f"<h3>发布工件 URL</h3>{_json_html(summary['urls'])}</section>"
         "</main></body></html>\n"
     )
@@ -3033,6 +3391,9 @@ def _run_robustness_html(
         "parameterSpace": plan_contract.get("parameterSpace", "not_available"),
         "trialBudget": trial_budget or "not_available",
         "evidence": overfitting,
+        "walkForwardWindowsAndMetrics": run.get(
+            "walkForwardEvidence", "not_available"
+        ),
     }
     return _json_html(contract)
 
@@ -3063,6 +3424,24 @@ def _run_risk_html(run: Mapping[str, Any]) -> str:
     if not selected:
         return _not_available(f"运行 {run['runId']} 未冻结风险与容量指标")
     return f"<h3>运行 {escape(run['runId'])}</h3>{_mapping_table(selected)}"
+
+
+def _run_reproducibility_html(run: Mapping[str, Any]) -> str:
+    identity = {
+        key: run.get(key, "not_available")
+        for key in (
+            "runId",
+            "reproducibilityKey",
+            "configSha256",
+            "dataSnapshotId",
+            "codeCommit",
+            "environmentSha256",
+            "randomSeed",
+            "manifestSha256",
+            "resultFingerprint",
+        )
+    }
+    return _json_html(identity)
 
 
 def _run_chart_html(run: Mapping[str, Any]) -> str:
@@ -3285,10 +3664,17 @@ def _evidence_text(item: Mapping[str, Any]) -> str:
 def _issue_comment(summary: dict[str, Any], base_url: str, marker: str) -> str:
     evaluation = summary["evaluation"]
     runs = summary["runs"]
-    run_lines = [
-        f"- `{item['runId']}`：{item['status']}；结果指纹 `{item['resultFingerprint'] or '无'}`"
-        for item in runs
-    ] or ["- 本评价未关联研究运行；原因已记录在缺失证据或限制项中。"]
+    status_counts = {
+        status: sum(1 for item in runs if item["status"] == status)
+        for status in ("succeeded", "failed", "interrupted")
+    }
+    run_line = (
+        f"- 共 {len(runs)} 次：成功 {status_counts['succeeded']}、"
+        f"失败 {status_counts['failed']}、中断 {status_counts['interrupted']}。"
+        "完整运行身份与结果指纹见机器摘要和冻结报告。"
+        if runs
+        else "- 本评价未关联研究运行；原因已记录在机器摘要的缺失证据或限制项中。"
+    )
     sections = []
     for title, key in (
         ("支持证据", "supportingEvidence"),
@@ -3298,8 +3684,12 @@ def _issue_comment(summary: dict[str, Any], base_url: str, marker: str) -> str:
         ("后续研究建议", "followUpRecommendations"),
     ):
         values = evaluation[key]
-        lines = [f"- {_evidence_text(item)}" for item in values] or ["- 无。"]
-        sections.append(f"### {title}\n\n" + "\n".join(lines))
+        line = (
+            f"- 共 {len(values)} 项；完整内容见机器摘要与冻结报告。"
+            if values
+            else "- 无。"
+        )
+        sections.append(f"### {title}\n\n{line}")
     proposal_url = _absolute_url(base_url, summary["followUpProposalUrl"])
     sections.append(
         f"### 后续研究提案\n\n- [查看该评价的结构化后续研究提案]({proposal_url})"
@@ -3311,17 +3701,30 @@ def _issue_comment(summary: dict[str, Any], base_url: str, marker: str) -> str:
         f"## 研究评价版本：{evaluation['conclusion']}\n\n"
         "> 本评论冻结该评价版本；是否为当前生效结论，以研究评价状态页顶部状态为准。"
         "若显示未完成或已替代，本评论不替代当前结论。\n\n"
-        f"- 策略：{summary['strategy']['displayName']}（`{summary['strategy']['id']}`）\n"
+        f"- 策略：{_bounded_comment_text(summary['strategy']['displayName'])}"
+        f"（`{summary['strategy']['id']}`）\n"
         f"- 评价版本：`{evaluation['version']}`\n"
         f"- 评价指纹：`{evaluation['sha256']}`\n"
         f"- [研究评价状态页与冻结 HTML 报告]({report_url})\n"
         f"- [机器摘要]({summary_url})\n\n"
         "### 运行事实\n\n"
-        + "\n".join(run_lines)
+        + run_line
         + "\n\n"
         + "\n\n".join(sections)
         + "\n\n> 本结论仅用于离线量化研究，不构成实盘指令、买卖评级或收益承诺。"
     )
+
+
+def _bounded_comment_text(value: Any, *, max_chars: int = 160) -> str:
+    normalized = " ".join(str(value).split()) or "未命名策略"
+    if len(normalized) <= max_chars:
+        return normalized
+    return normalized[: max_chars - 1] + "…"
+
+
+def _issue_comment_marker(summary: Mapping[str, Any]) -> str:
+    evaluation = summary["evaluation"]
+    return f"<!-- research-publication:evaluation:{evaluation['sha256']} -->"
 
 
 def _verify_readback(
@@ -3647,6 +4050,8 @@ def _report_url(evaluation_id: str) -> str:
 
 
 def _validate_public_base_url(value: str) -> None:
+    if len(value) > MAX_PUBLICATION_BASE_URL_CHARS:
+        raise PublicationConflictError("RESEARCH_PUBLIC_BASE_URL 超过安全长度上限")
     parsed = urlparse(value)
     is_loopback_http = parsed.scheme == "http" and parsed.hostname in {
         "localhost",
@@ -3665,6 +4070,8 @@ def _validate_public_base_url(value: str) -> None:
 
 
 def _validate_readback_base_url(value: str) -> None:
+    if len(value) > MAX_PUBLICATION_BASE_URL_CHARS:
+        raise PublicationConflictError("RESEARCH_READBACK_BASE_URL 超过安全长度上限")
     parsed = urlparse(value)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise PublicationConflictError(

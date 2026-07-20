@@ -176,6 +176,28 @@ def approved_issue_graph(
 
 
 class ResearchPlanContractTest(unittest.TestCase):
+    def test_canonical_issue_template_is_accepted_by_active_plan_parser(self) -> None:
+        template_path = REPO_ROOT / ".github" / "ISSUE_TEMPLATE" / "正式研究计划.md"
+        template = template_path.read_text(encoding="utf-8")
+        machine_json = template.split(PLAN_START_MARKER, 1)[1].split(
+            PLAN_END_MARKER, 1
+        )[0]
+        payload = json.loads(machine_json.strip().removeprefix("```json").removesuffix("```").strip())
+        valid = valid_plan_payload()
+        for field in ("strategy", "economicHypothesis", "runConfig", "sampleSplits"):
+            payload[field] = deepcopy(valid[field])
+
+        prepared = prepare_research_plan(
+            issue_body(payload), verify_universe_source=False
+        )
+
+        self.assertEqual(prepared.normalized["schemaVersion"], "research-plan/v2")
+        self.assertIn(
+            "oos_metrics.json",
+            prepared.normalized["reportContract"]["requiredArtifacts"],
+        )
+        self.assertIn("evaluationPolicy", prepared.normalized["reportContract"])
+
     def test_canonical_hash_is_stable_for_key_and_set_order(self) -> None:
         payload = valid_plan_payload()
         first = prepare(payload)
@@ -224,6 +246,13 @@ class ResearchPlanContractTest(unittest.TestCase):
         payload = valid_plan_payload()
         payload["runConfig"]["validationPolicy"] = {"mode": "none"}
         with self.assertRaisesRegex(ResearchPlanError, "walk-forward"):
+            prepare(payload)
+
+        payload = valid_plan_payload()
+        payload["reportContract"]["evaluationPolicy"]["marketRegime"][
+            "directionLookbackPeriods"
+        ] = 1
+        with self.assertRaises(ResearchPlanError):
             prepare(payload)
 
         payload = valid_plan_payload()

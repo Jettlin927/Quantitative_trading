@@ -133,6 +133,10 @@ def build_oos_metrics(
             policy["marketRegime"],
         ),
         "walkForward": dict(walk_forward) if walk_forward is not None else None,
+        "parameterNeighborhood": {
+            "status": "not_available",
+            "reason": "当前运行未执行冻结参数邻域；不得据此判定研究通过",
+        },
         "costStress": {
             "multiplier": policy["costStressMultiplier"],
             "baseTotalReturn": core["totalReturn"],
@@ -140,6 +144,10 @@ def build_oos_metrics(
             "returnDifference": float(
                 stressed_core["totalReturn"] - core["totalReturn"]
             ),
+        },
+        "capacity": {
+            "status": "not_available",
+            "reason": "当前运行未绑定预期资金规模、ADV 参与率与冲击模型",
         },
     }
 
@@ -184,7 +192,9 @@ def validate_oos_metrics_contract(
         "yearly",
         "marketRegimes",
         "walkForward",
+        "parameterNeighborhood",
         "costStress",
+        "capacity",
     }
     if (
         metrics.get("status") != "complete"
@@ -207,8 +217,35 @@ def validate_oos_metrics_contract(
     stress = metrics["costStress"]
     if not isinstance(stress, dict) or stress.get("multiplier") != policy["costStressMultiplier"]:
         raise ValueError("OOS 成本压力未绑定冻结倍数")
-    if metrics["walkForward"] is None:
-        raise ValueError("OOS 指标缺少 walk-forward 证据")
+    walk_forward = metrics["walkForward"]
+    validation_policy = config.get("validationPolicy")
+    if (
+        not isinstance(walk_forward, dict)
+        or not isinstance(validation_policy, Mapping)
+        or walk_forward.get("mode") != validation_policy.get("mode")
+        or walk_forward.get("oosOnly") is not True
+        or isinstance(walk_forward.get("windowCount"), bool)
+        or not isinstance(walk_forward.get("windowCount"), int)
+        or walk_forward["windowCount"] <= 0
+        or isinstance(walk_forward.get("testObservationCount"), bool)
+        or not isinstance(walk_forward.get("testObservationCount"), int)
+        or walk_forward["testObservationCount"] <= 0
+    ):
+        raise ValueError("OOS 指标缺少结构化 walk-forward 证据")
+    for field, label in (
+        ("parameterNeighborhood", "参数邻域"),
+        ("capacity", "容量"),
+    ):
+        evidence = metrics[field]
+        if not isinstance(evidence, dict) or evidence.get("status") not in {
+            "complete",
+            "not_available",
+        }:
+            raise ValueError(f"OOS {label}证据状态无效")
+        if evidence["status"] == "not_available" and not isinstance(
+            evidence.get("reason"), str
+        ):
+            raise ValueError(f"OOS {label}缺失必须说明原因")
 
 
 def _yearly_metrics(
@@ -306,14 +343,18 @@ def _market_regime_metrics(
                 }
                 continue
             dates = pd.DatetimeIndex(subset.index)
+            returns = summarize_return_subperiod(
+                subset["strategy_return"], subset["benchmark_return"]
+            )
+            returns["activeTotalReturn"] = float(
+                returns["totalReturn"] - returns["benchmarkTotalReturn"]
+            )
             cells[name] = {
                 "status": "available",
                 "startDate": dates.min().date().isoformat(),
                 "endDate": dates.max().date().isoformat(),
                 "observations": int(len(subset)),
-                **summarize_return_subperiod(
-                    subset["strategy_return"], subset["benchmark_return"]
-                ),
+                **returns,
                 **_execution_metrics_for_dates(
                     nav,
                     requests,

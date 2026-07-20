@@ -32,7 +32,7 @@
       "opposingEvidencePaths": [["lowVolatilityGateFollowup", "opposingEvidence"]],
       "missingEvidencePaths": [["lowVolatilityGateFollowup", "missingEvidence"]],
       "limitationPaths": [["lowVolatilityGateFollowup", "interpretation"]],
-      "followUpRecommendationPaths": [],
+      "followUpRecommendationPaths": [["lowVolatilityGateFollowup", "researchClassification"]],
       "expectedConclusion": "不通过"
     },
     {

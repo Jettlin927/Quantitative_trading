@@ -357,11 +357,17 @@ def _normalize_report_contract(value: Any) -> dict[str, Any]:
     expected_conclusions = sorted({"研究通过", "有条件候选", "证据不足", "受阻", "不通过"})
     if conclusions != expected_conclusions:
         raise ResearchPlanError("reportContract.conclusionValues 必须固定为五种研究结论")
+    try:
+        evaluation_policy = validate_evaluation_policy(value["evaluationPolicy"])
+    except (TypeError, ValueError) as exc:
+        raise ResearchPlanError(
+            f"reportContract.evaluationPolicy 无效：{exc}"
+        ) from exc
     return {
         "language": "zh-CN",
         "requiredArtifacts": artifacts,
         "conclusionValues": conclusions,
-        "evaluationPolicy": validate_evaluation_policy(value["evaluationPolicy"]),
+        "evaluationPolicy": evaluation_policy,
     }
 
 
