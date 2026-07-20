@@ -7,6 +7,7 @@
 - 统一术语：`CONTEXT.md`。
 - 架构决策：`docs/adr/`。
 - 文档总入口：`docs/index.md`；代码职责见 `docs/architecture/code-map.md`，历史资料只从 `docs/archive/` 读取。
+- 生产部署、数据库迁移、受控切换与家庭 Windows 访问：`docs/operations/production-deployment-and-home-access.md`。
 - Issue 与 Wayfinder 规则：`docs/agents/issue-tracker.md`。
 - Agent 领域文档规则：`docs/agents/domain.md`。
 - 具体策略研究强制规范：`docs/research/contracts/strategy-evaluation-standard.md`。
@@ -189,6 +190,7 @@ Docker 不可用时如实记录，不能假装验证通过。
 - 当前生效的远程访问决定是**仅使用 SSH 隧道**访问 loopback 服务；不购买或申请域名，不部署 Cloudflare Tunnel、Cloudflare Access 或 Tailscale Serve，也不开放公网 IP 端口。除非用户明确提出变更，否则后续任务不得再次把域名、外部认证入口或公网开放作为待确认项。
 - 构建、验证和排查优先在目标服务器执行，减少本机资源占用；仍须先确认目标主机和分支。
 - 新服务器迁移采用并行搭建、停写逻辑备份恢复、工件同步、schema/行数/日期/指纹/API/前端读回和旧服务器回滚。
+- 任意新电脑上的 Codex 都必须先按 `docs/operations/production-deployment-and-home-access.md` 现场核验目标主机、精确 `main` 提交、本机 SSH config、受保护的 `.env` 和当次授权；仓库文档、旧 Issue 或操作日志本身不构成持续生产授权。
 - 生产 Alembic upgrade、baseline stamp、`DROP INDEX`、覆盖恢复、生产切换、旧服务器清理和凭据变更必须由用户单独批准。
 - 代码合并、CI 通过、镜像构建、容器启动、生产读回和研究结论是不同事实，报告时必须分开。
 

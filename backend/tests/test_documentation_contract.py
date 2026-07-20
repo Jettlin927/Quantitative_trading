@@ -50,6 +50,7 @@ class DocumentationContractTest(unittest.TestCase):
             "research/contracts/strategy-evaluation-standard.md",
             "research/contracts/quant-foundation-trust-contract.md",
             "operations/cicd.md",
+            "operations/production-deployment-and-home-access.md",
             "acceptance/2026-07-11-production-migration-approval.md",
             "acceptance/2026-07-12-production-trustworthiness-acceptance.md",
             "archive/handoffs/agent-handoff-2026-07-19.md",
@@ -80,6 +81,21 @@ class DocumentationContractTest(unittest.TestCase):
         self.assertIn("不开放公网 IP 端口", agents)
         self.assertIn("除非用户明确提出变更", agents)
         self.assertNotIn("采用 **Cloudflare Tunnel + Cloudflare Access**", decision)
+
+    def test_production_deployment_handoff_keeps_live_gates(self) -> None:
+        handoff_path = (
+            DOCS_ROOT / "operations" / "production-deployment-and-home-access.md"
+        )
+        handoff = handoff_path.read_text(encoding="utf-8")
+        agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+
+        self.assertIn("本文是稳定操作合同", handoff)
+        self.assertIn("不构成生产授权", handoff)
+        self.assertIn("不得复制运行中的 PostgreSQL volume", handoff)
+        self.assertIn("旧服务器保持完整", handoff)
+        self.assertIn("Windows 家庭电脑", handoff)
+        self.assertIn("SSH 隧道只提供连接", handoff)
+        self.assertIn(str(handoff_path.relative_to(REPO_ROOT)), agents)
 
     def test_document_index_routes_every_module(self) -> None:
         index = (DOCS_ROOT / "index.md").read_text(encoding="utf-8")
