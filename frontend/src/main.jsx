@@ -52,6 +52,10 @@ export function App() {
   const [readiness, setReadiness] = useState({ stocks: null, etf: null })
   const [stockPage, setStockPage] = useState({ items: [], total: 0, limit: STOCK_PAGE_SIZE, offset: 0 })
   const [catalogs, setCatalogs] = useState({ indices: [], funds: [], industries: [] })
+  const [selectedCatalog, setSelectedCatalog] = useState({ kind: '', code: '' })
+  const [catalogDetail, setCatalogDetail] = useState({ kind: '', code: '', bars: [], adjustments: [], members: [] })
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [catalogError, setCatalogError] = useState('')
   const [usDb, setUsDb] = useState(null)
   const [strategies, setStrategies] = useState([])
   const [selectedStrategyId, setSelectedStrategyId] = useState('')
@@ -63,6 +67,7 @@ export function App() {
   const [selectedCode, setSelectedCode] = useState('')
   const [stockBars, setStockBars] = useState([])
   const [stockDetail, setStockDetail] = useState(null)
+  const [stockDataCode, setStockDataCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [researchLoading, setResearchLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -108,9 +113,18 @@ export function App() {
       if (key === 'etfReadiness') setReadiness((current) => ({ ...current, etf: value }))
       if (key === 'overview') setOverview(value)
       if (key === 'stocks') applyStockPage(value)
-      if (key === 'indices') setCatalogs((current) => ({ ...current, indices: value }))
-      if (key === 'funds') setCatalogs((current) => ({ ...current, funds: value }))
-      if (key === 'industries') setCatalogs((current) => ({ ...current, industries: value }))
+      if (key === 'indices') {
+        setCatalogs((current) => ({ ...current, indices: value }))
+        setSelectedCatalog((current) => current.code || !value.length ? current : { kind: 'index', code: value[0].tsCode })
+      }
+      if (key === 'funds') {
+        setCatalogs((current) => ({ ...current, funds: value }))
+        setSelectedCatalog((current) => current.code || !value.length ? current : { kind: 'fund', code: value[0].tsCode })
+      }
+      if (key === 'industries') {
+        setCatalogs((current) => ({ ...current, industries: value }))
+        setSelectedCatalog((current) => current.code || !value.length ? current : { kind: 'industry', code: value[0].indexCode })
+      }
       if (key === 'usDb') setUsDb(value)
       if (key === 'strategies') {
         setStrategies(value)
@@ -134,7 +148,24 @@ export function App() {
 
   function applyStockPage(page) {
     setStockPage(page)
-    setSelectedCode((current) => page.items.some((item) => item.ts_code === current) ? current : page.items[0]?.ts_code || '')
+    const nextCode = page.items.some((item) => item.ts_code === selectedCode) ? selectedCode : page.items[0]?.ts_code || ''
+    selectStock(nextCode)
+  }
+
+  function selectStock(tsCode) {
+    if (tsCode === selectedCode) return
+    setSelectedCode(tsCode)
+    setStockDataCode('')
+    setStockBars([])
+    setStockDetail(null)
+    setStockError('')
+  }
+
+  function selectCatalog(kind, code) {
+    if (selectedCatalog.kind === kind && selectedCatalog.code === code) return
+    setSelectedCatalog({ kind, code })
+    setCatalogDetail({ kind, code, bars: [], adjustments: [], members: [] })
+    setCatalogError('')
   }
 
   async function loadStocks(offset = 0) {
@@ -176,14 +207,19 @@ export function App() {
   useEffect(() => {
     if (!selectedCode) return undefined
     let ignore = false
+    const requestedCode = selectedCode
     async function loadSelectedStock() {
       setDetailLoading(true)
+      setStockDataCode('')
+      setStockBars([])
+      setStockDetail(null)
       try {
         const [barsRes, detailRes] = await Promise.all([
-          fetchJson(`/api/daily-bars?ts_code=${encodeURIComponent(selectedCode)}`),
-          fetchJson(`/api/stocks/${encodeURIComponent(selectedCode)}/detail`),
+          fetchJson(`/api/daily-bars?ts_code=${encodeURIComponent(requestedCode)}`),
+          fetchJson(`/api/stocks/${encodeURIComponent(requestedCode)}/detail`),
         ])
         if (!ignore) {
+          setStockDataCode(requestedCode)
           setStockBars(barsRes)
           setStockDetail(detailRes)
           setStockError('')
@@ -199,6 +235,41 @@ export function App() {
       ignore = true
     }
   }, [selectedCode])
+
+  useEffect(() => {
+    if (!selectedCatalog.code) return undefined
+    let ignore = false
+    const requested = selectedCatalog
+    async function loadSelectedCatalog() {
+      setCatalogLoading(true)
+      setCatalogError('')
+      setCatalogDetail({ ...requested, bars: [], adjustments: [], members: [] })
+      try {
+        const { startDate, endDate } = recentCatalogRange()
+        let detail
+        if (requested.kind === 'index') {
+          const bars = await fetchJson(`/api/indices/${encodeURIComponent(requested.code)}/daily-bars?start_date=${startDate}&end_date=${endDate}`)
+          detail = { ...requested, bars, adjustments: [], members: [] }
+        } else if (requested.kind === 'fund') {
+          const [bars, adjustments] = await Promise.all([
+            fetchJson(`/api/funds/${encodeURIComponent(requested.code)}/daily-bars?start_date=${startDate}&end_date=${endDate}`),
+            fetchJson(`/api/funds/${encodeURIComponent(requested.code)}/adjust-factors?start_date=${startDate}&end_date=${endDate}`),
+          ])
+          detail = { ...requested, bars, adjustments, members: [] }
+        } else {
+          const members = await fetchJson(`/api/industries/${encodeURIComponent(requested.code)}/members?trade_date=${endDate}`)
+          detail = { ...requested, bars: [], adjustments: [], members }
+        }
+        if (!ignore) setCatalogDetail(detail)
+      } catch (err) {
+        if (!ignore) setCatalogError(errorMessage(err))
+      } finally {
+        if (!ignore) setCatalogLoading(false)
+      }
+    }
+    loadSelectedCatalog()
+    return () => { ignore = true }
+  }, [selectedCatalog])
 
   useEffect(() => {
     if (!selectedStrategyId) {
@@ -248,7 +319,9 @@ export function App() {
   const coverageRows = useMemo(() => buildCoverageRows(overview), [overview])
   const syncRuns = useMemo(() => syncProgress?.runs || [], [syncProgress])
   const selectedStock = stocks.find((stock) => stock.ts_code === selectedCode) || stocks[0] || null
-  const selectedLatestBar = stockBars[stockBars.length - 1] || selectedStock || null
+  const selectedStockBars = stockDataCode === selectedCode ? stockBars : []
+  const selectedStockDetail = stockDataCode === selectedCode ? stockDetail : null
+  const selectedLatestBar = selectedStockBars[selectedStockBars.length - 1] || selectedStock || null
 
   return (
     <div className="app-frame">
@@ -292,12 +365,18 @@ export function App() {
               onSearch={() => loadStocks(0)}
               onPage={loadStocks}
               selectedCode={selectedCode}
-              setSelectedCode={setSelectedCode}
+              setSelectedCode={selectStock}
               selectedStock={selectedStock}
               selectedLatestBar={selectedLatestBar}
-              stockBars={stockBars}
-              stockDetail={stockDetail}
+              stockBars={selectedStockBars}
+              stockDetail={selectedStockDetail}
               catalogs={catalogs}
+              selectedCatalog={selectedCatalog}
+              setSelectedCatalog={selectCatalog}
+              catalogDetail={catalogDetail}
+              catalogLoading={catalogLoading}
+              catalogError={catalogError}
+              syncRuns={syncRuns}
               detailLoading={detailLoading}
               error={stockError}
             />
@@ -308,7 +387,7 @@ export function App() {
           ) : null}
 
           {activeView === 'operations' ? (
-            <OperationsView health={health} readiness={readiness} coverageRows={coverageRows} syncRuns={syncRuns} />
+            <OperationsView health={health} readiness={readiness} coverageRows={coverageRows} syncRuns={syncRuns} strategies={strategies} />
           ) : null}
         </main>
       </div>
@@ -414,10 +493,13 @@ function ResearchCockpitView({
   error,
 }) {
   const formalResearches = strategyProfile?.formal_researches || []
-  const evaluation = latestVersion(researchDetail?.evaluations)
-  const totalResearches = strategies.reduce((sum, item) => sum + Number(item.formal_research_count || 0), 0)
+  const publishedRecord = latestVersion((researchDetail?.publications || []).filter((item) => item.status === 'published'))
+  const evaluation = evaluationForPublication(researchDetail, publication)
+  const publicationFact = publication || publishedRecord
   const publishedStrategies = strategies.filter((item) => item.latest_publication_status === 'published').length
   const proposals = strategyProfile?.follow_up_proposals || []
+  const activeResearches = formalResearches.filter((item) => ['active', 'evaluating'].includes(item.phase)).length
+  const missingEvidence = evaluation?.missing_evidence?.length || 0
   return (
     <div className="view-stack enter research-cockpit">
       <section className="section-heading cockpit-heading">
@@ -431,11 +513,12 @@ function ResearchCockpitView({
       {error ? <DomainFailure title="研究档案读取失败" detail={error} /> : null}
 
       <section className="cockpit-metrics" aria-label="研究摘要">
-        <SummaryMetric label="策略档案" value={formatInt(strategies.length)} detail="静态登记策略" />
-        <SummaryMetric label="正式研究" value={formatInt(totalResearches)} detail="含历史迁移与原生研究" />
-        <SummaryMetric label="已有发布" value={formatInt(publishedStrategies)} detail="策略维度最新发布" />
+        <SummaryMetric label="待批准研究" value="功能债" detail="编排聚合投影尚未接入" />
+        <SummaryMetric label="运行中" value={formatInt(activeResearches)} detail="当前策略 active / evaluating" />
+        <SummaryMetric label="受阻研究" value="功能债" detail="编排受阻聚合尚未接入" />
+        <SummaryMetric label="最近发布" value={formatInt(publishedStrategies)} detail="有最新已发布结论的策略" />
+        <SummaryMetric label="尚缺证据" value={formatInt(missingEvidence)} detail="当前已发布评价版本" />
         <SummaryMetric label="后续提案" value={formatInt(proposals.length)} detail="不等于已批准研究" />
-        <SummaryMetric label="当前结论" value={publication?.conclusion || evaluation?.conclusion || '-'} detail="五态强制结论" />
       </section>
 
       <section className="cockpit-grid">
@@ -488,7 +571,7 @@ function ResearchCockpitView({
               </nav>
 
               {researchDetail ? (
-                <ResearchDetailView detail={researchDetail} evaluation={evaluation} publication={publication} />
+                <ResearchDetailView detail={researchDetail} evaluation={evaluation} publication={publicationFact} />
               ) : formalResearches.length && !error ? <div className="loading-state"><RefreshCw className="spin" size={18} />正在读取研究时间线…</div> : null}
             </>
           ) : !error ? <div className="loading-state">选择策略后查看结构化研究档案</div> : null}
@@ -596,7 +679,20 @@ function EvidenceList({ title, items = [], tone }) {
 }
 
 function AShareDataView(props) {
-  const { readiness, coverageRows, catalogs, stockDetail, error } = props
+  const {
+    readiness,
+    coverageRows,
+    catalogs,
+    stockDetail,
+    selectedCatalog,
+    setSelectedCatalog,
+    catalogDetail,
+    catalogLoading,
+    catalogError,
+    syncRuns,
+    error,
+  } = props
+  const failedSyncRuns = syncRuns.filter((run) => ['failed', 'error'].includes(String(run.status).toLowerCase())).length
   return (
     <div className="view-stack enter">
       <section className="section-heading actual-data-heading">
@@ -609,14 +705,17 @@ function AShareDataView(props) {
         <SummaryMetric label="ETF 时序库存" value={inventoryLabel(readiness.etf)} detail="质量运行另行判定" />
         <SummaryMetric label="估值历史" value={formatInt(stockDetail?.valuation_history?.length)} detail="当前股票返回记录" />
         <SummaryMetric label="财务历史" value={formatInt(stockDetail?.financial_history?.length)} detail="按公告日 point-in-time" />
+        <SummaryMetric label="同步失败" value={formatInt(failedSyncRuns)} detail="最近同步运行中的失败事实" />
       </section>
       <StockLabView {...props} />
       <FundamentalsHistory detail={stockDetail} />
       <section className="catalog-grid">
-        <CatalogPanel title="指数目录" eyebrow="指数基准" rows={catalogs.indices} codeKey="tsCode" metaKey="category" />
-        <CatalogPanel title="ETF 目录" eyebrow="ETF 范围" rows={catalogs.funds} codeKey="tsCode" metaKey="fundType" />
-        <CatalogPanel title="行业分类" eyebrow="申万 2021 行业" rows={catalogs.industries} codeKey="indexCode" nameKey="industryName" metaKey="level" />
+        <CatalogPanel title="指数目录" eyebrow="指数基准" kind="index" rows={catalogs.indices} codeKey="tsCode" metaKey="category" selected={selectedCatalog} onSelect={setSelectedCatalog} />
+        <CatalogPanel title="ETF 目录" eyebrow="ETF 范围" kind="fund" rows={catalogs.funds} codeKey="tsCode" metaKey="fundType" selected={selectedCatalog} onSelect={setSelectedCatalog} />
+        <CatalogPanel title="行业分类" eyebrow="申万 2021 行业" kind="industry" rows={catalogs.industries} codeKey="indexCode" nameKey="industryName" metaKey="level" selected={selectedCatalog} onSelect={setSelectedCatalog} />
       </section>
+      {catalogError ? <DomainFailure title="目录明细读取失败" detail={catalogError} /> : null}
+      <CatalogDetailPanel selection={selectedCatalog} detail={catalogDetail} loading={catalogLoading} />
       <Panel title="实际数据覆盖与研究用途" eyebrow="覆盖与质量"><CoverageMatrix rows={coverageRows} detailed /></Panel>
     </div>
   )
@@ -643,15 +742,44 @@ function FundamentalsHistory({ detail }) {
   )
 }
 
-function CatalogPanel({ title, eyebrow, rows, codeKey, nameKey = 'name', metaKey }) {
+function CatalogPanel({ title, eyebrow, kind, rows, codeKey, nameKey = 'name', metaKey, selected, onSelect }) {
   return (
     <Panel title={title} eyebrow={`${eyebrow} · ${formatInt(rows.length)}`}>
       <div className="catalog-list">
         {rows.slice(0, 12).map((row) => (
-          <div key={row[codeKey]}><span><b>{row[nameKey] || '-'}</b><small>{row[codeKey]}</small></span><em>{row[metaKey] || '-'}</em></div>
+          <button className={selected.kind === kind && selected.code === row[codeKey] ? 'active' : ''} key={row[codeKey]} onClick={() => onSelect(kind, row[codeKey])}>
+            <span><b>{row[nameKey] || '-'}</b><small>{row[codeKey]}</small></span><em>{row[metaKey] || '-'}</em>
+          </button>
         ))}
         {!rows.length ? <div className="empty-state">暂无目录记录</div> : null}
       </div>
+    </Panel>
+  )
+}
+
+function CatalogDetailPanel({ selection, detail, loading }) {
+  const isIndustry = selection.kind === 'industry'
+  const adjustmentByDate = new Map((detail.adjustments || []).map((item) => [item.tradeDate, item.adjFactor]))
+  return (
+    <Panel
+      title={selection.code || '请选择目录标的'}
+      eyebrow={isIndustry ? '当前交易日行业成员' : `${selection.kind === 'fund' ? 'ETF' : '指数'}近一年日线历史`}
+    >
+      {loading ? <div className="loading-state"><RefreshCw className="spin" size={18} />正在读取目录明细…</div> : (
+        <div className="table-scroll compact-history">
+          {isIndustry ? (
+            <table className="data-table"><thead><tr><th>成分代码</th><th>名称</th><th>纳入日</th><th>移出日</th><th>最新成员</th></tr></thead><tbody>
+              {(detail.members || []).slice(0, 50).map((row) => <tr key={`${row.conCode}-${row.inDate}`}><td className="mono strong">{row.conCode}</td><td>{row.conName || '-'}</td><td>{row.inDate}</td><td>{row.outDate || '-'}</td><td><Badge value={row.isNew ? '是' : '否'} /></td></tr>)}
+              {!detail.members?.length ? <EmptyRow colSpan={5} /> : null}
+            </tbody></table>
+          ) : (
+            <table className="data-table"><thead><tr><th>交易日</th><th>收盘</th><th>涨跌幅</th><th>成交额</th>{selection.kind === 'fund' ? <th>复权因子</th> : null}</tr></thead><tbody>
+              {(detail.bars || []).slice(-20).reverse().map((row) => <tr key={row.tradeDate}><td>{row.tradeDate}</td><td className="mono strong">{formatNumber(row.close)}</td><td className={priceTone(row.pctChg)}>{formatSignedPercent(row.pctChg)}</td><td>{formatDailyAmount(row.amount)}</td>{selection.kind === 'fund' ? <td>{formatNumber(adjustmentByDate.get(row.tradeDate))}</td> : null}</tr>)}
+              {!detail.bars?.length ? <EmptyRow colSpan={selection.kind === 'fund' ? 5 : 4} /> : null}
+            </tbody></table>
+          )}
+        </div>
+      )}
     </Panel>
   )
 }
@@ -677,7 +805,8 @@ function USDataBoundaryView({ usDb }) {
   )
 }
 
-function OperationsView({ health, readiness, coverageRows, syncRuns }) {
+function OperationsView({ health, readiness, coverageRows, syncRuns, strategies }) {
+  const publishedStrategies = strategies.filter((item) => item.latest_publication_status === 'published').length
   return (
     <div className="view-stack enter">
       <section className="section-heading"><div><span>只读系统事实</span><h2>系统运维</h2><p>仅展示 API、数据库、Worker、队列、数据覆盖与同步历史；不在驾驶舱执行写入或生产操作。</p></div><Badge value="无写入控制" /></section>
@@ -686,6 +815,9 @@ function OperationsView({ health, readiness, coverageRows, syncRuns }) {
         <OperationCard icon={Activity} title="Worker 心跳" value={health?.worker ? `${translateStatus(health.worker.status)} · ${health.worker.ageSeconds ?? '-'} 秒` : '未知'} healthy={health?.worker?.status === 'ok' && !health?.worker?.stale} />
         <OperationCard icon={ListChecks} title="队列" value={health?.queue ? `${health.queue.active} 个运行中 · ${health.queue.queued} 个排队中` : '未知'} healthy={Boolean(health?.queue) && health.queue.status !== 'stalled'} />
         <OperationCard icon={ShieldCheck} title="研究库存" value={`${inventoryLabel(readiness.stocks)} / ${inventoryLabel(readiness.etf)}`} healthy={isInventoryAvailable(readiness.stocks) && isInventoryAvailable(readiness.etf)} />
+        <OperationCard icon={FileText} title="发布健康" value={`${formatInt(publishedStrategies)} 个策略有已发布结论；队列聚合待接入`} healthy={publishedStrategies > 0} />
+        <OperationCard icon={Database} title="磁盘" value="功能债：只读磁盘探针尚未接入" healthy={false} />
+        <OperationCard icon={ShieldCheck} title="备份" value="人工核验门禁：跟踪议题 #28" healthy={false} />
       </section>
       <section className="data-detail-grid">
         <Panel title="PostgreSQL 数据覆盖" eyebrow="数据库实时计数" className="full-coverage"><CoverageMatrix rows={coverageRows} detailed /></Panel>
@@ -1116,8 +1248,25 @@ function buildStockScreenPath(query, offset) {
   return `/api/stocks/screen?${params.toString()}`
 }
 
+function recentCatalogRange() {
+  const end = new Date()
+  const start = new Date(end)
+  start.setUTCFullYear(start.getUTCFullYear() - 1)
+  return { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) }
+}
+
 function latestVersion(items = []) {
   return [...(items || [])].sort((left, right) => Number(right.version || 0) - Number(left.version || 0))[0] || null
+}
+
+function evaluationForPublication(detail, projection) {
+  const evaluations = detail?.evaluations || []
+  const published = latestVersion((detail?.publications || []).filter((item) => item.status === 'published'))
+  const evaluationId = projection?.evaluation_id || published?.evaluation_id
+  if (evaluationId) {
+    return evaluations.find((item) => String(item.id) === String(evaluationId)) || null
+  }
+  return published ? null : latestVersion(evaluations)
 }
 
 function shortHash(value) {
@@ -1128,7 +1277,7 @@ function shortHash(value) {
 function formatStructuredItem(item) {
   if (item === null || item === undefined) return '-'
   if (typeof item === 'string' || typeof item === 'number') return String(item)
-  const preferred = ['title', 'label', 'summary', 'description', 'rationale', 'reason', 'metric', 'name']
+  const preferred = ['statement', 'title', 'label', 'summary', 'description', 'rationale', 'reason', 'metric', 'name']
   for (const key of preferred) {
     if (item[key]) return String(item[key])
   }
