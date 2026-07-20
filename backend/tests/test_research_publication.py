@@ -14,6 +14,7 @@ import time
 import unittest
 from unittest.mock import patch
 
+import pandas as pd
 from alembic import command
 from sqlalchemy import create_engine, func, select
 from sqlalchemy import text
@@ -73,6 +74,7 @@ from backend.app.research_catalog import (
     get_strategy_profile,
 )
 from backend.app.quant_research.manifest import build_result_fingerprint
+from backend.app.quant_research.evaluation import build_capacity_evidence
 from backend.app.quant_research.runner import (
     run_quant_research,
     validate_research_archive,
@@ -311,6 +313,28 @@ class ResearchPublicationTest(unittest.TestCase):
             "costStressMultiplier": "2",
         }
         research_pass_policy = {
+            "oosPerformance": {
+                "minimumTotalReturn": "0.00",
+                "minimumExcessTotalReturn": "0.00",
+            },
+            "risk": {
+                "maximumAbsoluteMaxDrawdown": "0.20",
+                "maximumEs95": "0.10",
+                "maximumMaxSingleWeight": "0.80",
+                "maximumHhi": "0.70",
+            },
+            "walkForward": {
+                "minimumWindowTotalReturn": "0.00",
+                "minimumPositiveWindowRate": "0.50",
+            },
+            "costStress": {
+                "minimumStressedTotalReturn": "0.00",
+                "maximumAbsoluteReturnDifference": "0.05",
+            },
+            "multipleTesting": {
+                "minimumDsrProbability": "0.95",
+                "maximumPboProbability": "0.20",
+            },
             "parameterNeighborhood": {
                 "variants": [
                     {"id": "base", "changes": []},
@@ -395,7 +419,15 @@ class ResearchPublicationTest(unittest.TestCase):
                 "上涨_低波": {"observations": 2, "totalReturn": 0.04},
                 "下跌_高波": {"observations": 1, "totalReturn": -0.01},
             },
-            "walkForward": {"windows": 1, "passRate": 1.0},
+            "walkForward": {
+                "mode": "anchored",
+                "oosOnly": True,
+                "testObservationCount": 2,
+                "windowCount": 1,
+                "minimumWindowTotalReturn": 0.02,
+                "medianWindowTotalReturn": 0.02,
+                "positiveWindowRate": 1.0,
+            },
             "parameterNeighborhood": "单一冻结参数；not_applicable",
             "costStress": {"base": 0.03, "double": 0.02},
         }
@@ -495,6 +527,9 @@ class ResearchPublicationTest(unittest.TestCase):
                     "oosOnly": True,
                     "testObservationCount": 2,
                     "windowCount": 1,
+                    "minimumWindowTotalReturn": 0.02,
+                    "medianWindowTotalReturn": 0.02,
+                    "positiveWindowRate": 1.0,
                 }
             ),
             "parameterNeighborhood": (
@@ -1012,28 +1047,36 @@ class ResearchPublicationTest(unittest.TestCase):
         )
 
     def rewrite_oos_and_resign(self, run_id: str, mutate) -> None:
-        run_root = self.artifact_root / "runs" / run_id
-        oos_path = run_root / "oos_metrics.json"
-        metrics = json.loads(oos_path.read_text(encoding="utf-8"))
-        mutate(metrics)
-        oos_path.write_text(
-            json.dumps(
-                metrics,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-            + "\n",
-            encoding="utf-8",
+        self.rewrite_json_artifacts_and_resign(
+            run_id, {"oos_metrics.json": mutate}
         )
+
+    def rewrite_json_artifacts_and_resign(
+        self, run_id: str, mutations
+    ) -> None:
+        run_root = self.artifact_root / "runs" / run_id
         manifest_path = run_root / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        digest = sha256(oos_path.read_bytes()).hexdigest()
-        manifest["artifactHashes"]["oos_metrics.json"] = {
-            "filename": "oos_metrics.json",
-            "contentSha256": digest,
-            "fileSha256": digest,
-        }
+        for filename, mutate in mutations.items():
+            path = run_root / filename
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            mutate(payload)
+            path.write_text(
+                json.dumps(
+                    payload,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            digest = sha256(path.read_bytes()).hexdigest()
+            manifest["artifactHashes"][filename] = {
+                "filename": filename,
+                "contentSha256": digest,
+                "fileSha256": digest,
+            }
         fingerprint = build_result_fingerprint(manifest["artifactHashes"])
         manifest["resultFingerprint"] = fingerprint
         manifest_path.write_text(
@@ -1048,6 +1091,64 @@ class ResearchPublicationTest(unittest.TestCase):
         )
         with self.Session.begin() as db:
             db.get(ResearchRun, run_id).result_fingerprint = fingerprint
+
+    def test_capacity_allows_zero_turnover_without_accepting_zero_adv(self) -> None:
+        _formal_id, run_id, _issue_number = self.seed_research(101)
+        with self.Session() as db:
+            config = dict(db.get(ResearchRun, run_id).config)
+        execution_date = pd.Timestamp("2025-07-08")
+        requests = pd.DataFrame(
+            [
+                {
+                    "execution_date": execution_date,
+                    "ts_code": "AAA.SH",
+                    "requested_change": 0.5,
+                }
+            ]
+        )
+        history_dates = pd.bdate_range("2025-07-01", periods=5)
+        market_bars = pd.DataFrame(
+            [
+                {
+                    "trade_date": trade_date,
+                    "ts_code": "AAA.SH",
+                    "amount": amount,
+                }
+                for trade_date, amount in zip(
+                    history_dates,
+                    (1_000_000, 0, 1_000_000, 0, 1_000_000),
+                    strict=True,
+                )
+            ]
+            + [
+                {
+                    "trade_date": trade_date,
+                    "ts_code": "UNRELATED.SH",
+                    "amount": 0,
+                }
+                for trade_date in history_dates
+            ]
+        )
+
+        evidence = build_capacity_evidence(
+            config,
+            requests,
+            market_bars,
+            dates=pd.DatetimeIndex([execution_date]),
+        )
+        self.assertEqual(evidence["status"], "complete")
+        self.assertEqual(evidence["coveredRequestCount"], 1)
+
+        zero_adv = market_bars.copy()
+        zero_adv.loc[zero_adv["ts_code"].eq("AAA.SH"), "amount"] = 0
+        unavailable = build_capacity_evidence(
+            config,
+            requests,
+            zero_adv,
+            dates=pd.DatetimeIndex([execution_date]),
+        )
+        self.assertEqual(unavailable["status"], "not_available")
+        self.assertIn("ADV为零", unavailable["reason"])
 
     def test_all_five_conclusions_and_failed_run_audit_can_be_published(self) -> None:
         conclusions = ("研究通过", "有条件候选", "证据不足", "受阻", "不通过")
@@ -1102,6 +1203,28 @@ class ResearchPublicationTest(unittest.TestCase):
             "costStressMultiplier": "2",
         }
         research_pass_policy = {
+            "oosPerformance": {
+                "minimumTotalReturn": "-0.50",
+                "minimumExcessTotalReturn": "-0.50",
+            },
+            "risk": {
+                "maximumAbsoluteMaxDrawdown": "1",
+                "maximumEs95": "1",
+                "maximumMaxSingleWeight": "1",
+                "maximumHhi": "1",
+            },
+            "walkForward": {
+                "minimumWindowTotalReturn": "-0.50",
+                "minimumPositiveWindowRate": "0",
+            },
+            "costStress": {
+                "minimumStressedTotalReturn": "-0.50",
+                "maximumAbsoluteReturnDifference": "1",
+            },
+            "multipleTesting": {
+                "minimumDsrProbability": "0.95",
+                "maximumPboProbability": "0.20",
+            },
             "parameterNeighborhood": {
                 "variants": [
                     {"id": "base", "changes": []},
@@ -1591,6 +1714,94 @@ class ResearchPublicationTest(unittest.TestCase):
                 risk_formal_id,
                 self.draft(risk_run_id, conclusion="研究通过"),
             )
+
+    def test_research_passed_enforces_preregistered_core_thresholds(self) -> None:
+        cases = (
+            (
+                102,
+                "冻结 OOS 收益门槛",
+                {"oos_metrics.json": lambda metrics: metrics.update(
+                    {
+                        "totalReturn": -0.90,
+                        "benchmarkTotalReturn": 0.20,
+                        "excessTotalReturn": -1.10,
+                    }
+                )},
+                1,
+                False,
+            ),
+            (
+                103,
+                "冻结风险门槛",
+                {"oos_metrics.json": lambda metrics: metrics.update(
+                    {"maxDrawdown": -0.95}
+                )},
+                1,
+                False,
+            ),
+            (
+                104,
+                "冻结成本压力门槛",
+                {"oos_metrics.json": lambda metrics: metrics[
+                    "costStress"
+                ].update(
+                    {
+                        "stressedTotalReturn": -0.99,
+                        "returnDifference": -1.02,
+                    }
+                )},
+                1,
+                False,
+            ),
+            (
+                105,
+                "冻结 walk-forward 门槛",
+                {
+                    filename: lambda metrics: metrics["walkForward"].update(
+                        {
+                            "minimumWindowTotalReturn": -0.99,
+                            "positiveWindowRate": 0.0,
+                        }
+                    )
+                    for filename in ("metrics.json", "oos_metrics.json")
+                },
+                1,
+                False,
+            ),
+            (
+                106,
+                "冻结 DSR/PBO 门槛.*",
+                {"oos_metrics.json": lambda metrics: metrics["dsr"].update(
+                    {"probability": 0.10}
+                )},
+                2,
+                True,
+            ),
+            (
+                107,
+                "冻结 DSR/PBO 门槛.*",
+                {"oos_metrics.json": lambda metrics: metrics["pbo"].update(
+                    {"probability": 0.90}
+                )},
+                2,
+                True,
+            ),
+        )
+        for serial, message, mutations, max_trials, complete_multiple in cases:
+            with self.subTest(message=message):
+                formal_id, run_id, _issue_number = self.seed_research(
+                    serial,
+                    max_trials=max_trials,
+                    complete_multiple_testing=complete_multiple,
+                )
+                self.rewrite_json_artifacts_and_resign(
+                    run_id, mutations
+                )
+                with self.assertRaisesRegex(PublicationConflictError, message):
+                    self.publish(
+                        formal_id,
+                        self.draft(run_id, conclusion="研究通过"),
+                    )
 
     def test_research_passed_rejects_missing_regime_execution_facts(self) -> None:
         formal_id, run_id, _ = self.seed_research(98)

@@ -48,17 +48,17 @@ python scripts/research/publish_research_evaluation.py \
 
 五类结论都有最低内容合同：`有条件候选` 必须有支持证据、明确限制和后续建议；`证据不足` 必须有尚缺证据、限制和后续建议；`受阻` 必须有阻塞导致的缺失证据、阻塞事实和后续建议；`不通过` 必须有反对证据、限制和后续建议；`研究通过` 也必须保留限制和后续建议。原生研究存在成功运行时，还必须至少引用一项绑定该运行且可由 manifest 校验的 canonical 证据。
 
-`研究通过` 另须在 `supportingEvidence` 中显式列出十项硬门禁：`identity_and_hypothesis`、`point_in_time_universe`、`execution_semantics`、`net_cost_and_liquidity`、`matched_benchmark`、`test_oos`、`market_regime`、`trial_history`、`risk_and_capacity`、`reproducibility`。每项都必须为 `status: "passed"`，并用 `evidenceRefs` 连接已声明的 canonical 证据；同时必须包含 input snapshot、代码、环境、参数、账本和统计六类输入证据。账本必须真实引用 `rebalance_requests.csv.gz`、`rebalance_executions.csv.gz` 和 `positions.csv.gz`；统计必须同时引用全周期 `metrics.json`、冻结测试段 `oos_metrics.json`、匹配基准 `benchmark_nav.csv.gz`、两份 walk-forward 窗口/指标 CSV、风险暴露与风险贡献 CSV。`oos_metrics.json` 中的市场环境覆盖从实际可用单元反推，不能相信自报数组；参数邻域与容量必须为 `complete`，并用策略哈希、每个邻域配置哈希、预期资金规模、ADV 参数、参与率与冲击阈值逐项绑定 `research-plan/v3`。Runner 会重跑每个冻结邻域配置，并用 OOS 调仓请求和请求日前成交额计算容量；发布器重新闭合汇总、阈值和风险贡献，不能接受事后另填的“通过”字段。多次试验的 DSR/PBO 必须是带有限概率、冻结试验数和组合身份的结构化对象，`null` 或 `not_available` 不构成证据。不能只给同一 manifest 贴上不同类型标签。发布 HTML 报告是上述冻结证据和机器摘要的确定性下游输出，不用它自证“研究通过”。所有 `artifacts://<run_id>/<path>` 引用都必须显式填写本评价中的 `runId`，URI、运行、路径与 SHA-256 会逐项对照 canonical manifest 和实际文件，不能用仓库链接、空运行或格式正确的占位哈希绕过。
+`研究通过` 另须在 `supportingEvidence` 中显式列出十项硬门禁：`identity_and_hypothesis`、`point_in_time_universe`、`execution_semantics`、`net_cost_and_liquidity`、`matched_benchmark`、`test_oos`、`market_regime`、`trial_history`、`risk_and_capacity`、`reproducibility`。每项都必须为 `status: "passed"`，并用 `evidenceRefs` 连接已声明的 canonical 证据；同时必须包含 input snapshot、代码、环境、参数、账本和统计六类输入证据。账本必须真实引用 `rebalance_requests.csv.gz`、`rebalance_executions.csv.gz` 和 `positions.csv.gz`；统计必须同时引用全周期 `metrics.json`、冻结测试段 `oos_metrics.json`、匹配基准 `benchmark_nav.csv.gz`、两份 walk-forward 窗口/指标 CSV、风险暴露与风险贡献 CSV。`oos_metrics.json` 中的市场环境覆盖从实际可用单元反推，不能相信自报数组；OOS 净收益、超额收益、最大回撤、ES、单一权重、HHI、walk-forward、成本压力和多次试验概率必须逐项通过冻结门槛。参数邻域与容量必须为 `complete`，并用策略哈希、每个邻域配置哈希、预期资金规模、ADV 参数、参与率与冲击阈值逐项绑定 `research-plan/v3`。Runner 会重跑每个冻结邻域配置，并用 OOS 调仓请求和请求日前成交额计算容量；合法零成交额保留在 ADV 样本中，请求标的历史 ADV 全为零时明确返回证据不足。发布器重新闭合收益、汇总、阈值和风险贡献，不能接受事后另填的“通过”字段。多次试验的 DSR/PBO 必须是带有限概率、冻结试验数和组合身份的结构化对象，`null` 或 `not_available` 不构成证据。不能只给同一 manifest 贴上不同类型标签。发布 HTML 报告是上述冻结证据和机器摘要的确定性下游输出，不用它自证“研究通过”。所有 `artifacts://<run_id>/<path>` 引用都必须显式填写本评价中的 `runId`，URI、运行、路径与 SHA-256 会逐项对照 canonical manifest 和实际文件，不能用仓库链接、空运行或格式正确的占位哈希绕过。
 
 GitHub 终态评论只发布有界中文摘要、各类证据数量和稳定链接；完整证据文字、运行身份与结果指纹保留在不可变机器摘要和 HTML 报告中，避免超长合同触发 GitHub 评论上限后形成无法更正的冻结版本。评论只写入一个稳定的“后续研究提案”只读入口，不把可变的提案标题、状态或转化计划 ID 嵌入 canonical 工件。因此发布后新增或更新提案不会改变已冻结的摘要、报告和评论字节。
 
 ## 冻结测试段与 canonical 工件
 
-正式研究计划采用 `research-plan/v3`。`sampleSplits` 必须严格冻结且不重叠地覆盖 `train`、`validation` 和 `test_oos`；`runConfig.validationPolicy` 必须启用非 `none` 的 walk-forward；`reportContract.evaluationPolicy` 固定市场环境回看窗口、阈值与成本压力倍数，`reportContract.researchPassPolicy` 固定参数邻域和容量假设。任一边界、策略、邻域或容量阈值变化都会改变计划哈希并使既有批准失效。
+正式研究计划采用 `research-plan/v3`。`sampleSplits` 必须严格冻结且不重叠地覆盖 `train`、`validation` 和 `test_oos`；`runConfig.validationPolicy` 必须启用非 `none` 的 walk-forward；`reportContract.evaluationPolicy` 固定市场环境回看窗口、阈值与成本压力倍数，`reportContract.researchPassPolicy` 固定 OOS 收益、风险、walk-forward、成本压力、DSR/PBO、参数邻域和容量门槛。任一边界、策略或门槛变化都会改变计划哈希并使既有批准失效。
 
 运行归档采用 `research-run-artifact/v5`，其中 `oos_metrics.json` 为 `research-oos-metrics/v2`。`metrics.json` 继续保存完整研究区间统计；OOS 工件只从冻结 `test_oos` 计算，并包含显式期初净值、匹配基准、逐年统计、只使用前一交易日基准信息分类的市场环境矩阵、样本/warmup/开市日/调仓/请求/成交/阻塞/独立交易计数、期末与平均 gross/net 暴露、结构化 walk-forward、参数邻域重跑、成本压力、容量观察和由风险 CSV 汇总的组合波动与总风险贡献。`walk_forward_windows.csv.gz` 与 `walk_forward_metrics.csv.gz` 冻结逐窗口边界和 OOS 指标并原生展示在报告中。`benchmark_nav.csv.gz` 保存与策略完全对齐的主基准净值路径，首个研究日收益从 `pre_close` 或上一交易日收盘计算，不能从首个收盘重新归一化。
 
-发布器只允许 artifact schema v5 及以上的运行晋升为 `研究通过`，并逐项核对 OOS 边界、评价策略、研究通过策略、非空 walk-forward、参数配置身份、容量观察、风险贡献和 canonical 工件。报告中的 OOS 指标、市场环境、稳健性、风险和成交章节只读取 `oos_metrics.json`；全区间 `metrics.json` 不能代替 OOS 证据。
+发布器只允许 artifact schema v5 及以上的运行晋升为 `研究通过`，并逐项核对 OOS 边界、评价策略、研究通过策略、收益与风险门槛、非空且与窗口 CSV 闭合的 walk-forward、成本压力、DSR/PBO、参数配置身份、容量观察、风险贡献和 canonical 工件。报告中的 OOS 指标、市场环境、稳健性、风险和成交章节只读取 `oos_metrics.json`；全区间 `metrics.json` 不能代替 OOS 证据。
 
 ## 更正与旧链接
 

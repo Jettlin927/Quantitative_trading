@@ -1776,6 +1776,7 @@ def _validate_research_pass_report_contract(
         "blockedCount",
         "independentTradeCount",
         "totalReturn",
+        "excessTotalReturn",
         "annualizedVolatility",
         "maxDrawdown",
         "benchmarkTotalReturn",
@@ -1788,6 +1789,7 @@ def _validate_research_pass_report_contract(
         "averageNetExposure",
         "endingNetExposure",
         "averageHhi",
+        "maxHhi",
         "endingHhi",
         "var95",
         "es95",
@@ -1811,6 +1813,7 @@ def _validate_research_pass_report_contract(
         metrics = _read_canonical_json(
             root / "oos_metrics.json", "oos_metrics.json"
         )
+        full_metrics = _read_canonical_json(root / "metrics.json", "metrics.json")
         config = manifest.get("config")
         snapshot = manifest.get("dataSnapshot")
         if not isinstance(config, Mapping) or not isinstance(snapshot, Mapping):
@@ -1863,6 +1866,10 @@ def _validate_research_pass_report_contract(
             metrics.get("marketRegimes"),
             expected_observations=metrics.get("observations"),
         )
+        if metrics.get("walkForward") != full_metrics.get("walkForward"):
+            raise PublicationConflictError(
+                "研究通过报告的 OOS walk-forward 汇总与 canonical 全周期工件不一致"
+            )
         missing_metrics = sorted(required_metrics - set(metrics))
         if missing_metrics:
             raise PublicationConflictError(
@@ -1876,6 +1883,7 @@ def _validate_research_pass_report_contract(
         _validate_research_pass_risk_summary(
             metrics.get("riskSummary"), metrics=metrics
         )
+        _validate_research_pass_thresholds(metrics, config)
         if not _read_canonical_benchmark_series(root, manifest):
             raise PublicationConflictError(
                 "研究通过报告缺少匹配基准的 canonical 净值路径"
@@ -1894,7 +1902,147 @@ def _validate_research_pass_report_contract(
             metrics = _read_canonical_json(
                 Path(run.artifact_root) / "oos_metrics.json", "oos_metrics.json"
             )
-            _validate_multiple_testing_metrics(metrics, max_trials=max_trials)
+            config = _read_canonical_json(
+                Path(run.artifact_root) / "manifest.json", "manifest.json"
+            ).get("config")
+            if not isinstance(config, Mapping):
+                raise PublicationConflictError("研究通过报告缺少冻结运行配置")
+            policy = validate_research_pass_policy(
+                config.get("researchPassPolicy"), config
+            )["multipleTesting"]
+            _validate_multiple_testing_metrics(
+                metrics,
+                max_trials=max_trials,
+                policy=policy,
+            )
+
+
+def _validate_research_pass_thresholds(
+    metrics: Mapping[str, Any], config: Mapping[str, Any]
+) -> None:
+    try:
+        policy = validate_research_pass_policy(
+            config.get("researchPassPolicy"), config
+        )
+    except (TypeError, ValueError) as exc:
+        raise PublicationConflictError(
+            f"研究通过报告的冻结核心门槛无效：{exc}"
+        ) from exc
+
+    numeric_fields = {
+        "totalReturn": "OOS 总收益",
+        "benchmarkTotalReturn": "OOS 基准总收益",
+        "excessTotalReturn": "OOS 超额总收益",
+        "maxDrawdown": "OOS 最大回撤",
+        "es95": "OOS ES95",
+        "maxSingleWeight": "OOS 最大单一权重",
+        "maxHhi": "OOS 最大 HHI",
+    }
+    values: dict[str, float] = {}
+    for field, label in numeric_fields.items():
+        raw = metrics.get(field)
+        if (
+            isinstance(raw, bool)
+            or not isinstance(raw, (int, float))
+            or not math.isfinite(float(raw))
+        ):
+            raise PublicationConflictError(f"研究通过报告的{label}必须是有限数")
+        values[field] = float(raw)
+    if not _numbers_close(
+        values["excessTotalReturn"],
+        values["totalReturn"] - values["benchmarkTotalReturn"],
+    ):
+        raise PublicationConflictError("研究通过报告的 OOS 超额收益不闭合")
+
+    performance_policy = policy["oosPerformance"]
+    if (
+        values["totalReturn"]
+        < float(performance_policy["minimumTotalReturn"]) - 1e-12
+        or values["excessTotalReturn"]
+        < float(performance_policy["minimumExcessTotalReturn"]) - 1e-12
+    ):
+        raise PublicationConflictError("研究通过报告未通过冻结 OOS 收益门槛")
+
+    risk_policy = policy["risk"]
+    if (
+        values["maxDrawdown"] > 1e-12
+        or abs(values["maxDrawdown"])
+        > float(risk_policy["maximumAbsoluteMaxDrawdown"]) + 1e-12
+        or values["es95"] > float(risk_policy["maximumEs95"]) + 1e-12
+        or values["maxSingleWeight"] < 0
+        or values["maxSingleWeight"]
+        > float(risk_policy["maximumMaxSingleWeight"]) + 1e-12
+        or values["maxHhi"] < 0
+        or values["maxHhi"] > float(risk_policy["maximumHhi"]) + 1e-12
+    ):
+        raise PublicationConflictError("研究通过报告未通过冻结风险门槛")
+
+    walk_forward = metrics.get("walkForward")
+    if not isinstance(walk_forward, Mapping):
+        raise PublicationConflictError("研究通过报告缺少 canonical walk-forward 汇总")
+    walk_values = _finite_metric_values(
+        walk_forward,
+        (
+            "minimumWindowTotalReturn",
+            "medianWindowTotalReturn",
+            "positiveWindowRate",
+        ),
+        "walk-forward",
+    )
+    walk_policy = policy["walkForward"]
+    if (
+        not 0 <= walk_values["positiveWindowRate"] <= 1
+        or walk_values["minimumWindowTotalReturn"]
+        < float(walk_policy["minimumWindowTotalReturn"]) - 1e-12
+        or walk_values["positiveWindowRate"]
+        < float(walk_policy["minimumPositiveWindowRate"]) - 1e-12
+    ):
+        raise PublicationConflictError(
+            "研究通过报告未通过冻结 walk-forward 门槛"
+        )
+
+    stress = metrics.get("costStress")
+    if not isinstance(stress, Mapping):
+        raise PublicationConflictError("研究通过报告缺少 canonical 成本压力汇总")
+    stress_values = _finite_metric_values(
+        stress,
+        ("baseTotalReturn", "stressedTotalReturn", "returnDifference"),
+        "成本压力",
+    )
+    if (
+        not _numbers_close(stress_values["baseTotalReturn"], values["totalReturn"])
+        or not _numbers_close(
+            stress_values["returnDifference"],
+            stress_values["stressedTotalReturn"] - stress_values["baseTotalReturn"],
+        )
+    ):
+        raise PublicationConflictError("研究通过报告的成本压力收益不闭合")
+    stress_policy = policy["costStress"]
+    if (
+        stress_values["stressedTotalReturn"]
+        < float(stress_policy["minimumStressedTotalReturn"]) - 1e-12
+        or abs(stress_values["returnDifference"])
+        > float(stress_policy["maximumAbsoluteReturnDifference"]) + 1e-12
+    ):
+        raise PublicationConflictError("研究通过报告未通过冻结成本压力门槛")
+
+
+def _finite_metric_values(
+    value: Mapping[str, Any], fields: tuple[str, ...], label: str
+) -> dict[str, float]:
+    result: dict[str, float] = {}
+    for field in fields:
+        raw = value.get(field)
+        if (
+            isinstance(raw, bool)
+            or not isinstance(raw, (int, float))
+            or not math.isfinite(float(raw))
+        ):
+            raise PublicationConflictError(
+                f"研究通过报告的{label}字段无效：{field}"
+            )
+        result[field] = float(raw)
+    return result
 
 
 def _validate_research_pass_parameter_neighborhood(
@@ -2351,7 +2499,7 @@ def _linear_quantile(values: list[float], quantile: float) -> float:
 
 
 def _validate_multiple_testing_metrics(
-    metrics: Mapping[str, Any], *, max_trials: int
+    metrics: Mapping[str, Any], *, max_trials: int, policy: Mapping[str, Any]
 ) -> None:
     dsr = metrics.get("dsr")
     pbo = metrics.get("pbo")
@@ -2403,6 +2551,13 @@ def _validate_multiple_testing_metrics(
         or sum(winner_counts.values()) != combinations
     ):
         raise PublicationConflictError("PBO 缺少有效组合数")
+    if (
+        float(dsr["probability"])
+        < float(policy["minimumDsrProbability"]) - 1e-12
+        or float(pbo["probability"])
+        > float(policy["maximumPboProbability"]) + 1e-12
+    ):
+        raise PublicationConflictError("研究通过报告未通过冻结 DSR/PBO 门槛")
 
 
 def _validate_canonical_evidence_ref(

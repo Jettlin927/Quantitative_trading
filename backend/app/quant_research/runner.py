@@ -2299,11 +2299,20 @@ def _validate_walk_forward_frames(
             raise SnapshotIntegrityError("walk-forward 训练/test 边界或 OOS 观测数无效")
         previous_test_end = test_end
         test_observations += observations
+    try:
+        window_returns = metrics["total_return"].map(float)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise SnapshotIntegrityError("walk-forward 窗口收益无效") from exc
+    if not window_returns.map(math.isfinite).all():
+        raise SnapshotIntegrityError("walk-forward 窗口收益必须是有限数")
     return {
         "mode": policy["mode"],
         "oosOnly": True,
         "testObservationCount": test_observations,
         "windowCount": len(windows),
+        "minimumWindowTotalReturn": float(window_returns.min()),
+        "medianWindowTotalReturn": float(window_returns.median()),
+        "positiveWindowRate": float((window_returns > 0).mean()),
     }
 
 

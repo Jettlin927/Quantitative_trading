@@ -171,6 +171,7 @@ class ResearchWalkForwardTest(unittest.TestCase):
         summary = json.loads((result.path / "metrics.json").read_text(encoding="utf-8"))[
             "walkForward"
         ]
+        window_returns = metrics["total_return"].map(float)
         self.assertEqual(
             summary,
             {
@@ -178,6 +179,15 @@ class ResearchWalkForwardTest(unittest.TestCase):
                 "oosOnly": True,
                 "testObservationCount": 9,
                 "windowCount": 3,
+                "minimumWindowTotalReturn": float(
+                    window_returns.min()
+                ),
+                "medianWindowTotalReturn": float(
+                    window_returns.median()
+                ),
+                "positiveWindowRate": float(
+                    (window_returns > 0).mean()
+                ),
             },
         )
         self.assertTrue(reproduce_quant_research(result.path)["matches"])
