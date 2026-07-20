@@ -11,7 +11,7 @@
 5. 先以 `pending` 从数据库/API 和 `RESEARCH_READBACK_BASE_URL` 指向的前端同源入口读回；一致后提交数据库发布版本，再从同一前端入口读回 `published`。评价版本、结论、运行指纹、工件 URL 任一不一致都停止。
 6. 只有 `published` 已经持久化并经前端读回，才把正式研究与编排状态收敛为已发布；全部数据库事务成功后，用一次 GitHub Issue 更新同时关闭研究 Issue 并设置 `研究:已发布` 标签。GitHub PATCH 是成功路径最后一个有副作用动作，关闭之后不再追加数据库尾写。动态状态页只承诺数据库、API 与前端已经读回，并明确说明 GitHub 终态仍由 Worker 持续核验和补偿。
 
-发布记录已经变为 `published`、但核心状态或 GitHub 原子收敛失败时，不改写该不可变版本；正式研究与编排状态回到可审计的评价/阻塞态，并记录 `research_publication_failed`。Worker 仅对可重试故障按最新失败事件的时间退避，且每个正式研究只恢复最新发布版本；不会重放已被更正的旧评价。发布记录提交前的暂时外部故障按同一评价创建后继发布尝试。工件篡改、身份冲突和读回内容不一致属于确定性失败，停止自动重试，修复后必须显式重提同一评价。所有路径都复用同一评价、同一工件和同一 Issue 评论。PostgreSQL advisory lock 覆盖整段外部发布流程，即使同时启动多个 Worker，也只有一个流程可创建评论和收敛状态。Worker 只消费已经显式冻结的评价，绝不根据运行成功或失败自动猜测五类结论。
+发布记录已经变为 `published`、但核心状态或 GitHub 原子收敛失败时，不改写该不可变版本；正式研究与编排状态回到可审计的评价/阻塞态，并记录 `research_publication_failed`。Worker 优先恢复最新但尚未收敛的 published 版本，同时持续巡检当前生效版本，即使后面已有 pending/failed 更正也不会漏掉旧生效结论。巡检会按数据库事实重建并逐字节核对三份发布工件，再核对冻结评论 ID、正文、Issue 标题、状态和标签；任何漂移都会使动态状态页退出“当前生效”。可重试故障按最新失败事件退避；工件篡改、身份冲突、非法 URL 和读回内容漂移属于确定性失败，停止自动重试。评论仍存在时可恢复原正文后显式重放；评论已删除且 GitHub 无法恢复原 ID 时，只能创建前向更正版本和新评论，旧数据库身份继续保留。PostgreSQL advisory lock 覆盖整段外部发布流程，即使同时启动多个 Worker，也只有一个流程可创建评论和收敛状态。Worker 只消费已经显式冻结的评价，绝不根据运行成功或失败自动猜测五类结论。
 
 ## 显式评价入口
 
@@ -48,15 +48,15 @@ python scripts/research/publish_research_evaluation.py \
 
 五类结论都有最低内容合同：`有条件候选` 必须有支持证据、明确限制和后续建议；`证据不足` 必须有尚缺证据、限制和后续建议；`受阻` 必须有阻塞导致的缺失证据、阻塞事实和后续建议；`不通过` 必须有反对证据、限制和后续建议；`研究通过` 也必须保留限制和后续建议。原生研究存在成功运行时，还必须至少引用一项绑定该运行且可由 manifest 校验的 canonical 证据。
 
-`研究通过` 另须在 `supportingEvidence` 中显式列出十项硬门禁：`identity_and_hypothesis`、`point_in_time_universe`、`execution_semantics`、`net_cost_and_liquidity`、`matched_benchmark`、`test_oos`、`market_regime`、`trial_history`、`risk_and_capacity`、`reproducibility`。每项都必须为 `status: "passed"`，并用 `evidenceRefs` 连接已声明的 canonical 证据；同时必须包含 input snapshot、代码、环境、参数、账本和统计六类输入证据。账本必须真实引用 `rebalance_requests.csv.gz`、`rebalance_executions.csv.gz` 和 `positions.csv.gz`；统计必须同时引用全周期 `metrics.json`、冻结测试段 `oos_metrics.json`、匹配基准 `benchmark_nav.csv.gz`、风险暴露 `risk_exposures.csv.gz` 与风险贡献 `risk_contributions.csv.gz`。不能只给同一 manifest 贴上不同类型标签。发布 HTML 报告是上述冻结证据和机器摘要的确定性下游输出，不用它自证“研究通过”。所有 `artifacts://<run_id>/<path>` 引用都必须显式填写本评价中的 `runId`，URI、运行、路径与 SHA-256 会逐项对照 canonical manifest 和实际文件，不能用仓库链接、空运行或格式正确的占位哈希绕过。
+`研究通过` 另须在 `supportingEvidence` 中显式列出十项硬门禁：`identity_and_hypothesis`、`point_in_time_universe`、`execution_semantics`、`net_cost_and_liquidity`、`matched_benchmark`、`test_oos`、`market_regime`、`trial_history`、`risk_and_capacity`、`reproducibility`。每项都必须为 `status: "passed"`，并用 `evidenceRefs` 连接已声明的 canonical 证据；同时必须包含 input snapshot、代码、环境、参数、账本和统计六类输入证据。账本必须真实引用 `rebalance_requests.csv.gz`、`rebalance_executions.csv.gz` 和 `positions.csv.gz`；统计必须同时引用全周期 `metrics.json`、冻结测试段 `oos_metrics.json`、匹配基准 `benchmark_nav.csv.gz`、两份 walk-forward 窗口/指标 CSV、风险暴露与风险贡献 CSV。`oos_metrics.json` 中的市场环境覆盖从实际可用单元反推，不能相信自报数组；参数邻域与容量必须为 `complete`，容量须给出预期资金规模、ADV 参与率和冲击模型。多次试验的 DSR/PBO 必须是带有限概率、冻结试验数和组合身份的结构化对象，`null` 或 `not_available` 不构成证据。不能只给同一 manifest 贴上不同类型标签。发布 HTML 报告是上述冻结证据和机器摘要的确定性下游输出，不用它自证“研究通过”。所有 `artifacts://<run_id>/<path>` 引用都必须显式填写本评价中的 `runId`，URI、运行、路径与 SHA-256 会逐项对照 canonical manifest 和实际文件，不能用仓库链接、空运行或格式正确的占位哈希绕过。
 
-GitHub 结论评论只写入一个稳定的“后续研究提案”只读入口，不把可变的提案标题、状态或转化计划 ID 嵌入 canonical 工件。因此发布后新增或更新提案不会改变已冻结的摘要、报告和评论字节。
+GitHub 终态评论只发布有界中文摘要、各类证据数量和稳定链接；完整证据文字、运行身份与结果指纹保留在不可变机器摘要和 HTML 报告中，避免超长合同触发 GitHub 评论上限后形成无法更正的冻结版本。评论只写入一个稳定的“后续研究提案”只读入口，不把可变的提案标题、状态或转化计划 ID 嵌入 canonical 工件。因此发布后新增或更新提案不会改变已冻结的摘要、报告和评论字节。
 
 ## 冻结测试段与 canonical 工件
 
 正式研究计划采用 `research-plan/v2`。`sampleSplits` 必须严格冻结且不重叠地覆盖 `train`、`validation` 和 `test_oos`；`runConfig.validationPolicy` 必须启用非 `none` 的 walk-forward；`reportContract.evaluationPolicy` 固定市场环境回看窗口、阈值与成本压力倍数。任一边界或策略变化都会改变计划哈希并使既有批准失效。
 
-运行归档采用 `research-run-artifact/v4`。`metrics.json` 继续保存完整研究区间统计；`oos_metrics.json` 只从冻结 `test_oos` 计算，并包含显式期初净值、匹配基准、逐年统计、只使用前一交易日基准信息分类的市场环境矩阵、OOS 成交统计、walk-forward 摘要与冻结倍数的成本压力重跑。`benchmark_nav.csv.gz` 保存与策略完全对齐的主基准净值路径，首个研究日收益从 `pre_close` 或上一交易日收盘计算，不能从首个收盘重新归一化。
+运行归档采用 `research-run-artifact/v4`。`metrics.json` 继续保存完整研究区间统计；`oos_metrics.json` 只从冻结 `test_oos` 计算，并包含显式期初净值、匹配基准、逐年统计、只使用前一交易日基准信息分类的市场环境矩阵、OOS 成交统计、结构化 walk-forward 摘要与冻结倍数的成本压力重跑。当前 Runner 尚未执行参数邻域或绑定预期资金规模、ADV 和冲击模型时，会明确写入 `not_available`；该归档仍可支持非通过结论，但不得晋升为 `研究通过`。`walk_forward_windows.csv.gz` 与 `walk_forward_metrics.csv.gz` 冻结逐窗口边界和 OOS 指标并原生展示在报告中。`benchmark_nav.csv.gz` 保存与策略完全对齐的主基准净值路径，首个研究日收益从 `pre_close` 或上一交易日收盘计算，不能从首个收盘重新归一化。
 
 发布器只允许 artifact schema v4 及以上的运行晋升为 `研究通过`，并逐项核对 OOS 边界、评价策略、非空 walk-forward、风险策略和 canonical 工件。报告中的 OOS 指标、市场环境、稳健性、风险和成交章节只读取 `oos_metrics.json`；全区间 `metrics.json` 不能代替 OOS 证据。
 
@@ -76,7 +76,7 @@ python scripts/research/register_historical_issue_mapping.py \
   --issue-number <对应 Issue 编号>
 ```
 
-工具会先读回 GitHub Issue 的编号、类型、OPEN 状态和标签，再在数据库中写入不可变映射；重复登记同一映射幂等，换绑或复用 Issue 会失败。本阶段只准备 migration、清单和登记工具，不执行生产 migration 或映射写入。
+工具会先读取冻结清单，拒绝任何策略与 Issue 的交叉换绑，再读回精确仓库中 Issue 的编号、标题、类型、OPEN 状态和标签，最后才在数据库中写入不可变映射；重复登记同一映射幂等，换绑、复用或改名都会失败。发布 Worker 也会再次核对冻结 pair 和 GitHub Issue；pending 发布只接受 OPEN，已发布记录允许 OPEN/CLOSED 进入补偿，但仍严格核对标题与两枚历史标签。历史导入与原生评价共用五类结论的最低内容合同，不允许“不通过”省略后续建议。本阶段只准备 migration、清单和登记工具，不执行生产 migration 或映射写入。
 
 ## 配置与门禁
 
@@ -84,5 +84,7 @@ python scripts/research/register_historical_issue_mapping.py \
 - `RESEARCH_READBACK_BASE_URL`：研究 Worker 实际读回的前端同源入口。Compose 默认使用 `http://frontend:5173`，以验证前端代理和 API/工件路由；不能改成绕过前端的数据库内部调用。
 - `RESEARCH_PUBLICATION_RETRY_SECONDS`：发布失败后再次领取同一评价的最短间隔，默认 300 秒，防止外部故障时形成紧密重试。
 - `RESEARCH_ARTIFACT_ROOT`：API 与研究 Worker 共享的持久工件根目录。
+
+既有 pending/published 评价遇到非法 public/readback URL 时也会写入失败审计，不会在 Worker 循环外静默抛错。
 
 本合同不授权生产部署、生产 Alembic upgrade、正式研究启动或历史迁移 apply。第一阶段也不购买或申请域名、不部署 Cloudflare/Tailscale、不开放公网端口；上述边界发生变化时仍需用户重新决定。

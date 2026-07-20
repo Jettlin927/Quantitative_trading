@@ -24,12 +24,13 @@ from backend.app.models import (  # noqa: E402
     ResearchPublicationIssueMapping,
 )
 from backend.app.github_research import (  # noqa: E402
-    HISTORICAL_RESEARCH_LABEL,
     GitHubIssueClient,
 )
-
-
-REQUIRED_ISSUE_LABELS = {"类型:策略研究", HISTORICAL_RESEARCH_LABEL}
+from backend.app.historical_publication_issues import (  # noqa: E402
+    EXPECTED_REPOSITORY,
+    resolve_historical_publication_issue,
+    validate_historical_publication_issue_snapshot,
+)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -49,9 +50,15 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.issue_number <= 0:
             raise ValueError("issue-number 必须是正整数")
+        expected_issue = resolve_historical_publication_issue(
+            args.strategy_id, args.issue_number
+        )
         assert_schema_revision_at_head(engine)
-        issue = GitHubIssueClient.from_env().get_issue(args.issue_number)
-        _validate_issue(issue, args.issue_number)
+        github = GitHubIssueClient.from_env()
+        if github.repository != EXPECTED_REPOSITORY:
+            raise RuntimeError("GitHub 仓库与历史研究冻结映射清单不一致")
+        issue = github.get_issue(args.issue_number)
+        validate_historical_publication_issue_snapshot(issue, expected_issue)
         with SessionLocal.begin() as db:
             formals = list(
                 db.scalars(
@@ -107,25 +114,5 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         return 3
-
-
-def _validate_issue(issue: object, expected_number: int) -> None:
-    if not isinstance(issue, dict) or issue.get("number") != expected_number:
-        raise RuntimeError("GitHub 返回的 Issue 身份与待登记编号不一致")
-    if "pull_request" in issue:
-        raise RuntimeError("历史研究映射目标必须是 Issue，不能是 Pull Request")
-    if str(issue.get("state") or "").lower() != "open":
-        raise RuntimeError("历史研究映射只允许登记 OPEN Issue")
-    labels = {
-        str(item.get("name") or "") if isinstance(item, dict) else str(item)
-        for item in issue.get("labels", [])
-    }
-    missing = sorted(REQUIRED_ISSUE_LABELS - labels)
-    if missing:
-        raise RuntimeError(
-            "历史研究 Issue 缺少标签：" + "、".join(missing)
-        )
-
-
 if __name__ == "__main__":
     raise SystemExit(main())

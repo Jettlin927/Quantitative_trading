@@ -8,7 +8,6 @@ from tempfile import TemporaryDirectory
 from hashlib import sha256
 import json
 import os
-import re
 import socket
 from threading import Barrier, Lock, Thread
 import time
@@ -30,6 +29,10 @@ from backend.app.github_research import (
     GitHubResearchError,
     GitHubUnavailableError,
 )
+from backend.app.historical_publication_issues import (
+    resolve_historical_publication_issue,
+    validate_historical_publication_issue_snapshot,
+)
 from backend.app.models import (
     FormalResearch,
     FollowUpResearchProposal,
@@ -49,6 +52,7 @@ from backend.app.models import (
 from backend.app.research_publication import (
     EvaluationDraft,
     EvidenceDraft,
+    MAX_GITHUB_ISSUE_COMMENT_BYTES,
     PublicationConflictError,
     PublicationError,
     RESEARCH_PASS_REQUIRED_GATES,
@@ -83,9 +87,12 @@ from scripts.research import register_historical_issue_mapping
 
 
 class FakeGitHubClient:
+    repository = "Jettlin927/Quantitative_trading"
+
     def __init__(self) -> None:
         self.issues: dict[int, dict] = {}
         self.comments: dict[int, list[dict]] = {}
+        self.next_comment_id = 9000
         self.fail_close_once = False
         self.fail_get_once = False
 
@@ -93,6 +100,7 @@ class FakeGitHubClient:
         self.issues[issue_number] = {
             "number": issue_number,
             "state": "open",
+            "title": "研究计划：测试",
             "labels": [{"name": "类型:策略研究"}],
         }
         self.comments[issue_number] = []
@@ -126,7 +134,8 @@ class FakeGitHubClient:
             if existing["body"] != body:
                 raise GitHubResearchError("同一评价标记已存在不同正文")
             return existing
-        comment = {"id": 9000 + sum(map(len, self.comments.values())), "body": body}
+        comment = {"id": self.next_comment_id, "body": body}
+        self.next_comment_id += 1
         self.comments[issue_number].append(comment)
         return dict(comment)
 
@@ -216,15 +225,26 @@ class ResearchPublicationTest(unittest.TestCase):
         run_status: str = "succeeded",
         origin: str = "native",
         plan_oos_start: str | None = None,
+        max_trials: int = 1,
+        complete_multiple_testing: bool = False,
+        sparse_regime_cells: bool = False,
+        invalid_walk_forward: bool = False,
+        complete_parameter_neighborhood: bool = True,
+        complete_capacity: bool = True,
     ) -> tuple[str, str, int]:
         suffix = f"{serial:012d}"
-        strategy_id = f"publication_contract_{serial}"
+        historical = origin == "historical_import"
+        strategy_id = (
+            "etf_volatility_managed"
+            if historical
+            else f"publication_contract_{serial}"
+        )
         plan_id = f"10000000-0000-0000-0000-{suffix}"
         approval_id = f"20000000-0000-0000-0000-{suffix}"
         formal_id = f"30000000-0000-0000-0000-{suffix}"
         orchestration_id = f"40000000-0000-0000-0000-{suffix}"
         run_id = f"50000000-0000-0000-0000-{suffix}"
-        issue_number = 700 + serial
+        issue_number = 37 if historical else 700 + serial
         snapshot_id = None
         run_root = self.artifact_root / "runs" / run_id
         run_root.mkdir(parents=True)
@@ -324,6 +344,25 @@ class ResearchPublicationTest(unittest.TestCase):
             "parameterNeighborhood": "单一冻结参数；not_applicable",
             "costStress": {"base": 0.03, "double": 0.02},
         }
+        regime_cells = {
+            name: {
+                "status": "available",
+                "startDate": "2025-07-01",
+                "endDate": "2025-12-31",
+                "observations": 2,
+                "totalReturn": 0.02,
+                "benchmarkTotalReturn": 0.01,
+                "activeTotalReturn": 0.01,
+                "annualizedVolatility": 0.12,
+                "maxDrawdown": -0.02,
+                "averageOneWayTurnover": 0.1,
+                "cumulativeTransactionCostRate": 0.001,
+                "blockedRequestRate": 0.0,
+            }
+            for name in ("上涨_低波", "上涨_高波", "下跌_低波", "下跌_高波")
+        }
+        if sparse_regime_cells:
+            regime_cells = {"上涨_低波": regime_cells["上涨_低波"]}
         oos_metrics = {
             **metrics,
             "schemaVersion": "research-oos-metrics/v1",
@@ -336,27 +375,77 @@ class ResearchPublicationTest(unittest.TestCase):
             "evaluationPolicySha256": canonical_sha256(evaluation_policy),
             "startDate": "2025-12-31",
             "endDate": "2025-12-31",
-            "observations": 1,
+            "observations": 8,
             "yearly": {"2025": {"totalReturn": 0.03}},
             "marketRegimes": {
                 "policy": evaluation_policy["marketRegime"],
                 "coverage": {
-                    "observations": 3,
+                    "observations": sum(
+                        item["observations"] for item in regime_cells.values()
+                    ),
                     "directionStates": ["上涨", "下跌"],
                     "volatilityStates": ["高波", "低波"],
                 },
-                "cells": {
-                    "上涨_低波": {"observations": 1, "totalReturn": 0.03}
-                },
+                "cells": regime_cells,
             },
-            "walkForward": {"oosOnly": True, "windowCount": 1},
+            "walkForward": (
+                "not_available"
+                if invalid_walk_forward
+                else {
+                    "mode": "anchored",
+                    "oosOnly": True,
+                    "testObservationCount": 2,
+                    "windowCount": 1,
+                }
+            ),
+            "parameterNeighborhood": (
+                {
+                    "status": "complete",
+                    "evaluatedConfigurations": 3,
+                    "conclusion": "冻结参数邻域内指标平滑，未见单点崩塌。",
+                }
+                if complete_parameter_neighborhood
+                else {"status": "not_available", "reason": "未执行参数邻域"}
+            ),
             "costStress": {
                 "multiplier": "2",
                 "baseTotalReturn": 0.03,
                 "stressedTotalReturn": 0.02,
                 "returnDifference": -0.01,
             },
+            "capacity": (
+                {
+                    "status": "complete",
+                    "expectedCapital": 1000000,
+                    "medianAdvParticipationRate": 0.001,
+                    "p95AdvParticipationRate": 0.003,
+                    "maxAdvParticipationRate": 0.005,
+                    "impactModel": "冻结线性冲击模型",
+                }
+                if complete_capacity
+                else {"status": "not_available", "reason": "未绑定 ADV 与资金规模"}
+            ),
         }
+        if max_trials > 1:
+            oos_metrics["dsr"] = (
+                {
+                    "trialCount": max_trials,
+                    "observations": 120,
+                    "probability": 0.96,
+                }
+                if complete_multiple_testing
+                else None
+            )
+            oos_metrics["pbo"] = (
+                {
+                    "monthlyObservations": 24,
+                    "combinations": 10,
+                    "probability": 0.2,
+                    "trainingWinnerCounts": {"方案一": 6, "方案二": 4},
+                }
+                if complete_multiple_testing
+                else "not_available"
+            )
         nav_csv = (
             "trade_date,nav,cash_weight,gross_exposure,one_way_turnover,transaction_cost_rate\n"
             "2025-01-02,0.99,0.4,0.6,0.1,0.0005\n"
@@ -403,6 +492,20 @@ class ResearchPublicationTest(unittest.TestCase):
             "risk_exposures.csv.gz": gzip.compress(b"risk\n1\n", mtime=0),
             "risk_contributions.csv.gz": gzip.compress(
                 b"contribution\n1\n", mtime=0
+            ),
+            "walk_forward_windows.csv.gz": gzip.compress(
+                (
+                    "window_id,mode,train_start,train_end,test_start,test_end,train_periods,test_periods\n"
+                    "wf-0001,anchored,2025-01-02,2025-06-30,2025-07-01,2025-12-31,60,20\n"
+                ).encode(),
+                mtime=0,
+            ),
+            "walk_forward_metrics.csv.gz": gzip.compress(
+                (
+                    "window_id,sample_role,start_date,end_date,observations,total_return,max_drawdown\n"
+                    "wf-0001,test_oos,2025-07-01,2025-12-31,2,0.02,-0.01\n"
+                ).encode(),
+                mtime=0,
             ),
         }
         artifact_hashes = {}
@@ -469,7 +572,6 @@ class ResearchPublicationTest(unittest.TestCase):
                 code_commit="c" * 40,
                 metadata_json={},
             )
-            historical = origin == "historical_import"
             plan_json = {
                 "strategyId": strategy_id,
                 "strategy": {
@@ -481,7 +583,7 @@ class ResearchPublicationTest(unittest.TestCase):
                 "economicHypothesis": "测试假设仅用于验证发布合同。",
                 "gates": ["净成本门禁", "OOS 门禁", "复现身份门禁"],
                 "parameterSpace": {"singleRun": ["frozen"]},
-                "trialBudget": {"maxTrials": 1},
+                "trialBudget": {"maxTrials": max_trials},
                 "runConfig": config,
                 "sampleSplits": [dict(item) for item in sample_splits],
                 "reportContract": {"evaluationPolicy": evaluation_policy},
@@ -600,11 +702,59 @@ class ResearchPublicationTest(unittest.TestCase):
                     )
                 )
         self.github.add_issue(issue_number)
-        if origin == "historical_import":
+        if historical:
+            self.github.issues[issue_number]["title"] = (
+                "历史研究：沪深300 ETF 波动率管理结构化评价发布"
+            )
             self.github.issues[issue_number]["labels"].append(
                 {"name": "来源:历史导入"}
             )
         return formal_id, run_id, issue_number
+
+    def seed_historical_pending(
+        self, serial: int
+    ) -> tuple[str, str, str, int]:
+        formal_id, run_id, issue_number = self.seed_research(
+            serial, origin="historical_import"
+        )
+        suffix = f"{serial:012d}"
+        evaluation_id = f"60000000-0000-0000-0000-{suffix}"
+        publication_id = f"70000000-0000-0000-0000-{suffix}"
+        with self.Session.begin() as db:
+            db.add(
+                ResearchEvaluation(
+                    id=evaluation_id,
+                    formal_research_id=formal_id,
+                    version=1,
+                    conclusion="不通过",
+                    evaluation_sha256="6" * 64,
+                    supporting_evidence=[{"statement": "历史报告已冻结"}],
+                    opposing_evidence=[{"statement": "门禁未通过"}],
+                    missing_evidence=[],
+                    limitations=[{"statement": "历史迁移"}],
+                    follow_up_recommendations=[],
+                )
+            )
+            db.flush()
+            db.add(
+                ResearchEvaluationRun(
+                    evaluation_id=evaluation_id,
+                    run_id=run_id,
+                )
+            )
+            db.add(
+                ResearchPublication(
+                    id=publication_id,
+                    formal_research_id=formal_id,
+                    evaluation_id=evaluation_id,
+                    version=1,
+                    status="pending",
+                    publication_sha256="7" * 64,
+                    artifact_manifest_uri="artifacts://history/manifest.json",
+                    issue_number=issue_number,
+                )
+            )
+        return formal_id, evaluation_id, publication_id, issue_number
 
     def draft(
         self,
@@ -626,6 +776,8 @@ class ResearchPublicationTest(unittest.TestCase):
                 ("statistics", "metrics.json"),
                 ("statistics", "oos_metrics.json"),
                 ("statistics", "benchmark_nav.csv.gz"),
+                ("statistics", "walk_forward_windows.csv.gz"),
+                ("statistics", "walk_forward_metrics.csv.gz"),
                 ("statistics", "risk_exposures.csv.gz"),
                 ("statistics", "risk_contributions.csv.gz"),
             ]
@@ -707,7 +859,9 @@ class ResearchPublicationTest(unittest.TestCase):
         self.assertEqual(projection.conclusion, "受阻")
         self.assertEqual(self.github.issues[issue_number]["state"], "closed")
 
-    def test_real_runner_oos_archive_can_publish_research_passed(self) -> None:
+    def test_real_runner_without_capacity_or_parameter_neighborhood_cannot_pass(
+        self,
+    ) -> None:
         with self.Session() as db:
             quality_run_id, universe_hash = seed_golden_database(db)
         config = golden_run_config(quality_run_id, universe_hash)
@@ -871,6 +1025,8 @@ class ResearchPublicationTest(unittest.TestCase):
             ("statistics", "metrics.json"),
             ("statistics", "oos_metrics.json"),
             ("statistics", "benchmark_nav.csv.gz"),
+            ("statistics", "walk_forward_windows.csv.gz"),
+            ("statistics", "walk_forward_metrics.csv.gz"),
             ("statistics", "risk_exposures.csv.gz"),
             ("statistics", "risk_contributions.csv.gz"),
         ]
@@ -920,14 +1076,22 @@ class ResearchPublicationTest(unittest.TestCase):
             evidence_refs=evidence_refs,
         )
 
+        oos_metrics = json.loads((run.path / "oos_metrics.json").read_text())
+        self.assertEqual(oos_metrics["capacity"]["status"], "not_available")
+        self.assertEqual(
+            oos_metrics["parameterNeighborhood"]["status"], "not_available"
+        )
         with patch(
             "backend.app.research_publication.validate_research_archive",
             side_effect=validate_research_archive,
         ):
-            projection = self.publish(formal_id, draft)
+            with self.assertRaisesRegex(
+                PublicationConflictError,
+                "市场环境指标无效|canonical 参数邻域证据",
+            ):
+                self.publish(formal_id, draft)
 
-        self.assertEqual(projection.conclusion, "研究通过")
-        self.assertEqual(self.github.issues[issue_number]["state"], "closed")
+        self.assertEqual(self.github.issues[issue_number]["state"], "open")
 
     def test_each_conclusion_requires_meaningful_minimum_evidence(self) -> None:
         cases = (
@@ -1016,7 +1180,7 @@ class ResearchPublicationTest(unittest.TestCase):
         self.assertIn("年化波动率（annualizedVolatility）", table)
         self.assertIn("原始指标（customMetric）", table)
 
-    def test_report_run_audit_table_keeps_seven_columns(self) -> None:
+    def test_report_run_audit_lists_complete_reproducibility_identity(self) -> None:
         formal_id, run_id, _ = self.seed_research(79)
         projection = self.publish(formal_id, self.draft(run_id))
         with self.Session() as db:
@@ -1025,13 +1189,21 @@ class ResearchPublicationTest(unittest.TestCase):
                 self.artifact_root,
                 str(projection.evaluation_id),
             )
-        audit = report.split("10. 复现身份与失败审计", 1)[1].split(
-            "</table>", 1
-        )[0]
-        self.assertEqual(audit.count("<th>"), 7)
-        rows = re.findall(r"<tr>(.*?)</tr>", audit, flags=re.DOTALL)
-        self.assertTrue(rows)
-        self.assertTrue(all(row.count("<td>") == 7 for row in rows if "<td>" in row))
+        audit = report.split("10. 复现身份与失败审计", 1)[1]
+        for field in (
+            "runId",
+            "reproducibilityKey",
+            "configSha256",
+            "dataSnapshotId",
+            "codeCommit",
+            "environmentSha256",
+            "randomSeed",
+            "manifestSha256",
+            "resultFingerprint",
+        ):
+            self.assertIn(field, audit)
+        self.assertIn("wf-0001", report)
+        self.assertIn("test_start", report)
 
     def test_failed_run_cannot_be_promoted_to_research_passed(self) -> None:
         formal_id, run_id, _ = self.seed_research(10, run_status="failed")
@@ -1086,6 +1258,79 @@ class ResearchPublicationTest(unittest.TestCase):
                 formal_id, self.draft(run_id, conclusion="研究通过")
             )
 
+    def test_research_passed_derives_regime_coverage_from_actual_cells(self) -> None:
+        formal_id, run_id, _ = self.seed_research(
+            90, sparse_regime_cells=True
+        )
+
+        with self.assertRaisesRegex(
+            PublicationConflictError, "实际市场环境单元未覆盖"
+        ):
+            self.publish(formal_id, self.draft(run_id, conclusion="研究通过"))
+
+    def test_research_passed_rejects_unavailable_parameter_and_capacity_evidence(
+        self,
+    ) -> None:
+        parameter_formal_id, parameter_run_id, _ = self.seed_research(
+            93, complete_parameter_neighborhood=False
+        )
+        with self.assertRaisesRegex(
+            PublicationConflictError, "canonical 参数邻域证据"
+        ):
+            self.publish(
+                parameter_formal_id,
+                self.draft(parameter_run_id, conclusion="研究通过"),
+            )
+
+        capacity_formal_id, capacity_run_id, _ = self.seed_research(
+            94, complete_capacity=False
+        )
+        with self.assertRaisesRegex(
+            PublicationConflictError, "预期资金规模、ADV 参与率与冲击模型"
+        ):
+            self.publish(
+                capacity_formal_id,
+                self.draft(capacity_run_id, conclusion="研究通过"),
+            )
+
+    def test_research_passed_requires_structured_walk_forward_and_csv_evidence(
+        self,
+    ) -> None:
+        formal_id, run_id, _ = self.seed_research(
+            91, invalid_walk_forward=True
+        )
+        with self.assertRaisesRegex(
+            PublicationConflictError, "结构化 walk-forward 证据"
+        ):
+            self.publish(formal_id, self.draft(run_id, conclusion="研究通过"))
+
+        evidence_formal_id, evidence_run_id, _ = self.seed_research(92)
+        draft = self.draft(evidence_run_id, conclusion="研究通过")
+        refs = tuple(
+            item
+            for item in draft.evidence_refs
+            if not item.uri.endswith(
+                ("walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz")
+            )
+        )
+        declared_uris = sorted({item.uri for item in refs})
+        draft = replace(
+            draft,
+            evidence_refs=refs,
+            supporting_evidence=tuple(
+                (
+                    {**item, "evidenceRefs": declared_uris}
+                    if item.get("gate") or item.get("planGate")
+                    else item
+                )
+                for item in draft.supporting_evidence
+            ),
+        )
+        with self.assertRaisesRegex(
+            PublicationConflictError, "缺少 canonical 工件.*walk_forward"
+        ):
+            self.publish(evidence_formal_id, draft)
+
     def test_research_passed_requires_every_frozen_plan_gate(self) -> None:
         formal_id, run_id, _ = self.seed_research(68)
         draft = self.draft(run_id, conclusion="研究通过")
@@ -1102,6 +1347,27 @@ class ResearchPublicationTest(unittest.TestCase):
             PublicationConflictError, "缺少冻结计划事前门禁.*OOS 门禁"
         ):
             self.publish(formal_id, draft)
+
+    def test_multiple_trial_pass_requires_structured_numeric_dsr_and_pbo(
+        self,
+    ) -> None:
+        formal_id, run_id, _ = self.seed_research(86, max_trials=2)
+        with self.assertRaisesRegex(
+            PublicationConflictError, "结构化 DSR 与 PBO"
+        ):
+            self.publish(formal_id, self.draft(run_id, conclusion="研究通过"))
+
+        valid_formal_id, valid_run_id, issue_number = self.seed_research(
+            87,
+            max_trials=2,
+            complete_multiple_testing=True,
+        )
+        projection = self.publish(
+            valid_formal_id,
+            self.draft(valid_run_id, conclusion="研究通过"),
+        )
+        self.assertEqual(projection.conclusion, "研究通过")
+        self.assertEqual(self.github.issues[issue_number]["state"], "closed")
 
     def test_research_passed_rejects_unverifiable_external_evidence(self) -> None:
         formal_id, run_id, _ = self.seed_research(57)
@@ -1651,6 +1917,84 @@ class ResearchPublicationTest(unittest.TestCase):
         self.assertEqual(failure_count, 0)
         self.assertEqual(self.github.issues[issue_number]["state"], "closed")
 
+    def test_worker_detects_edited_terminal_comment_without_overwriting_it(
+        self,
+    ) -> None:
+        formal_id, run_id, issue_number = self.seed_research(84)
+        draft = self.draft(run_id)
+        self.publish(formal_id, draft)
+        original = self.github.comments[issue_number][0]["body"]
+        edited = original + "\n人工改写"
+        self.github.comments[issue_number][0]["body"] = edited
+
+        with self.assertRaisesRegex(PublicationError, "终态评论缺失或正文漂移"):
+            publish_next_pending_research_evaluation(
+                self.Session,
+                self.github,
+                artifact_root=self.artifact_root,
+                public_base_url="https://research.example.com",
+                readback_client=self.readback,
+                retry_failed_after_seconds=0,
+            )
+
+        self.assertEqual(len(self.github.comments[issue_number]), 1)
+        self.assertEqual(self.github.comments[issue_number][0]["body"], edited)
+        with self.Session() as db:
+            self.assertEqual(db.get(FormalResearch, formal_id).phase, "evaluating")
+            failure = db.scalars(
+                select(ResearchEvent)
+                .where(ResearchEvent.event_type == "research_publication_failed")
+                .order_by(ResearchEvent.sequence_no.desc())
+            ).first()
+        self.assertIs(failure.payload_json["retryable"], False)
+
+        self.github.comments[issue_number][0]["body"] = original
+        recovered = self.publish(formal_id, draft)
+        self.assertEqual(recovered.status, "published")
+        with self.Session() as db:
+            self.assertEqual(db.get(FormalResearch, formal_id).phase, "published")
+
+    def test_deleted_terminal_comment_can_be_replaced_by_forward_correction(
+        self,
+    ) -> None:
+        formal_id, run_id, issue_number = self.seed_research(85)
+        first = self.publish(formal_id, self.draft(run_id))
+        first_comment_id = self.github.comments[issue_number][0]["id"]
+        self.github.comments[issue_number].clear()
+
+        with self.assertRaisesRegex(PublicationError, "终态评论缺失或正文漂移"):
+            publish_next_pending_research_evaluation(
+                self.Session,
+                self.github,
+                artifact_root=self.artifact_root,
+                public_base_url="https://research.example.com",
+                readback_client=self.readback,
+                retry_failed_after_seconds=0,
+            )
+        self.assertEqual(self.github.comments[issue_number], [])
+
+        correction = self.publish(
+            formal_id,
+            self.draft(
+                run_id,
+                conclusion="不通过",
+                version_note="终态评论删除后的前向更正",
+                supersedes_evaluation_id=str(first.evaluation_id),
+            ),
+        )
+
+        self.assertEqual(correction.status, "published")
+        self.assertEqual(len(self.github.comments[issue_number]), 1)
+        self.assertNotEqual(
+            self.github.comments[issue_number][0]["id"], first_comment_id
+        )
+        with self.Session() as db:
+            publications = db.scalars(
+                select(ResearchPublication).order_by(ResearchPublication.version)
+            ).all()
+        self.assertEqual([item.status for item in publications], ["published", "published"])
+        self.assertEqual(publications[1].supersedes_publication_id, publications[0].id)
+
     def test_correction_creates_replacement_and_keeps_old_stable_report(self) -> None:
         formal_id, run_id, _ = self.seed_research(30)
         first = self.publish(formal_id, self.draft(run_id))
@@ -1761,9 +2105,46 @@ class ResearchPublicationTest(unittest.TestCase):
         self.assertEqual(summary_path.read_text(encoding="utf-8"), "tampered\n")
         with self.Session() as db:
             statuses = db.scalars(
-                select(ResearchPublication.status).order_by(ResearchPublication.version)
+                select(ResearchPublication.status).order_by(
+                    ResearchPublication.version
+                )
             ).all()
             self.assertEqual(statuses, ["failed", "failed"])
+
+    def test_worker_detects_tampered_published_report_without_overwriting(self) -> None:
+        formal_id, run_id, _issue_number = self.seed_research(88)
+        projection = self.publish(formal_id, self.draft(run_id))
+        report_path = (
+            self.artifact_root
+            / "publications"
+            / str(projection.evaluation_id)
+            / "report.html"
+        )
+        tampered = b"<html><body>tampered</body></html>\n"
+        report_path.write_bytes(tampered)
+
+        with self.assertRaisesRegex(PublicationError, "发布工件内容不匹配"):
+            publish_next_pending_research_evaluation(
+                self.Session,
+                self.github,
+                artifact_root=self.artifact_root,
+                public_base_url="https://research.example.com",
+                readback_client=self.readback,
+                retry_failed_after_seconds=0,
+            )
+
+        self.assertEqual(report_path.read_bytes(), tampered)
+        with self.Session() as db:
+            status_page = render_evaluation_report_page(
+                db, self.artifact_root, str(projection.evaluation_id)
+            )
+            failed = db.scalars(
+                select(ResearchEvent)
+                .where(ResearchEvent.event_type == "research_publication_failed")
+                .order_by(ResearchEvent.sequence_no.desc())
+            ).first()
+        self.assertIn("此评价尚未完成一致发布", status_page)
+        self.assertIs(failed.payload_json["retryable"], False)
 
     def test_frontend_readback_mismatch_keeps_issue_open_and_attempt_failed(
         self,
@@ -1837,7 +2218,7 @@ class ResearchPublicationTest(unittest.TestCase):
         self.assertIs(event.payload_json["retryable"], False)
 
     def test_failed_correction_does_not_hide_latest_published_conclusion(self) -> None:
-        formal_id, run_id, _ = self.seed_research(48)
+        formal_id, run_id, issue_number = self.seed_research(48)
         first = self.publish(formal_id, self.draft(run_id, conclusion="证据不足"))
         self.readback.override_conclusion = "研究通过"
 
@@ -1859,6 +2240,32 @@ class ResearchPublicationTest(unittest.TestCase):
         self.assertEqual(summary.latest_publication_id, first.publication_id)
         self.assertEqual(summary.latest_publication_conclusion, "证据不足")
         self.assertEqual(summary.latest_publication_status, "published")
+
+        self.readback.override_conclusion = None
+        self.github.comments[issue_number][0]["body"] += "\n人工改写旧生效评论"
+        with self.assertRaisesRegex(PublicationError, "终态评论缺失或正文漂移"):
+            publish_next_pending_research_evaluation(
+                self.Session,
+                self.github,
+                artifact_root=self.artifact_root,
+                public_base_url="https://research.example.com",
+                readback_client=self.readback,
+                retry_failed_after_seconds=0,
+            )
+        with self.Session() as db:
+            latest_failure = db.scalars(
+                select(ResearchEvent)
+                .where(ResearchEvent.event_type == "research_publication_failed")
+                .order_by(ResearchEvent.sequence_no.desc())
+            ).first()
+            status_page = render_evaluation_report_page(
+                db, self.artifact_root, str(first.evaluation_id)
+            )
+        self.assertEqual(
+            latest_failure.payload_json["publicationId"],
+            str(first.publication_id),
+        )
+        self.assertIn("此评价尚未完成一致发布", status_page)
 
     def test_post_published_correction_failure_keeps_previous_current_and_blocks_v3(
         self,
@@ -2042,6 +2449,30 @@ class ResearchPublicationTest(unittest.TestCase):
         self.assertEqual(summary_path.read_bytes(), frozen_summary)
         self.assertEqual(self.github.comments[issue_number][0]["body"], comment)
         self.assertEqual(len(self.github.comments[issue_number]), 1)
+
+    def test_issue_comment_is_bounded_and_full_evidence_stays_in_report(
+        self,
+    ) -> None:
+        formal_id, run_id, issue_number = self.seed_research(84)
+        large_statement = "超长反对证据" + "量" * 70_000
+        draft = replace(
+            self.draft(run_id, conclusion="不通过"),
+            opposing_evidence=({"statement": large_statement},),
+        )
+
+        projection = self.publish(formal_id, draft)
+
+        comment = self.github.comments[issue_number][0]["body"]
+        with self.Session() as db:
+            report = render_evaluation_report(
+                db, self.artifact_root, str(projection.evaluation_id)
+            )
+        self.assertLessEqual(
+            len(comment.encode("utf-8")), MAX_GITHUB_ISSUE_COMMENT_BYTES
+        )
+        self.assertIn("完整内容见机器摘要与冻结报告", comment)
+        self.assertNotIn(large_statement, comment)
+        self.assertIn(large_statement, report)
 
     def test_worker_does_not_retry_deterministic_publication_failure(self) -> None:
         formal_id, run_id, _ = self.seed_research(55)
@@ -2266,6 +2697,36 @@ class ResearchPublicationTest(unittest.TestCase):
         )
         self.assertEqual(projection.status, "published")
 
+    def test_invalid_public_url_marks_existing_pending_publication_failed(
+        self,
+    ) -> None:
+        formal_id, run_id, _ = self.seed_research(89)
+        pending = prepare_research_evaluation(
+            self.Session,
+            formal_research_id=formal_id,
+            draft=self.draft(run_id),
+        )
+
+        with self.assertRaisesRegex(PublicationConflictError, "loopback HTTP URL"):
+            publish_existing_research_evaluation(
+                self.Session,
+                self.github,
+                evaluation_id=str(pending.evaluation_id),
+                artifact_root=self.artifact_root,
+                public_base_url="http://research.example.com",
+                readback_client=self.readback,
+            )
+
+        with self.Session() as db:
+            publication = db.get(ResearchPublication, str(pending.publication_id))
+            failure = db.scalar(
+                select(ResearchEvent).where(
+                    ResearchEvent.event_type == "research_publication_failed"
+                )
+            )
+        self.assertEqual(publication.status, "failed")
+        self.assertIs(failure.payload_json["retryable"], False)
+
     def test_preexisting_pending_evaluation_is_published_without_duplication(
         self,
     ) -> None:
@@ -2293,7 +2754,9 @@ class ResearchPublicationTest(unittest.TestCase):
                     "opposingEvidence": [{"statement": "门禁未通过"}],
                     "missingEvidence": [],
                     "limitations": [{"statement": "历史迁移"}],
-                    "followUpRecommendations": [],
+                    "followUpRecommendations": [
+                        {"statement": "保持为待证伪假设，不在同一 OOS 调参。"}
+                    ],
                     "runIdentities": [
                         {
                             "runId": run_id,
@@ -2315,7 +2778,9 @@ class ResearchPublicationTest(unittest.TestCase):
                 opposing_evidence=[{"statement": "门禁未通过"}],
                 missing_evidence=[],
                 limitations=[{"statement": "历史迁移"}],
-                follow_up_recommendations=[],
+                follow_up_recommendations=[
+                    {"statement": "保持为待证伪假设，不在同一 OOS 调参。"}
+                ],
             )
             db.add(evaluation)
             db.flush()
@@ -2379,43 +2844,12 @@ class ResearchPublicationTest(unittest.TestCase):
             self.assertEqual(publication.artifact_manifest_uri, projection.manifest_url)
             self.assertNotEqual(publication.publication_sha256, "7" * 64)
 
-    def test_historical_pending_requires_dedicated_labeled_issue(self) -> None:
-        formal_id, _run_id, issue_number = self.seed_research(
-            66, origin="historical_import"
-        )
-        evaluation_id = "60000000-0000-0000-0000-000000000066"
-        publication_id = "70000000-0000-0000-0000-000000000066"
-        with self.Session.begin() as db:
-            db.add(
-                ResearchEvaluation(
-                    id=evaluation_id,
-                    formal_research_id=formal_id,
-                    version=1,
-                    conclusion="不通过",
-                    evaluation_sha256="6" * 64,
-                    supporting_evidence=[{"statement": "历史报告已冻结"}],
-                    opposing_evidence=[{"statement": "门禁未通过"}],
-                    missing_evidence=[],
-                    limitations=[{"statement": "历史迁移"}],
-                    follow_up_recommendations=[],
-                )
-            )
-            db.flush()
-            db.add(
-                ResearchPublication(
-                    id=publication_id,
-                    formal_research_id=formal_id,
-                    evaluation_id=evaluation_id,
-                    version=1,
-                    status="pending",
-                    publication_sha256="7" * 64,
-                    artifact_manifest_uri="artifacts://history/manifest.json",
-                    issue_number=issue_number,
-                )
-            )
-        self.github.issues[issue_number]["labels"] = [{"name": "类型:工程任务"}]
-
-        self.assertIsNone(
+        self.github.issues[issue_number]["labels"] = [
+            item
+            for item in self.github.issues[issue_number]["labels"]
+            if item["name"] != "来源:历史导入"
+        ]
+        with self.assertRaisesRegex(PublicationError, "缺少标签"):
             publish_next_pending_research_evaluation(
                 self.Session,
                 self.github,
@@ -2424,7 +2858,36 @@ class ResearchPublicationTest(unittest.TestCase):
                 readback_client=self.readback,
                 retry_failed_after_seconds=0,
             )
+        with self.Session() as db:
+            formal = db.get(FormalResearch, formal_id)
+            failed = db.scalars(
+                select(ResearchEvent)
+                .where(ResearchEvent.event_type == "research_publication_failed")
+                .order_by(ResearchEvent.sequence_no.desc())
+            ).first()
+            status_page = render_evaluation_report_page(
+                db, self.artifact_root, evaluation_id
+            )
+        self.assertEqual(formal.phase, "stopped")
+        self.assertIs(failed.payload_json["retryable"], False)
+        self.assertIn("此评价尚未完成一致发布", status_page)
+        self.assertIn('class="banner incomplete"', status_page)
+
+    def test_historical_pending_requires_dedicated_labeled_issue(self) -> None:
+        formal_id, evaluation_id, _publication_id, issue_number = (
+            self.seed_historical_pending(66)
         )
+        self.github.issues[issue_number]["labels"] = [{"name": "类型:工程任务"}]
+
+        with self.assertRaisesRegex(PublicationConflictError, "独立的策略研究 Issue"):
+            publish_next_pending_research_evaluation(
+                self.Session,
+                self.github,
+                artifact_root=self.artifact_root,
+                public_base_url="https://research.example.com",
+                readback_client=self.readback,
+                retry_failed_after_seconds=0,
+            )
         with self.assertRaisesRegex(PublicationConflictError, "独立的策略研究 Issue"):
             publish_existing_research_evaluation(
                 self.Session,
@@ -2435,6 +2898,82 @@ class ResearchPublicationTest(unittest.TestCase):
                 readback_client=self.readback,
             )
         self.assertEqual(self.github.comments[issue_number], [])
+        with self.Session() as db:
+            publication = db.scalar(select(ResearchPublication))
+            failure = db.scalar(
+                select(ResearchEvent).where(
+                    ResearchEvent.event_type == "research_publication_failed"
+                )
+            )
+        self.assertEqual(publication.status, "failed")
+        self.assertIs(failure.payload_json["retryable"], False)
+
+    def test_historical_pending_requires_same_minimum_content_contract(self) -> None:
+        _formal_id, evaluation_id, _publication_id, issue_number = (
+            self.seed_historical_pending(81)
+        )
+
+        with self.assertRaisesRegex(PublicationConflictError, "后续建议"):
+            publish_existing_research_evaluation(
+                self.Session,
+                self.github,
+                evaluation_id=evaluation_id,
+                artifact_root=self.artifact_root,
+                public_base_url="https://research.example.com",
+                readback_client=self.readback,
+            )
+
+        self.assertEqual(self.github.comments[issue_number], [])
+
+    def test_historical_pending_rejects_closed_issue_before_publication(self) -> None:
+        _formal_id, evaluation_id, _publication_id, issue_number = (
+            self.seed_historical_pending(82)
+        )
+        self.github.issues[issue_number]["state"] = "closed"
+
+        with self.assertRaisesRegex(PublicationConflictError, "OPEN Issue"):
+            publish_existing_research_evaluation(
+                self.Session,
+                self.github,
+                evaluation_id=evaluation_id,
+                artifact_root=self.artifact_root,
+                public_base_url="https://research.example.com",
+                readback_client=self.readback,
+            )
+
+        self.assertEqual(self.github.comments[issue_number], [])
+
+    def test_historical_pending_revalidates_frozen_strategy_issue_pair(self) -> None:
+        if self.engine.dialect.name != "sqlite":
+            self.skipTest("PostgreSQL 由 0010 不可变触发器直接拒绝映射 UPDATE")
+        formal_id, evaluation_id, _publication_id, _issue_number = (
+            self.seed_historical_pending(83)
+        )
+        with self.Session.begin() as db:
+            db.execute(
+                text(
+                    "UPDATE research_publication_issue_mappings "
+                    "SET issue_number = 38 WHERE formal_research_id = :formal_id"
+                ),
+                {"formal_id": formal_id.replace("-", "")},
+            )
+        self.github.add_issue(38)
+        self.github.issues[38]["title"] = (
+            "历史研究：沪深300 ETF 低波动准入结构化评价发布"
+        )
+        self.github.issues[38]["labels"].append({"name": "来源:历史导入"})
+
+        with self.assertRaisesRegex(PublicationConflictError, "冻结映射"):
+            publish_existing_research_evaluation(
+                self.Session,
+                self.github,
+                evaluation_id=evaluation_id,
+                artifact_root=self.artifact_root,
+                public_base_url="https://research.example.com",
+                readback_client=self.readback,
+            )
+
+        self.assertEqual(self.github.comments[38], [])
 
     def test_historical_issue_mapping_is_immutable_in_orm(self) -> None:
         formal_id, _run_id, _ = self.seed_research(
@@ -2522,14 +3061,39 @@ class ResearchPublicationTest(unittest.TestCase):
 
 
 class ResearchPublicationGitHubClientTest(unittest.TestCase):
+    def test_published_historical_issue_allows_state_label_drift_for_repair(
+        self,
+    ) -> None:
+        expected = resolve_historical_publication_issue(
+            "etf_volatility_managed", 37
+        )
+        issue = {
+            "number": 37,
+            "state": "closed",
+            "title": expected.title,
+            "labels": [
+                {"name": "类型:策略研究"},
+                {"name": "来源:历史导入"},
+            ],
+        }
+
+        validate_historical_publication_issue_snapshot(
+            issue, expected, allow_published=True
+        )
+        with self.assertRaisesRegex(ValueError, "OPEN Issue"):
+            validate_historical_publication_issue_snapshot(issue, expected)
+
     def test_historical_mapping_rejects_invalid_issue_before_database_write(
         self,
     ) -> None:
         class InvalidIssueClient:
+            repository = "Jettlin927/Quantitative_trading"
+
             def get_issue(self, issue_number: int) -> dict:
                 return {
                     "number": issue_number,
                     "state": "open",
+                    "title": "历史研究：沪深300 ETF 波动率管理结构化评价发布",
                     "labels": [{"name": "类型:策略研究"}],
                 }
 
@@ -2558,11 +3122,42 @@ class ResearchPublicationGitHubClientTest(unittest.TestCase):
             ),
         ):
             status = register_historical_issue_mapping.main(
-                ["--strategy-id", "history", "--issue-number", "123"]
+                [
+                    "--strategy-id",
+                    "etf_volatility_managed",
+                    "--issue-number",
+                    "37",
+                ]
             )
 
         self.assertEqual(status, 3)
         self.assertFalse(database.opened)
+
+    def test_historical_mapping_rejects_cross_binding_before_external_access(
+        self,
+    ) -> None:
+        with (
+            patch.object(
+                register_historical_issue_mapping,
+                "assert_schema_revision_at_head",
+            ) as schema_check,
+            patch.object(
+                register_historical_issue_mapping.GitHubIssueClient,
+                "from_env",
+            ) as github_factory,
+        ):
+            status = register_historical_issue_mapping.main(
+                [
+                    "--strategy-id",
+                    "etf_volatility_managed",
+                    "--issue-number",
+                    "38",
+                ]
+            )
+
+        self.assertEqual(status, 3)
+        schema_check.assert_not_called()
+        github_factory.assert_not_called()
 
     def test_explicit_evaluation_contract_is_strictly_parsed(self) -> None:
         formal_id, draft = parse_evaluation_contract(
