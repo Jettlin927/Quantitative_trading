@@ -69,6 +69,18 @@ class DocumentationContractTest(unittest.TestCase):
         self.assertNotIn("## 数据表", readme)
         self.assertIsNone(re.search(r"\b[0-9a-f]{40}\b", readme), "README 不得冻结易漂移提交哈希")
 
+    def test_remote_access_decision_stays_ssh_only(self) -> None:
+        decision = (
+            DOCS_ROOT / "operations" / "private-https-authentication-decision.md"
+        ).read_text(encoding="utf-8")
+        agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+
+        self.assertIn("SSH 隧道是研究系统唯一的远程访问入口", decision)
+        self.assertIn("不购买或申请域名", decision)
+        self.assertIn("不开放公网 IP 端口", agents)
+        self.assertIn("除非用户明确提出变更", agents)
+        self.assertNotIn("采用 **Cloudflare Tunnel + Cloudflare Access**", decision)
+
     def test_document_index_routes_every_module(self) -> None:
         index = (DOCS_ROOT / "index.md").read_text(encoding="utf-8")
         for target in [
