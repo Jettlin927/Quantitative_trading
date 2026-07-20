@@ -6,7 +6,7 @@
 - [远端 Docker 只读巡检](remote-docker-inspection.md)
 - [新服务器安全容器运行环境](new-server-runtime.md)
 - [GitHub 研究计划与服务端编排器](research-orchestrator.md)
-- [私有 HTTPS 入口身份认证决策](private-https-authentication-decision.md)
+- [远程访问决策：仅使用 SSH 隧道](private-https-authentication-decision.md)
 - [不可变生产验收证据](../acceptance/)
 
 生产 migration、baseline stamp、覆盖恢复、生产切换、旧服务器清理、凭据变更和公网入口上线都需要用户单独批准。
