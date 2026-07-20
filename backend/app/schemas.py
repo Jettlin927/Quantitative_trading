@@ -23,6 +23,13 @@ class StockScreenOut(StockOut):
     valuation: dict[str, Any] = Field(default_factory=dict)
 
 
+class StockScreenPageOut(BaseModel):
+    items: list[StockScreenOut] = Field(default_factory=list)
+    total: int = 0
+    limit: int
+    offset: int
+
+
 class StockPoolCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=80)
     description: str | None = Field(default=None, max_length=200)
@@ -180,6 +187,19 @@ class StockFundamentalsOut(BaseModel):
     ts_code: str
     valuation: dict[str, Any] = Field(default_factory=dict)
     financial: dict[str, Any] = Field(default_factory=dict)
+
+
+class StockDetailOut(BaseModel):
+    stock: StockOut
+    latest_bar: DailyBarOut | None = None
+    valuation: dict[str, Any] = Field(default_factory=dict)
+    financial: dict[str, Any] = Field(default_factory=dict)
+    valuation_history: list[dict[str, Any]] = Field(default_factory=list)
+    financial_history: list[dict[str, Any]] = Field(default_factory=list)
+    listing: dict[str, Any] = Field(default_factory=dict)
+    latest_limit_price: dict[str, Any] = Field(default_factory=dict)
+    latest_suspend_event: dict[str, Any] = Field(default_factory=dict)
+    latest_adjust_factor: dict[str, Any] = Field(default_factory=dict)
 
 
 class DataQualityRunRequest(BaseModel):
