@@ -51,6 +51,20 @@ DUPLICATE_INDEX_NAMES = {
 
 
 class SchemaMigrationTest(unittest.TestCase):
+    def test_all_revision_ids_fit_postgres_alembic_version_column(self):
+        revision_dir = REPO_ROOT / "backend" / "migrations" / "versions"
+        revisions = {}
+        for path in revision_dir.glob("*.py"):
+            match = re.search(r'^revision = "([^"]+)"$', path.read_text(encoding="utf-8"), re.MULTILINE)
+            if match is not None:
+                revisions[path.name] = match.group(1)
+
+        self.assertTrue(revisions)
+        self.assertEqual(
+            {name: value for name, value in revisions.items() if len(value) > 32},
+            {},
+        )
+
     def test_offline_upgrade_is_explicit_and_does_not_connect(self):
         output = StringIO()
         config = alembic_config()
@@ -80,10 +94,11 @@ class SchemaMigrationTest(unittest.TestCase):
                 command.upgrade(alembic_config(connection), "head")
             expected_tables = set(Base.metadata.tables) | {"alembic_version"}
             self.assertEqual(set(inspect(engine).get_table_names()), expected_tables)
-            self.assertEqual(len(Base.metadata.tables), 42)
+            self.assertEqual(len(Base.metadata.tables), 43)
             self.assertIn("research_runs", Base.metadata.tables)
             self.assertIn("strategy_definitions", Base.metadata.tables)
             self.assertIn("research_publications", Base.metadata.tables)
+            self.assertIn("research_publication_issue_mappings", Base.metadata.tables)
             self.assertIn("research_orchestrations", Base.metadata.tables)
             self.assertIn("research_work_items", Base.metadata.tables)
             actual_indexes = {

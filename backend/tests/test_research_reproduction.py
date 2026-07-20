@@ -12,9 +12,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.models import FundDailyBar, ResearchRun
-from backend.app.quant_research.runner import reproduce_quant_research, run_quant_research
+from backend.app.quant_research.runner import (
+    _build_primary_benchmark_nav,
+    reproduce_quant_research,
+    run_quant_research,
+)
 from backend.app.quant_research.run_config import FormalRunConfigurationError, canonical_json_bytes
 from backend.app.quant_research.snapshot import SnapshotCapacityPolicy, SnapshotIntegrityError
+from backend.app.quant_research.strategy_registry import resolve_strategy_definition
 from backend.app.quant_research.artifacts import (
     atomic_write_json,
     read_canonical_csv_gz,
@@ -37,11 +42,11 @@ class ResearchReproductionTest(unittest.TestCase):
         self.engine.dispose()
         self.tmp.cleanup()
 
-    def _run(self):
+    def _run(self, config=None):
         with Session(self.engine) as db:
             return run_quant_research(
                 db,
-                self.config,
+                config or self.config,
                 self.output_root,
                 code_commit="golden-test-commit",
                 schema_revision="test-schema",
@@ -49,16 +54,55 @@ class ResearchReproductionTest(unittest.TestCase):
                 capacity_policy=SnapshotCapacityPolicy(min_remaining_bytes=0),
             )
 
+    def _formal_config(self):
+        config = dict(self.config)
+        config["validationPolicy"] = {
+            "mode": "anchored",
+            "trainPeriods": 5,
+            "testPeriods": 2,
+            "stepPeriods": 2,
+        }
+        config["evaluationSampleSplits"] = [
+            {
+                "role": "train",
+                "startDate": "2026-01-05",
+                "endDate": "2026-01-09",
+            },
+            {
+                "role": "validation",
+                "startDate": "2026-01-12",
+                "endDate": "2026-01-15",
+            },
+            {
+                "role": "test_oos",
+                "startDate": "2026-01-16",
+                "endDate": "2026-01-23",
+            },
+        ]
+        config["evaluationPolicy"] = {
+            "marketRegime": {
+                "directionLookbackPeriods": 2,
+                "upThreshold": "0.004",
+                "downThreshold": "-0.004",
+                "volatilityLookbackPeriods": 2,
+                "highVolatilityThreshold": "0.01",
+            },
+            "costStressMultiplier": "2",
+        }
+        return config
+
     def test_two_runs_have_byte_identical_deterministic_outputs(self):
         first = self._run()
         second = self._run()
         for name in (
             "targets.csv.gz",
             "nav.csv.gz",
+            "benchmark_nav.csv.gz",
             "rebalance_requests.csv.gz",
             "rebalance_executions.csv.gz",
             "positions.csv.gz",
             "metrics.json",
+            "oos_metrics.json",
         ):
             with self.subTest(name=name):
                 self.assertEqual((first.path / name).read_bytes(), (second.path / name).read_bytes())
@@ -66,10 +110,12 @@ class ResearchReproductionTest(unittest.TestCase):
         self.assertEqual(first.manifest["reproducibilityKey"], second.manifest["reproducibilityKey"])
         self.assertNotEqual(first.run_id, second.run_id)
 
-    def test_v2_archive_contains_reconciled_ledgers_and_extended_metrics(self):
+    def test_v4_archive_contains_oos_benchmark_ledgers_and_extended_metrics(self):
         run = self._run()
-        self.assertEqual(run.manifest["artifactSchemaVersion"], 2)
+        self.assertEqual(run.manifest["artifactSchemaVersion"], 4)
         for name in (
+            "benchmark_nav.csv.gz",
+            "oos_metrics.json",
             "rebalance_requests.csv.gz",
             "rebalance_executions.csv.gz",
             "positions.csv.gz",
@@ -80,6 +126,42 @@ class ResearchReproductionTest(unittest.TestCase):
         self.assertIn("sortino", metrics)
         self.assertIn("averageOneWayTurnover", metrics)
         self.assertIn("cumulativeTransactionCostRate", metrics)
+
+    def test_formal_run_freezes_distinct_test_oos_metrics_and_reproduces(self):
+        run = self._run(self._formal_config())
+        full = json.loads((run.path / "metrics.json").read_text(encoding="utf-8"))
+        oos = json.loads(
+            (run.path / "oos_metrics.json").read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(oos["sampleRole"], "test_oos")
+        self.assertEqual(oos["sampleStartDate"], "2026-01-16")
+        self.assertEqual(oos["sampleEndDate"], "2026-01-23")
+        self.assertNotEqual(oos["startDate"], full["startDate"])
+        self.assertNotEqual(oos["totalReturn"], full["totalReturn"])
+        self.assertGreaterEqual(
+            len(oos["marketRegimes"]["coverage"]["directionStates"]), 2
+        )
+        self.assertGreaterEqual(
+            len(oos["marketRegimes"]["coverage"]["volatilityStates"]), 2
+        )
+        self.assertTrue(reproduce_quant_research(run.path)["matches"])
+
+    def test_market_reference_benchmark_uses_research_boundary_pre_close(self):
+        run = self._run()
+        config = dict(self.config)
+        config["startDate"] = "2026-01-07"
+        benchmark = _build_primary_benchmark_nav(
+            resolve_strategy_definition(config),
+            run.path / "inputs",
+            config,
+            compressed=True,
+            table_artifacts=run.manifest["dataSnapshot"]["tableArtifacts"],
+        )
+
+        self.assertEqual(benchmark.iloc[0]["trade_date"].date().isoformat(), "2026-01-07")
+        self.assertAlmostEqual(float(benchmark.iloc[0]["nav"]), 3012 / 3006)
+        self.assertNotAlmostEqual(float(benchmark.iloc[0]["nav"]), 3012 / 3000)
 
     def test_v2_archive_rejects_tampered_ledger_before_recalculation(self):
         for name in (
@@ -173,7 +255,15 @@ class ResearchReproductionTest(unittest.TestCase):
             self.assertFalse(any(item.status == "succeeded" for item in failed))
 
     def test_reproduce_rejects_corrupted_archived_outputs_and_audit_files(self):
-        for name in ("targets.csv.gz", "nav.csv.gz", "metrics.json", "quality.json", "limitations.json"):
+        for name in (
+            "targets.csv.gz",
+            "nav.csv.gz",
+            "benchmark_nav.csv.gz",
+            "metrics.json",
+            "quality.json",
+            "limitations.json",
+            "oos_metrics.json",
+        ):
             with self.subTest(name=name):
                 run = self._run()
                 path = run.path / name
@@ -230,6 +320,8 @@ class ResearchReproductionTest(unittest.TestCase):
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         config = json.loads((run_path / "config.json").read_text(encoding="utf-8"))
         for name in (
+            "benchmark_nav.csv.gz",
+            "oos_metrics.json",
             "rebalance_requests.csv.gz",
             "rebalance_executions.csv.gz",
             "positions.csv.gz",
@@ -267,6 +359,8 @@ class ResearchReproductionTest(unittest.TestCase):
             elif stage == "metrics":
                 checkpoint["inputs"] = {"nav": checkpoint["inputs"]["nav"]}
                 checkpoint["outputs"]["metrics"] = manifest["artifactHashes"]["metrics.json"]
+                checkpoint["outputs"].pop("primaryBenchmarkNav")
+                checkpoint["outputs"].pop("oosMetrics")
             elif stage == "manifest":
                 checkpoint["inputs"] = {
                     "artifactContentSha256": {

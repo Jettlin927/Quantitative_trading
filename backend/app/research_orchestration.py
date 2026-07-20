@@ -46,9 +46,9 @@ ALLOWED_TRANSITIONS = {
     "running": {"queued", "stopping", "publishing", "blocked", "stopped"},
     "stopping": {"blocked", "stopped"},
     "publishing": {"published", "blocked", "stopped"},
-    "blocked": {"pending_approval", "approved", "queued", "stopped"},
-    "published": set(),
-    "stopped": {"queued"},
+    "blocked": {"pending_approval", "approved", "queued", "publishing", "stopped"},
+    "published": {"publishing"},
+    "stopped": {"queued", "publishing"},
 }
 
 

@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import time
 from typing import Any
@@ -12,6 +13,7 @@ from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import ValidationError
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -55,6 +57,7 @@ from .schemas import (
     DailyBarOut,
     DataQualityRunRequest,
     FormalResearchDetailOut,
+    ResearchPublicationProjectionOut,
     StrategyProfileOut,
     StrategyProfileSummaryOut,
     StockFundamentalsOut,
@@ -84,7 +87,17 @@ from .schemas import (
 from .data_quality.contracts import QualityCheckContract
 from .data_quality.runner import list_quality_results, quality_run_to_dict, run_data_quality_check
 from .quant_research.readiness import evaluate_quality_run_readiness, evaluate_research_readiness
-from .research_catalog import get_formal_research_detail, get_strategy_profile, list_strategy_profiles
+from .research_catalog import (
+    get_formal_research_detail,
+    get_publication_projection,
+    get_strategy_profile,
+    list_strategy_profiles,
+)
+from .research_publication import (
+    get_evaluation_artifact_path,
+    render_evaluation_report,
+    render_evaluation_report_page,
+)
 from .tushare_client import decimal_or_none, get_pro_api, parse_tushare_date, tushare_date
 from .us_research import build_us_research_import_preview, build_us_research_overview
 from .strategy_results import build_strategy_results_overview
@@ -1190,6 +1203,57 @@ def get_research_detail(research_id: UUID, db: Session = Depends(get_db)) -> For
     if detail is None:
         raise HTTPException(status_code=404, detail="正式研究不存在")
     return detail
+
+
+@app.get(
+    "/api/research/publications/{publication_id}",
+    response_model=ResearchPublicationProjectionOut,
+)
+def get_research_publication(
+    publication_id: UUID,
+    db: Session = Depends(get_db),
+) -> ResearchPublicationProjectionOut:
+    projection = get_publication_projection(db, str(publication_id))
+    if projection is None:
+        raise HTTPException(status_code=404, detail="研究发布不存在")
+    return projection
+
+
+@app.get("/api/research/evaluations/{evaluation_id}/artifacts/{filename}")
+def get_research_evaluation_artifact(
+    evaluation_id: UUID,
+    filename: str,
+    db: Session = Depends(get_db),
+) -> Response:
+    artifact_root = Path(os.getenv("RESEARCH_ARTIFACT_ROOT", "outputs/research-runs"))
+    try:
+        path = get_evaluation_artifact_path(artifact_root, str(evaluation_id), filename)
+        if filename == "report.html":
+            return HTMLResponse(
+                render_evaluation_report(db, artifact_root, str(evaluation_id)),
+                headers={"Cache-Control": "no-cache"},
+            )
+        if not path.is_file():
+            raise FileNotFoundError
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="发布工件不存在") from exc
+    media_type = "application/json" if filename.endswith(".json") else "application/octet-stream"
+    return FileResponse(path, media_type=media_type)
+
+
+@app.get("/api/research/evaluations/{evaluation_id}/report")
+def get_research_evaluation_report(
+    evaluation_id: UUID,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    artifact_root = Path(os.getenv("RESEARCH_ARTIFACT_ROOT", "outputs/research-runs"))
+    try:
+        report = render_evaluation_report_page(
+            db, artifact_root, str(evaluation_id)
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="研究评价报告不存在") from exc
+    return HTMLResponse(report, headers={"Cache-Control": "no-cache"})
 
 
 @app.post("/api/data-quality/runs", status_code=201)

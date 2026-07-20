@@ -66,6 +66,10 @@ def build_environment_fingerprint(
 
 def build_result_fingerprint(artifact_hashes: Mapping[str, Mapping[str, Any]]) -> str:
     base_names = {"targets.csv.gz", "nav.csv.gz", "metrics.json"}
+    if "benchmark_nav.csv.gz" in artifact_hashes:
+        base_names.add("benchmark_nav.csv.gz")
+    if "oos_metrics.json" in artifact_hashes:
+        base_names.add("oos_metrics.json")
     ledger_names = {
         "rebalance_requests.csv.gz",
         "rebalance_executions.csv.gz",
@@ -121,8 +125,8 @@ def build_research_manifest(
     artifact_schema_version: int = 1,
     generated_at: datetime | None = None,
 ) -> dict[str, Any]:
-    if artifact_schema_version not in {1, 2}:
-        raise ValueError("artifact_schema_version 只允许 1 或 2")
+    if artifact_schema_version not in {1, 2, 3, 4}:
+        raise ValueError("artifact_schema_version 只允许 1、2、3 或 4")
     generated = generated_at or datetime.now(timezone.utc)
     result_fingerprint = build_result_fingerprint(artifact_hashes)
     return {

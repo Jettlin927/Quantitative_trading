@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -11,6 +12,7 @@ import tempfile
 from typing import Any, Callable
 from uuid import uuid4
 
+import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -30,6 +32,11 @@ from .baselines import (
     open_strategy_inputs,
     summarize_sentinel_metrics,
     validate_explicit_universe,
+)
+from .evaluation import (
+    build_cost_stress_config,
+    build_oos_metrics,
+    validate_oos_metrics_contract,
 )
 from .manifest import (
     build_environment_fingerprint,
@@ -86,6 +93,7 @@ NAV_COLUMNS = (
     "unfilled_target_weight",
     "carried_valuation_count",
 )
+BENCHMARK_NAV_COLUMNS = ("trade_date", "nav")
 REBALANCE_REQUEST_COLUMNS = (
     "execution_date",
     "signal_date",
@@ -116,7 +124,7 @@ STAGES = (
 )
 INTERRUPTIBLE_STAGES = {"input_snapshot", "simulation", "finalize"}
 CHECKPOINT_SCHEMA_VERSION = 1
-ARTIFACT_SCHEMA_VERSION = 2
+ARTIFACT_SCHEMA_VERSION = 4
 
 
 class ResumeError(RuntimeError):
@@ -543,6 +551,19 @@ def _execute_pipeline(
         executions = read_canonical_csv_gz(working / "rebalance_executions.csv.gz")
         positions = read_canonical_csv_gz(working / "positions.csv.gz")
         metrics.update(summarize_execution_metrics(nav, requests, executions, positions))
+        benchmark_nav = _build_primary_benchmark_nav(
+            strategy,
+            working / "inputs",
+            normalized,
+            compressed=True,
+            table_artifacts=table_artifacts,
+        )
+        benchmark_nav_artifact = write_dataframe_csv_gz(
+            working / "benchmark_nav.csv.gz",
+            benchmark_nav,
+            columns=BENCHMARK_NAV_COLUMNS,
+            natural_key=("trade_date",),
+        )
         walk_forward_artifacts: dict[str, dict[str, Any]] = {}
         risk_artifacts: dict[str, dict[str, Any]] = {}
         metric_outputs: dict[str, Any] = {}
@@ -609,8 +630,33 @@ def _execute_pipeline(
                     "riskContributions": contributions_artifact,
                 }
             )
+        stressed_nav = nav
+        if "evaluationPolicy" in normalized:
+            targets = read_canonical_csv_gz(working / "targets.csv.gz")
+            stressed_simulation, _stressed_calendar = _simulate_strategy_targets(
+                strategy,
+                working / "inputs",
+                build_cost_stress_config(normalized),
+                targets,
+                compressed=True,
+                table_artifacts=table_artifacts,
+            )
+            stressed_nav = stressed_simulation.nav
+        oos_metrics = build_oos_metrics(
+            normalized,
+            nav,
+            benchmark_nav,
+            requests,
+            executions,
+            positions,
+            stressed_nav,
+            walk_forward=metrics.get("walkForward"),
+        )
         limitations = sorted(set(strategy.limitations()))
         metrics_artifact = atomic_write_json(working / "metrics.json", metrics)
+        oos_metrics_artifact = atomic_write_json(
+            working / "oos_metrics.json", oos_metrics
+        )
         limitations_artifact = atomic_write_json(working / "limitations.json", limitations)
         _write_checkpoint(
             registry_db,
@@ -625,7 +671,9 @@ def _execute_pipeline(
             },
             outputs={
                 "metrics": metrics_artifact,
+                "oosMetrics": oos_metrics_artifact,
                 "limitations": limitations_artifact,
+                "primaryBenchmarkNav": benchmark_nav_artifact,
                 **metric_outputs,
             },
             checkpoints=checkpoints,
@@ -633,9 +681,15 @@ def _execute_pipeline(
         _maybe_interrupt(interrupt_after_stage, "metrics")
     else:
         metrics = _read_json(working / "metrics.json", "metrics.json")
+        oos_metrics_artifact = _checkpoint_artifact(
+            checkpoints, "metrics", "oosMetrics"
+        )
         limitations = _read_json(working / "limitations.json", "limitations.json")
         metrics_artifact = _checkpoint_artifact(checkpoints, "metrics", "metrics")
         limitations_artifact = _checkpoint_artifact(checkpoints, "metrics", "limitations")
+        benchmark_nav_artifact = _checkpoint_artifact(
+            checkpoints, "metrics", "primaryBenchmarkNav"
+        )
         walk_forward_artifacts = {}
         if _walk_forward_enabled(normalized):
             walk_forward_artifacts = {
@@ -667,10 +721,12 @@ def _execute_pipeline(
             "quality.json": quality_artifact,
             "targets.csv.gz": targets_artifact,
             "nav.csv.gz": nav_artifact,
+            "benchmark_nav.csv.gz": benchmark_nav_artifact,
             "rebalance_requests.csv.gz": requests_artifact,
             "rebalance_executions.csv.gz": executions_artifact,
             "positions.csv.gz": positions_artifact,
             "metrics.json": metrics_artifact,
+            "oos_metrics.json": oos_metrics_artifact,
             "limitations.json": limitations_artifact,
             **walk_forward_artifacts,
             **risk_artifacts,
@@ -795,14 +851,14 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
     if manifest.get("randomSeed") != config["randomSeed"]:
         raise SnapshotIntegrityError("manifest randomSeed 与 config 不一致")
     artifact_schema_version = manifest.get("artifactSchemaVersion", 1)
-    if artifact_schema_version not in {1, 2}:
+    if artifact_schema_version not in {1, 2, 3, 4}:
         raise SnapshotIntegrityError("manifest artifactSchemaVersion 不受支持")
     walk_forward_enabled = _walk_forward_enabled(config)
-    if walk_forward_enabled and artifact_schema_version != 2:
-        raise SnapshotIntegrityError("walk-forward 工件只允许归档 schema v2")
+    if walk_forward_enabled and artifact_schema_version < 2:
+        raise SnapshotIntegrityError("walk-forward 工件只允许归档 schema v2+")
     risk_enabled = _risk_enabled(config)
-    if risk_enabled and artifact_schema_version != 2:
-        raise SnapshotIntegrityError("风险工件只允许归档 schema v2")
+    if risk_enabled and artifact_schema_version < 2:
+        raise SnapshotIntegrityError("风险工件只允许归档 schema v2+")
 
     expected = manifest["artifactHashes"]
     _validate_manifest_input_artifacts(
@@ -818,7 +874,7 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
         "targets.csv.gz": (TARGET_COLUMNS, ("signal_date", "ts_code")),
         "nav.csv.gz": (NAV_COLUMNS, ("trade_date",)),
     }
-    if artifact_schema_version == 2:
+    if artifact_schema_version >= 2:
         csv_contracts.update(
             {
                 "rebalance_requests.csv.gz": (
@@ -831,6 +887,11 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
                 ),
                 "positions.csv.gz": (POSITION_COLUMNS, ("trade_date", "ts_code")),
             }
+        )
+    if artifact_schema_version >= 3:
+        csv_contracts["benchmark_nav.csv.gz"] = (
+            BENCHMARK_NAV_COLUMNS,
+            ("trade_date",),
         )
     if walk_forward_enabled:
         csv_contracts.update(
@@ -870,7 +931,10 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
             )
         except (ArtifactIntegrityError, KeyError) as exc:
             raise SnapshotIntegrityError(f"归档研究产物无效：{name}") from exc
-    for name in ("quality.json", "metrics.json", "limitations.json"):
+    json_artifacts = ["quality.json", "metrics.json", "limitations.json"]
+    if artifact_schema_version >= 4:
+        json_artifacts.append("oos_metrics.json")
+    for name in json_artifacts:
         try:
             verify_file_artifact(run_path / name, expected[name])
         except (ArtifactIntegrityError, KeyError) as exc:
@@ -879,7 +943,15 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
     limitations = _read_json(run_path / "limitations.json", "limitations.json")
     if quality != manifest.get("qualityRun") or limitations != manifest.get("limitations"):
         raise SnapshotIntegrityError("归档审计产物与 manifest 不一致")
-    if artifact_schema_version == 2:
+    if artifact_schema_version >= 4:
+        try:
+            validate_oos_metrics_contract(
+                _read_json(run_path / "oos_metrics.json", "oos_metrics.json"),
+                config,
+            )
+        except ValueError as exc:
+            raise SnapshotIntegrityError("归档 OOS 指标合同无效") from exc
+    if artifact_schema_version >= 2:
         persisted_metrics = _read_json(run_path / "metrics.json", "metrics.json")
         try:
             recalculated_execution_metrics = summarize_execution_metrics(
@@ -959,7 +1031,7 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
             "nav.csv.gz": nav_artifact,
         }
         metrics_simulation = replace(simulation, nav=persisted_nav)
-        if artifact_schema_version == 2:
+        if artifact_schema_version >= 2:
             actual["rebalance_requests.csv.gz"] = write_dataframe_csv_gz(
                 temporary / "rebalance_requests.csv.gz",
                 simulation.rebalance_requests,
@@ -988,6 +1060,20 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
                     temporary / "rebalance_executions.csv.gz"
                 ),
                 positions=read_canonical_csv_gz(temporary / "positions.csv.gz"),
+            )
+        if artifact_schema_version >= 3:
+            benchmark_nav = _build_primary_benchmark_nav(
+                strategy,
+                run_path / "inputs",
+                config,
+                compressed=True,
+                table_artifacts=table_artifacts,
+            )
+            actual["benchmark_nav.csv.gz"] = write_dataframe_csv_gz(
+                temporary / "benchmark_nav.csv.gz",
+                benchmark_nav,
+                columns=BENCHMARK_NAV_COLUMNS,
+                natural_key=("trade_date",),
             )
         metrics = _summarize_reproduction_metrics(
             strategy,
@@ -1040,6 +1126,31 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
                 risk.contributions,
                 columns=RISK_CONTRIBUTION_COLUMNS,
                 natural_key=("trade_date", "ts_code"),
+            )
+        if artifact_schema_version >= 4:
+            stressed_nav = persisted_nav
+            if "evaluationPolicy" in config:
+                stressed_simulation, _stressed_calendar = _simulate_strategy_targets(
+                    strategy,
+                    run_path / "inputs",
+                    build_cost_stress_config(config),
+                    persisted_targets,
+                    compressed=True,
+                    table_artifacts=table_artifacts,
+                )
+                stressed_nav = stressed_simulation.nav
+            oos_metrics = build_oos_metrics(
+                config,
+                persisted_nav,
+                benchmark_nav,
+                metrics_simulation.rebalance_requests,
+                metrics_simulation.rebalance_executions,
+                metrics_simulation.positions,
+                stressed_nav,
+                walk_forward=metrics.get("walkForward"),
+            )
+            actual["oos_metrics.json"] = atomic_write_json(
+                temporary / "oos_metrics.json", oos_metrics
             )
         actual["metrics.json"] = atomic_write_json(temporary / "metrics.json", metrics)
     mismatches = [
@@ -1097,7 +1208,7 @@ def _summarize_reproduction_metrics(
         compressed=True,
         table_artifacts=table_artifacts,
     )
-    if artifact_schema_version == 2:
+    if artifact_schema_version >= 2:
         metrics.update(
             summarize_execution_metrics(
                 nav,
@@ -1115,6 +1226,79 @@ def _walk_forward_enabled(config: dict[str, Any]) -> bool:
 
 def _risk_enabled(config: dict[str, Any]) -> bool:
     return validate_risk_policy(config.get("riskPolicy"))["mode"] != "none"
+
+
+def _build_primary_benchmark_nav(
+    strategy: StrategyDefinition,
+    input_root: Path,
+    config: dict[str, Any],
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]],
+) -> pd.DataFrame:
+    """从冻结输入重建与策略指标同口径的主基准净值。"""
+
+    _, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
+    research_start = pd.Timestamp(config["startDate"])
+    research_end = pd.Timestamp(config["endDate"])
+    source = strategy.walk_forward_benchmark_source
+    if source == "universe_adjusted_etf":
+        members = validate_explicit_universe(reader, config, compressed)
+        prices = load_adjusted_etf_prices(reader, config, members)
+        benchmark = prices[prices["trade_date"].between(research_start, research_end)][
+            ["trade_date", "adj_open", "adj_close"]
+        ].copy()
+        if benchmark.empty:
+            raise ValueError("冻结 ETF 主基准路径为空")
+        opening_nav = pd.to_numeric(benchmark["adj_open"], errors="raise").iloc[0]
+        benchmark["nav"] = pd.to_numeric(
+            benchmark["adj_close"], errors="raise"
+        ) / opening_nav
+    elif source == "config_market_reference":
+        benchmark = reader("index_daily_bars")
+        benchmark["trade_date"] = pd.to_datetime(
+            benchmark["trade_date"], errors="raise"
+        )
+        warmup_start = pd.Timestamp(config["warmupStart"])
+        benchmark = benchmark[
+            benchmark["ts_code"].eq(config["benchmark"])
+            & benchmark["trade_date"].between(warmup_start, research_end)
+        ][["trade_date", "close", "pre_close"]].copy()
+        benchmark = benchmark.sort_values("trade_date", kind="stable")
+        if benchmark.empty:
+            raise ValueError("冻结市场主基准路径为空")
+        benchmark["close"] = pd.to_numeric(benchmark["close"], errors="raise")
+        benchmark["pre_close"] = pd.to_numeric(
+            benchmark["pre_close"], errors="coerce"
+        )
+        research_benchmark = benchmark[
+            benchmark["trade_date"].between(research_start, research_end)
+        ].copy()
+        if research_benchmark.empty:
+            raise ValueError("冻结市场主基准研究区间为空")
+        first_row = research_benchmark.iloc[0]
+        opening_nav = first_row["pre_close"]
+        if not math.isfinite(float(opening_nav)) or float(opening_nav) <= 0:
+            prior = benchmark[benchmark["trade_date"] < first_row["trade_date"]]
+            if prior.empty:
+                raise ValueError("冻结市场主基准缺少研究边界前收盘或首日 pre_close")
+            opening_nav = prior.iloc[-1]["close"]
+        research_benchmark["nav"] = research_benchmark["close"] / float(
+            opening_nav
+        )
+        benchmark = research_benchmark
+    else:
+        raise ValueError("策略主基准来源未登记")
+    result = benchmark[["trade_date", "nav"]].copy()
+    result = result.sort_values("trade_date", kind="stable").reset_index(drop=True)
+    result["nav"] = pd.to_numeric(result["nav"], errors="raise")
+    if (
+        result.empty
+        or not result["nav"].map(math.isfinite).all()
+        or (result["nav"] <= 0).any()
+    ):
+        raise ValueError("冻结主基准净值非有限正数或为空")
+    return result
 
 
 def _evaluate_walk_forward(
@@ -1347,6 +1531,9 @@ def _verify_completed_stage_artifacts(
             raise ResumeIntegrityError("metrics checkpoint 输入 hash 不一致")
         expected_metric_outputs = {
             "metrics": _checkpoint_artifact(checkpoints, "metrics", "metrics"),
+            "oosMetrics": _checkpoint_artifact(
+                checkpoints, "metrics", "oosMetrics"
+            ),
             "limitations": _checkpoint_artifact(
                 checkpoints, "metrics", "limitations"
             ),
@@ -1356,8 +1543,20 @@ def _verify_completed_stage_artifacts(
             expected_metric_outputs["metrics"],
         )
         verify_file_artifact(
+            working / "oos_metrics.json",
+            expected_metric_outputs["oosMetrics"],
+        )
+        verify_file_artifact(
             working / "limitations.json",
             expected_metric_outputs["limitations"],
+        )
+        benchmark_artifact = _checkpoint_artifact(
+            checkpoints, "metrics", "primaryBenchmarkNav"
+        )
+        expected_metric_outputs["primaryBenchmarkNav"] = benchmark_artifact
+        verify_csv_artifact(
+            working / "benchmark_nav.csv.gz",
+            benchmark_artifact,
         )
         if _walk_forward_enabled(dict(run.config or {})):
             for filename, artifact_name in (
@@ -1561,7 +1760,7 @@ def _validate_manifest_input_artifacts(
         "metrics.json",
         "limitations.json",
     }
-    if artifact_schema_version == 2:
+    if artifact_schema_version >= 2:
         required_outputs.update(
             {
                 "rebalance_requests.csv.gz",
@@ -1569,6 +1768,10 @@ def _validate_manifest_input_artifacts(
                 "positions.csv.gz",
             }
         )
+    if artifact_schema_version >= 3:
+        required_outputs.add("benchmark_nav.csv.gz")
+    if artifact_schema_version >= 4:
+        required_outputs.add("oos_metrics.json")
     if walk_forward_enabled:
         required_outputs.update(
             {
@@ -1654,7 +1857,7 @@ def _archive_checkpoint_identity(manifest: dict[str, Any], stage: str) -> dict[s
         "dataSnapshotId": manifest["dataSnapshot"]["snapshotId"] if include_snapshot else None,
         "reproducibilityKey": manifest["reproducibilityKey"] if include_snapshot else None,
     }
-    if manifest.get("artifactSchemaVersion", 1) == 2:
+    if manifest.get("artifactSchemaVersion", 1) >= 2:
         identity = {
             "strategyId": manifest["strategyId"],
             "strategyVersion": manifest["config"]["strategyVersion"],
@@ -1716,7 +1919,7 @@ def _validate_archive_checkpoint_artifacts(
 
     nav = _checkpoint_artifact(checkpoints, "simulation", "nav")
     simulation_outputs = {"nav": nav}
-    if manifest.get("artifactSchemaVersion", 1) == 2:
+    if manifest.get("artifactSchemaVersion", 1) >= 2:
         simulation_outputs.update(
             {
                 "rebalanceRequests": _checkpoint_artifact(checkpoints, "simulation", "rebalanceRequests"),
@@ -1725,7 +1928,7 @@ def _validate_archive_checkpoint_artifacts(
             }
         )
     expected_simulation_outputs = {"nav": artifact_hashes["nav.csv.gz"]}
-    if manifest.get("artifactSchemaVersion", 1) == 2:
+    if manifest.get("artifactSchemaVersion", 1) >= 2:
         expected_simulation_outputs.update(
             {
                 "rebalanceRequests": artifact_hashes["rebalance_requests.csv.gz"],
@@ -1745,6 +1948,14 @@ def _validate_archive_checkpoint_artifacts(
         "metrics": artifact_hashes["metrics.json"],
         "limitations": artifact_hashes["limitations.json"],
     }
+    if manifest.get("artifactSchemaVersion", 1) >= 3:
+        expected_metric_outputs["primaryBenchmarkNav"] = artifact_hashes[
+            "benchmark_nav.csv.gz"
+        ]
+    if manifest.get("artifactSchemaVersion", 1) >= 4:
+        expected_metric_outputs["oosMetrics"] = artifact_hashes[
+            "oos_metrics.json"
+        ]
     if _walk_forward_enabled(manifest["config"]):
         expected_metric_outputs.update(
             {
@@ -1766,7 +1977,7 @@ def _validate_archive_checkpoint_artifacts(
             }
         )
     expected_metric_inputs = {"nav": nav}
-    if manifest.get("artifactSchemaVersion", 1) == 2:
+    if manifest.get("artifactSchemaVersion", 1) >= 2:
         expected_metric_inputs.update(
             {
                 "rebalanceRequests": simulation_outputs["rebalanceRequests"],
@@ -1897,11 +2108,11 @@ def _cleanup_uncommitted_stage_files(
 ) -> None:
     completed_count = len(checkpoints)
     stage_outputs = {
-        0: ("quality.json", "inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        1: ("inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        2: ("targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        3: ("nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
-        4: ("walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "limitations.json", "manifest.json"),
+        0: ("quality.json", "inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "oos_metrics.json", "limitations.json", "manifest.json"),
+        1: ("inputs", "targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "oos_metrics.json", "limitations.json", "manifest.json"),
+        2: ("targets.csv.gz", "nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "oos_metrics.json", "limitations.json", "manifest.json"),
+        3: ("nav.csv.gz", "rebalance_requests.csv.gz", "rebalance_executions.csv.gz", "positions.csv.gz", "walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "oos_metrics.json", "limitations.json", "manifest.json"),
+        4: ("walk_forward_windows.csv.gz", "walk_forward_metrics.csv.gz", "risk_exposures.csv.gz", "risk_contributions.csv.gz", "metrics.json", "oos_metrics.json", "limitations.json", "manifest.json"),
         5: ("manifest.json",),
         6: (),
         7: (),
