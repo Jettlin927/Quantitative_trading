@@ -42,6 +42,9 @@ class GitHubPermissionError(GitHubResearchError):
     pass
 
 
+HISTORICAL_RESEARCH_LABEL = "来源:历史导入"
+
+
 @dataclass(frozen=True)
 class PollResult:
     github_available: bool
@@ -98,13 +101,17 @@ class GitHubIssueClient:
                 return issues
             page += 1
 
+    def get_issue(self, issue_number: int) -> dict[str, Any]:
+        return self._request("GET", f"/repos/{self.repository}/issues/{issue_number}")
+
     def list_comments(self, issue_number: int) -> list[dict[str, Any]]:
         comments: list[dict[str, Any]] = []
         page = 1
         while True:
             query = urlencode({"per_page": "100", "page": str(page)})
             batch = self._request(
-                "GET", f"/repos/{self.repository}/issues/{issue_number}/comments?{query}"
+                "GET",
+                f"/repos/{self.repository}/issues/{issue_number}/comments?{query}",
             )
             comments.extend(batch)
             if len(batch) < 100:
@@ -120,7 +127,11 @@ class GitHubIssueClient:
         marker: str,
     ) -> dict[str, Any]:
         existing = next(
-            (item for item in existing_comments if marker in str(item.get("body") or "")),
+            (
+                item
+                for item in existing_comments
+                if marker in str(item.get("body") or "")
+            ),
             None,
         )
         if existing is not None:
@@ -133,6 +144,64 @@ class GitHubIssueClient:
             "POST",
             f"/repos/{self.repository}/issues/{issue_number}/comments",
             {"body": body},
+        )
+
+    def ensure_comment(
+        self,
+        issue_number: int,
+        body: str,
+        existing_comments: list[dict[str, Any]],
+        *,
+        marker: str,
+    ) -> dict[str, Any]:
+        """创建不可变终态评论；同一标记只允许完全相同的正文。"""
+
+        existing = next(
+            (
+                item
+                for item in existing_comments
+                if marker in str(item.get("body") or "")
+            ),
+            None,
+        )
+        if existing is not None:
+            if str(existing.get("body") or "") != body:
+                raise GitHubResearchError(
+                    "同一评价标记已存在不同正文，拒绝覆盖终态评论"
+                )
+            return existing
+        return self._request(
+            "POST",
+            f"/repos/{self.repository}/issues/{issue_number}/comments",
+            {"body": body},
+        )
+
+    def finalize_issue(
+        self,
+        issue_number: int,
+        issue: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """在一次 Issue 更新中同时收敛关闭状态与研究状态标签。"""
+
+        current = issue or self.get_issue(issue_number)
+        current_labels = {
+            str(item.get("name") or "") for item in current.get("labels", [])
+        }
+        desired_labels = sorted(
+            (current_labels - RESEARCH_STATE_LABELS) | {"研究:已发布"}
+        )
+        if str(
+            current.get("state") or ""
+        ).lower() == "closed" and current_labels == set(desired_labels):
+            return current
+        return self._request(
+            "PATCH",
+            f"/repos/{self.repository}/issues/{issue_number}",
+            {
+                "state": "closed",
+                "state_reason": "completed",
+                "labels": desired_labels,
+            },
         )
 
     def set_state_label(
@@ -185,10 +254,14 @@ class GitHubIssueClient:
             if exc.code == 404 and method == "DELETE":
                 return None
             if exc.code >= 500 or exc.code == 429:
-                raise GitHubUnavailableError(f"GitHub 暂时不可用：HTTP {exc.code}") from exc
+                raise GitHubUnavailableError(
+                    f"GitHub 暂时不可用：HTTP {exc.code}"
+                ) from exc
             raise GitHubResearchError(f"GitHub 请求失败：HTTP {exc.code}") from exc
         except (TimeoutError, URLError) as exc:
-            raise GitHubUnavailableError(f"GitHub 连接失败：{type(exc).__name__}") from exc
+            raise GitHubUnavailableError(
+                f"GitHub 连接失败：{type(exc).__name__}"
+            ) from exc
         if not raw:
             return None
         return json.loads(raw.decode("utf-8"))
@@ -212,6 +285,9 @@ def poll_research_issues_once(
     errors: list[str] = []
     for raw_issue in issues:
         issue = _issue_snapshot(raw_issue)
+        # 历史导入 Issue 只承载既有评价发布，不解析批准，也绝不进入研究队列。
+        if HISTORICAL_RESEARCH_LABEL in issue.labels:
+            continue
         raw_comments: list[dict[str, Any]] = []
         try:
             raw_comments = client.list_comments(issue.number)
@@ -242,9 +318,15 @@ def poll_research_issues_once(
                     app_git_ref=app_git_ref,
                     authorization_write_confirmed=write_confirmed,
                 )
-            client.set_state_label(issue.number, set(issue.labels), result.desired_label)
+            # 已发布标签与 Issue 关闭必须由一致发布器在读回后原子完成。
+            if result.state != "published":
+                client.set_state_label(
+                    issue.number, set(issue.labels), result.desired_label
+                )
             if result.state == "blocked" and result.approval_found:
-                marker = f"<!-- research-orchestrator:blocked:{prepared.plan_sha256} -->"
+                marker = (
+                    f"<!-- research-orchestrator:blocked:{prepared.plan_sha256} -->"
+                )
                 client.confirm_comment(
                     issue.number,
                     _blocked_comment(prepared, marker, result.reason),
@@ -252,10 +334,12 @@ def poll_research_issues_once(
                     marker=marker,
                 )
             elif not result.approval_found:
-                marker_kind = "pending" if result.state == "pending_approval" else "approval-invalid"
-                marker = (
-                    f"<!-- research-orchestrator:{marker_kind}:{prepared.plan_sha256} -->"
+                marker_kind = (
+                    "pending"
+                    if result.state == "pending_approval"
+                    else "approval-invalid"
                 )
+                marker = f"<!-- research-orchestrator:{marker_kind}:{prepared.plan_sha256} -->"
                 client.confirm_comment(
                     issue.number,
                     (
@@ -267,7 +351,11 @@ def poll_research_issues_once(
                     marker=marker,
                 )
             processed.append(result)
-        except (ResearchPlanError, ResearchAuthorizationError, ResearchStateTransitionError) as exc:
+        except (
+            ResearchPlanError,
+            ResearchAuthorizationError,
+            ResearchStateTransitionError,
+        ) as exc:
             message = f"研究 Issue #{issue.number} 计划或状态无效：{exc}"
             errors.append(message)
             with session_factory.begin() as db:

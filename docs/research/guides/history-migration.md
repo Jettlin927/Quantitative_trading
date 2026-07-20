@@ -9,7 +9,7 @@ Issue #21 的迁移只把治理合同建立前已经存在的研究事实映射�
 - 三份 legacy 结果只建立“已归档”策略档案，原 `status=ok` 或“观察”只作为来源元数据保留，不创建当前研究评价。
 - 其余运行保持未发布；不能依靠相同指纹、成功状态或相似策略名猜测归属。
 
-冻结来源合同位于 [`configs/research-history-migration-v1.json`](../../../configs/research-history-migration-v1.json)。迁移代码会校验合同、manifest、三份当前 HTML 报告、机器摘要、双轮复现证据和 legacy 全部原始工件的哈希；四项当前研究的经济假设、支持证据、反对证据、尚缺证据、限制项与后续建议均使用合同中显式 JSON 路径读取，不按字段名猜测。
+冻结来源合同位于 [`configs/research-history-migration-v1.json`](../../../configs/research-history-migration-v1.json)。迁移代码会校验合同、manifest、三份当前 HTML 报告、机器摘要、双轮复现证据和 legacy 全部原始工件的哈希；四项当前研究的经济假设、支持证据、反对证据、尚缺证据、限制项与后续建议均使用合同中显式 JSON 路径读取，不按字段名猜测。低波动准入的后续建议明确取自 `lowVolatilityGateFollowup.researchClassification`，历史“不通过”评价同样不能省略后续研究建议。
 
 ## 三种模式
 

@@ -227,6 +227,7 @@ def evaluate_walk_forward(
             }
         )
     metrics_frame = pd.DataFrame(rows, columns=WALK_FORWARD_METRIC_COLUMNS)
+    window_returns = metrics_frame["total_return"].astype(float)
     return (
         windows,
         metrics_frame,
@@ -235,5 +236,8 @@ def evaluate_walk_forward(
             "oosOnly": True,
             "testObservationCount": int(metrics_frame["observations"].sum()),
             "windowCount": len(windows),
+            "minimumWindowTotalReturn": float(window_returns.min()),
+            "medianWindowTotalReturn": float(window_returns.median()),
+            "positiveWindowRate": float((window_returns > 0).mean()),
         },
     )

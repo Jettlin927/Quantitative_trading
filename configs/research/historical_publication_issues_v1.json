@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "historical-publication-issues/v1",
+  "repository": "Jettlin927/Quantitative_trading",
+  "mappings": [
+    {
+      "strategyId": "etf_volatility_managed",
+      "issueNumber": 37,
+      "title": "历史研究：沪深300 ETF 波动率管理结构化评价发布"
+    },
+    {
+      "strategyId": "etf_low_volatility_gate",
+      "issueNumber": 38,
+      "title": "历史研究：沪深300 ETF 低波动准入结构化评价发布"
+    },
+    {
+      "strategyId": "etf_trend_120d",
+      "issueNumber": 39,
+      "title": "历史研究：沪深300 ETF 120 日均线趋势结构化评价发布"
+    },
+    {
+      "strategyId": "a_share_b1_trend_pullback",
+      "issueNumber": 40,
+      "title": "历史研究：A 股 B1 趋势回调公开规则近似复现结构化评价发布"
+    }
+  ],
+  "requiredLabels": [
+    "类型:策略研究",
+    "来源:历史导入"
+  ],
+  "productionGate": "必须先由用户单独批准生产 Alembic upgrade；登记工具只在现场复核 Issue 仍为 OPEN 且标签完整后写入不可变映射。"
+}
