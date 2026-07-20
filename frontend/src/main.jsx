@@ -59,7 +59,8 @@ export function App() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [globalError, setGlobalError] = useState('')
   const [researchError, setResearchError] = useState('')
-  const [stockError, setStockError] = useState('')
+  const [stockListError, setStockListError] = useState('')
+  const [stockDetailError, setStockDetailError] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
   const stockRequestId = useRef(0)
   const catalogRequestId = useRef(0)
@@ -100,6 +101,7 @@ export function App() {
         return
       }
       if (result.status === 'rejected') {
+        if (key === 'stocks') setStockListError(errorMessage(result.reason))
         if (key === 'strategies') {
           setResearchError(errorMessage(result.reason))
           setResearchLoading(false)
@@ -113,7 +115,10 @@ export function App() {
       if (key === 'stockReadiness') setReadiness((current) => ({ ...current, stocks: value }))
       if (key === 'etfReadiness') setReadiness((current) => ({ ...current, etf: value }))
       if (key === 'overview') setOverview(value)
-      if (key === 'stocks') applyStockPage(value)
+      if (key === 'stocks') {
+        setStockListError('')
+        applyStockPage(value)
+      }
       if (key === 'indices') {
         setCatalogs((current) => ({ ...current, indices: value }))
         if (!selectedCatalogRef.current.code && value.length) selectCatalog('index', value[0].tsCode)
@@ -170,7 +175,7 @@ export function App() {
     setStockDataCode('')
     setStockBars([])
     setStockDetail(null)
-    setStockError('')
+    setStockDetailError('')
     if (!tsCode) setDetailLoading(false)
   }
 
@@ -200,10 +205,10 @@ export function App() {
       setStockDataCode(requestedCode)
       setStockBars(barsRes)
       setStockDetail(detailRes)
-      setStockError('')
+      setStockDetailError('')
       return true
     } catch (err) {
-      if (requestId === stockRequestId.current) setStockError(errorMessage(err))
+      if (requestId === stockRequestId.current) setStockDetailError(errorMessage(err))
       return false
     } finally {
       if (requestId === stockRequestId.current) setDetailLoading(false)
@@ -309,15 +314,12 @@ export function App() {
 
   async function loadStocks(offset = 0) {
     const request = beginStockPageRequest(buildStockScreenPath(query, offset))
-    setLoading(true)
-    setStockError('')
+    setStockListError('')
     try {
       const page = await fetchJson(request.path)
       if (isCurrentStockPageRequest(request)) applyStockPage(page)
     } catch (err) {
-      if (isCurrentStockPageRequest(request)) setStockError(errorMessage(err))
-    } finally {
-      if (isCurrentStockPageRequest(request)) setLoading(false)
+      if (isCurrentStockPageRequest(request)) setStockListError(errorMessage(err))
     }
   }
 
@@ -446,7 +448,7 @@ export function App() {
               catalogError={catalogError}
               syncRuns={syncRuns}
               detailLoading={detailLoading}
-              error={stockError}
+              error={[stockListError, stockDetailError].filter(Boolean).join('；')}
             />
           ) : null}
           {activeView === 'us-data' ? <USDataBoundaryView usDb={usDb} /> : null}

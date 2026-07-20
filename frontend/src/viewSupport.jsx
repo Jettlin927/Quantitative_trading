@@ -197,6 +197,7 @@ function formatStructuredValue(value) {
     return entries.length ? formatStructuredEntries(entries, '=', '，') : '无附加信息'
   }
   if (typeof value === 'boolean') return value ? '是' : '否'
+  if (typeof value === 'number') return String(value)
   return translateStatus(value)
 }
 
@@ -217,7 +218,7 @@ export function inventoryLabel(value) {
 }
 
 export function translateStatus(value) {
-  const text = String(value || 'unknown')
+  const text = String(value ?? 'unknown')
   const labels = {
     unknown: '未知', ready: '就绪', ok: '正常', success: '成功', succeeded: '执行成功', connected: '已连接', available: '可用',
     blocked: '受阻', failed: '失败', fail: '失败', error: '错误', empty: '空', queued: '排队中', running: '运行中', retrying: '重试中',

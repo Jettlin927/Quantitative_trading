@@ -130,8 +130,8 @@ function chartRangeStartIndex(candles, range) {
   if (!candles.length || range === 'all') return 0
   const years = { '1y': 1, '3y': 3, '5y': 5 }[range]
   if (!years) return Math.max(0, candles.length - 180)
-  const cutoff = new Date(`${candles[candles.length - 1].time}T00:00:00`)
-  cutoff.setFullYear(cutoff.getFullYear() - years)
+  const cutoff = new Date(`${candles[candles.length - 1].time}T00:00:00Z`)
+  cutoff.setUTCFullYear(cutoff.getUTCFullYear() - years)
   const cutoffText = cutoff.toISOString().slice(0, 10)
   const firstVisible = candles.findIndex((bar) => bar.time >= cutoffText)
   return firstVisible < 0 ? 0 : firstVisible
