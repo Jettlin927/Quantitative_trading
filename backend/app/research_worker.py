@@ -16,7 +16,12 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal, assert_schema_revision_at_head, engine
-from .github_research import GitHubIssueClient, poll_research_issues_once
+from .github_research import (
+    GitHubIssueClient,
+    GitHubPermissionError,
+    GitHubUnavailableError,
+    poll_research_issues_once,
+)
 from .models import (
     FormalResearch,
     DataSyncJob,
@@ -33,6 +38,7 @@ from .quant_research.runner import (
 )
 from .research_orchestration import append_research_event, transition_orchestration
 from .research_plan import ResearchServerLimits
+from .research_publication import publish_next_pending_research_evaluation
 from .work_coordination import try_acquire_heavy_work_claim_lock
 
 
@@ -329,19 +335,20 @@ def execute_claimed_research_work(
     except ResearchBudgetExceeded as exc:
         fail_research_work(claim, exc, transient=False, session_factory=factory)
         return "blocked"
-    except Exception as exc:
+    except Exception as runner_exc:
         if lease_lost.is_set():
             return "lease_lost"
         if heartbeat_failure.is_set():
-            exc, transient = _classify_heartbeat_failure(heartbeat_errors)
+            failure_exc, transient = _classify_heartbeat_failure(heartbeat_errors)
         else:
+            failure_exc = runner_exc
             transient = isinstance(
-                exc,
+                failure_exc,
                 (OperationalError, TimeoutError, ConnectionError),
             )
         return fail_research_work(
             claim,
-            exc,
+            failure_exc,
             transient=transient,
             session_factory=factory,
         )
@@ -801,6 +808,49 @@ def _positive_int_env(name: str, default: int) -> int:
     return value
 
 
+def _contains_github_availability_failure(exc: BaseException) -> bool:
+    visited: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+        if isinstance(current, (GitHubPermissionError, GitHubUnavailableError)):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def _publish_pending_evaluation_once(
+    *,
+    session_factory: SessionFactory,
+    github: GitHubIssueClient,
+    github_available: Event,
+    artifact_root: Path,
+    public_base_url: str,
+    readback_base_url: str | None,
+    retry_failed_after_seconds: int,
+) -> None:
+    try:
+        publication = publish_next_pending_research_evaluation(
+            session_factory,
+            github,
+            artifact_root=artifact_root,
+            public_base_url=public_base_url,
+            readback_base_url=readback_base_url,
+            retry_failed_after_seconds=retry_failed_after_seconds,
+        )
+    except Exception as exc:
+        if _contains_github_availability_failure(exc):
+            github_available.clear()
+        print(f"研究评价发布异常：{type(exc).__name__}: {exc}", flush=True)
+        return
+    if publication is not None:
+        print(
+            "研究评价已完成一致发布："
+            f"publication_id={publication.publication_id}",
+            flush=True,
+        )
+
+
 def _main() -> None:
     assert_schema_revision_at_head(engine)
     client = GitHubIssueClient.from_env()
@@ -810,6 +860,9 @@ def _main() -> None:
     poll_seconds = _positive_int_env("RESEARCH_WORKER_POLL_SECONDS", 30)
     heartbeat_seconds = _positive_int_env("RESEARCH_WORKER_HEARTBEAT_SECONDS", 20)
     lease_seconds = _positive_int_env("RESEARCH_WORKER_LEASE_SECONDS", 120)
+    publication_retry_seconds = _positive_int_env(
+        "RESEARCH_PUBLICATION_RETRY_SECONDS", 300
+    )
     if heartbeat_seconds >= lease_seconds:
         raise ValueError("RESEARCH_WORKER_HEARTBEAT_SECONDS 必须小于租约秒数")
     worker_id = os.getenv("RESEARCH_WORKER_ID") or f"{socket.gethostname()}-{os.getpid()}"
@@ -822,6 +875,12 @@ def _main() -> None:
     signal.signal(signal.SIGTERM, stop_signal)
     github_available = Event()
     first_poll_done = Event()
+    public_base_url = (
+        os.getenv("RESEARCH_PUBLIC_BASE_URL", "").strip()
+        or "http://127.0.0.1:15173"
+    )
+    readback_base_url = os.getenv("RESEARCH_READBACK_BASE_URL", "").strip() or None
+    artifact_root = Path(os.getenv("RESEARCH_ARTIFACT_ROOT", "outputs/research-runs"))
 
     def poll_loop() -> None:
         while not stopped.is_set():
@@ -842,6 +901,17 @@ def _main() -> None:
             except Exception as exc:
                 github_available.clear()
                 print(f"GitHub 研究轮询异常：{type(exc).__name__}: {exc}", flush=True)
+            else:
+                if poll.github_available:
+                    _publish_pending_evaluation_once(
+                        session_factory=SessionLocal,
+                        github=client,
+                        github_available=github_available,
+                        artifact_root=artifact_root,
+                        public_base_url=public_base_url,
+                        readback_base_url=readback_base_url,
+                        retry_failed_after_seconds=publication_retry_seconds,
+                    )
             finally:
                 first_poll_done.set()
             stopped.wait(poll_seconds)

@@ -375,6 +375,35 @@ class ResearchPublicationOut(BaseModel):
     published_at: datetime | None = None
 
 
+class ResearchPublicationRunOut(BaseModel):
+    run_id: str
+    status: Literal["succeeded", "failed", "interrupted"]
+    result_fingerprint: str | None = None
+    artifact_root: str
+
+
+class ResearchPublicationProjectionOut(BaseModel):
+    publication_id: UUID
+    formal_research_id: UUID
+    publication_version: int
+    status: Literal["pending", "published", "failed"]
+    publication_sha256: str
+    supersedes_publication_id: UUID | None = None
+    evaluation_id: UUID
+    evaluation_version: int
+    conclusion: Literal["研究通过", "有条件候选", "证据不足", "受阻", "不通过"]
+    evaluation_sha256: str
+    supersedes_evaluation_id: UUID | None = None
+    superseded_by_evaluation_id: UUID | None = None
+    runs: list[ResearchPublicationRunOut] = Field(default_factory=list)
+    manifest_url: str
+    summary_url: str
+    report_url: str
+    issue_number: int
+    issue_comment_id: int | None = None
+    published_at: datetime | None = None
+
+
 class FollowUpResearchProposalOut(BaseModel):
     id: UUID
     strategy_id: str

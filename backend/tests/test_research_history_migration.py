@@ -151,6 +151,11 @@ class ResearchHistoryMigrationTest(unittest.TestCase):
         low_volatility = by_strategy["etf_low_volatility_gate"]
         self.assertIn("月末 ETF 实现方差", low_volatility.economic_thesis)
         self.assertNotIn("预期收益不会随方差一比一上升", low_volatility.economic_thesis)
+        self.assertTrue(low_volatility.follow_up_recommendations)
+        self.assertIn(
+            "待证伪的新研究假设",
+            low_volatility.follow_up_recommendations[0]["statement"],
+        )
         trend = by_strategy["etf_trend_120d"]
         self.assertTrue(trend.supporting_evidence)
         self.assertTrue(trend.opposing_evidence)

@@ -27,9 +27,19 @@ from .schemas import (
     ResearchEventOut,
     ResearchPlanApprovalOut,
     ResearchPublicationOut,
+    ResearchPublicationProjectionOut,
+    ResearchPublicationRunOut,
     ResearchRunSummaryOut,
     StrategyProfileOut,
     StrategyProfileSummaryOut,
+)
+
+
+PUBLICATION_SUCCESS_EVENT_TYPES = frozenset(
+    {"research_published", "research_publication_recovered"}
+)
+PUBLICATION_LIFECYCLE_EVENT_TYPES = frozenset(
+    {*PUBLICATION_SUCCESS_EVENT_TYPES, "research_publication_failed"}
 )
 
 
@@ -124,6 +134,85 @@ def get_formal_research_detail(db: Session, research_id: str) -> FormalResearchD
     )
 
 
+def get_publication_projection(
+    db: Session,
+    publication_id: str,
+) -> ResearchPublicationProjectionOut | None:
+    publication = db.get(ResearchPublication, publication_id)
+    if publication is None:
+        return None
+    evaluation = db.get(ResearchEvaluation, publication.evaluation_id)
+    if evaluation is None:
+        raise RuntimeError("研究发布缺少对应评价记录")
+    run_ids = list(
+        db.scalars(
+            select(ResearchEvaluationRun.run_id)
+            .where(ResearchEvaluationRun.evaluation_id == evaluation.id)
+            .order_by(ResearchEvaluationRun.run_id)
+        ).all()
+    )
+    runs = (
+        db.scalars(
+            select(ResearchRun)
+            .where(ResearchRun.run_id.in_(run_ids))
+            .order_by(ResearchRun.run_id)
+        ).all()
+        if run_ids
+        else []
+    )
+    effective_publication_ids = _effective_publication_ids(
+        db, [publication.formal_research_id]
+    )
+    successor = (
+        db.scalar(
+            select(ResearchEvaluation)
+            .join(
+                ResearchPublication,
+                ResearchPublication.evaluation_id == ResearchEvaluation.id,
+            )
+            .where(
+                ResearchEvaluation.supersedes_evaluation_id == evaluation.id,
+                ResearchPublication.status == "published",
+                ResearchPublication.id.in_(effective_publication_ids),
+            )
+            .order_by(ResearchEvaluation.version.desc())
+            .limit(1)
+        )
+        if effective_publication_ids
+        else None
+    )
+    artifact_base = f"/api/research/evaluations/{evaluation.id}/artifacts"
+    return ResearchPublicationProjectionOut(
+        publication_id=publication.id,
+        formal_research_id=publication.formal_research_id,
+        publication_version=publication.version,
+        status=publication.status,
+        publication_sha256=publication.publication_sha256,
+        supersedes_publication_id=publication.supersedes_publication_id,
+        evaluation_id=evaluation.id,
+        evaluation_version=evaluation.version,
+        conclusion=evaluation.conclusion,
+        evaluation_sha256=evaluation.evaluation_sha256,
+        supersedes_evaluation_id=evaluation.supersedes_evaluation_id,
+        superseded_by_evaluation_id=successor.id if successor else None,
+        runs=[
+            ResearchPublicationRunOut(
+                run_id=item.run_id,
+                status=item.status,
+                result_fingerprint=item.result_fingerprint,
+                artifact_root=item.artifact_root,
+            )
+            for item in runs
+        ],
+        manifest_url=publication.artifact_manifest_uri,
+        summary_url=f"{artifact_base}/summary.json",
+        report_url=f"/api/research/evaluations/{evaluation.id}/report",
+        issue_number=publication.issue_number,
+        issue_comment_id=publication.issue_comment_id,
+        published_at=publication.published_at,
+    )
+
+
 def _strategy_summary(db: Session, strategy: StrategyDefinition) -> StrategyProfileSummaryOut:
     research_ids = list(
         db.scalars(
@@ -153,12 +242,7 @@ def _strategy_summary(db: Session, strategy: StrategyDefinition) -> StrategyProf
 
 
 def _formal_research_summary(db: Session, research: FormalResearch) -> FormalResearchSummaryOut:
-    latest_publication = db.scalar(
-        select(ResearchPublication)
-        .where(ResearchPublication.formal_research_id == research.id)
-        .order_by(ResearchPublication.version.desc())
-        .limit(1)
-    )
+    latest_publication = _latest_publication(db, [research.id])
     publication_evaluation = _publication_evaluation(db, latest_publication)
     run_count = int(
         db.scalar(
@@ -188,11 +272,70 @@ def _formal_research_summary(db: Session, research: FormalResearch) -> FormalRes
 def _latest_publication(db: Session, research_ids: list[str]) -> ResearchPublication | None:
     if not research_ids:
         return None
+    effective_publication_ids = _effective_publication_ids(db, research_ids)
+    published = (
+        db.scalar(
+            select(ResearchPublication)
+            .where(
+                ResearchPublication.formal_research_id.in_(research_ids),
+                ResearchPublication.status == "published",
+                ResearchPublication.id.in_(effective_publication_ids),
+            )
+            .order_by(
+                ResearchPublication.published_at.desc(),
+                ResearchPublication.created_at.desc(),
+                ResearchPublication.version.desc(),
+            )
+            .limit(1)
+        )
+        if effective_publication_ids
+        else None
+    )
+    if published is not None:
+        return published
     return db.scalar(
         select(ResearchPublication)
-        .where(ResearchPublication.formal_research_id.in_(research_ids))
+        .where(
+            ResearchPublication.formal_research_id.in_(research_ids),
+            ResearchPublication.status.in_({"pending", "failed"}),
+        )
         .order_by(ResearchPublication.created_at.desc(), ResearchPublication.version.desc())
         .limit(1)
+    )
+
+
+def _effective_publication_ids(db: Session, research_ids: list[str]) -> set[str]:
+    if not research_ids:
+        return set()
+    outcomes: dict[str, str] = {}
+    events = db.scalars(
+        select(ResearchEvent)
+        .where(
+            ResearchEvent.formal_research_id.in_(research_ids),
+            ResearchEvent.event_type.in_(PUBLICATION_LIFECYCLE_EVENT_TYPES),
+        )
+        .order_by(ResearchEvent.formal_research_id, ResearchEvent.sequence_no)
+    ).all()
+    for event in events:
+        payload = event.payload_json
+        publication_id = payload.get("publicationId") if isinstance(payload, dict) else None
+        if publication_id:
+            outcomes[str(publication_id)] = event.event_type
+    return {
+        publication_id
+        for publication_id, event_type in outcomes.items()
+        if event_type in PUBLICATION_SUCCESS_EVENT_TYPES
+    }
+
+
+def is_publication_effective(db: Session, publication_id: str) -> bool:
+    """判断发布是否是已完成全部一致性收敛的生效版本。"""
+
+    publication = db.get(ResearchPublication, publication_id)
+    if publication is None or publication.status != "published":
+        return False
+    return publication.id in _effective_publication_ids(
+        db, [publication.formal_research_id]
     )
 
 

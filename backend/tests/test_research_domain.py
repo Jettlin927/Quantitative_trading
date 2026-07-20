@@ -148,6 +148,13 @@ class ResearchDomainTest(unittest.TestCase):
             issue_comment_id=10002,
             published_at=datetime(2026, 7, 19, tzinfo=timezone.utc),
         )
+        publication_event = ResearchEvent(
+            id="30000000-0000-0000-0000-000000000002",
+            formal_research_id=formal.id,
+            sequence_no=2,
+            event_type="research_published",
+            payload_json={"publicationId": publication.id},
+        )
         proposal = FollowUpResearchProposal(
             id="70000000-0000-0000-0000-000000000001",
             strategy_id=strategy.strategy_id,
@@ -170,6 +177,7 @@ class ResearchDomainTest(unittest.TestCase):
                 *evaluation_runs,
                 evidence,
                 publication,
+                publication_event,
                 proposal,
             ]
         )
@@ -355,10 +363,17 @@ class ResearchDomainTest(unittest.TestCase):
         self.assertIn("/api/research/strategies", route_methods)
         self.assertIn("/api/research/strategies/{strategy_id}", route_methods)
         self.assertIn("/api/research/formal-researches/{research_id}", route_methods)
+        self.assertIn("/api/research/publications/{publication_id}", route_methods)
+        self.assertIn(
+            "/api/research/evaluations/{evaluation_id}/artifacts/{filename}",
+            route_methods,
+        )
         for path in (
             "/api/research/strategies",
             "/api/research/strategies/{strategy_id}",
             "/api/research/formal-researches/{research_id}",
+            "/api/research/publications/{publication_id}",
+            "/api/research/evaluations/{evaluation_id}/artifacts/{filename}",
         ):
             self.assertEqual(route_methods[path], {"GET"})
 
