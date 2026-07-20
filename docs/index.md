@@ -22,6 +22,7 @@
 ## 运维、验收与治理
 
 - [运维手册](operations/)
+- [生产部署、受控切换与家庭电脑访问](operations/production-deployment-and-home-access.md)
 - [不可变验收证据](acceptance/)
 - [架构决策](adr/)
 - [Agent 规则](agents/)
