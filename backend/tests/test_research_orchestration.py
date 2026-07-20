@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import os
 from tempfile import TemporaryDirectory
+from threading import Event
 import unittest
 from unittest.mock import patch
 
@@ -15,7 +16,7 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy import text
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from backend.app.database import Base, alembic_config
 from backend.app.github_research import (
@@ -36,6 +37,7 @@ from backend.app.models import (
 from backend.app.research_orchestration import (
     CommentSnapshot,
     IssueSnapshot,
+    OrchestrationResult,
     ResearchStateTransitionError,
     apply_issue_plan,
     append_research_event,
@@ -50,6 +52,7 @@ from backend.app.research_plan import (
     ResearchServerLimits,
     prepare_research_plan,
 )
+from backend.app.research_publication import PublicationConflictError
 from backend.app import research_worker
 from backend.app import sync_worker
 
@@ -61,7 +64,9 @@ APP_COMMIT = "c" * 40
 
 def valid_plan_payload() -> dict:
     config = json.loads(
-        (REPO_ROOT / "configs/research/etf_trend_baseline.json").read_text(encoding="utf-8")
+        (REPO_ROOT / "configs/research/etf_trend_baseline.json").read_text(
+            encoding="utf-8"
+        )
     )
     config["qualityRunId"] = "quality-ready"
     config["validationPolicy"] = {
@@ -71,7 +76,7 @@ def valid_plan_payload() -> dict:
         "stepPeriods": 20,
     }
     return {
-        "schemaVersion": "research-plan/v1",
+        "schemaVersion": "research-plan/v2",
         "strategy": {
             "id": config["strategyId"],
             "version": config["strategyVersion"],
@@ -99,8 +104,29 @@ def valid_plan_payload() -> dict:
         },
         "reportContract": {
             "language": "zh-CN",
-            "requiredArtifacts": ["report.html", "metrics.json", "manifest.json"],
-            "conclusionValues": ["研究通过", "有条件候选", "证据不足", "受阻", "不通过"],
+            "requiredArtifacts": [
+                "report.html",
+                "oos_metrics.json",
+                "metrics.json",
+                "manifest.json",
+            ],
+            "conclusionValues": [
+                "研究通过",
+                "有条件候选",
+                "证据不足",
+                "受阻",
+                "不通过",
+            ],
+            "evaluationPolicy": {
+                "marketRegime": {
+                    "directionLookbackPeriods": 20,
+                    "upThreshold": "0.03",
+                    "downThreshold": "-0.03",
+                    "volatilityLookbackPeriods": 20,
+                    "highVolatilityThreshold": "0.20",
+                },
+                "costStressMultiplier": "2",
+            },
         },
     }
 
@@ -125,7 +151,9 @@ def approved_issue_graph(
     prepared=None,
 ):
     prepared = prepared or prepare()
-    issue = IssueSnapshot(number=issue_number, state="OPEN", body="", labels=("类型:策略研究",))
+    issue = IssueSnapshot(
+        number=issue_number, state="OPEN", body="", labels=("类型:策略研究",)
+    )
     comments = [
         CommentSnapshot(
             id=issue_number * 100,
@@ -153,7 +181,9 @@ class ResearchPlanContractTest(unittest.TestCase):
         first = prepare(payload)
         reordered = {key: payload[key] for key in reversed(list(payload))}
         reordered["gates"] = list(reversed(reordered["gates"]))
-        reordered["reportContract"] = dict(reversed(list(reordered["reportContract"].items())))
+        reordered["reportContract"] = dict(
+            reversed(list(reordered["reportContract"].items()))
+        )
         second = prepare(reordered)
 
         self.assertEqual(first.plan_sha256, second.plan_sha256)
@@ -192,6 +222,11 @@ class ResearchPlanContractTest(unittest.TestCase):
             prepare(payload)
 
         payload = valid_plan_payload()
+        payload["runConfig"]["validationPolicy"] = {"mode": "none"}
+        with self.assertRaisesRegex(ResearchPlanError, "walk-forward"):
+            prepare(payload)
+
+        payload = valid_plan_payload()
         payload["parameterSpace"] = {}
         with self.assertRaisesRegex(ResearchPlanError, "单一冻结批次"):
             prepare(payload)
@@ -202,10 +237,12 @@ class ResearchPlanContractTest(unittest.TestCase):
         with self.assertRaisesRegex(ResearchPlanError, "YYYY-MM-DD"):
             prepare(payload)
 
-    def test_duplicate_json_keys_are_rejected_instead_of_silently_overwritten(self) -> None:
+    def test_duplicate_json_keys_are_rejected_instead_of_silently_overwritten(
+        self,
+    ) -> None:
         body = (
             f"{PLAN_START_MARKER}\n"
-            '{"schemaVersion":"research-plan/v1","schemaVersion":"other"}'
+            '{"schemaVersion":"research-plan/v2","schemaVersion":"other"}'
             f"\n{PLAN_END_MARKER}"
         )
         with self.assertRaisesRegex(ResearchPlanError, "不允许重复键：schemaVersion"):
@@ -244,10 +281,111 @@ class ResearchOrchestrationTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.engine.dispose()
 
+    def test_published_label_is_reserved_for_atomic_publication_finalizer(self) -> None:
+        prepared = prepare()
+
+        class PublishedClient:
+            def __init__(self):
+                self.labels = []
+
+            def list_research_issues(self):
+                return [
+                    {
+                        "number": 908,
+                        "state": "open",
+                        "body": issue_body(valid_plan_payload()),
+                        "labels": [
+                            {"name": "类型:策略研究"},
+                            {"name": "研究:运行中"},
+                        ],
+                    }
+                ]
+
+            def list_comments(self, _number):
+                return [
+                    {
+                        "id": 90800,
+                        "user": {"login": "Jettlin927"},
+                        "body": prepared.approval_comment,
+                    }
+                ]
+
+            def confirm_comment(self, *_args, **_kwargs):
+                return {"id": 1}
+
+            def set_state_label(self, number, _current, desired):
+                self.labels.append((number, desired))
+
+        result = OrchestrationResult(
+            issue_number=908,
+            plan_sha256=prepared.plan_sha256,
+            state="published",
+            desired_label="研究:已发布",
+            approval_found=True,
+            queue_created=False,
+        )
+        client = PublishedClient()
+        with patch("backend.app.github_research.apply_issue_plan", return_value=result):
+            poll = poll_research_issues_once(
+                client,
+                self.Session,
+                app_git_commit=APP_COMMIT,
+                app_git_ref="refs/heads/main",
+                limits=ResearchServerLimits(),
+            )
+
+        self.assertTrue(poll.github_available)
+        self.assertEqual(poll.processed, (result,))
+        self.assertEqual(client.labels, [])
+
+    def test_historical_issue_is_read_only_and_never_enters_approval_queue(self) -> None:
+        class HistoricalClient:
+            def __init__(self):
+                self.comments_read = False
+
+            def list_research_issues(self):
+                return [
+                    {
+                        "number": 9210,
+                        "state": "open",
+                        "body": "历史评价发布入口，不是研究计划。",
+                        "labels": [
+                            {"name": "类型:策略研究"},
+                            {"name": "来源:历史导入"},
+                        ],
+                    }
+                ]
+
+            def list_comments(self, _number):
+                self.comments_read = True
+                raise AssertionError("历史 Issue 不应进入批准解析")
+
+        client = HistoricalClient()
+        poll = poll_research_issues_once(
+            client,
+            self.Session,
+            app_git_commit=APP_COMMIT,
+            app_git_ref="refs/heads/main",
+            limits=ResearchServerLimits(),
+        )
+
+        self.assertTrue(poll.github_available)
+        self.assertEqual(poll.processed, ())
+        self.assertEqual(poll.errors, ())
+        self.assertFalse(client.comments_read)
+        with self.Session() as db:
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(ResearchWorkItem)), 0
+            )
+
     def test_exact_approval_is_idempotent_and_creates_one_queue(self) -> None:
         prepared = prepare()
         issue = IssueSnapshot(number=902, state="OPEN", body="")
-        wrong = [CommentSnapshot(id=1, author_login="Jettlin927", body=prepared.approval_comment + " ")]
+        wrong = [
+            CommentSnapshot(
+                id=1, author_login="Jettlin927", body=prepared.approval_comment + " "
+            )
+        ]
         with self.Session.begin() as db:
             pending = apply_issue_plan(
                 db,
@@ -261,7 +399,11 @@ class ResearchOrchestrationTest(unittest.TestCase):
             )
         self.assertEqual(pending.state, "pending_approval")
 
-        exact = [CommentSnapshot(id=2, author_login="Jettlin927", body=prepared.approval_comment)]
+        exact = [
+            CommentSnapshot(
+                id=2, author_login="Jettlin927", body=prepared.approval_comment
+            )
+        ]
         for _ in range(2):
             with self.Session.begin() as db:
                 result = apply_issue_plan(
@@ -276,14 +418,24 @@ class ResearchOrchestrationTest(unittest.TestCase):
                 )
         self.assertEqual(result.state, "queued")
         with self.Session() as db:
-            self.assertEqual(db.scalar(select(func.count()).select_from(FormalResearch)), 1)
-            self.assertEqual(db.scalar(select(func.count()).select_from(ResearchWorkItem)), 1)
-            self.assertEqual(db.scalar(select(func.count()).select_from(ResearchEvent)), 2)
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(FormalResearch)), 1
+            )
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(ResearchWorkItem)), 1
+            )
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(ResearchEvent)), 2
+            )
 
     def test_write_permission_must_be_confirmed_before_queue(self) -> None:
         prepared = prepare()
         issue = IssueSnapshot(number=903, state="OPEN", body="")
-        comments = [CommentSnapshot(id=3, author_login="Jettlin927", body=prepared.approval_comment)]
+        comments = [
+            CommentSnapshot(
+                id=3, author_login="Jettlin927", body=prepared.approval_comment
+            )
+        ]
         with self.Session.begin() as db:
             result = apply_issue_plan(
                 db,
@@ -297,11 +449,19 @@ class ResearchOrchestrationTest(unittest.TestCase):
             )
         self.assertFalse(result.queue_created)
         with self.Session() as db:
-            self.assertEqual(db.scalar(select(func.count()).select_from(FormalResearch)), 0)
-            self.assertEqual(db.scalar(select(func.count()).select_from(ResearchWorkItem)), 0)
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(FormalResearch)), 0
+            )
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(ResearchWorkItem)), 0
+            )
 
-    def test_deleted_or_edited_approval_comment_invalidates_existing_queue(self) -> None:
-        prepared, issue, _comments, _ = approved_issue_graph(self.Session, issue_number=9031)
+    def test_deleted_or_edited_approval_comment_invalidates_existing_queue(
+        self,
+    ) -> None:
+        prepared, issue, _comments, _ = approved_issue_graph(
+            self.Session, issue_number=9031
+        )
         for _ in range(2):
             with self.Session.begin() as db:
                 result = apply_issue_plan(
@@ -319,15 +479,17 @@ class ResearchOrchestrationTest(unittest.TestCase):
         with self.Session() as db:
             self.assertEqual(db.scalar(select(ResearchWorkItem.status)), "interrupted")
             invalidations = db.scalar(
-                select(func.count()).select_from(ResearchEvent).where(
-                    ResearchEvent.event_type == "approval_comment_invalidated"
-                )
+                select(func.count())
+                .select_from(ResearchEvent)
+                .where(ResearchEvent.event_type == "approval_comment_invalidated")
             )
         self.assertEqual(invalidations, 1)
 
     def test_duplicate_approval_cannot_override_an_earlier_stop(self) -> None:
         prepared = prepare()
-        issue = IssueSnapshot(number=90311, state="OPEN", body=issue_body(valid_plan_payload()))
+        issue = IssueSnapshot(
+            number=90311, state="OPEN", body=issue_body(valid_plan_payload())
+        )
         approval = CommentSnapshot(
             id=9031100,
             author_login="Jettlin927",
@@ -374,7 +536,9 @@ class ResearchOrchestrationTest(unittest.TestCase):
 
     def test_duplicate_approval_cannot_replace_deleted_bound_approval(self) -> None:
         prepared = prepare()
-        issue = IssueSnapshot(number=90313, state="OPEN", body=issue_body(valid_plan_payload()))
+        issue = IssueSnapshot(
+            number=90313, state="OPEN", body=issue_body(valid_plan_payload())
+        )
         original = CommentSnapshot(
             id=9031300,
             author_login="Jettlin927",
@@ -463,7 +627,9 @@ class ResearchOrchestrationTest(unittest.TestCase):
         self.assertFalse(reused_approval.queue_created)
         self.assertIn("永久失效", reused_approval.reason)
         with self.Session() as db:
-            self.assertTrue(db.scalar(select(ResearchOrchestration.approval_invalidated)))
+            self.assertTrue(
+                db.scalar(select(ResearchOrchestration.approval_invalidated))
+            )
             self.assertIsNone(db.scalar(select(ResearchWorkItem.id)))
 
     def test_editing_chinese_summary_invalidates_same_machine_plan(self) -> None:
@@ -508,14 +674,22 @@ class ResearchOrchestrationTest(unittest.TestCase):
         self.assertEqual(result.state, "blocked")
         self.assertIn("永久失效", result.reason)
         with self.Session() as db:
-            self.assertTrue(db.scalar(select(ResearchOrchestration.approval_invalidated)))
+            self.assertTrue(
+                db.scalar(select(ResearchOrchestration.approval_invalidated))
+            )
             self.assertEqual(db.scalar(select(ResearchWorkItem.status)), "interrupted")
 
-    def test_invalid_edit_before_formal_creation_cannot_revive_old_approval(self) -> None:
+    def test_invalid_edit_before_formal_creation_cannot_revive_old_approval(
+        self,
+    ) -> None:
         prepared = prepare()
-        issue = IssueSnapshot(number=9032, state="OPEN", body=issue_body(valid_plan_payload()))
+        issue = IssueSnapshot(
+            number=9032, state="OPEN", body=issue_body(valid_plan_payload())
+        )
         comments = [
-            CommentSnapshot(id=903200, author_login="Jettlin927", body=prepared.approval_comment)
+            CommentSnapshot(
+                id=903200, author_login="Jettlin927", body=prepared.approval_comment
+            )
         ]
         with self.Session.begin() as db:
             blocked = apply_issue_plan(
@@ -551,12 +725,16 @@ class ResearchOrchestrationTest(unittest.TestCase):
         self.assertEqual(restored.state, "blocked")
         self.assertIn("永久失效", restored.reason)
         with self.Session() as db:
-            self.assertEqual(db.scalar(select(func.count()).select_from(FormalResearch)), 0)
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(FormalResearch)), 0
+            )
 
     def test_wrong_author_closed_issue_and_code_mismatch_never_start(self) -> None:
         prepared = prepare()
         wrong_author = [
-            CommentSnapshot(id=31, author_login="someone-else", body=prepared.approval_comment)
+            CommentSnapshot(
+                id=31, author_login="someone-else", body=prepared.approval_comment
+            )
         ]
         with self.Session.begin() as db:
             result = apply_issue_plan(
@@ -634,11 +812,19 @@ class ResearchOrchestrationTest(unittest.TestCase):
         self.assertEqual(feature_ref.state, "blocked")
         self.assertIn("refs/heads/main", feature_ref.reason)
         with self.Session() as db:
-            self.assertEqual(db.scalar(select(func.count()).select_from(FormalResearch)), 0)
-            self.assertEqual(db.scalar(select(func.count()).select_from(ResearchWorkItem)), 0)
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(FormalResearch)), 0
+            )
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(ResearchWorkItem)), 0
+            )
 
-    def test_closing_an_already_queued_issue_cancels_the_queue_idempotently(self) -> None:
-        prepared, _issue, comments, _ = approved_issue_graph(self.Session, issue_number=934)
+    def test_closing_an_already_queued_issue_cancels_the_queue_idempotently(
+        self,
+    ) -> None:
+        prepared, _issue, comments, _ = approved_issue_graph(
+            self.Session, issue_number=934
+        )
         closed = IssueSnapshot(number=934, state="CLOSED", body="")
         for _ in range(2):
             with self.Session.begin() as db:
@@ -666,7 +852,9 @@ class ResearchOrchestrationTest(unittest.TestCase):
             event_count = db.scalar(select(func.count()).select_from(ResearchEvent))
         self.assertEqual(event_count, 3)
 
-    def test_edit_invalidates_old_approval_and_old_hash_cannot_start_new_plan(self) -> None:
+    def test_edit_invalidates_old_approval_and_old_hash_cannot_start_new_plan(
+        self,
+    ) -> None:
         old, issue, comments, _ = approved_issue_graph(self.Session, issue_number=904)
         changed_payload = valid_plan_payload()
         changed_payload["economicHypothesis"] += " 该版本缩小了假设。"
@@ -685,7 +873,8 @@ class ResearchOrchestrationTest(unittest.TestCase):
         self.assertEqual(current.state, "pending_approval")
         with self.Session() as db:
             plans = db.scalars(
-                select(FrozenResearchPlan).where(FrozenResearchPlan.issue_number == issue.number)
+                select(FrozenResearchPlan)
+                .where(FrozenResearchPlan.issue_number == issue.number)
                 .order_by(FrozenResearchPlan.version)
             ).all()
             old_state = db.scalar(
@@ -695,13 +884,20 @@ class ResearchOrchestrationTest(unittest.TestCase):
             )
             old_work = db.scalar(select(ResearchWorkItem))
             old_formal = db.scalar(select(FormalResearch))
-            self.assertEqual([plan.plan_sha256 for plan in plans], [old.plan_sha256, changed.plan_sha256])
+            self.assertEqual(
+                [plan.plan_sha256 for plan in plans],
+                [old.plan_sha256, changed.plan_sha256],
+            )
             self.assertEqual(old_state, "stopped")
             self.assertEqual(old_work.status, "interrupted")
             self.assertEqual(old_formal.phase, "stopped")
 
-    def test_edit_after_run_success_stops_before_evaluation_without_waiting_for_worker(self) -> None:
-        prepared, issue, comments, _ = approved_issue_graph(self.Session, issue_number=909)
+    def test_edit_after_run_success_stops_before_evaluation_without_waiting_for_worker(
+        self,
+    ) -> None:
+        prepared, issue, comments, _ = approved_issue_graph(
+            self.Session, issue_number=909
+        )
         with self.Session.begin() as db:
             work = db.scalar(select(ResearchWorkItem))
             work.status = "succeeded"
@@ -727,7 +923,10 @@ class ResearchOrchestrationTest(unittest.TestCase):
         with self.Session() as db:
             old_orchestration = db.scalar(
                 select(ResearchOrchestration)
-                .join(FrozenResearchPlan, FrozenResearchPlan.id == ResearchOrchestration.plan_id)
+                .join(
+                    FrozenResearchPlan,
+                    FrozenResearchPlan.id == ResearchOrchestration.plan_id,
+                )
                 .where(FrozenResearchPlan.plan_sha256 == prepared.plan_sha256)
             )
             formal = db.get(FormalResearch, old_orchestration.formal_research_id)
@@ -736,9 +935,13 @@ class ResearchOrchestrationTest(unittest.TestCase):
             self.assertIsNotNone(formal.completed_at)
 
     def test_stop_comment_preserves_records_and_stops_before_start(self) -> None:
-        prepared, issue, comments, _ = approved_issue_graph(self.Session, issue_number=905)
+        prepared, issue, comments, _ = approved_issue_graph(
+            self.Session, issue_number=905
+        )
         comments.append(
-            CommentSnapshot(id=90501, author_login="Jettlin927", body=prepared.stop_comment)
+            CommentSnapshot(
+                id=90501, author_login="Jettlin927", body=prepared.stop_comment
+            )
         )
         with self.Session.begin() as db:
             result = apply_issue_plan(
@@ -754,7 +957,9 @@ class ResearchOrchestrationTest(unittest.TestCase):
         self.assertEqual(result.state, "stopped")
         with self.Session() as db:
             self.assertEqual(db.scalar(select(ResearchWorkItem.status)), "interrupted")
-            self.assertGreaterEqual(db.scalar(select(func.count()).select_from(ResearchEvent)), 3)
+            self.assertGreaterEqual(
+                db.scalar(select(func.count()).select_from(ResearchEvent)), 3
+            )
 
         with self.Session.begin() as db:
             closed = apply_issue_plan(
@@ -770,7 +975,9 @@ class ResearchOrchestrationTest(unittest.TestCase):
         self.assertEqual(closed.state, "stopped")
 
     def test_latest_resume_comment_requeues_same_interrupted_run(self) -> None:
-        prepared, issue, comments, _ = approved_issue_graph(self.Session, issue_number=908)
+        prepared, issue, comments, _ = approved_issue_graph(
+            self.Session, issue_number=908
+        )
         run_id = "20000000-0000-0000-0000-000000000008"
         attempt_id = "30000000-0000-0000-0000-000000000008"
         with self.Session.begin() as db:
@@ -805,7 +1012,9 @@ class ResearchOrchestrationTest(unittest.TestCase):
 
         comments.extend(
             [
-                CommentSnapshot(id=90801, author_login="Jettlin927", body=prepared.stop_comment),
+                CommentSnapshot(
+                    id=90801, author_login="Jettlin927", body=prepared.stop_comment
+                ),
                 CommentSnapshot(
                     id=90802,
                     author_login="Jettlin927",
@@ -919,7 +1128,9 @@ class ResearchOrchestrationTest(unittest.TestCase):
         )
         self.assertFalse(denied.github_available)
         with self.Session() as db:
-            self.assertEqual(db.scalar(select(func.count()).select_from(ResearchWorkItem)), 0)
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(ResearchWorkItem)), 0
+            )
 
         class UnavailableClient:
             def list_research_issues(self):
@@ -989,8 +1200,12 @@ class ResearchOrchestrationTest(unittest.TestCase):
         self.assertIn("已绑定其他 Issue", poll.errors[0])
         self.assertIn((9062, "研究:受阻"), client.labels)
 
-    def test_malformed_edit_invalidates_an_existing_queue_before_comment_write(self) -> None:
-        prepared, _issue, _comments, _ = approved_issue_graph(self.Session, issue_number=907)
+    def test_malformed_edit_invalidates_an_existing_queue_before_comment_write(
+        self,
+    ) -> None:
+        prepared, _issue, _comments, _ = approved_issue_graph(
+            self.Session, issue_number=907
+        )
 
         class InvalidEditClient:
             def __init__(self):
@@ -1054,6 +1269,35 @@ class ResearchWorkerTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.engine.dispose()
 
+    def test_deterministic_publication_failure_does_not_block_work_claim(self) -> None:
+        approved_issue_graph(self.Session, issue_number=930)
+        github_available = Event()
+        github_available.set()
+
+        with patch(
+            "backend.app.research_worker.publish_next_pending_research_evaluation",
+            side_effect=PublicationConflictError("模拟确定性发布合同错误"),
+        ):
+            research_worker._publish_pending_evaluation_once(
+                session_factory=self.Session,
+                github=object(),
+                github_available=github_available,
+                artifact_root=Path("unused"),
+                public_base_url="http://127.0.0.1:15173",
+                readback_base_url=None,
+                retry_failed_after_seconds=300,
+            )
+
+        self.assertTrue(github_available.is_set())
+        claim = research_worker.claim_next_research_work(
+            "worker-after-publication-error",
+            github_available=github_available.is_set(),
+            session_factory=self.Session,
+            now=NOW,
+            lease_seconds=30,
+        )
+        self.assertIsNotNone(claim)
+
     def test_single_concurrency_duplicate_claim_and_retry_budget(self) -> None:
         approved_issue_graph(self.Session, issue_number=910)
         claim = research_worker.claim_next_research_work(
@@ -1072,7 +1316,9 @@ class ResearchWorkerTest(unittest.TestCase):
             lease_seconds=30,
         )
         self.assertIsNone(duplicate)
-        self.assertEqual(research_worker._mark_work_running(claim, self.Session, NOW), "running")
+        self.assertEqual(
+            research_worker._mark_work_running(claim, self.Session, NOW), "running"
+        )
         outcome = research_worker.fail_research_work(
             claim,
             TimeoutError("临时网络错误"),
@@ -1113,7 +1359,9 @@ class ResearchWorkerTest(unittest.TestCase):
             self.assertEqual(orchestration.state, "blocked")
 
     def test_expired_lease_recovers_same_interrupted_run(self) -> None:
-        prepared, _issue, _comments, _ = approved_issue_graph(self.Session, issue_number=911)
+        prepared, _issue, _comments, _ = approved_issue_graph(
+            self.Session, issue_number=911
+        )
         first = research_worker.claim_next_research_work(
             "worker-reused-after-crash",
             github_available=True,
@@ -1148,7 +1396,9 @@ class ResearchWorkerTest(unittest.TestCase):
             now=NOW + timedelta(seconds=11),
             lease_seconds=30,
         )
-        self.assertEqual(recovered.resume_run_id, "20000000-0000-0000-0000-000000000011")
+        self.assertEqual(
+            recovered.resume_run_id, "20000000-0000-0000-0000-000000000011"
+        )
         self.assertEqual(recovered.attempt_count, 2)
         self.assertEqual(recovered.attempt_id, first.attempt_id)
         self.assertNotEqual(recovered.lease_token, first.lease_token)
@@ -1166,8 +1416,12 @@ class ResearchWorkerTest(unittest.TestCase):
             self.assertEqual(run.status, "interrupted")
             self.assertIn("租约过期", run.error)
 
-    def test_expired_lease_reconciles_terminal_run_without_duplicate_execution(self) -> None:
-        prepared, _issue, _comments, _ = approved_issue_graph(self.Session, issue_number=9111)
+    def test_expired_lease_reconciles_terminal_run_without_duplicate_execution(
+        self,
+    ) -> None:
+        prepared, _issue, _comments, _ = approved_issue_graph(
+            self.Session, issue_number=9111
+        )
         claim = research_worker.claim_next_research_work(
             "worker-before-terminal-crash",
             github_available=True,
@@ -1175,7 +1429,9 @@ class ResearchWorkerTest(unittest.TestCase):
             now=NOW,
             lease_seconds=10,
         )
-        self.assertEqual(research_worker._mark_work_running(claim, self.Session, NOW), "running")
+        self.assertEqual(
+            research_worker._mark_work_running(claim, self.Session, NOW), "running"
+        )
         run_id = "20000000-0000-0000-0000-000000000111"
         with self.Session.begin() as db:
             db.add(
@@ -1214,10 +1470,14 @@ class ResearchWorkerTest(unittest.TestCase):
             self.assertEqual(work.status, "succeeded")
             self.assertEqual(work.current_run_id, run_id)
             self.assertEqual(formal.phase, "evaluating")
-            self.assertEqual(db.scalar(select(func.count()).select_from(ResearchRun)), 1)
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(ResearchRun)), 1
+            )
 
     def test_expired_lease_blocks_terminal_failure_without_blind_retry(self) -> None:
-        prepared, _issue, _comments, _ = approved_issue_graph(self.Session, issue_number=9112)
+        prepared, _issue, _comments, _ = approved_issue_graph(
+            self.Session, issue_number=9112
+        )
         claim = research_worker.claim_next_research_work(
             "worker-before-failure-crash",
             github_available=True,
@@ -1225,7 +1485,9 @@ class ResearchWorkerTest(unittest.TestCase):
             now=NOW,
             lease_seconds=10,
         )
-        self.assertEqual(research_worker._mark_work_running(claim, self.Session, NOW), "running")
+        self.assertEqual(
+            research_worker._mark_work_running(claim, self.Session, NOW), "running"
+        )
         run_id = "20000000-0000-0000-0000-000000000112"
         with self.Session.begin() as db:
             db.add(
@@ -1263,7 +1525,9 @@ class ResearchWorkerTest(unittest.TestCase):
             orchestration = db.get(ResearchOrchestration, claim.orchestration_id)
             self.assertEqual(work.status, "failed")
             self.assertEqual(orchestration.state, "blocked")
-            self.assertEqual(db.scalar(select(func.count()).select_from(ResearchRun)), 1)
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(ResearchRun)), 1
+            )
 
     def test_heartbeat_failure_retries_instead_of_becoming_user_stop(self) -> None:
         prepared, _issue, _comments, _ = approved_issue_graph(
@@ -1444,7 +1708,67 @@ class ResearchWorkerTest(unittest.TestCase):
             self.assertEqual(work.last_error_kind, "ResearchHeartbeatError")
             self.assertEqual(orchestration.state, "blocked")
 
-    def test_terminal_success_waits_for_lease_reconciliation_after_heartbeat_failure(self) -> None:
+    def test_executor_permanent_failure_blocks_work_item(self) -> None:
+        approved_issue_graph(self.Session, issue_number=9118)
+        claim = research_worker.claim_next_research_work(
+            "worker-permanent-executor-failure",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW,
+            lease_seconds=30,
+        )
+
+        def fail_permanently(_claim, _stop_event):
+            raise ValueError("确定性执行错误")
+
+        outcome = research_worker.execute_claimed_research_work(
+            claim,
+            executor=fail_permanently,
+            session_factory=self.Session,
+            heartbeat_interval_seconds=1,
+            lease_seconds=30,
+        )
+
+        self.assertEqual(outcome, "blocked")
+        with self.Session() as db:
+            work = db.get(ResearchWorkItem, claim.work_item_id)
+            orchestration = db.get(ResearchOrchestration, claim.orchestration_id)
+            self.assertEqual(work.status, "failed")
+            self.assertEqual(work.last_error_kind, "ValueError")
+            self.assertEqual(orchestration.state, "blocked")
+
+    def test_executor_transient_failure_schedules_retry(self) -> None:
+        approved_issue_graph(self.Session, issue_number=9119)
+        claim = research_worker.claim_next_research_work(
+            "worker-transient-executor-failure",
+            github_available=True,
+            session_factory=self.Session,
+            now=NOW,
+            lease_seconds=30,
+        )
+
+        def fail_transiently(_claim, _stop_event):
+            raise TimeoutError("临时执行超时")
+
+        outcome = research_worker.execute_claimed_research_work(
+            claim,
+            executor=fail_transiently,
+            session_factory=self.Session,
+            heartbeat_interval_seconds=1,
+            lease_seconds=30,
+        )
+
+        self.assertEqual(outcome, "retrying")
+        with self.Session() as db:
+            work = db.get(ResearchWorkItem, claim.work_item_id)
+            orchestration = db.get(ResearchOrchestration, claim.orchestration_id)
+            self.assertEqual(work.status, "queued")
+            self.assertEqual(work.last_error_kind, "TimeoutError")
+            self.assertEqual(orchestration.state, "queued")
+
+    def test_terminal_success_waits_for_lease_reconciliation_after_heartbeat_failure(
+        self,
+    ) -> None:
         prepared, _issue, _comments, _ = approved_issue_graph(
             self.Session,
             issue_number=9115,
@@ -1523,7 +1847,9 @@ class ResearchWorkerTest(unittest.TestCase):
             self.assertEqual(work.status, "succeeded")
             self.assertEqual(work.current_run_id, run_id)
             self.assertEqual(formal.phase, "evaluating")
-            self.assertEqual(db.scalar(select(func.count()).select_from(ResearchRun)), 1)
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(ResearchRun)), 1
+            )
 
     def test_expired_new_attempt_does_not_reconcile_previous_terminal_run(self) -> None:
         prepared, _issue, _comments, _ = approved_issue_graph(
@@ -1631,8 +1957,12 @@ class ResearchWorkerTest(unittest.TestCase):
             self.assertIsNone(work.lease_owner)
             self.assertEqual(orchestration.state, "blocked")
 
-    def test_stop_racing_with_completion_blocks_evaluation_but_keeps_run_success(self) -> None:
-        prepared, _issue, _comments, _ = approved_issue_graph(self.Session, issue_number=914)
+    def test_stop_racing_with_completion_blocks_evaluation_but_keeps_run_success(
+        self,
+    ) -> None:
+        prepared, _issue, _comments, _ = approved_issue_graph(
+            self.Session, issue_number=914
+        )
         claim = research_worker.claim_next_research_work(
             "worker-completion-race",
             github_available=True,
@@ -1640,7 +1970,9 @@ class ResearchWorkerTest(unittest.TestCase):
             now=NOW,
             lease_seconds=30,
         )
-        self.assertEqual(research_worker._mark_work_running(claim, self.Session, NOW), "running")
+        self.assertEqual(
+            research_worker._mark_work_running(claim, self.Session, NOW), "running"
+        )
         run_id = "20000000-0000-0000-0000-000000000014"
         with self.Session.begin() as db:
             db.add(
@@ -1671,7 +2003,9 @@ class ResearchWorkerTest(unittest.TestCase):
 
         outcome = research_worker.complete_research_work(
             claim,
-            research_worker.ResearchRunResult(run_id=run_id, path=Path("."), manifest={}),
+            research_worker.ResearchRunResult(
+                run_id=run_id, path=Path("."), manifest={}
+            ),
             session_factory=self.Session,
             now=NOW + timedelta(seconds=2),
         )
@@ -1725,8 +2059,13 @@ class ResearchWorkerPostgresTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         database_url = os.environ["TEST_RESEARCH_WORKER_POSTGRES_URL"]
         parsed = make_url(database_url)
-        if parsed.host not in {"127.0.0.1", "localhost"} or parsed.database != "quant_worker_test":
-            raise AssertionError("研究 Worker 集成测试只允许本机 quant_worker_test 隔离库")
+        if (
+            parsed.host not in {"127.0.0.1", "localhost"}
+            or parsed.database != "quant_worker_test"
+        ):
+            raise AssertionError(
+                "研究 Worker 集成测试只允许本机 quant_worker_test 隔离库"
+            )
         cls.engine = create_engine(database_url, pool_pre_ping=True)
         with cls.engine.begin() as connection:
             connection.execute(text("DROP SCHEMA public CASCADE"))
@@ -1753,14 +2092,20 @@ class ResearchWorkerPostgresTest(unittest.TestCase):
         approved_issue_graph(self.Session, issue_number=920)
         second_payload = valid_plan_payload()
         second_payload["economicHypothesis"] += " 第二个独立研究计划。"
-        approved_issue_graph(self.Session, issue_number=921, prepared=prepare(second_payload))
+        approved_issue_graph(
+            self.Session, issue_number=921, prepared=prepare(second_payload)
+        )
 
         with self.Session() as db:
             work_items = db.scalars(
-                select(ResearchWorkItem).order_by(ResearchWorkItem.created_at, ResearchWorkItem.id)
+                select(ResearchWorkItem).order_by(
+                    ResearchWorkItem.created_at, ResearchWorkItem.id
+                )
             ).all()
             orchestration_id = work_items[0].orchestration_id
-        with self.assertRaisesRegex(DBAPIError, "research orchestration relation mismatch"):
+        with self.assertRaisesRegex(
+            DBAPIError, "research orchestration relation mismatch"
+        ):
             with self.engine.begin() as connection:
                 connection.execute(
                     text(
@@ -1768,7 +2113,9 @@ class ResearchWorkerPostgresTest(unittest.TestCase):
                     ),
                     {"id": orchestration_id},
                 )
-        with self.assertRaisesRegex(DBAPIError, "research orchestration relation mismatch"):
+        with self.assertRaisesRegex(
+            DBAPIError, "research orchestration relation mismatch"
+        ):
             with self.engine.begin() as connection:
                 connection.execute(
                     text(
@@ -1797,14 +2144,14 @@ class ResearchWorkerPostgresTest(unittest.TestCase):
         self.assertEqual(len([claim for claim in claims if claim is not None]), 1)
         with self.Session() as db:
             active = db.scalar(
-                select(func.count()).select_from(ResearchWorkItem).where(
-                    ResearchWorkItem.status == "leased"
-                )
+                select(func.count())
+                .select_from(ResearchWorkItem)
+                .where(ResearchWorkItem.status == "leased")
             )
             queued = db.scalar(
-                select(func.count()).select_from(ResearchWorkItem).where(
-                    ResearchWorkItem.status == "queued"
-                )
+                select(func.count())
+                .select_from(ResearchWorkItem)
+                .where(ResearchWorkItem.status == "queued")
             )
         self.assertEqual(active, 1)
         self.assertEqual(queued, 1)

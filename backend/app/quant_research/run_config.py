@@ -31,6 +31,7 @@ REQUIRED_CONFIG_FIELDS = (
     "qualityRunId",
     "allowedWarnings",
 )
+EVALUATION_SAMPLE_ROLES = ("train", "validation", "test_oos")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -67,6 +68,92 @@ def validate_risk_policy(policy: Any) -> dict[str, Any]:
         "lookbackPeriods": lookback,
         "minPeriods": minimum,
     }
+
+
+def validate_evaluation_policy(policy: Any) -> dict[str, Any]:
+    if not isinstance(policy, dict) or set(policy) != {
+        "marketRegime",
+        "costStressMultiplier",
+    }:
+        raise ValueError(
+            "evaluationPolicy 必须固定 marketRegime 与 costStressMultiplier"
+        )
+    regime = policy["marketRegime"]
+    expected = {
+        "directionLookbackPeriods",
+        "upThreshold",
+        "downThreshold",
+        "volatilityLookbackPeriods",
+        "highVolatilityThreshold",
+    }
+    if not isinstance(regime, dict) or set(regime) != expected:
+        raise ValueError("evaluationPolicy.marketRegime 字段不完整或含未知字段")
+    for field in ("directionLookbackPeriods", "volatilityLookbackPeriods"):
+        value = regime[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 2:
+            raise ValueError(f"evaluationPolicy.marketRegime.{field} 必须是至少 2 的整数")
+    up = _finite_decimal_string(regime["upThreshold"], "upThreshold")
+    down = _finite_decimal_string(regime["downThreshold"], "downThreshold")
+    high_volatility = _finite_decimal_string(
+        regime["highVolatilityThreshold"], "highVolatilityThreshold"
+    )
+    multiplier = _finite_decimal_string(
+        policy["costStressMultiplier"], "costStressMultiplier"
+    )
+    if up <= 0 or down >= 0 or down >= up:
+        raise ValueError("市场方向阈值必须满足 downThreshold < 0 < upThreshold")
+    if high_volatility <= 0:
+        raise ValueError("highVolatilityThreshold 必须大于 0")
+    if multiplier <= 1:
+        raise ValueError("costStressMultiplier 必须大于 1")
+    return {
+        "marketRegime": {
+            "directionLookbackPeriods": regime["directionLookbackPeriods"],
+            "upThreshold": str(regime["upThreshold"]),
+            "downThreshold": str(regime["downThreshold"]),
+            "volatilityLookbackPeriods": regime["volatilityLookbackPeriods"],
+            "highVolatilityThreshold": str(regime["highVolatilityThreshold"]),
+        },
+        "costStressMultiplier": str(policy["costStressMultiplier"]),
+    }
+
+
+def validate_evaluation_sample_splits(
+    value: Any,
+    *,
+    start_date: str,
+    end_date: str,
+) -> list[dict[str, str]]:
+    if not isinstance(value, list) or len(value) != len(EVALUATION_SAMPLE_ROLES):
+        raise ValueError("evaluationSampleSplits 必须固定 train、validation、test_oos 三段")
+    normalized: list[dict[str, str]] = []
+    for expected_role, item in zip(EVALUATION_SAMPLE_ROLES, value, strict=True):
+        if not isinstance(item, dict) or set(item) != {"role", "startDate", "endDate"}:
+            raise ValueError("evaluationSampleSplits 每段只允许 role/startDate/endDate")
+        if item.get("role") != expected_role:
+            raise ValueError("evaluationSampleSplits 必须按 train、validation、test_oos 排列")
+        segment_start = _parse_date(item["startDate"], f"evaluationSampleSplits.{expected_role}.startDate")
+        segment_end = _parse_date(item["endDate"], f"evaluationSampleSplits.{expected_role}.endDate")
+        if segment_start > segment_end:
+            raise ValueError(f"evaluationSampleSplits.{expected_role} 起始日期晚于结束日期")
+        normalized.append(
+            {
+                "role": expected_role,
+                "startDate": segment_start.isoformat(),
+                "endDate": segment_end.isoformat(),
+            }
+        )
+    if any(
+        date.fromisoformat(normalized[index]["endDate"])
+        >= date.fromisoformat(normalized[index + 1]["startDate"])
+        for index in range(len(normalized) - 1)
+    ):
+        raise ValueError("evaluationSampleSplits 三段必须严格不重叠")
+    if normalized[0]["startDate"] != start_date:
+        raise ValueError("evaluationSampleSplits.train.startDate 必须等于 startDate")
+    if normalized[-1]["endDate"] != end_date:
+        raise ValueError("evaluationSampleSplits.test_oos.endDate 必须等于 endDate")
+    return normalized
 
 
 def canonical_json_bytes(value: Any) -> bytes:
@@ -145,6 +232,22 @@ def validate_run_config(
     if not warmup_start <= start_date <= end_date:
         raise ValueError("日期必须满足 warmupStart <= startDate <= endDate")
 
+    has_evaluation_policy = "evaluationPolicy" in normalized
+    has_evaluation_splits = "evaluationSampleSplits" in normalized
+    if has_evaluation_policy != has_evaluation_splits:
+        raise ValueError(
+            "evaluationPolicy 与 evaluationSampleSplits 必须同时冻结"
+        )
+    if has_evaluation_policy:
+        normalized["evaluationPolicy"] = validate_evaluation_policy(
+            normalized["evaluationPolicy"]
+        )
+        normalized["evaluationSampleSplits"] = validate_evaluation_sample_splits(
+            normalized["evaluationSampleSplits"],
+            start_date=normalized["startDate"],
+            end_date=normalized["endDate"],
+        )
+
     _validate_universe(
         normalized["universe"],
         scope=normalized["scope"],
@@ -152,6 +255,20 @@ def validate_run_config(
         verify_source=verify_universe_source,
     )
     return normalized
+
+
+def _finite_decimal_string(value: Any, field: str) -> Decimal:
+    if not isinstance(value, str):
+        raise ValueError(f"evaluationPolicy.{field} 必须使用字符串化十进制定点")
+    try:
+        parsed = Decimal(value)
+    except Exception as exc:
+        raise ValueError(
+            f"evaluationPolicy.{field} 必须使用字符串化十进制定点"
+        ) from exc
+    if not parsed.is_finite():
+        raise ValueError(f"evaluationPolicy.{field} 必须是有限数")
+    return parsed
 
 
 def build_reproducibility_key(

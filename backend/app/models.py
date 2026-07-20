@@ -965,6 +965,32 @@ class ResearchPublication(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class ResearchPublicationIssueMapping(Base):
+    __tablename__ = "research_publication_issue_mappings"
+    __table_args__ = (
+        CheckConstraint(
+            "source = 'historical_import'",
+            name="ck_research_publication_issue_mappings_source",
+        ),
+        UniqueConstraint(
+            "issue_number", name="uq_research_publication_issue_mappings_issue"
+        ),
+    )
+
+    formal_research_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("formal_researches.id", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+    issue_number: Mapped[int] = mapped_column()
+    source: Mapped[str] = mapped_column(
+        String(24), default="historical_import", server_default="historical_import"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class FollowUpResearchProposal(Base):
     __tablename__ = "follow_up_research_proposals"
     __table_args__ = (
@@ -1023,6 +1049,7 @@ for _immutable_model in (
     ResearchEvaluation,
     ResearchEvaluationRun,
     ResearchEvidenceRef,
+    ResearchPublicationIssueMapping,
 ):
     event.listen(_immutable_model, "before_update", _reject_immutable_update)
     event.listen(_immutable_model, "before_delete", _reject_immutable_delete)

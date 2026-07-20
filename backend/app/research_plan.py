@@ -9,11 +9,16 @@ import os
 import re
 from typing import Any
 
-from .quant_research.run_config import canonical_json_bytes, canonical_sha256, validate_run_config
+from .quant_research.run_config import (
+    canonical_json_bytes,
+    canonical_sha256,
+    validate_evaluation_policy,
+    validate_run_config,
+)
 from .quant_research.strategy_registry import resolve_strategy_definition
 
 
-PLAN_SCHEMA_VERSION = "research-plan/v1"
+PLAN_SCHEMA_VERSION = "research-plan/v2"
 PLAN_START_MARKER = "<!-- research-plan-json:start -->"
 PLAN_END_MARKER = "<!-- research-plan-json:end -->"
 COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40,64}$")
@@ -148,6 +153,8 @@ def normalize_research_plan(
         raise ResearchPlanError("正式研究必须使用下一交易日执行口径 next_trade_open")
     if run_config["executionPolicy"].get("signalPrice") != "close":
         raise ResearchPlanError("正式研究必须固定收盘信号口径 signalPrice=close")
+    if run_config.get("validationPolicy", {}).get("mode") == "none":
+        raise ResearchPlanError("正式研究必须冻结非 none 的 walk-forward validationPolicy")
     _validate_decimal_strings(run_config.get("costModel"), "runConfig.costModel")
 
     data_policy = payload["dataPolicy"]
@@ -162,6 +169,14 @@ def normalize_research_plan(
     stop_rules = _normalize_string_set(payload["stopRules"], "stopRules")
     resource_budget = _normalize_resource_budget(payload["resourceBudget"], limits)
     report_contract = _normalize_report_contract(payload["reportContract"])
+    run_config = validate_run_config(
+        {
+            **run_config,
+            "evaluationSampleSplits": sample_splits,
+            "evaluationPolicy": report_contract["evaluationPolicy"],
+        },
+        verify_universe_source=False,
+    )
 
     return {
         "schemaVersion": PLAN_SCHEMA_VERSION,
@@ -319,13 +334,23 @@ def _normalize_resource_budget(value: Any, limits: ResearchServerLimits) -> dict
 
 
 def _normalize_report_contract(value: Any) -> dict[str, Any]:
-    expected = {"language", "requiredArtifacts", "conclusionValues"}
+    expected = {
+        "language",
+        "requiredArtifacts",
+        "conclusionValues",
+        "evaluationPolicy",
+    }
     if not isinstance(value, dict) or set(value) != expected:
         raise ResearchPlanError("reportContract 字段不完整或含未知字段")
     if value["language"] != "zh-CN":
         raise ResearchPlanError("reportContract.language 必须是 zh-CN")
     artifacts = _normalize_string_set(value["requiredArtifacts"], "reportContract.requiredArtifacts")
-    required = {"manifest.json", "metrics.json", "report.html"}
+    required = {
+        "manifest.json",
+        "metrics.json",
+        "oos_metrics.json",
+        "report.html",
+    }
     if not required.issubset(artifacts):
         raise ResearchPlanError("reportContract.requiredArtifacts 缺少基础证据工件")
     conclusions = _normalize_string_set(value["conclusionValues"], "reportContract.conclusionValues")
@@ -336,6 +361,7 @@ def _normalize_report_contract(value: Any) -> dict[str, Any]:
         "language": "zh-CN",
         "requiredArtifacts": artifacts,
         "conclusionValues": conclusions,
+        "evaluationPolicy": validate_evaluation_policy(value["evaluationPolicy"]),
     }
 
 
