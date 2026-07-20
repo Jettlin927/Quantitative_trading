@@ -106,23 +106,25 @@ function CatalogPanel({ title, eyebrow, kind, rows, codeKey, nameKey = 'name', m
 
 function CatalogDetailPanel({ selection, detail, loading }) {
   const isIndustry = selection.kind === 'industry'
-  const adjustmentByDate = new Map((detail.adjustments || []).map((item) => [item.tradeDate, item.adjFactor]))
+  const matchesSelection = detail.kind === selection.kind && detail.code === selection.code
+  const currentDetail = matchesSelection ? detail : { bars: [], adjustments: [], members: [] }
+  const adjustmentByDate = new Map((currentDetail.adjustments || []).map((item) => [item.tradeDate, item.adjFactor]))
   return (
     <Panel
       title={selection.code || '请选择目录标的'}
-      eyebrow={isIndustry ? `当前交易日行业成员 · ${formatInt(detail.members?.length || 0)}` : `${selection.kind === 'fund' ? 'ETF' : '指数'}近一年日线 · ${formatInt(detail.bars?.length || 0)}`}
+      eyebrow={isIndustry ? `当前交易日行业成员 · ${formatInt(currentDetail.members?.length || 0)}` : `${selection.kind === 'fund' ? 'ETF' : '指数'}近一年日线 · ${formatInt(currentDetail.bars?.length || 0)}`}
     >
       {loading ? <div className="loading-state"><RefreshCw className="spin" size={18} />正在读取目录明细…</div> : (
         <div className="table-scroll compact-history">
           {isIndustry ? (
             <table className="data-table"><thead><tr><th>成分代码</th><th>名称</th><th>纳入日</th><th>移出日</th><th>最新成员</th></tr></thead><tbody>
-              {(detail.members || []).map((row) => <tr key={`${row.conCode}-${row.inDate}`}><td className="mono strong">{row.conCode}</td><td>{row.conName || '-'}</td><td>{row.inDate}</td><td>{row.outDate || '-'}</td><td><Badge value={row.isNew ? '是' : '否'} /></td></tr>)}
-              {!detail.members?.length ? <EmptyRow colSpan={5} /> : null}
+              {(currentDetail.members || []).map((row) => <tr key={`${row.conCode}-${row.inDate}`}><td className="mono strong">{row.conCode}</td><td>{row.conName || '-'}</td><td>{row.inDate}</td><td>{row.outDate || '-'}</td><td><Badge value={row.isNew ? '是' : '否'} /></td></tr>)}
+              {!currentDetail.members?.length ? <EmptyRow colSpan={5} /> : null}
             </tbody></table>
           ) : (
             <table className="data-table"><thead><tr><th>交易日</th><th>收盘</th><th>涨跌幅</th><th>成交额</th>{selection.kind === 'fund' ? <th>复权因子</th> : null}</tr></thead><tbody>
-              {[...(detail.bars || [])].reverse().map((row) => <tr key={row.tradeDate}><td>{row.tradeDate}</td><td className="mono strong">{formatNumber(row.close)}</td><td className={priceTone(row.pctChg)}>{formatSignedPercent(row.pctChg)}</td><td>{formatDailyAmount(row.amount)}</td>{selection.kind === 'fund' ? <td>{formatNumber(adjustmentByDate.get(row.tradeDate))}</td> : null}</tr>)}
-              {!detail.bars?.length ? <EmptyRow colSpan={selection.kind === 'fund' ? 5 : 4} /> : null}
+              {[...(currentDetail.bars || [])].reverse().map((row) => <tr key={row.tradeDate}><td>{row.tradeDate}</td><td className="mono strong">{formatNumber(row.close)}</td><td className={priceTone(row.pctChg)}>{formatSignedPercent(row.pctChg)}</td><td>{formatDailyAmount(row.amount)}</td>{selection.kind === 'fund' ? <td>{formatNumber(adjustmentByDate.get(row.tradeDate))}</td> : null}</tr>)}
+              {!currentDetail.bars?.length ? <EmptyRow colSpan={selection.kind === 'fund' ? 5 : 4} /> : null}
             </tbody></table>
           )}
         </div>
@@ -137,12 +139,14 @@ function DataQualityDetails({ readiness, coverageRows, syncRuns }) {
     ...(readiness.etf?.blockers || []).map((item) => `ETF：${formatStructuredItem(item)}`),
   ]
   const gaps = coverageRows.filter((item) => item.status !== 'available').map((item) => `${item.label}：${translateStatus(item.status)}`)
+  const localGapDebt = ['功能债：当前只读 API 尚未提供按日期与标的定位的局部缺口质量结果；整表非空不代表局部完整。']
   const problematicRuns = syncRuns.filter((run) => ['failed', 'error', 'partial'].includes(String(run.status).toLowerCase()))
   return (
     <Panel title="覆盖缺口与同步异常" eyebrow="质量明细">
       <div className="quality-detail-grid">
         <EvidenceList title="库存阻塞项" items={blockers} tone="missing" />
         <EvidenceList title="空缺数据集" items={gaps} tone="missing" />
+        <EvidenceList title="局部缺口探针" items={localGapDebt} tone="missing" />
         <div className="table-scroll"><table className="data-table"><thead><tr><th>同步目标</th><th>状态</th><th>范围</th><th>失败解释</th><th>时间</th></tr></thead><tbody>
           {problematicRuns.map((run) => <tr key={run.id || `${run.target}-${run.createdAt}`}><td className="mono strong">{run.target}</td><td><Badge value={run.status} /></td><td>{[run.startDate, run.endDate].filter(Boolean).join(' → ') || '-'}</td><td>{run.message || '未提供错误说明'}</td><td>{formatDateTime(run.createdAt)}</td></tr>)}
           {!problematicRuns.length ? <EmptyRow colSpan={5} /> : null}

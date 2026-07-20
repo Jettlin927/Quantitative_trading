@@ -63,6 +63,12 @@ export function App() {
   const [lastUpdated, setLastUpdated] = useState(null)
   const stockRequestId = useRef(0)
   const catalogRequestId = useRef(0)
+  const strategyRequestId = useRef(0)
+  const researchRequestId = useRef(0)
+  const selectedCodeRef = useRef('')
+  const selectedCatalogRef = useRef({ kind: '', code: '' })
+  const selectedStrategyIdRef = useRef('')
+  const selectedResearchIdRef = useRef('')
 
   async function refreshAll(refreshCoverage = false) {
     setLoading(true)
@@ -90,7 +96,8 @@ export function App() {
         if (key === 'strategies') {
           setResearchError(errorMessage(result.reason))
           setResearchLoading(false)
-        } else failures.push(`${key}: ${errorMessage(result.reason)}`)
+        }
+        failures.push(`${key}: ${errorMessage(result.reason)}`)
         return
       }
       const value = result.value
@@ -102,47 +109,52 @@ export function App() {
       if (key === 'stocks') applyStockPage(value)
       if (key === 'indices') {
         setCatalogs((current) => ({ ...current, indices: value }))
-        setSelectedCatalog((current) => current.code || !value.length ? current : { kind: 'index', code: value[0].tsCode })
+        if (!selectedCatalogRef.current.code && value.length) selectCatalog('index', value[0].tsCode)
       }
       if (key === 'funds') {
         setCatalogs((current) => ({ ...current, funds: value }))
-        setSelectedCatalog((current) => current.code || !value.length ? current : { kind: 'fund', code: value[0].tsCode })
+        if (!selectedCatalogRef.current.code && value.length) selectCatalog('fund', value[0].tsCode)
       }
       if (key === 'industries') {
         setCatalogs((current) => ({ ...current, industries: value }))
-        setSelectedCatalog((current) => current.code || !value.length ? current : { kind: 'industry', code: value[0].indexCode })
+        if (!selectedCatalogRef.current.code && value.length) selectCatalog('industry', value[0].indexCode)
       }
       if (key === 'usDb') setUsDb(value)
       if (key === 'strategies') {
         setStrategies(value)
-        setSelectedStrategyId((current) => value.some((item) => item.strategy_id === current) ? current : value[0]?.strategy_id || '')
+        const current = selectedStrategyIdRef.current
+        const next = value.some((item) => item.strategy_id === current) ? current : value[0]?.strategy_id || ''
+        if (next !== current) selectStrategy(next)
         if (!value.length) {
           setResearchLoading(false)
           setStrategyProfile(null)
-          setSelectedResearchId('')
           setResearchDetail(null)
           setPublication(null)
         }
       }
     })
-    await Promise.allSettled([
-      selectedCode ? loadSelectedStockData(selectedCode) : Promise.resolve(),
-      selectedCatalog.code ? loadSelectedCatalogData(selectedCatalog) : Promise.resolve(),
-    ])
+    const detailResults = refreshCoverage ? await Promise.all([
+      selectedCodeRef.current ? loadSelectedStockData(selectedCodeRef.current) : Promise.resolve(true),
+      selectedCatalogRef.current.code ? loadSelectedCatalogData(selectedCatalogRef.current) : Promise.resolve(true),
+      refreshSelectedResearchData(selectedStrategyIdRef.current),
+    ]) : [true]
     if (failures.length) setGlobalError(`部分只读数据读取失败：${failures.join('；')}`)
-    if (results.some((result) => result.status === 'fulfilled')) setLastUpdated(new Date())
+    if (refreshCoverage && !failures.length && detailResults.every(Boolean)) setLastUpdated(new Date())
     setResearchLoading(false)
     setLoading(false)
   }
 
   function applyStockPage(page) {
     setStockPage(page)
-    const nextCode = page.items.some((item) => item.ts_code === selectedCode) ? selectedCode : page.items[0]?.ts_code || ''
+    const current = selectedCodeRef.current
+    const nextCode = page.items.some((item) => item.ts_code === current) ? current : page.items[0]?.ts_code || ''
     selectStock(nextCode)
   }
 
   function selectStock(tsCode) {
-    if (tsCode === selectedCode) return
+    if (tsCode === selectedCodeRef.current) return
+    selectedCodeRef.current = tsCode
+    stockRequestId.current += 1
     setSelectedCode(tsCode)
     setStockDataCode('')
     setStockBars([])
@@ -151,9 +163,12 @@ export function App() {
   }
 
   function selectCatalog(kind, code) {
-    if (selectedCatalog.kind === kind && selectedCatalog.code === code) return
-    setSelectedCatalog({ kind, code })
-    setCatalogDetail({ kind, code, bars: [], adjustments: [], members: [] })
+    if (selectedCatalogRef.current.kind === kind && selectedCatalogRef.current.code === code) return
+    const next = { kind, code }
+    selectedCatalogRef.current = next
+    catalogRequestId.current += 1
+    setSelectedCatalog(next)
+    setCatalogDetail({ ...next, bars: [], adjustments: [], members: [] })
     setCatalogError('')
   }
 
@@ -169,13 +184,15 @@ export function App() {
         fetchJson(`/api/daily-bars?ts_code=${encodeURIComponent(requestedCode)}`),
         fetchJson(`/api/stocks/${encodeURIComponent(requestedCode)}/detail`),
       ])
-      if (requestId !== stockRequestId.current) return
+      if (requestId !== stockRequestId.current || requestedCode !== selectedCodeRef.current) return false
       setStockDataCode(requestedCode)
       setStockBars(barsRes)
       setStockDetail(detailRes)
       setStockError('')
+      return true
     } catch (err) {
       if (requestId === stockRequestId.current) setStockError(errorMessage(err))
+      return false
     } finally {
       if (requestId === stockRequestId.current) setDetailLoading(false)
     }
@@ -203,13 +220,80 @@ export function App() {
         const members = await fetchJson(`/api/industries/${encodeURIComponent(requested.code)}/members?trade_date=${endDate}`)
         detail = { ...requested, bars: [], adjustments: [], members }
       }
-      if (requestId === catalogRequestId.current) setCatalogDetail(detail)
+      const isCurrent = requestId === catalogRequestId.current
+        && requested.kind === selectedCatalogRef.current.kind
+        && requested.code === selectedCatalogRef.current.code
+      if (isCurrent) setCatalogDetail(detail)
+      return isCurrent
     } catch (err) {
       if (requestId === catalogRequestId.current) setCatalogError(errorMessage(err))
+      return false
     } finally {
       if (requestId === catalogRequestId.current) setCatalogLoading(false)
     }
   }, [])
+
+  const loadStrategyProfileData = useCallback(async (strategyId) => {
+    const requestId = strategyRequestId.current + 1
+    strategyRequestId.current = requestId
+    try {
+      const profile = await fetchJson(`/api/research/strategies/${encodeURIComponent(strategyId)}`)
+      if (requestId !== strategyRequestId.current || strategyId !== selectedStrategyIdRef.current) return { ok: false, researchId: '' }
+      setResearchError('')
+      setStrategyProfile(profile)
+      const currentResearchId = selectedResearchIdRef.current
+      const nextResearchId = profile.formal_researches.some((item) => item.id === currentResearchId)
+        ? currentResearchId
+        : profile.formal_researches[0]?.id || ''
+      if (nextResearchId !== currentResearchId) {
+        selectedResearchIdRef.current = nextResearchId
+        researchRequestId.current += 1
+        setSelectedResearchId(nextResearchId)
+        setResearchDetail(null)
+        setPublication(null)
+      }
+      if (!profile.formal_researches.length) {
+        setResearchDetail(null)
+        setPublication(null)
+      }
+      return { ok: true, researchId: nextResearchId }
+    } catch (err) {
+      if (requestId === strategyRequestId.current) setResearchError(errorMessage(err))
+      return { ok: false, researchId: '' }
+    } finally {
+      if (requestId === strategyRequestId.current) setResearchLoading(false)
+    }
+  }, [])
+
+  const loadResearchDetailData = useCallback(async (researchId) => {
+    const requestId = researchRequestId.current + 1
+    researchRequestId.current = requestId
+    try {
+      const detail = await fetchJson(`/api/research/formal-researches/${encodeURIComponent(researchId)}`)
+      if (requestId !== researchRequestId.current || researchId !== selectedResearchIdRef.current) return false
+      const latest = [...detail.publications]
+        .filter((item) => item.status === 'published')
+        .sort((left, right) => right.version - left.version)[0]
+      const projection = latest ? await fetchJson(`/api/research/publications/${encodeURIComponent(latest.id)}`) : null
+      if (requestId !== researchRequestId.current || researchId !== selectedResearchIdRef.current) return false
+      setResearchError('')
+      setResearchDetail(detail)
+      setPublication(projection)
+      return true
+    } catch (err) {
+      if (requestId === researchRequestId.current) setResearchError(errorMessage(err))
+      return false
+    } finally {
+      if (requestId === researchRequestId.current) setResearchLoading(false)
+    }
+  }, [])
+
+  async function refreshSelectedResearchData(strategyId) {
+    if (!strategyId) return true
+    const profileResult = await loadStrategyProfileData(strategyId)
+    if (!profileResult.ok || !profileResult.researchId) return profileResult.ok
+    return loadResearchDetailData(profileResult.researchId)
+  }
 
   async function loadStocks(offset = 0) {
     setLoading(true)
@@ -224,6 +308,11 @@ export function App() {
   }
 
   function selectStrategy(strategyId) {
+    if (strategyId === selectedStrategyIdRef.current) return
+    selectedStrategyIdRef.current = strategyId
+    selectedResearchIdRef.current = ''
+    strategyRequestId.current += 1
+    researchRequestId.current += 1
     setResearchLoading(true)
     setResearchError('')
     setStrategyProfile(null)
@@ -234,6 +323,9 @@ export function App() {
   }
 
   function selectResearch(researchId) {
+    if (researchId === selectedResearchIdRef.current) return
+    selectedResearchIdRef.current = researchId
+    researchRequestId.current += 1
     setResearchLoading(true)
     setResearchError('')
     setResearchDetail(null)
@@ -261,41 +353,21 @@ export function App() {
 
   useEffect(() => {
     if (!selectedStrategyId) return undefined
-    let ignore = false
-    fetchJson(`/api/research/strategies/${encodeURIComponent(selectedStrategyId)}`)
-      .then((profile) => {
-        if (ignore) return
-        setResearchError('')
-        setStrategyProfile(profile)
-        setSelectedResearchId((current) => profile.formal_researches.some((item) => item.id === current) ? current : profile.formal_researches[0]?.id || '')
-        if (!profile.formal_researches.length) {
-          setResearchDetail(null)
-          setPublication(null)
-        }
-      })
-      .catch((err) => { if (!ignore) setResearchError(errorMessage(err)) })
-      .finally(() => { if (!ignore) setResearchLoading(false) })
-    return () => { ignore = true }
-  }, [selectedStrategyId])
+    const timer = window.setTimeout(() => loadStrategyProfileData(selectedStrategyId), 0)
+    return () => {
+      window.clearTimeout(timer)
+      strategyRequestId.current += 1
+    }
+  }, [loadStrategyProfileData, selectedStrategyId])
 
   useEffect(() => {
     if (!selectedResearchId) return undefined
-    let ignore = false
-    fetchJson(`/api/research/formal-researches/${encodeURIComponent(selectedResearchId)}`)
-      .then(async (detail) => {
-        if (ignore) return
-        setResearchError('')
-        setResearchDetail(detail)
-        const latest = [...detail.publications]
-          .filter((item) => item.status === 'published')
-          .sort((left, right) => right.version - left.version)[0]
-        const projection = latest ? await fetchJson(`/api/research/publications/${encodeURIComponent(latest.id)}`) : null
-        if (!ignore) setPublication(projection)
-      })
-      .catch((err) => { if (!ignore) setResearchError(errorMessage(err)) })
-      .finally(() => { if (!ignore) setResearchLoading(false) })
-    return () => { ignore = true }
-  }, [selectedResearchId])
+    const timer = window.setTimeout(() => loadResearchDetailData(selectedResearchId), 0)
+    return () => {
+      window.clearTimeout(timer)
+      researchRequestId.current += 1
+    }
+  }, [loadResearchDetailData, selectedResearchId])
 
   const stocks = stockPage.items
   const coverageRows = useMemo(() => buildCoverageRows(overview), [overview])

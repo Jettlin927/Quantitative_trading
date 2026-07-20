@@ -5,6 +5,7 @@ import {
   LineSeries,
   createChart,
 } from 'lightweight-charts'
+import { formatDailyAmount, formatNumber } from './viewSupport.jsx'
 
 const CHART_RANGES = [
   { id: 'recent', label: '近 180 日' },
@@ -34,19 +35,37 @@ export function TechnicalChart({ bars }) {
   }, [range, series])
 
   if (!series.candles.length) return <div className="chart-empty">暂无可绘制的日线数据</div>
+  const first = series.candles[0]
+  const latest = series.candles[series.candles.length - 1]
+  const accessibleBars = bars.filter((bar) => bar.trade_date).slice(-30).reverse()
+  const summary = `日 K 线共 ${series.candles.length} 个交易日，范围 ${first.time} 至 ${latest.time}，最新收盘 ${formatNumber(latest.close)}`
   return (
-    <div className="chart-stack">
-      <div className="chart-toolbar">
-        <div className="chart-legend"><span><i className="ma10" />MA10</span><span><i className="ma20" />MA20</span><span><i className="volume" />成交量</span></div>
-        <div className="chart-ranges" aria-label="行情显示区间">
-          {CHART_RANGES.map((item) => (
-            <button className={range === item.id ? 'active' : ''} key={item.id} onClick={() => setRange(item.id)}>{item.label}</button>
-          ))}
+    <>
+      <div className="chart-stack">
+        <div className="chart-toolbar">
+          <div className="chart-legend"><span><i className="ma10" />MA10</span><span><i className="ma20" />MA20</span><span><i className="volume" />成交量</span></div>
+          <div className="chart-ranges" aria-label="行情显示区间">
+            {CHART_RANGES.map((item) => (
+              <button className={range === item.id ? 'active' : ''} key={item.id} onClick={() => setRange(item.id)}>{item.label}</button>
+            ))}
+          </div>
         </div>
+        <div className="chart-pane price" ref={priceRef} role="img" aria-label={`价格图。${summary}`} />
+        <div className="chart-pane volume" ref={volumeRef} role="img" aria-label={`成交量图。${summary}`} />
       </div>
-      <div className="chart-pane price" ref={priceRef} />
-      <div className="chart-pane volume" ref={volumeRef} />
-    </div>
+      <details className="chart-accessible-table">
+        <summary>查看最近 {accessibleBars.length} 条行情数据表（共 {series.candles.length} 条）</summary>
+        <div className="table-scroll compact-history">
+          <table className="data-table">
+            <caption className="sr-only">{summary}</caption>
+            <thead><tr><th>交易日</th><th>开盘</th><th>最高</th><th>最低</th><th>收盘</th><th>成交量</th><th>成交额</th></tr></thead>
+            <tbody>
+              {accessibleBars.map((bar) => <tr key={bar.trade_date}><td>{bar.trade_date}</td><td>{formatNumber(bar.open)}</td><td>{formatNumber(bar.high)}</td><td>{formatNumber(bar.low)}</td><td className="mono strong">{formatNumber(bar.close)}</td><td>{formatNumber(bar.vol)}</td><td>{formatDailyAmount(bar.amount)}</td></tr>)}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </>
   )
 }
 

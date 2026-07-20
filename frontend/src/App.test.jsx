@@ -4,6 +4,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './main.jsx'
 
+vi.mock('lightweight-charts', () => ({
+  CandlestickSeries: 'candlestick',
+  HistogramSeries: 'histogram',
+  LineSeries: 'line',
+  createChart: vi.fn(() => {
+    const timeScale = {
+      fitContent: vi.fn(),
+      setVisibleLogicalRange: vi.fn(),
+      subscribeVisibleLogicalRangeChange: vi.fn(),
+    }
+    return {
+      addSeries: vi.fn(() => ({ setData: vi.fn() })),
+      applyOptions: vi.fn(),
+      remove: vi.fn(),
+      timeScale: () => timeScale,
+    }
+  }),
+}))
+
 const RESEARCH_ID = '11111111-1111-4111-8111-111111111111'
 const PUBLICATION_ID = '22222222-2222-4222-8222-222222222222'
 const EVALUATION_ID = '55555555-5555-4555-8555-555555555555'
@@ -44,7 +63,7 @@ const researchDetail = {
     { run_id: 'run-001', status: 'succeeded', stage: 'completed', result_fingerprint: 'c'.repeat(64), finished_at: '2026-07-20T00:30:00Z', error: null },
     { run_id: 'run-000', status: 'failed', stage: 'simulation', result_fingerprint: null, finished_at: '2026-07-20T00:20:00Z', error: '冻结输入缺失' },
   ],
-  events: [{ id: '44444444-4444-4444-8444-444444444444', sequence_no: 1, event_type: 'run_succeeded', payload_json: { summary: '执行完成' }, occurred_at: '2026-07-20T00:30:00Z' }],
+  events: [{ id: '44444444-4444-4444-8444-444444444444', sequence_no: 1, event_type: 'research_run_succeeded', payload_json: { runId: 'run-001', artifactRoot: '/artifacts/run-001' }, occurred_at: '2026-07-20T00:30:00Z' }],
   evaluations: [{ id: EVALUATION_ID, version: 1, conclusion: '研究通过', supporting_evidence: [{ statement: 'OOS 净收益通过' }], opposing_evidence: [], missing_evidence: [], limitations: [{ statement: '仅覆盖既定区间' }], follow_up_recommendations: [] }],
   publications: [{ id: PUBLICATION_ID, evaluation_id: EVALUATION_ID, version: 1, status: 'published', created_at: '2026-07-20T00:40:00Z', published_at: '2026-07-20T00:41:00Z' }],
   follow_up_proposals: [{ id: PROPOSAL_ID, title: '扩大市场环境复核', rationale: '补足极端环境证据。', status: 'proposed', created_at: '2026-07-20T00:45:00Z' }],
@@ -116,7 +135,11 @@ describe('研究驾驶舱', () => {
     expect(screen.getByRole('heading', { name: '运行事实' })).toBeInTheDocument()
     expect(screen.getAllByText('研究通过').length).toBeGreaterThan(0)
     expect(screen.getByText('冻结输入缺失')).toBeInTheDocument()
+    expect(screen.getByText('组合模拟')).toBeInTheDocument()
+    expect(screen.getByText('研究运行完成')).toBeInTheDocument()
+    expect(screen.getByText(/运行：run-001；工件目录：\/artifacts\/run-001/)).toBeInTheDocument()
     expect(screen.getByText('扩大市场环境复核')).toBeInTheDocument()
+    expect(screen.getAllByText('已提议').length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: /打开原始 HTML 证据/ })).toHaveAttribute('href', '/api/research/evaluations/report')
   })
 
@@ -136,6 +159,43 @@ describe('研究驾驶舱', () => {
     expect(screen.getAllByText('研究通过').length).toBeGreaterThan(0)
   })
 
+  it('全局刷新会重读策略、研究与发布投影，并在全部成功后更新时间', async () => {
+    render(<App />)
+    await screen.findByRole('link', { name: /打开原始 HTML 证据/ })
+    const fetchMock = vi.mocked(globalThis.fetch)
+    const before = {
+      profile: fetchMock.mock.calls.filter(([path]) => path === '/api/research/strategies/momentum-v1').length,
+      detail: fetchMock.mock.calls.filter(([path]) => path === `/api/research/formal-researches/${RESEARCH_ID}`).length,
+      publication: fetchMock.mock.calls.filter(([path]) => path === `/api/research/publications/${PUBLICATION_ID}`).length,
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: /全局刷新/ }))
+    await waitFor(() => expect(document.querySelector('.updated-at')).not.toHaveTextContent('尚未刷新'))
+    expect(fetchMock.mock.calls.filter(([path]) => path === '/api/research/strategies/momentum-v1').length).toBeGreaterThan(before.profile)
+    expect(fetchMock.mock.calls.filter(([path]) => path === `/api/research/formal-researches/${RESEARCH_ID}`).length).toBeGreaterThan(before.detail)
+    expect(fetchMock.mock.calls.filter(([path]) => path === `/api/research/publications/${PUBLICATION_ID}`).length).toBeGreaterThan(before.publication)
+  })
+
+  it('发布投影刷新失败时保留一致旧事实且不伪造刷新时间', async () => {
+    let failPublication = false
+    installFetch({
+      route: (path) => {
+        if (failPublication && path === `/api/research/publications/${PUBLICATION_ID}`) {
+          return Promise.resolve(new Response(JSON.stringify({ detail: '发布投影暂不可用' }), { status: 503, headers: { 'Content-Type': 'application/json' } }))
+        }
+        return null
+      },
+    })
+    render(<App />)
+    await screen.findByRole('link', { name: /打开原始 HTML 证据/ })
+    failPublication = true
+
+    fireEvent.click(screen.getByRole('button', { name: /全局刷新/ }))
+    await screen.findByText('发布投影暂不可用')
+    expect(document.querySelector('.updated-at')).toHaveTextContent('尚未刷新')
+    expect(screen.getAllByText('研究通过').length).toBeGreaterThan(0)
+  })
+
   it('研究 API 失败时保留其他只读区域可访问', async () => {
     installFetch({ failStrategies: true })
     render(<App />)
@@ -150,6 +210,10 @@ describe('研究驾驶舱', () => {
   it('切换股票时清空旧事实，并忽略较晚返回的旧股票响应', async () => {
     const oldBars = deferred()
     const oldDetail = deferred()
+    const refreshBars = deferred()
+    const refreshDetail = deferred()
+    let delayStockRefresh = false
+    let oldStockResolved = false
     const stockPage = {
       items: [
         { ts_code: '000001.SZ', symbol: '000001', name: '甲公司', close: 10, pct_chg: 1 },
@@ -162,10 +226,10 @@ describe('研究驾驶舱', () => {
     installFetch({
       coreOverrides: { '/api/stocks/screen?limit=50&offset=0': stockPage },
       route: (path) => {
-        if (path === '/api/daily-bars?ts_code=000001.SZ') return oldBars.promise
-        if (path === '/api/stocks/000001.SZ/detail') return oldDetail.promise
-        if (path === '/api/daily-bars?ts_code=000002.SZ') return ok([])
-        if (path === '/api/stocks/000002.SZ/detail') return ok({ listing: { listStatus: '乙股状态' }, valuation_history: [], financial_history: [] })
+        if (path === '/api/daily-bars?ts_code=000001.SZ') return oldStockResolved ? ok([]) : oldBars.promise
+        if (path === '/api/stocks/000001.SZ/detail') return oldStockResolved ? ok({ listing: { listStatus: '甲股当前状态' }, valuation_history: [], financial_history: [] }) : oldDetail.promise
+        if (path === '/api/daily-bars?ts_code=000002.SZ') return delayStockRefresh ? refreshBars.promise : ok([])
+        if (path === '/api/stocks/000002.SZ/detail') return delayStockRefresh ? refreshDetail.promise : ok({ listing: { listStatus: '乙股状态' }, valuation_history: [], financial_history: [] })
         return null
       },
     })
@@ -177,6 +241,7 @@ describe('研究驾驶舱', () => {
     await screen.findByText('乙股状态')
     expect(screen.getByText('暂无可绘制的日线数据')).toBeInTheDocument()
 
+    oldStockResolved = true
     oldBars.resolve(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     oldDetail.resolve(new Response(JSON.stringify({ listing: { listStatus: '甲股旧状态' }, valuation_history: [], financial_history: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     await waitFor(() => expect(screen.queryByText('甲股旧状态')).not.toBeInTheDocument())
@@ -184,8 +249,44 @@ describe('研究驾驶舱', () => {
 
     const fetchMock = vi.mocked(globalThis.fetch)
     const detailCallsBeforeRefresh = fetchMock.mock.calls.filter(([path]) => path === '/api/stocks/000002.SZ/detail').length
+    delayStockRefresh = true
     fireEvent.click(screen.getByRole('button', { name: /全局刷新/ }))
     await waitFor(() => expect(fetchMock.mock.calls.filter(([path]) => path === '/api/stocks/000002.SZ/detail').length).toBeGreaterThan(detailCallsBeforeRefresh))
+    fireEvent.click(screen.getByRole('button', { name: /000001.*甲公司/ }))
+    await screen.findByText('甲股当前状态')
+
+    refreshBars.resolve(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    refreshDetail.resolve(new Response(JSON.stringify({ listing: { listStatus: '乙股刷新旧状态' }, valuation_history: [], financial_history: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    await waitFor(() => expect(screen.queryByText('乙股刷新旧状态')).not.toBeInTheDocument())
+    expect(screen.getByText('甲股当前状态')).toBeInTheDocument()
+  })
+
+  it('为图形行情提供中文摘要与可展开的数据表', async () => {
+    const stockPage = {
+      items: [{ ts_code: '000001.SZ', symbol: '000001', name: '甲公司', close: 11, pct_chg: 1 }],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    }
+    const bars = [
+      { trade_date: '2026-07-17', open: 10, high: 11, low: 9, close: 10.5, vol: 1000, amount: 2000 },
+      { trade_date: '2026-07-18', open: 10.5, high: 12, low: 10, close: 11, vol: 1200, amount: 2400 },
+    ]
+    installFetch({
+      coreOverrides: { '/api/stocks/screen?limit=50&offset=0': stockPage },
+      route: (path) => {
+        if (path === '/api/daily-bars?ts_code=000001.SZ') return ok(bars)
+        if (path === '/api/stocks/000001.SZ/detail') return ok({ listing: {}, valuation_history: [], financial_history: [] })
+        return null
+      },
+    })
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
+
+    await screen.findByRole('img', { name: /价格图。日 K 线共 2 个交易日/ })
+    expect(screen.getByText(/当前只读 API 尚未提供按日期与标的定位的局部缺口质量结果/)).toBeInTheDocument()
+    fireEvent.click(screen.getByText(/查看最近 2 条行情数据表/))
+    expect(screen.getByRole('table', { name: /日 K 线共 2 个交易日/ })).toBeInTheDocument()
   })
 
   it('指数、ETF 与行业目录可读取历史和当前成员，单域失败不阻断页面', async () => {
@@ -193,6 +294,9 @@ describe('研究驾驶舱', () => {
     const funds = [{ tsCode: '510300.SH', name: '沪深 300 ETF', fundType: '股票型' }]
     const industries = [{ indexCode: '801081.SI', industryName: '半导体', level: 'L2' }]
     let failIndustry = false
+    let delayFundRefresh = false
+    const fundBars = deferred()
+    const fundAdjustments = deferred()
     installFetch({
       coreOverrides: {
         '/api/indices?limit=1000': indices,
@@ -202,8 +306,8 @@ describe('研究驾驶舱', () => {
       },
       route: (path) => {
         if (path.startsWith('/api/indices/000001.SH/daily-bars?')) return ok([{ tradeDate: '2026-07-18', close: 3210.12, pctChg: 0.5, amount: 100000 }])
-        if (path.startsWith('/api/funds/510300.SH/daily-bars?')) return ok([{ tradeDate: '2026-07-18', close: 4.56, pctChg: -0.4, amount: 80000 }])
-        if (path.startsWith('/api/funds/510300.SH/adjust-factors?')) return ok([{ tradeDate: '2026-07-18', adjFactor: 1.23 }])
+        if (path.startsWith('/api/funds/510300.SH/daily-bars?')) return delayFundRefresh ? fundBars.promise : ok([{ tradeDate: '2026-07-18', close: 4.56, pctChg: -0.4, amount: 80000 }])
+        if (path.startsWith('/api/funds/510300.SH/adjust-factors?')) return delayFundRefresh ? fundAdjustments.promise : ok([{ tradeDate: '2026-07-18', adjFactor: 1.23 }])
         if (path.startsWith('/api/industries/801081.SI/members?')) {
           if (failIndustry) return Promise.resolve(new Response(JSON.stringify({ detail: '行业成员暂不可用' }), { status: 503, headers: { 'Content-Type': 'application/json' } }))
           return ok([{ conCode: '600703.SH', conName: '三安光电', inDate: '2020-01-01', outDate: null, isNew: true }])
@@ -218,8 +322,17 @@ describe('研究驾驶舱', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /沪深 300 ETF.*510300.SH/ }))
     await screen.findByText('1.23')
+    const fetchMock = vi.mocked(globalThis.fetch)
+    const fundCallsBeforeRefresh = fetchMock.mock.calls.filter(([path]) => String(path).startsWith('/api/funds/510300.SH/daily-bars?')).length
+    delayFundRefresh = true
+    fireEvent.click(screen.getByRole('button', { name: /全局刷新/ }))
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([path]) => String(path).startsWith('/api/funds/510300.SH/daily-bars?')).length).toBeGreaterThan(fundCallsBeforeRefresh))
     fireEvent.click(screen.getByRole('button', { name: /半导体.*801081.SI/ }))
     await screen.findByText('600703.SH')
+    fundBars.resolve(new Response(JSON.stringify([{ tradeDate: '2026-07-18', close: 9.99, pctChg: 9.9, amount: 99999 }]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    fundAdjustments.resolve(new Response(JSON.stringify([{ tradeDate: '2026-07-18', adjFactor: 9.99 }]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    await waitFor(() => expect(screen.queryByText('9.99')).not.toBeInTheDocument())
+    expect(screen.getByText('600703.SH')).toBeInTheDocument()
 
     failIndustry = true
     fireEvent.click(screen.getByRole('button', { name: /上证指数.*000001.SH/ }))

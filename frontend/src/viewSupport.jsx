@@ -167,12 +167,36 @@ export function shortHash(value) {
 
 export function formatStructuredItem(item) {
   if (item === null || item === undefined) return '-'
-  if (typeof item === 'string' || typeof item === 'number') return String(item)
+  if (['string', 'number', 'boolean'].includes(typeof item)) return String(item)
   const preferred = ['statement', 'title', 'label', 'summary', 'description', 'rationale', 'reason', 'metric', 'name']
   for (const key of preferred) {
     if (item[key]) return String(item[key])
   }
-  return JSON.stringify(item)
+  const entries = Object.entries(item)
+  if (!entries.length) return '无附加信息'
+  return entries.slice(0, 6).map(([key, value]) => `${structuredKeyLabel(key)}：${formatStructuredValue(value)}`).join('；')
+}
+
+function structuredKeyLabel(key) {
+  const labels = {
+    actorLogin: '操作人', approvalCommentId: '批准评论', artifactRoot: '工件目录', attemptCount: '尝试次数', commentId: '评论',
+    conclusion: '结论', error: '错误', errorKind: '错误类型', evaluationId: '评价', evaluationSha256: '评价指纹',
+    issueCommentId: '议题评论', issueNumber: '议题', manifestUrl: '清单地址', maxAttempts: '最大尝试次数',
+    newPlanSha256: '新计划指纹', planSha256: '计划指纹', previousWorker: '原 Worker', publicationId: '发布',
+    publicationStatus: '发布状态', resourceBudget: '资源预算', resumeRunId: '恢复运行', retryable: '可重试', runId: '运行',
+    supersededByPlanId: '替代计划', supersedesPublicationId: '替代发布', workerId: 'Worker',
+  }
+  return labels[key] || key
+}
+
+function formatStructuredValue(value) {
+  if (value === null || value === undefined || value === '') return '-'
+  if (Array.isArray(value)) return value.map(formatStructuredValue).join('、') || '-'
+  if (typeof value === 'object') {
+    return Object.entries(value).slice(0, 4).map(([key, child]) => `${structuredKeyLabel(key)}=${formatStructuredValue(child)}`).join('，') || '无附加信息'
+  }
+  if (typeof value === 'boolean') return value ? '是' : '否'
+  return String(value)
 }
 
 export function conclusionTone(value) {
@@ -190,7 +214,9 @@ export function translateStatus(value) {
   const labels = {
     unknown: '未知', ready: '就绪', ok: '正常', success: '成功', succeeded: '执行成功', connected: '已连接', available: '可用',
     blocked: '受阻', failed: '失败', fail: '失败', error: '错误', empty: '空', queued: '排队中', running: '运行中', retrying: '重试中',
-    interrupted: '已中断', pending: '待发布', published: '已发布', active: '进行中', stopped: '已停止', approved: '已批准', invalidated: '已失效', historical_import: '历史导入', evaluating: '评价中', completed: '已完成',
+    interrupted: '已中断', pending: '待发布', published: '已发布', active: '进行中', stopped: '已停止', stopping: '停止中', approved: '已批准', invalidated: '已失效', historical_import: '历史导入', evaluating: '评价中', publishing: '发布中', completed: '已完成', finalized: '已归档',
+    quality_gate: '质量门禁', input_snapshot: '冻结输入', features_targets: '特征与目标', simulation: '组合模拟', metrics: '指标计算', manifest: '生成清单', finalize: '归档完成',
+    proposed: '已提议', accepted: '已接受', rejected: '已拒绝', converted: '已转为计划',
     inventory_available: '库存可用', stalled: '停滞', partial: '部分完成', loading: '加载中',
   }
   return labels[text.toLowerCase()] || text
@@ -198,8 +224,17 @@ export function translateStatus(value) {
 
 export function translateEventType(value) {
   const labels = {
+    plan_approved: '冻结计划已批准', research_queued: '正式研究已排队', research_attempt_started: '研究尝试已开始',
+    research_run_succeeded: '研究运行完成', research_retry_scheduled: '研究重试已排期', research_blocked: '研究已受阻',
+    research_lease_recovered: '研究租约已恢复', research_succeeded_after_lease_expiry: '过期租约成功运行已核对', research_failed_after_lease_expiry: '过期租约失败运行已核对',
+    research_stop_requested: '研究停止已请求', research_stopped: '研究已停止', research_stopped_before_start: '研究启动前已停止',
+    research_stopped_before_attempt: '研究尝试前已停止', research_stopped_after_run: '研究运行后已停止', research_stopped_after_lease_expiry: '过期租约停止已落实',
+    research_resume_requested: '研究恢复已请求', invalid_plan_stop_requested: '失效计划停止已请求', plan_approval_invalidated: '计划批准已失效',
+    approval_comment_invalidated: '批准评论已失效', closed_issue_stop_requested: '关闭议题触发停止请求', closed_issue_blocked: '关闭议题已阻止研究',
+    research_publication_prepared: '研究发布已准备', research_published: '研究结论已发布', research_publication_failed: '研究发布失败',
+    research_publication_recovered: '研究发布已恢复',
     run_queued: '研究运行已排队', run_started: '研究运行已开始', run_succeeded: '研究运行完成', run_failed: '研究运行失败',
-    evaluation_created: '研究评价已形成', publication_published: '研究结论已发布', research_stopped: '研究已停止',
+    evaluation_created: '研究评价已形成', publication_published: '研究结论已发布',
   }
   return labels[String(value || '').toLowerCase()] || String(value || '未知事件')
 }
