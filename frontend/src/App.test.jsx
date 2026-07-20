@@ -333,7 +333,7 @@ describe('研究驾驶舱', () => {
     expect(screen.getByText('未选择股票')).toBeInTheDocument()
   })
 
-  it('分页沿用已提交查询，不使用输入框中的未提交草稿', async () => {
+  it('分页仅沿用成功应用的查询，不使用未提交草稿或失败查询', async () => {
     const firstPage = {
       items: [{ ts_code: '000001.SZ', symbol: '000001', name: '第一页股票', close: 10, pct_chg: 0 }],
       total: 101,
