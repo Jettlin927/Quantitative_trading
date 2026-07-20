@@ -55,6 +55,8 @@ RESEARCH_WORK_STATUS_VALUES = {
 }
 PUBLICATION_STATUS_VALUES = {"pending", "published", "failed"}
 FOLLOW_UP_PROPOSAL_STATUS_VALUES = {"proposed", "accepted", "rejected", "converted"}
+RESEARCH_PLAN_ACTION_VALUES = {"approved", "invalidated", "stopped", "historical_import"}
+FORMAL_RESEARCH_ORIGIN_VALUES = {"native", "historical_import"}
 
 
 class Stock(Base):
@@ -653,8 +655,13 @@ class ResearchPlanApproval(Base):
     __tablename__ = "research_plan_approvals"
     __table_args__ = (
         CheckConstraint(
-            "action in ('approved', 'invalidated', 'stopped')",
+            "action in ('approved', 'invalidated', 'stopped', 'historical_import')",
             name="ck_research_plan_approvals_action",
+        ),
+        CheckConstraint(
+            "(action = 'historical_import' and comment_id is null and source_uri is not null) "
+            "or (action <> 'historical_import' and comment_id is not null and source_uri is null)",
+            name="ck_research_plan_approvals_provenance",
         ),
         UniqueConstraint("comment_id", name="uq_research_plan_approvals_comment"),
         SqlIndex("ix_research_plan_approvals_plan_created", "plan_id", "created_at"),
@@ -665,9 +672,10 @@ class ResearchPlanApproval(Base):
         Uuid(as_uuid=False),
         ForeignKey("frozen_research_plans.id", ondelete="RESTRICT")
     )
-    action: Mapped[str] = mapped_column(String(16))
+    action: Mapped[str] = mapped_column(String(24))
     actor_login: Mapped[str] = mapped_column(String(80))
-    comment_id: Mapped[int] = mapped_column(BigInteger)
+    comment_id: Mapped[int | None] = mapped_column(BigInteger)
+    source_uri: Mapped[str | None] = mapped_column(String(1000))
     comment_body: Mapped[str] = mapped_column(String(500))
     plan_sha256: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -679,6 +687,14 @@ class FormalResearch(Base):
         CheckConstraint(
             "phase in ('approved', 'active', 'evaluating', 'published', 'stopped')",
             name="ck_formal_researches_phase",
+        ),
+        CheckConstraint(
+            "origin in ('native', 'historical_import')",
+            name="ck_formal_researches_origin",
+        ),
+        CheckConstraint(
+            "origin <> 'historical_import' or phase in ('published', 'stopped')",
+            name="ck_formal_researches_historical_phase",
         ),
         UniqueConstraint("plan_id", name="uq_formal_researches_plan"),
         UniqueConstraint("approval_id", name="uq_formal_researches_approval"),
@@ -694,6 +710,7 @@ class FormalResearch(Base):
         Uuid(as_uuid=False),
         ForeignKey("research_plan_approvals.id", ondelete="RESTRICT")
     )
+    origin: Mapped[str] = mapped_column(String(24), default="native", server_default="native")
     phase: Mapped[str] = mapped_column(String(16), default="approved", server_default="approved")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
