@@ -61,6 +61,7 @@ from .schemas import (
     StrategyProfileOut,
     StrategyProfileSummaryOut,
     StockFundamentalsOut,
+    StockDetailOut,
     StockOut,
     StockPoolCreate,
     StockPoolDetailOut,
@@ -68,6 +69,7 @@ from .schemas import (
     StockPoolOut,
     StockPoolMemberOut,
     StockScreenOut,
+    StockScreenPageOut,
     SyncAdjustFactorsRequest,
     SyncDailyRequest,
     SyncFundamentalsRequest,
@@ -354,19 +356,25 @@ def list_stocks(
     return list(db.scalars(stmt).all())
 
 
-@app.get("/api/stocks/screen", response_model=list[StockScreenOut])
+@app.get("/api/stocks/screen", response_model=StockScreenPageOut)
 def screen_stocks(
     q: str | None = None,
     industry: str | None = None,
     market: str | None = None,
     limit: int = 200,
+    offset: int = 0,
     db: Session = Depends(get_db),
-) -> list[StockScreenOut]:
+) -> StockScreenPageOut:
     filters = build_stock_filters(q=q, industry=industry, market=market)
-    stmt = select(Stock).order_by(Stock.ts_code).limit(min(max(limit, 1), 1000))
+    page_limit = min(max(limit, 1), 1000)
+    page_offset = max(offset, 0)
+    stmt = select(Stock).order_by(Stock.ts_code).offset(page_offset).limit(page_limit)
+    count_stmt = select(func.count()).select_from(Stock)
     if filters:
         stmt = stmt.where(*filters)
+        count_stmt = count_stmt.where(*filters)
     stocks = list(db.scalars(stmt).all())
+    total = int(db.scalar(count_stmt) or 0)
     ts_codes = [stock.ts_code for stock in stocks]
     latest_bar_by_code = query_latest_bars(db, ts_codes)
     latest_basic_by_code = query_latest_daily_basic(db, ts_codes)
@@ -386,7 +394,7 @@ def screen_stocks(
                 valuation=daily_basic_to_dict(valuation),
             )
         )
-    return rows
+    return StockScreenPageOut(items=rows, total=total, limit=page_limit, offset=page_offset)
 
 
 @app.get("/api/stock-pools", response_model=list[StockPoolOut])
@@ -963,6 +971,76 @@ def get_stock_fundamentals(ts_code: str, db: Session = Depends(get_db)) -> Stock
     valuation = db.scalars(select(StockDailyBasic).where(StockDailyBasic.ts_code == code).order_by(StockDailyBasic.trade_date.desc()).limit(1)).first()
     financial = db.scalars(select(StockFinancialIndicator).where(StockFinancialIndicator.ts_code == code).order_by(StockFinancialIndicator.ann_date.desc()).limit(1)).first()
     return StockFundamentalsOut(ts_code=code, valuation=daily_basic_to_dict(valuation), financial=financial_indicator_to_dict(financial))
+
+
+@app.get("/api/stocks/{ts_code}/valuation-history")
+def get_stock_valuation_history(
+    ts_code: str,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    limit: int = 250,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    return query_stock_valuation_history(db, ts_code.upper(), start_date, end_date, limit)
+
+
+@app.get("/api/stocks/{ts_code}/financial-history")
+def get_stock_financial_history(
+    ts_code: str,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    limit: int = 80,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    return query_stock_financial_history(db, ts_code.upper(), start_date, end_date, limit)
+
+
+@app.get("/api/stocks/{ts_code}/detail", response_model=StockDetailOut)
+def get_stock_detail(ts_code: str, db: Session = Depends(get_db)) -> StockDetailOut:
+    code = ts_code.upper()
+    stock = db.get(Stock, code)
+    if stock is None:
+        raise HTTPException(status_code=404, detail="股票不存在")
+
+    latest_bar = db.scalars(
+        select(StockDailyBar)
+        .where(StockDailyBar.ts_code == code)
+        .order_by(StockDailyBar.trade_date.desc())
+        .limit(1)
+    ).first()
+    valuation_history = query_stock_valuation_history(db, code, None, None, 250)
+    financial_history = query_stock_financial_history(db, code, None, None, 80)
+    listing = db.get(StockListing, code)
+    latest_limit_price = db.scalars(
+        select(StockLimitPrice)
+        .where(StockLimitPrice.ts_code == code)
+        .order_by(StockLimitPrice.trade_date.desc())
+        .limit(1)
+    ).first()
+    latest_suspend_event = db.scalars(
+        select(StockSuspendEvent)
+        .where(StockSuspendEvent.ts_code == code)
+        .order_by(StockSuspendEvent.trade_date.desc(), StockSuspendEvent.id.desc())
+        .limit(1)
+    ).first()
+    latest_adjust_factor = db.scalars(
+        select(StockAdjustFactor)
+        .where(StockAdjustFactor.ts_code == code)
+        .order_by(StockAdjustFactor.trade_date.desc())
+        .limit(1)
+    ).first()
+    return StockDetailOut(
+        stock=StockOut(**stock_to_dict(stock)),
+        latest_bar=daily_bar_to_schema(latest_bar) if latest_bar else None,
+        valuation=valuation_history[-1] if valuation_history else {},
+        financial=financial_history[-1] if financial_history else {},
+        valuation_history=valuation_history,
+        financial_history=financial_history,
+        listing=stock_listing_to_dict(listing) if listing else {},
+        latest_limit_price=stock_limit_price_to_dict(latest_limit_price) if latest_limit_price else {},
+        latest_suspend_event=stock_suspend_event_to_dict(latest_suspend_event) if latest_suspend_event else {},
+        latest_adjust_factor=adjust_factor_to_dict(latest_adjust_factor) if latest_adjust_factor else {},
+    )
 
 
 @app.get("/api/stock-listings")
@@ -2029,6 +2107,51 @@ def daily_bar_to_schema(row: StockDailyBar) -> DailyBarOut:
         vol=decimal_to_float(row.vol),
         amount=decimal_to_float(row.amount),
     )
+
+
+def query_stock_valuation_history(
+    db: Session,
+    ts_code: str,
+    start_date: date | None,
+    end_date: date | None,
+    limit: int,
+) -> list[dict[str, Any]]:
+    stmt = select(StockDailyBasic).where(StockDailyBasic.ts_code == ts_code)
+    if start_date:
+        stmt = stmt.where(StockDailyBasic.trade_date >= start_date)
+    if end_date:
+        stmt = stmt.where(StockDailyBasic.trade_date <= end_date)
+    rows = list(
+        db.scalars(
+            stmt.order_by(StockDailyBasic.trade_date.desc()).limit(min(max(limit, 1), 1000))
+        ).all()
+    )
+    return [daily_basic_to_dict(row) for row in reversed(rows)]
+
+
+def query_stock_financial_history(
+    db: Session,
+    ts_code: str,
+    start_date: date | None,
+    end_date: date | None,
+    limit: int,
+) -> list[dict[str, Any]]:
+    stmt = select(StockFinancialIndicator).where(
+        StockFinancialIndicator.ts_code == ts_code
+    )
+    if start_date:
+        stmt = stmt.where(StockFinancialIndicator.ann_date >= start_date)
+    if end_date:
+        stmt = stmt.where(StockFinancialIndicator.ann_date <= end_date)
+    rows = list(
+        db.scalars(
+            stmt.order_by(
+                StockFinancialIndicator.ann_date.desc(),
+                StockFinancialIndicator.end_date.desc(),
+            ).limit(min(max(limit, 1), 1000))
+        ).all()
+    )
+    return [financial_indicator_to_dict(row) for row in reversed(rows)]
 
 
 def daily_basic_to_dict(row: StockDailyBasic | None) -> dict[str, Any]:
