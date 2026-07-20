@@ -10,7 +10,17 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.app import main
 from backend.app.database import Base
-from backend.app.models import DataOverviewSnapshot, Stock, StockDailyBar
+from backend.app.models import (
+    DataOverviewSnapshot,
+    Stock,
+    StockAdjustFactor,
+    StockDailyBar,
+    StockDailyBasic,
+    StockFinancialIndicator,
+    StockLimitPrice,
+    StockListing,
+    StockSuspendEvent,
+)
 from backend.app.schemas import DataQualityRunRequest
 
 
@@ -22,6 +32,7 @@ class DataApiContractTest(unittest.TestCase):
 
         with self.Session() as db:
             db.add(Stock(ts_code="600703.SH", symbol="600703", name="三安光电", area="湖北", industry="半导体", market="主板", list_date=date(1996, 5, 28)))
+            db.add(Stock(ts_code="000001.SZ", symbol="000001", name="平安银行", area="深圳", industry="银行", market="主板", list_date=date(1991, 4, 3)))
             db.add(
                 StockDailyBar(
                     ts_code="600703.SH",
@@ -34,6 +45,54 @@ class DataApiContractTest(unittest.TestCase):
                     vol=1000,
                     amount=1200,
                 )
+            )
+            db.add_all(
+                [
+                    StockDailyBasic(
+                        ts_code="600703.SH",
+                        trade_date=date(2026, 5, 29),
+                        close=12.3,
+                        turnover_rate=1.5,
+                        pe_ttm=22.4,
+                        pb=2.1,
+                    ),
+                    StockFinancialIndicator(
+                        ts_code="600703.SH",
+                        ann_date=date(2026, 4, 30),
+                        end_date=date(2026, 3, 31),
+                        eps=0.25,
+                        roe=4.2,
+                    ),
+                    StockListing(
+                        ts_code="600703.SH",
+                        symbol="600703",
+                        name="三安光电",
+                        area="湖北",
+                        industry="半导体",
+                        market="主板",
+                        exchange="SSE",
+                        list_status="L",
+                        list_date=date(1996, 5, 28),
+                    ),
+                    StockLimitPrice(
+                        ts_code="600703.SH",
+                        trade_date=date(2026, 5, 29),
+                        pre_close=12.15,
+                        up_limit=13.37,
+                        down_limit=10.94,
+                    ),
+                    StockSuspendEvent(
+                        ts_code="600703.SH",
+                        trade_date=date(2026, 5, 28),
+                        suspend_type="S",
+                        suspend_timing="09:30-10:30",
+                    ),
+                    StockAdjustFactor(
+                        ts_code="600703.SH",
+                        trade_date=date(2026, 5, 29),
+                        adj_factor=3.14,
+                    ),
+                ]
             )
             db.commit()
 
@@ -68,7 +127,7 @@ class DataApiContractTest(unittest.TestCase):
         self.assertIn("tables", health)
         self.assertNotIn("tables", light_health)
         payload = overview
-        self.assertEqual(payload["aShare"]["stocks"], 1)
+        self.assertEqual(payload["aShare"]["stocks"], 2)
         self.assertEqual(payload["aShare"]["dailyBars"]["maxDate"], "2026-05-29")
         self.assertEqual(payload["tables"]["stockDailyBars"], 1)
         self.assertIsNotNone(snapshot)
@@ -87,14 +146,39 @@ class DataApiContractTest(unittest.TestCase):
         with self.open_session() as db:
             stocks = main.list_stocks(q="三安", db=db)
             screen = main.screen_stocks(q="600703", db=db)
+            first_page = main.screen_stocks(limit=1, offset=0, db=db)
+            second_page = main.screen_stocks(limit=1, offset=1, db=db)
             bars = main.get_daily_bars("600703.SH", date(2026, 5, 1), date(2026, 5, 31), db)
             all_bars = main.get_daily_bars("600703.SH", db=db)
 
         self.assertEqual(stocks[0].ts_code, "600703.SH")
-        self.assertEqual(screen[0].close, 12.3)
-        self.assertFalse(hasattr(screen[0], "signal_summary"))
+        self.assertEqual(screen.items[0].close, 12.3)
+        self.assertEqual(screen.total, 1)
+        self.assertFalse(hasattr(screen.items[0], "signal_summary"))
+        self.assertEqual(first_page.total, 2)
+        self.assertEqual(first_page.limit, 1)
+        self.assertEqual(first_page.offset, 0)
+        self.assertEqual(second_page.offset, 1)
+        self.assertNotEqual(first_page.items[0].ts_code, second_page.items[0].ts_code)
         self.assertEqual(bars[0].trade_date, date(2026, 5, 29))
         self.assertEqual(all_bars[0].trade_date, date(2026, 5, 29))
+
+    def test_stock_detail_and_histories_are_read_only_actual_data(self):
+        with self.open_session() as db:
+            valuation = main.get_stock_valuation_history("600703.sh", db=db)
+            financial = main.get_stock_financial_history("600703.sh", db=db)
+            detail = main.get_stock_detail("600703.sh", db=db)
+
+        self.assertEqual(valuation[0]["tradeDate"], "2026-05-29")
+        self.assertEqual(financial[0]["annDate"], "2026-04-30")
+        self.assertEqual(detail.stock.ts_code, "600703.SH")
+        self.assertEqual(detail.latest_bar.trade_date, date(2026, 5, 29))
+        self.assertEqual(detail.valuation["peTtm"], 22.4)
+        self.assertEqual(detail.financial["roe"], 4.2)
+        self.assertEqual(detail.listing["listStatus"], "L")
+        self.assertEqual(detail.latest_limit_price["tradeDate"], "2026-05-29")
+        self.assertEqual(detail.latest_suspend_event["tradeDate"], "2026-05-28")
+        self.assertEqual(detail.latest_adjust_factor["adjFactor"], 3.14)
 
     def test_strategy_and_backtest_routes_are_gone(self):
         paths = {route.path for route in main.app.routes}
@@ -178,7 +262,7 @@ class DataApiContractTest(unittest.TestCase):
             overview = main.get_db_overview(db)
 
         self.assertEqual(overview["aShare"]["tradeCalendar"]["rows"], 2)
-        self.assertEqual(overview["aShare"]["adjustFactors"]["rows"], 1)
+        self.assertEqual(overview["aShare"]["adjustFactors"]["rows"], 2)
         self.assertEqual(overview["aShare"]["indices"]["rows"], 4)
         self.assertEqual(overview["aShare"]["indexDailyBars"]["rows"], 1)
         self.assertEqual(overview["aShare"]["funds"]["rows"], 2)
