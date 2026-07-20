@@ -285,9 +285,10 @@ class FrozenResearchPlanOut(BaseModel):
 class ResearchPlanApprovalOut(BaseModel):
     id: UUID
     plan_id: UUID
-    action: Literal["approved", "invalidated", "stopped"]
+    action: Literal["approved", "invalidated", "stopped", "historical_import"]
     actor_login: str
-    comment_id: int
+    comment_id: int | None = None
+    source_uri: str | None = None
     comment_body: str
     plan_sha256: str
     created_at: datetime | None = None
@@ -390,6 +391,7 @@ class FollowUpResearchProposalOut(BaseModel):
 class FormalResearchSummaryOut(BaseModel):
     id: UUID
     plan_id: UUID
+    origin: Literal["native", "historical_import"]
     phase: Literal["approved", "active", "evaluating", "published", "stopped"]
     run_count: int = 0
     latest_publication_id: UUID | None = None
@@ -418,6 +420,7 @@ class StrategyProfileOut(BaseModel):
 
 class FormalResearchDetailOut(BaseModel):
     id: UUID
+    origin: Literal["native", "historical_import"]
     phase: Literal["approved", "active", "evaluating", "published", "stopped"]
     plan: FrozenResearchPlanOut
     approval: ResearchPlanApprovalOut
