@@ -110,9 +110,9 @@ class ResearchReproductionTest(unittest.TestCase):
         self.assertEqual(first.manifest["reproducibilityKey"], second.manifest["reproducibilityKey"])
         self.assertNotEqual(first.run_id, second.run_id)
 
-    def test_v4_archive_contains_oos_benchmark_ledgers_and_extended_metrics(self):
+    def test_v5_archive_contains_oos_benchmark_ledgers_and_extended_metrics(self):
         run = self._run()
-        self.assertEqual(run.manifest["artifactSchemaVersion"], 4)
+        self.assertEqual(run.manifest["artifactSchemaVersion"], 5)
         for name in (
             "benchmark_nav.csv.gz",
             "oos_metrics.json",

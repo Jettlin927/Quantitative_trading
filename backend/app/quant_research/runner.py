@@ -34,6 +34,7 @@ from .baselines import (
     validate_explicit_universe,
 )
 from .evaluation import (
+    build_capacity_evidence,
     build_cost_stress_config,
     build_oos_metrics,
     validate_oos_metrics_contract,
@@ -44,6 +45,7 @@ from .manifest import (
     build_result_fingerprint,
 )
 from .metrics import summarize_execution_metrics
+from .reporting import summarize_nav_window
 from .risk import (
     RISK_CONTRIBUTION_COLUMNS,
     RISK_EXPOSURE_COLUMNS,
@@ -52,9 +54,11 @@ from .risk import (
 )
 from .run_config import (
     FormalRunConfigurationError,
+    build_parameter_neighborhood_configs,
     build_reproducibility_key,
     canonical_sha256,
     canonical_run_config_sha256,
+    validate_research_pass_policy,
     validate_risk_policy,
     validate_run_config,
 )
@@ -124,7 +128,7 @@ STAGES = (
 )
 INTERRUPTIBLE_STAGES = {"input_snapshot", "simulation", "finalize"}
 CHECKPOINT_SCHEMA_VERSION = 1
-ARTIFACT_SCHEMA_VERSION = 4
+ARTIFACT_SCHEMA_VERSION = 5
 
 
 class ResumeError(RuntimeError):
@@ -566,6 +570,7 @@ def _execute_pipeline(
         )
         walk_forward_artifacts: dict[str, dict[str, Any]] = {}
         risk_artifacts: dict[str, dict[str, Any]] = {}
+        risk = None
         metric_outputs: dict[str, Any] = {}
         if _walk_forward_enabled(normalized):
             windows, window_metrics, walk_forward_summary = _evaluate_walk_forward(
@@ -642,6 +647,45 @@ def _execute_pipeline(
                 table_artifacts=table_artifacts,
             )
             stressed_nav = stressed_simulation.nav
+        parameter_neighborhood = (
+            _evaluate_parameter_neighborhood(
+                working / "inputs",
+                normalized,
+                nav,
+                benchmark_nav,
+                compressed=True,
+                table_artifacts=table_artifacts,
+            )
+            if "researchPassPolicy" in normalized
+            else None
+        )
+        capacity_evidence = None
+        if "researchPassPolicy" in normalized:
+            test_split = next(
+                item
+                for item in normalized["evaluationSampleSplits"]
+                if item["role"] == "test_oos"
+            )
+            nav_dates = pd.to_datetime(nav["trade_date"])
+            oos_dates = pd.DatetimeIndex(
+                nav_dates[
+                    nav_dates.between(
+                        pd.Timestamp(test_split["startDate"]),
+                        pd.Timestamp(test_split["endDate"]),
+                    )
+                ]
+            )
+            capacity_evidence = build_capacity_evidence(
+                normalized,
+                requests,
+                _load_market_amount_bars(
+                    working / "inputs",
+                    normalized,
+                    compressed=True,
+                    table_artifacts=table_artifacts,
+                ),
+                dates=oos_dates,
+            )
         oos_metrics = build_oos_metrics(
             normalized,
             nav,
@@ -651,6 +695,12 @@ def _execute_pipeline(
             positions,
             stressed_nav,
             walk_forward=metrics.get("walkForward"),
+            parameter_neighborhood=parameter_neighborhood,
+            capacity=capacity_evidence,
+            risk_exposures=(risk.exposures if risk is not None else None),
+            risk_contributions=(
+                risk.contributions if risk is not None else None
+            ),
         )
         limitations = sorted(set(strategy.limitations()))
         metrics_artifact = atomic_write_json(working / "metrics.json", metrics)
@@ -851,7 +901,7 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
     if manifest.get("randomSeed") != config["randomSeed"]:
         raise SnapshotIntegrityError("manifest randomSeed 与 config 不一致")
     artifact_schema_version = manifest.get("artifactSchemaVersion", 1)
-    if artifact_schema_version not in {1, 2, 3, 4}:
+    if artifact_schema_version not in {1, 2, 3, 4, 5}:
         raise SnapshotIntegrityError("manifest artifactSchemaVersion 不受支持")
     walk_forward_enabled = _walk_forward_enabled(config)
     if walk_forward_enabled and artifact_schema_version < 2:
@@ -1106,6 +1156,7 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
                 natural_key=("window_id",),
             )
             metrics["walkForward"] = walk_forward_summary
+        risk = None
         if _risk_enabled(config):
             risk = calculate_frozen_risk_frames(
                 run_path / "inputs",
@@ -1139,6 +1190,45 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
                     table_artifacts=table_artifacts,
                 )
                 stressed_nav = stressed_simulation.nav
+            parameter_neighborhood = (
+                _evaluate_parameter_neighborhood(
+                    run_path / "inputs",
+                    config,
+                    persisted_nav,
+                    benchmark_nav,
+                    compressed=True,
+                    table_artifacts=table_artifacts,
+                )
+                if "researchPassPolicy" in config
+                else None
+            )
+            capacity_evidence = None
+            if "researchPassPolicy" in config:
+                test_split = next(
+                    item
+                    for item in config["evaluationSampleSplits"]
+                    if item["role"] == "test_oos"
+                )
+                nav_dates = pd.to_datetime(persisted_nav["trade_date"])
+                oos_dates = pd.DatetimeIndex(
+                    nav_dates[
+                        nav_dates.between(
+                            pd.Timestamp(test_split["startDate"]),
+                            pd.Timestamp(test_split["endDate"]),
+                        )
+                    ]
+                )
+                capacity_evidence = build_capacity_evidence(
+                    config,
+                    metrics_simulation.rebalance_requests,
+                    _load_market_amount_bars(
+                        run_path / "inputs",
+                        config,
+                        compressed=True,
+                        table_artifacts=table_artifacts,
+                    ),
+                    dates=oos_dates,
+                )
             oos_metrics = build_oos_metrics(
                 config,
                 persisted_nav,
@@ -1148,6 +1238,12 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
                 metrics_simulation.positions,
                 stressed_nav,
                 walk_forward=metrics.get("walkForward"),
+                parameter_neighborhood=parameter_neighborhood,
+                capacity=capacity_evidence,
+                risk_exposures=(risk.exposures if risk is not None else None),
+                risk_contributions=(
+                    risk.contributions if risk is not None else None
+                ),
             )
             actual["oos_metrics.json"] = atomic_write_json(
                 temporary / "oos_metrics.json", oos_metrics
@@ -1330,6 +1426,115 @@ def _evaluate_walk_forward(
         research_end=config["endDate"],
         policy=config.get("validationPolicy"),
     )
+
+
+def _evaluate_parameter_neighborhood(
+    input_root: Path,
+    config: dict[str, Any],
+    base_nav: pd.DataFrame,
+    benchmark_nav: pd.DataFrame,
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    policy = validate_research_pass_policy(
+        config.get("researchPassPolicy"), config
+    )["parameterNeighborhood"]
+    test_split = next(
+        item
+        for item in config["evaluationSampleSplits"]
+        if item["role"] == "test_oos"
+    )
+    start = pd.Timestamp(test_split["startDate"])
+    end = pd.Timestamp(test_split["endDate"])
+    configurations: list[dict[str, Any]] = []
+    for variant_id, candidate in build_parameter_neighborhood_configs(config):
+        research_pass_policy = candidate.pop("researchPassPolicy")
+        candidate = validate_run_config(candidate, verify_universe_source=False)
+        candidate["researchPassPolicy"] = research_pass_policy
+        candidate_strategy = resolve_strategy_definition(candidate)
+        if variant_id == "base":
+            candidate_nav = base_nav
+        else:
+            targets = _build_strategy_targets(
+                candidate_strategy,
+                input_root,
+                candidate,
+                compressed=compressed,
+                table_artifacts=table_artifacts,
+            )
+            simulation, _calendar = _simulate_strategy_targets(
+                candidate_strategy,
+                input_root,
+                candidate,
+                targets,
+                compressed=compressed,
+                table_artifacts=table_artifacts,
+            )
+            candidate_nav = simulation.nav
+        summary = summarize_nav_window(
+            candidate_nav,
+            start=start,
+            end=end,
+            benchmark_nav=benchmark_nav,
+            include_extended=True,
+        )
+        changes = next(
+            item["changes"]
+            for item in policy["variants"]
+            if item["id"] == variant_id
+        )
+        configurations.append(
+            {
+                "id": variant_id,
+                "changes": changes,
+                "configSha256": canonical_run_config_sha256(candidate),
+                "totalReturn": summary["totalReturn"],
+                "maxDrawdown": summary["maxDrawdown"],
+            }
+        )
+    returns = [float(item["totalReturn"]) for item in configurations]
+    maximum_difference = max(returns) - min(returns)
+    minimum_return = min(returns)
+    allowed_difference = float(policy["maximumAbsoluteOosReturnDifference"])
+    allowed_minimum_return = float(policy["minimumOosTotalReturn"])
+    return {
+        "status": "complete",
+        "policySha256": canonical_sha256(policy),
+        "evaluatedConfigurations": len(configurations),
+        "maximumAllowedAbsoluteOosReturnDifference": policy[
+            "maximumAbsoluteOosReturnDifference"
+        ],
+        "minimumAllowedOosTotalReturn": policy["minimumOosTotalReturn"],
+        "maximumObservedAbsoluteOosReturnDifference": maximum_difference,
+        "minimumObservedOosTotalReturn": minimum_return,
+        "passed": bool(
+            maximum_difference <= allowed_difference
+            and minimum_return >= allowed_minimum_return
+        ),
+        "configurations": configurations,
+    }
+
+
+def _load_market_amount_bars(
+    input_root: Path,
+    config: dict[str, Any],
+    *,
+    compressed: bool,
+    table_artifacts: dict[str, dict[str, Any]],
+) -> pd.DataFrame:
+    _, reader = open_strategy_inputs(input_root, compressed, table_artifacts)
+    table = (
+        "fund_daily_bars"
+        if config["scope"] == "etf_time_series"
+        else "stock_daily_bars"
+    )
+    bars = reader(table)
+    required = {"trade_date", "ts_code", "amount"}
+    missing = sorted(required - set(bars.columns))
+    if missing:
+        raise ValueError("冻结市场成交额缺少字段：" + ", ".join(missing))
+    return bars.loc[:, ["trade_date", "ts_code", "amount"]].copy()
 
 
 def _initialize_checkpoint_index(working: Path, run_id: str) -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import date, datetime
 from decimal import Decimal
 from hashlib import sha256
@@ -7,7 +8,7 @@ import json
 import math
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, Mapping
 
 from .universe import evaluate_universe_provenance
 from .validation import validate_validation_policy
@@ -33,6 +34,7 @@ REQUIRED_CONFIG_FIELDS = (
 )
 EVALUATION_SAMPLE_ROLES = ("train", "validation", "test_oos")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+PARAMETER_VARIANT_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -116,6 +118,203 @@ def validate_evaluation_policy(policy: Any) -> dict[str, Any]:
         },
         "costStressMultiplier": str(policy["costStressMultiplier"]),
     }
+
+
+def validate_research_pass_policy(
+    policy: Any,
+    base_config: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(policy, dict) or set(policy) != {
+        "parameterNeighborhood",
+        "capacity",
+    }:
+        raise ValueError(
+            "researchPassPolicy 必须冻结 parameterNeighborhood 与 capacity"
+        )
+    parameter_policy = policy["parameterNeighborhood"]
+    if not isinstance(parameter_policy, dict) or set(parameter_policy) != {
+        "variants",
+        "maximumAbsoluteOosReturnDifference",
+        "minimumOosTotalReturn",
+    }:
+        raise ValueError("researchPassPolicy.parameterNeighborhood 字段无效")
+    variants = parameter_policy["variants"]
+    if not isinstance(variants, list) or not 3 <= len(variants) <= 9:
+        raise ValueError("参数邻域必须冻结 3 到 9 个配置")
+    normalized_variants: list[dict[str, Any]] = []
+    variant_ids: set[str] = set()
+    result_identities: set[str] = set()
+    base_seen = False
+    for item in variants:
+        if not isinstance(item, dict) or set(item) != {"id", "changes"}:
+            raise ValueError("参数邻域配置只允许 id/changes")
+        variant_id = str(item["id"])
+        if (
+            not PARAMETER_VARIANT_ID_PATTERN.fullmatch(variant_id)
+            or variant_id in variant_ids
+        ):
+            raise ValueError("参数邻域 id 格式无效或重复")
+        changes = item["changes"]
+        if not isinstance(changes, list):
+            raise ValueError("参数邻域 changes 必须是数组")
+        candidate_parameters = {
+            section: deepcopy(dict(base_config[section]))
+            for section in ("featureParameters", "targetWeightParameters")
+            if isinstance(base_config.get(section), Mapping)
+        }
+        normalized_changes: list[dict[str, Any]] = []
+        paths: set[str] = set()
+        for change in changes:
+            if not isinstance(change, dict) or set(change) != {"path", "value"}:
+                raise ValueError("参数邻域 change 只允许 path/value")
+            path = str(change["path"])
+            parts = path.split(".")
+            if (
+                len(parts) != 2
+                or parts[0]
+                not in {"featureParameters", "targetWeightParameters"}
+                or path in paths
+                or not isinstance(base_config.get(parts[0]), Mapping)
+                or parts[1] not in base_config[parts[0]]
+            ):
+                raise ValueError("参数邻域只能修改已冻结的特征或目标权重参数")
+            value = change["value"]
+            if not isinstance(value, (str, int, bool)):
+                raise ValueError("参数邻域值只允许字符串、整数或布尔值")
+            paths.add(path)
+            normalized_changes.append({"path": path, "value": value})
+            candidate_parameters[parts[0]][parts[1]] = value
+        normalized_changes.sort(key=lambda change: change["path"])
+        if variant_id == "base":
+            if normalized_changes:
+                raise ValueError("参数邻域 base 配置不得包含改动")
+            base_seen = True
+        elif not normalized_changes:
+            raise ValueError("非 base 参数邻域配置必须包含改动")
+        identity = canonical_sha256(candidate_parameters)
+        if identity in result_identities:
+            raise ValueError("参数邻域配置必须产生不同的实际参数")
+        result_identities.add(identity)
+        variant_ids.add(variant_id)
+        normalized_variants.append(
+            {"id": variant_id, "changes": normalized_changes}
+        )
+    if not base_seen:
+        raise ValueError("参数邻域必须包含无改动的 base 配置")
+    normalized_variants.sort(key=lambda item: item["id"])
+    maximum_difference = _decimal_text(
+        parameter_policy["maximumAbsoluteOosReturnDifference"],
+        "researchPassPolicy.parameterNeighborhood.maximumAbsoluteOosReturnDifference",
+    )
+    _decimal_text(
+        parameter_policy["minimumOosTotalReturn"],
+        "researchPassPolicy.parameterNeighborhood.minimumOosTotalReturn",
+    )
+    if maximum_difference <= 0:
+        raise ValueError("参数邻域最大 OOS 收益差必须大于 0")
+
+    capacity = policy["capacity"]
+    required_capacity = {
+        "expectedCapital",
+        "advLookbackPeriods",
+        "minimumAdvObservations",
+        "marketAmountScale",
+        "maximumAdvParticipationRate",
+        "impactModel",
+        "maximumModeledImpactRate",
+    }
+    if not isinstance(capacity, dict) or set(capacity) != required_capacity:
+        raise ValueError("researchPassPolicy.capacity 字段无效")
+    adv_lookback = capacity["advLookbackPeriods"]
+    minimum_adv = capacity["minimumAdvObservations"]
+    if (
+        isinstance(adv_lookback, bool)
+        or not isinstance(adv_lookback, int)
+        or adv_lookback < 2
+        or isinstance(minimum_adv, bool)
+        or not isinstance(minimum_adv, int)
+        or not 2 <= minimum_adv <= adv_lookback
+    ):
+        raise ValueError("容量 ADV 窗口必须满足 2 <= minimum <= lookback")
+    expected_capital = _decimal_text(
+        capacity["expectedCapital"],
+        "researchPassPolicy.capacity.expectedCapital",
+    )
+    amount_scale = _decimal_text(
+        capacity["marketAmountScale"],
+        "researchPassPolicy.capacity.marketAmountScale",
+    )
+    maximum_participation = _decimal_text(
+        capacity["maximumAdvParticipationRate"],
+        "researchPassPolicy.capacity.maximumAdvParticipationRate",
+    )
+    maximum_impact = _decimal_text(
+        capacity["maximumModeledImpactRate"],
+        "researchPassPolicy.capacity.maximumModeledImpactRate",
+    )
+    if expected_capital <= 0 or amount_scale <= 0:
+        raise ValueError("容量预期资金规模与市场金额缩放必须大于 0")
+    if not 0 < maximum_participation <= 1 or not 0 < maximum_impact <= 1:
+        raise ValueError("容量参与率与冲击率阈值必须位于 (0, 1]")
+    impact_model = capacity["impactModel"]
+    if not isinstance(impact_model, dict) or set(impact_model) != {
+        "type",
+        "coefficient",
+    }:
+        raise ValueError("容量 impactModel 只允许 type/coefficient")
+    if impact_model.get("type") != "linear":
+        raise ValueError("容量 impactModel.type 当前只允许 linear")
+    impact_coefficient = _decimal_text(
+        impact_model["coefficient"],
+        "researchPassPolicy.capacity.impactModel.coefficient",
+    )
+    if impact_coefficient <= 0:
+        raise ValueError("容量线性冲击系数必须大于 0")
+    return {
+        "parameterNeighborhood": {
+            "variants": normalized_variants,
+            "maximumAbsoluteOosReturnDifference": str(
+                parameter_policy["maximumAbsoluteOosReturnDifference"]
+            ),
+            "minimumOosTotalReturn": str(
+                parameter_policy["minimumOosTotalReturn"]
+            ),
+        },
+        "capacity": {
+            "expectedCapital": str(capacity["expectedCapital"]),
+            "advLookbackPeriods": adv_lookback,
+            "minimumAdvObservations": minimum_adv,
+            "marketAmountScale": str(capacity["marketAmountScale"]),
+            "maximumAdvParticipationRate": str(
+                capacity["maximumAdvParticipationRate"]
+            ),
+            "impactModel": {
+                "type": "linear",
+                "coefficient": str(impact_model["coefficient"]),
+            },
+            "maximumModeledImpactRate": str(
+                capacity["maximumModeledImpactRate"]
+            ),
+        },
+    }
+
+
+def build_parameter_neighborhood_configs(
+    config: Mapping[str, Any],
+) -> tuple[tuple[str, dict[str, Any]], ...]:
+    policy = validate_research_pass_policy(
+        config.get("researchPassPolicy"), config
+    )
+    variants: list[tuple[str, dict[str, Any]]] = []
+    for variant in policy["parameterNeighborhood"]["variants"]:
+        candidate = deepcopy(dict(config))
+        candidate["researchPassPolicy"] = policy
+        for change in variant["changes"]:
+            section, field = change["path"].split(".", 1)
+            candidate[section] = dict(candidate[section])
+            candidate[section][field] = change["value"]
+        variants.append((variant["id"], candidate))
+    return tuple(variants)
 
 
 def validate_evaluation_sample_splits(
@@ -225,6 +424,10 @@ def validate_run_config(
         normalized["riskPolicy"] = validate_risk_policy(normalized["riskPolicy"])
     else:
         validate_risk_policy(None)
+    if "researchPassPolicy" in normalized:
+        normalized["researchPassPolicy"] = validate_research_pass_policy(
+            normalized["researchPassPolicy"], normalized
+        )
 
     warmup_start = _parse_date(normalized["warmupStart"], "warmupStart")
     start_date = _parse_date(normalized["startDate"], "startDate")
@@ -237,6 +440,10 @@ def validate_run_config(
     if has_evaluation_policy != has_evaluation_splits:
         raise ValueError(
             "evaluationPolicy 与 evaluationSampleSplits 必须同时冻结"
+        )
+    if "researchPassPolicy" in normalized and not has_evaluation_policy:
+        raise ValueError(
+            "researchPassPolicy 必须与 evaluationPolicy 和 evaluationSampleSplits 同时冻结"
         )
     if has_evaluation_policy:
         normalized["evaluationPolicy"] = validate_evaluation_policy(
@@ -268,6 +475,18 @@ def _finite_decimal_string(value: Any, field: str) -> Decimal:
         ) from exc
     if not parsed.is_finite():
         raise ValueError(f"evaluationPolicy.{field} 必须是有限数")
+    return parsed
+
+
+def _decimal_text(value: Any, field: str) -> Decimal:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} 必须使用字符串化十进制定点")
+    try:
+        parsed = Decimal(value)
+    except Exception as exc:
+        raise ValueError(f"{field} 必须使用字符串化十进制定点") from exc
+    if not parsed.is_finite():
+        raise ValueError(f"{field} 必须是有限数")
     return parsed
 
 

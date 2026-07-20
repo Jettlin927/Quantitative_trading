@@ -77,7 +77,11 @@ from backend.app.quant_research.runner import (
     run_quant_research,
     validate_research_archive,
 )
-from backend.app.quant_research.run_config import canonical_sha256
+from backend.app.quant_research.run_config import (
+    build_parameter_neighborhood_configs,
+    canonical_run_config_sha256,
+    canonical_sha256,
+)
 from backend.app.quant_research.snapshot import (
     SnapshotCapacityPolicy,
     SnapshotIntegrityError,
@@ -251,10 +255,13 @@ class ResearchPublicationTest(unittest.TestCase):
         config = {
             "strategyId": strategy_id,
             "strategyVersion": "1",
+            "scope": "etf_time_series",
             "startDate": "2025-01-02",
             "endDate": "2025-12-31",
             "warmupStart": "2024-06-01",
             "benchmark": "000300.SH",
+            "featureParameters": {"lookbackPeriod": 20},
+            "targetWeightParameters": {},
             "executionPolicy": {
                 "signalPrice": "close",
                 "executionPrice": "next_trade_open",
@@ -303,16 +310,59 @@ class ResearchPublicationTest(unittest.TestCase):
             },
             "costStressMultiplier": "2",
         }
+        research_pass_policy = {
+            "parameterNeighborhood": {
+                "variants": [
+                    {"id": "base", "changes": []},
+                    {
+                        "id": "lower",
+                        "changes": [
+                            {
+                                "path": "featureParameters.lookbackPeriod",
+                                "value": 15,
+                            }
+                        ],
+                    },
+                    {
+                        "id": "upper",
+                        "changes": [
+                            {
+                                "path": "featureParameters.lookbackPeriod",
+                                "value": 25,
+                            }
+                        ],
+                    },
+                ],
+                "maximumAbsoluteOosReturnDifference": "0.05",
+                "minimumOosTotalReturn": "-0.05",
+            },
+            "capacity": {
+                "expectedCapital": "1000000",
+                "advLookbackPeriods": 20,
+                "minimumAdvObservations": 5,
+                "marketAmountScale": "1000",
+                "maximumAdvParticipationRate": "0.10",
+                "impactModel": {"type": "linear", "coefficient": "0.10"},
+                "maximumModeledImpactRate": "0.01",
+            },
+        }
         config.update(
             {
                 "evaluationSampleSplits": sample_splits,
                 "evaluationPolicy": evaluation_policy,
+                "researchPassPolicy": research_pass_policy,
             }
         )
         metrics = {
             "startDate": "2025-01-02",
             "endDate": "2025-12-31",
             "observations": 3,
+            "openTradingDays": 3,
+            "rebalanceCount": 1,
+            "requestCount": 1,
+            "executionCount": 1,
+            "blockedCount": 0,
+            "independentTradeCount": 1,
             "totalReturn": 0.03,
             "annualizedReturn": 0.03,
             "annualizedVolatility": 0.12,
@@ -333,6 +383,11 @@ class ResearchPublicationTest(unittest.TestCase):
             "maxSingleWeight": 0.6,
             "averageHhi": 0.42,
             "maxHhi": 0.5,
+            "endingHhi": 0.5,
+            "averageGrossExposure": 0.55,
+            "endingGrossExposure": 0.6,
+            "averageNetExposure": 0.55,
+            "endingNetExposure": 0.6,
             "var95": 0.02,
             "es95": 0.025,
             "yearly": {"2025": {"totalReturn": 0.03}},
@@ -350,6 +405,12 @@ class ResearchPublicationTest(unittest.TestCase):
                 "startDate": "2025-07-01",
                 "endDate": "2025-12-31",
                 "observations": 2,
+                "openTradingDays": 2,
+                "rebalanceCount": 1,
+                "requestCount": 1,
+                "executionCount": 1,
+                "blockedCount": 0,
+                "independentTradeCount": 1,
                 "totalReturn": 0.02,
                 "benchmarkTotalReturn": 0.01,
                 "activeTotalReturn": 0.01,
@@ -358,24 +419,62 @@ class ResearchPublicationTest(unittest.TestCase):
                 "averageOneWayTurnover": 0.1,
                 "cumulativeTransactionCostRate": 0.001,
                 "blockedRequestRate": 0.0,
+                "averageGrossExposure": 0.55,
+                "endingGrossExposure": 0.6,
+                "averageNetExposure": 0.55,
+                "endingNetExposure": 0.6,
+                "averageHhi": 0.42,
+                "endingHhi": 0.5,
             }
             for name in ("上涨_低波", "上涨_高波", "下跌_低波", "下跌_高波")
         }
         if sparse_regime_cells:
             regime_cells = {"上涨_低波": regime_cells["上涨_低波"]}
+        parameter_returns = {"base": 0.03, "lower": 0.02, "upper": 0.04}
+        parameter_configurations = [
+            {
+                "id": variant_id,
+                "changes": next(
+                    item["changes"]
+                    for item in research_pass_policy["parameterNeighborhood"][
+                        "variants"
+                    ]
+                    if item["id"] == variant_id
+                ),
+                "configSha256": canonical_run_config_sha256(candidate),
+                "totalReturn": parameter_returns[variant_id],
+                "maxDrawdown": -0.02,
+            }
+            for variant_id, candidate in build_parameter_neighborhood_configs(
+                config
+            )
+        ]
         oos_metrics = {
             **metrics,
-            "schemaVersion": "research-oos-metrics/v1",
+            "schemaVersion": "research-oos-metrics/v2",
             "status": "complete",
             "sampleRole": "test_oos",
             "sampleStartDate": "2025-07-01",
             "sampleEndDate": "2025-12-31",
+            "warmupStartDate": "2024-06-01",
             "sampleSplitSha256": canonical_sha256(sample_splits),
             "evaluationPolicy": evaluation_policy,
             "evaluationPolicySha256": canonical_sha256(evaluation_policy),
             "startDate": "2025-12-31",
             "endDate": "2025-12-31",
             "observations": 8,
+            "openTradingDays": 8,
+            "rebalanceCount": 4,
+            "requestCount": 4,
+            "executionCount": 4,
+            "blockedCount": 0,
+            "independentTradeCount": 4,
+            "averageGrossExposure": 0.55,
+            "endingGrossExposure": 0.6,
+            "averageNetExposure": 0.55,
+            "endingNetExposure": 0.6,
+            "averageHhi": 0.42,
+            "endingHhi": 0.5,
             "yearly": {"2025": {"totalReturn": 0.03}},
             "marketRegimes": {
                 "policy": evaluation_policy["marketRegime"],
@@ -401,11 +500,25 @@ class ResearchPublicationTest(unittest.TestCase):
             "parameterNeighborhood": (
                 {
                     "status": "complete",
+                    "policySha256": canonical_sha256(
+                        research_pass_policy["parameterNeighborhood"]
+                    ),
                     "evaluatedConfigurations": 3,
-                    "conclusion": "冻结参数邻域内指标平滑，未见单点崩塌。",
+                    "maximumAllowedAbsoluteOosReturnDifference": "0.05",
+                    "minimumAllowedOosTotalReturn": "-0.05",
+                    "maximumObservedAbsoluteOosReturnDifference": 0.02,
+                    "minimumObservedOosTotalReturn": 0.02,
+                    "passed": True,
+                    "configurations": parameter_configurations,
                 }
                 if complete_parameter_neighborhood
-                else {"status": "not_available", "reason": "未执行参数邻域"}
+                else {
+                    "status": "not_available",
+                    "policySha256": canonical_sha256(
+                        research_pass_policy["parameterNeighborhood"]
+                    ),
+                    "reason": "未执行参数邻域",
+                }
             ),
             "costStress": {
                 "multiplier": "2",
@@ -416,15 +529,69 @@ class ResearchPublicationTest(unittest.TestCase):
             "capacity": (
                 {
                     "status": "complete",
-                    "expectedCapital": 1000000,
+                    "policySha256": canonical_sha256(
+                        research_pass_policy["capacity"]
+                    ),
+                    "expectedCapital": "1000000",
+                    "advLookbackPeriods": 20,
+                    "minimumAdvObservations": 5,
+                    "marketAmountScale": "1000",
+                    "maximumAllowedAdvParticipationRate": "0.10",
+                    "impactModel": {
+                        "type": "linear",
+                        "coefficient": "0.10",
+                    },
+                    "maximumAllowedModeledImpactRate": "0.01",
+                    "requestCount": 1,
+                    "coveredRequestCount": 1,
                     "medianAdvParticipationRate": 0.001,
-                    "p95AdvParticipationRate": 0.003,
-                    "maxAdvParticipationRate": 0.005,
-                    "impactModel": "冻结线性冲击模型",
+                    "p95AdvParticipationRate": 0.001,
+                    "maxAdvParticipationRate": 0.001,
+                    "maxModeledImpactRate": 0.0001,
+                    "passed": True,
+                    "observations": [
+                        {
+                            "executionDate": "2025-07-02",
+                            "tsCode": "510300.SH",
+                            "advObservations": 20,
+                            "requestedChange": 0.5,
+                            "advAmount": 500000000.0,
+                            "participationRate": 0.001,
+                            "modeledImpactRate": 0.0001,
+                        }
+                    ],
                 }
                 if complete_capacity
-                else {"status": "not_available", "reason": "未绑定 ADV 与资金规模"}
+                else {
+                    "status": "not_available",
+                    "policySha256": canonical_sha256(
+                        research_pass_policy["capacity"]
+                    ),
+                    "reason": "未绑定 ADV 与资金规模",
+                }
             ),
+            "riskSummary": {
+                "status": "complete",
+                "observations": 8,
+                "averageGrossExposure": 0.55,
+                "endingGrossExposure": 0.6,
+                "averageNetExposure": 0.55,
+                "endingNetExposure": 0.6,
+                "averageHhi": 0.42,
+                "endingHhi": 0.5,
+                "averagePortfolioVolatility": 0.11,
+                "endingPortfolioVolatility": 0.12,
+                "riskContributionObservations": 6,
+                "riskContributionEndDate": "2025-12-31",
+                "endingRiskContributions": [
+                    {
+                        "tsCode": "510300.SH",
+                        "closeWeight": 0.6,
+                        "totalRiskContribution": 0.12,
+                    }
+                ],
+                "unavailableReason": None,
+            },
         }
         if max_trials > 1:
             oos_metrics["dsr"] = (
@@ -551,7 +718,7 @@ class ResearchPublicationTest(unittest.TestCase):
                     "environment": {"sha256": "e" * 64, "timezone": "Asia/Shanghai"},
                     "limitations": ["仅用于发布合同验证"],
                     "boundaries": {"researchOnly": True, "executionEnabled": False},
-                    "artifactSchemaVersion": 4,
+                    "artifactSchemaVersion": 5,
                     "artifactHashes": artifact_hashes,
                     "resultFingerprint": result_fingerprint,
                 },
@@ -586,7 +753,10 @@ class ResearchPublicationTest(unittest.TestCase):
                 "trialBudget": {"maxTrials": max_trials},
                 "runConfig": config,
                 "sampleSplits": [dict(item) for item in sample_splits],
-                "reportContract": {"evaluationPolicy": evaluation_policy},
+                "reportContract": {
+                    "evaluationPolicy": evaluation_policy,
+                    "researchPassPolicy": research_pass_policy,
+                },
             }
             if plan_oos_start is not None:
                 plan_json["sampleSplits"][2]["startDate"] = plan_oos_start
@@ -605,7 +775,7 @@ class ResearchPublicationTest(unittest.TestCase):
                 strategy_id=strategy_id,
                 issue_number=issue_number,
                 version=1,
-                schema_version="research-plan/v2",
+                schema_version="research-plan/v3",
                 plan_sha256=f"{serial:064x}",
                 code_commit="c" * 40,
                 plan_json=plan_json,
@@ -841,6 +1011,44 @@ class ResearchPublicationTest(unittest.TestCase):
             readback_client=self.readback,
         )
 
+    def rewrite_oos_and_resign(self, run_id: str, mutate) -> None:
+        run_root = self.artifact_root / "runs" / run_id
+        oos_path = run_root / "oos_metrics.json"
+        metrics = json.loads(oos_path.read_text(encoding="utf-8"))
+        mutate(metrics)
+        oos_path.write_text(
+            json.dumps(
+                metrics,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        manifest_path = run_root / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        digest = sha256(oos_path.read_bytes()).hexdigest()
+        manifest["artifactHashes"]["oos_metrics.json"] = {
+            "filename": "oos_metrics.json",
+            "contentSha256": digest,
+            "fileSha256": digest,
+        }
+        fingerprint = build_result_fingerprint(manifest["artifactHashes"])
+        manifest["resultFingerprint"] = fingerprint
+        manifest_path.write_text(
+            json.dumps(
+                manifest,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        with self.Session.begin() as db:
+            db.get(ResearchRun, run_id).result_fingerprint = fingerprint
+
     def test_all_five_conclusions_and_failed_run_audit_can_be_published(self) -> None:
         conclusions = ("研究通过", "有条件候选", "证据不足", "受阻", "不通过")
         for serial, conclusion in enumerate(conclusions, start=1):
@@ -859,12 +1067,13 @@ class ResearchPublicationTest(unittest.TestCase):
         self.assertEqual(projection.conclusion, "受阻")
         self.assertEqual(self.github.issues[issue_number]["state"], "closed")
 
-    def test_real_runner_without_capacity_or_parameter_neighborhood_cannot_pass(
+    def test_real_runner_plan_bound_capacity_and_parameter_neighborhood_can_pass(
         self,
     ) -> None:
         with self.Session() as db:
             quality_run_id, universe_hash = seed_golden_database(db)
         config = golden_run_config(quality_run_id, universe_hash)
+        config["targetWeightParameters"]["signalDate"] = "2026-01-16"
         sample_splits = [
             {
                 "role": "train",
@@ -892,6 +1101,42 @@ class ResearchPublicationTest(unittest.TestCase):
             },
             "costStressMultiplier": "2",
         }
+        research_pass_policy = {
+            "parameterNeighborhood": {
+                "variants": [
+                    {"id": "base", "changes": []},
+                    {
+                        "id": "lower",
+                        "changes": [
+                            {
+                                "path": "targetWeightParameters.targetWeight",
+                                "value": "0.6",
+                            }
+                        ],
+                    },
+                    {
+                        "id": "upper",
+                        "changes": [
+                            {
+                                "path": "targetWeightParameters.targetWeight",
+                                "value": "0.8",
+                            }
+                        ],
+                    },
+                ],
+                "maximumAbsoluteOosReturnDifference": "0.20",
+                "minimumOosTotalReturn": "-0.20",
+            },
+            "capacity": {
+                "expectedCapital": "10000",
+                "advLookbackPeriods": 5,
+                "minimumAdvObservations": 3,
+                "marketAmountScale": "1000",
+                "maximumAdvParticipationRate": "0.10",
+                "impactModel": {"type": "linear", "coefficient": "0.10"},
+                "maximumModeledImpactRate": "0.01",
+            },
+        }
         config.update(
             {
                 "validationPolicy": {
@@ -907,6 +1152,7 @@ class ResearchPublicationTest(unittest.TestCase):
                 },
                 "evaluationSampleSplits": sample_splits,
                 "evaluationPolicy": evaluation_policy,
+                "researchPassPolicy": research_pass_policy,
             }
         )
         plan_id = "61000000-0000-0000-0000-000000000001"
@@ -928,7 +1174,10 @@ class ResearchPublicationTest(unittest.TestCase):
             "parameterSpace": {"singleRun": ["frozen"]},
             "trialBudget": {"maxTrials": 1},
             "gates": ["净成本门禁", "OOS 门禁", "复现身份门禁"],
-            "reportContract": {"evaluationPolicy": evaluation_policy},
+            "reportContract": {
+                "evaluationPolicy": evaluation_policy,
+                "researchPassPolicy": research_pass_policy,
+            },
         }
         with self.Session.begin() as db:
             db.add(
@@ -949,7 +1198,7 @@ class ResearchPublicationTest(unittest.TestCase):
                     strategy_id="sentinel_etf_baseline",
                     issue_number=issue_number,
                     version=1,
-                    schema_version="research-plan/v2",
+                    schema_version="research-plan/v3",
                     plan_sha256=canonical_sha256(plan_json),
                     code_commit="c" * 40,
                     plan_json=plan_json,
@@ -1077,21 +1326,20 @@ class ResearchPublicationTest(unittest.TestCase):
         )
 
         oos_metrics = json.loads((run.path / "oos_metrics.json").read_text())
-        self.assertEqual(oos_metrics["capacity"]["status"], "not_available")
+        self.assertEqual(oos_metrics["capacity"]["status"], "complete")
+        self.assertTrue(oos_metrics["capacity"]["passed"])
         self.assertEqual(
-            oos_metrics["parameterNeighborhood"]["status"], "not_available"
+            oos_metrics["parameterNeighborhood"]["status"], "complete"
         )
+        self.assertTrue(oos_metrics["parameterNeighborhood"]["passed"])
         with patch(
             "backend.app.research_publication.validate_research_archive",
             side_effect=validate_research_archive,
         ):
-            with self.assertRaisesRegex(
-                PublicationConflictError,
-                "市场环境指标无效|canonical 参数邻域证据",
-            ):
-                self.publish(formal_id, draft)
+            projection = self.publish(formal_id, draft)
 
-        self.assertEqual(self.github.issues[issue_number]["state"], "open")
+        self.assertEqual(projection.conclusion, "研究通过")
+        self.assertEqual(self.github.issues[issue_number]["state"], "closed")
 
     def test_each_conclusion_requires_meaningful_minimum_evidence(self) -> None:
         cases = (
@@ -1252,7 +1500,7 @@ class ResearchPublicationTest(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(
-            PublicationConflictError, "OOS 边界或评价策略与冻结研究计划不一致"
+            PublicationConflictError, "OOS 边界、评价策略或研究通过策略与冻结计划不一致"
         ):
             self.publish(
                 formal_id, self.draft(run_id, conclusion="研究通过")
@@ -1292,6 +1540,88 @@ class ResearchPublicationTest(unittest.TestCase):
                 capacity_formal_id,
                 self.draft(capacity_run_id, conclusion="研究通过"),
             )
+
+    def test_research_passed_rejects_plan_identity_and_risk_summary_tampering(
+        self,
+    ) -> None:
+        parameter_formal_id, parameter_run_id, _ = self.seed_research(95)
+        self.rewrite_oos_and_resign(
+            parameter_run_id,
+            lambda metrics: metrics["parameterNeighborhood"][
+                "configurations"
+            ][0].update({"configSha256": "0" * 64}),
+        )
+        with self.assertRaisesRegex(
+            PublicationConflictError, "参数邻域配置身份与冻结计划不一致"
+        ):
+            self.publish(
+                parameter_formal_id,
+                self.draft(parameter_run_id, conclusion="研究通过"),
+            )
+
+        capacity_formal_id, capacity_run_id, _ = self.seed_research(96)
+        self.rewrite_oos_and_resign(
+            capacity_run_id,
+            lambda metrics: metrics["capacity"].update(
+                {"expectedCapital": "2000000"}
+            ),
+        )
+        with self.assertRaisesRegex(
+            PublicationConflictError, "容量合同与冻结计划不一致"
+        ):
+            self.publish(
+                capacity_formal_id,
+                self.draft(capacity_run_id, conclusion="研究通过"),
+            )
+
+        risk_formal_id, risk_run_id, _ = self.seed_research(97)
+        self.rewrite_oos_and_resign(
+            risk_run_id,
+            lambda metrics: metrics["riskSummary"].update(
+                {
+                    "riskContributionObservations": 0,
+                    "endingRiskContributions": [],
+                }
+            ),
+        )
+        with self.assertRaisesRegex(
+            PublicationConflictError, "缺少可用总风险贡献"
+        ):
+            self.publish(
+                risk_formal_id,
+                self.draft(risk_run_id, conclusion="研究通过"),
+            )
+
+    def test_research_passed_rejects_missing_regime_execution_facts(self) -> None:
+        formal_id, run_id, _ = self.seed_research(98)
+
+        def remove_execution_count(metrics):
+            del metrics["marketRegimes"]["cells"]["上涨_低波"][
+                "executionCount"
+            ]
+
+        self.rewrite_oos_and_resign(run_id, remove_execution_count)
+        with self.assertRaisesRegex(
+            PublicationConflictError, "市场环境单元缺少指标.*executionCount"
+        ):
+            self.publish(formal_id, self.draft(run_id, conclusion="研究通过"))
+
+    def test_report_natively_displays_execution_and_risk_summary(self) -> None:
+        formal_id, run_id, _ = self.seed_research(99)
+        projection = self.publish(
+            formal_id, self.draft(run_id, conclusion="研究通过")
+        )
+        with self.Session() as db:
+            report = render_evaluation_report(
+                db,
+                self.artifact_root,
+                str(projection.evaluation_id),
+            )
+        self.assertIn("warmupStartDate", report)
+        self.assertIn("executionCount", report)
+        self.assertIn("endingRiskContributions", report)
+        self.assertIn("成交请求数（executionCount）", report)
+        self.assertIn("组合风险与总风险贡献（riskSummary）", report)
 
     def test_research_passed_requires_structured_walk_forward_and_csv_evidence(
         self,

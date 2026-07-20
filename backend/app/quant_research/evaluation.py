@@ -18,10 +18,11 @@ from .run_config import (
     canonical_sha256,
     validate_evaluation_policy,
     validate_evaluation_sample_splits,
+    validate_research_pass_policy,
 )
 
 
-OOS_METRICS_SCHEMA_VERSION = "research-oos-metrics/v1"
+OOS_METRICS_SCHEMA_VERSION = "research-oos-metrics/v2"
 STRESSED_COST_FIELDS = ("buyRate", "sellRate", "slippageRate")
 
 
@@ -39,6 +40,258 @@ def build_cost_stress_config(config: Mapping[str, Any]) -> dict[str, Any]:
     return stressed
 
 
+def build_capacity_evidence(
+    config: Mapping[str, Any],
+    requests: pd.DataFrame,
+    market_bars: pd.DataFrame,
+    *,
+    dates: pd.DatetimeIndex,
+) -> dict[str, Any]:
+    pass_policy = config.get("researchPassPolicy")
+    if pass_policy is None:
+        return {
+            "status": "not_available",
+            "reason": "运行配置未冻结容量策略",
+        }
+    policy = validate_research_pass_policy(pass_policy, config)["capacity"]
+    required_requests = {"execution_date", "ts_code", "requested_change"}
+    required_bars = {"trade_date", "ts_code", "amount"}
+    if not required_requests.issubset(requests.columns) or not required_bars.issubset(
+        market_bars.columns
+    ):
+        raise ValueError("容量证据缺少请求或市场成交额字段")
+    date_values = set(pd.DatetimeIndex(dates))
+    request_frame = requests.loc[:, sorted(required_requests)].copy()
+    request_frame["execution_date"] = pd.to_datetime(
+        request_frame["execution_date"], errors="raise"
+    )
+    request_frame["ts_code"] = request_frame["ts_code"].astype(str).str.upper()
+    request_frame["requested_change"] = pd.to_numeric(
+        request_frame["requested_change"], errors="raise"
+    ).abs()
+    request_frame = request_frame[
+        request_frame["execution_date"].isin(date_values)
+        & request_frame["requested_change"].gt(1e-12)
+    ].sort_values(["execution_date", "ts_code"], kind="stable")
+    if request_frame.empty:
+        return {
+            "status": "not_available",
+            "policySha256": canonical_sha256(policy),
+            "reason": "冻结 test/OOS 没有可用于容量估算的调仓请求",
+        }
+    bars = market_bars.loc[:, sorted(required_bars)].copy()
+    bars["trade_date"] = pd.to_datetime(bars["trade_date"], errors="raise")
+    bars["ts_code"] = bars["ts_code"].astype(str).str.upper()
+    bars["amount"] = pd.to_numeric(bars["amount"], errors="coerce")
+    bars = bars.sort_values(["ts_code", "trade_date"], kind="stable")
+    valid_amounts = bars["amount"].dropna()
+    if (
+        bars.duplicated(["ts_code", "trade_date"]).any()
+        or (valid_amounts <= 0).any()
+        or not valid_amounts.map(math.isfinite).all()
+    ):
+        raise ValueError("容量市场成交额必须按标的/日期唯一且为正数")
+    expected_capital = float(policy["expectedCapital"])
+    amount_scale = float(policy["marketAmountScale"])
+    lookback = int(policy["advLookbackPeriods"])
+    minimum = int(policy["minimumAdvObservations"])
+    coefficient = float(policy["impactModel"]["coefficient"])
+    observations: list[dict[str, Any]] = []
+    uncovered: list[str] = []
+    for request in request_frame.itertuples(index=False):
+        history = bars[
+            bars["ts_code"].eq(request.ts_code)
+            & bars["trade_date"].lt(request.execution_date)
+        ].tail(lookback).dropna(subset=["amount"])
+        if len(history) < minimum:
+            uncovered.append(
+                f"{request.execution_date.date().isoformat()}:{request.ts_code}"
+            )
+            continue
+        adv = float(history["amount"].mean()) * amount_scale
+        participation = expected_capital * float(request.requested_change) / adv
+        modeled_impact = coefficient * participation
+        if not math.isfinite(participation) or not math.isfinite(modeled_impact):
+            raise ValueError("容量参与率或冲击率不是有限数")
+        observations.append(
+            {
+                "executionDate": request.execution_date.date().isoformat(),
+                "tsCode": request.ts_code,
+                "advObservations": int(len(history)),
+                "requestedChange": float(request.requested_change),
+                "advAmount": adv,
+                "participationRate": participation,
+                "modeledImpactRate": modeled_impact,
+            }
+        )
+    if uncovered:
+        return {
+            "status": "not_available",
+            "policySha256": canonical_sha256(policy),
+            "reason": "部分 OOS 请求缺少事前 ADV 历史：" + ", ".join(uncovered[:10]),
+            "requestCount": int(len(request_frame)),
+            "coveredRequestCount": int(len(observations)),
+        }
+    rates = pd.Series(
+        [item["participationRate"] for item in observations], dtype=float
+    )
+    impacts = pd.Series(
+        [item["modeledImpactRate"] for item in observations], dtype=float
+    )
+    maximum_participation = float(policy["maximumAdvParticipationRate"])
+    maximum_impact = float(policy["maximumModeledImpactRate"])
+    return {
+        "status": "complete",
+        "policySha256": canonical_sha256(policy),
+        "expectedCapital": policy["expectedCapital"],
+        "advLookbackPeriods": lookback,
+        "minimumAdvObservations": minimum,
+        "marketAmountScale": policy["marketAmountScale"],
+        "maximumAllowedAdvParticipationRate": policy[
+            "maximumAdvParticipationRate"
+        ],
+        "impactModel": policy["impactModel"],
+        "maximumAllowedModeledImpactRate": policy[
+            "maximumModeledImpactRate"
+        ],
+        "requestCount": int(len(request_frame)),
+        "coveredRequestCount": int(len(observations)),
+        "medianAdvParticipationRate": float(rates.median()),
+        "p95AdvParticipationRate": float(rates.quantile(0.95)),
+        "maxAdvParticipationRate": float(rates.max()),
+        "maxModeledImpactRate": float(impacts.max()),
+        "passed": bool(
+            float(rates.max()) <= maximum_participation
+            and float(impacts.max()) <= maximum_impact
+        ),
+        "observations": observations,
+    }
+
+
+def build_risk_summary(
+    exposures: pd.DataFrame | None,
+    contributions: pd.DataFrame | None,
+    *,
+    dates: pd.DatetimeIndex,
+) -> dict[str, Any]:
+    if exposures is None or contributions is None:
+        return {
+            "status": "not_available",
+            "reason": "运行未生成冻结风险暴露与风险贡献工件",
+        }
+    required_exposures = {
+        "trade_date",
+        "gross_exposure",
+        "net_exposure",
+        "cash_weight",
+        "max_weight",
+        "hhi",
+    }
+    required_contributions = {
+        "trade_date",
+        "ts_code",
+        "close_weight",
+        "total_risk_contribution",
+        "portfolio_volatility",
+    }
+    if not required_exposures.issubset(
+        exposures.columns
+    ) or not required_contributions.issubset(contributions.columns):
+        raise ValueError("风险汇总缺少暴露或风险贡献字段")
+    date_values = set(pd.DatetimeIndex(dates))
+    exposure_frame = exposures.copy()
+    contribution_frame = contributions.copy()
+    exposure_frame["trade_date"] = pd.to_datetime(
+        exposure_frame["trade_date"], errors="raise"
+    )
+    contribution_frame["trade_date"] = pd.to_datetime(
+        contribution_frame["trade_date"], errors="raise"
+    )
+    exposure_frame = exposure_frame[
+        exposure_frame["trade_date"].isin(date_values)
+    ].sort_values("trade_date", kind="stable")
+    contribution_frame = contribution_frame[
+        contribution_frame["trade_date"].isin(date_values)
+    ].sort_values(["trade_date", "ts_code"], kind="stable")
+    if exposure_frame.empty or len(exposure_frame) != len(date_values):
+        raise ValueError("风险暴露未完整覆盖冻结 test/OOS 日期")
+    numeric_exposure = (
+        "gross_exposure",
+        "net_exposure",
+        "cash_weight",
+        "max_weight",
+        "hhi",
+    )
+    for column in numeric_exposure:
+        exposure_frame[column] = pd.to_numeric(
+            exposure_frame[column], errors="raise"
+        )
+    for column in (
+        "close_weight",
+        "total_risk_contribution",
+        "portfolio_volatility",
+    ):
+        contribution_frame[column] = pd.to_numeric(
+            contribution_frame[column], errors="coerce"
+        )
+    volatility = contribution_frame.dropna(subset=["portfolio_volatility"])[
+        ["trade_date", "portfolio_volatility"]
+    ].drop_duplicates("trade_date")
+    contribution_available = contribution_frame.dropna(
+        subset=["total_risk_contribution", "portfolio_volatility"]
+    )
+    ending_contributions: list[dict[str, Any]] = []
+    ending_volatility: float | None = None
+    risk_contribution_end_date: str | None = None
+    if not contribution_available.empty:
+        ending_date = contribution_available["trade_date"].max()
+        risk_contribution_end_date = ending_date.date().isoformat()
+        ending = contribution_available[
+            contribution_available["trade_date"].eq(ending_date)
+        ].copy()
+        ending = ending.reindex(
+            ending["total_risk_contribution"].abs().sort_values(
+                ascending=False, kind="stable"
+            ).index
+        )
+        ending_volatility = float(ending["portfolio_volatility"].iloc[0])
+        ending_contributions = [
+            {
+                "tsCode": str(row.ts_code),
+                "closeWeight": float(row.close_weight),
+                "totalRiskContribution": float(row.total_risk_contribution),
+            }
+            for row in ending.itertuples(index=False)
+        ]
+    last = exposure_frame.iloc[-1]
+    return {
+        "status": "complete",
+        "observations": int(len(exposure_frame)),
+        "averageGrossExposure": float(exposure_frame["gross_exposure"].mean()),
+        "endingGrossExposure": float(last["gross_exposure"]),
+        "averageNetExposure": float(exposure_frame["net_exposure"].mean()),
+        "endingNetExposure": float(last["net_exposure"]),
+        "averageHhi": float(exposure_frame["hhi"].mean()),
+        "endingHhi": float(last["hhi"]),
+        "averagePortfolioVolatility": (
+            float(volatility["portfolio_volatility"].mean())
+            if not volatility.empty
+            else None
+        ),
+        "endingPortfolioVolatility": ending_volatility,
+        "riskContributionObservations": int(
+            contribution_available["trade_date"].nunique()
+        ),
+        "riskContributionEndDate": risk_contribution_end_date,
+        "endingRiskContributions": ending_contributions,
+        "unavailableReason": (
+            None
+            if ending_contributions
+            else "冻结风险窗口尚未形成可用组合波动与风险贡献"
+        ),
+    }
+
+
 def build_oos_metrics(
     config: Mapping[str, Any],
     nav: pd.DataFrame,
@@ -49,6 +302,10 @@ def build_oos_metrics(
     stressed_nav: pd.DataFrame,
     *,
     walk_forward: Mapping[str, Any] | None,
+    parameter_neighborhood: Mapping[str, Any] | None = None,
+    capacity: Mapping[str, Any] | None = None,
+    risk_exposures: pd.DataFrame | None = None,
+    risk_contributions: pd.DataFrame | None = None,
 ) -> dict[str, Any]:
     splits_value = config.get("evaluationSampleSplits")
     policy_value = config.get("evaluationPolicy")
@@ -107,6 +364,7 @@ def build_oos_metrics(
         "sampleRole": "test_oos",
         "sampleStartDate": test_split["startDate"],
         "sampleEndDate": test_split["endDate"],
+        "warmupStartDate": str(config["warmupStart"]),
         "sampleSplitSha256": canonical_sha256(splits),
         "evaluationPolicy": policy,
         "evaluationPolicySha256": canonical_sha256(policy),
@@ -133,10 +391,25 @@ def build_oos_metrics(
             policy["marketRegime"],
         ),
         "walkForward": dict(walk_forward) if walk_forward is not None else None,
-        "parameterNeighborhood": {
-            "status": "not_available",
-            "reason": "当前运行未执行冻结参数邻域；不得据此判定研究通过",
-        },
+        "parameterNeighborhood": (
+            dict(parameter_neighborhood)
+            if parameter_neighborhood is not None
+            else {
+                "status": "not_available",
+                **(
+                    {
+                        "policySha256": canonical_sha256(
+                            validate_research_pass_policy(
+                                config["researchPassPolicy"], config
+                            )["parameterNeighborhood"]
+                        )
+                    }
+                    if "researchPassPolicy" in config
+                    else {}
+                ),
+                "reason": "当前运行未绑定冻结参数邻域；不得据此判定研究通过",
+            }
+        ),
         "costStress": {
             "multiplier": policy["costStressMultiplier"],
             "baseTotalReturn": core["totalReturn"],
@@ -145,10 +418,30 @@ def build_oos_metrics(
                 stressed_core["totalReturn"] - core["totalReturn"]
             ),
         },
-        "capacity": {
-            "status": "not_available",
-            "reason": "当前运行未绑定预期资金规模、ADV 参与率与冲击模型",
-        },
+        "capacity": (
+            dict(capacity)
+            if capacity is not None
+            else {
+                "status": "not_available",
+                **(
+                    {
+                        "policySha256": canonical_sha256(
+                            validate_research_pass_policy(
+                                config["researchPassPolicy"], config
+                            )["capacity"]
+                        )
+                    }
+                    if "researchPassPolicy" in config
+                    else {}
+                ),
+                "reason": "当前运行未绑定预期资金规模、ADV 参与率与冲击模型",
+            }
+        ),
+        "riskSummary": build_risk_summary(
+            risk_exposures,
+            risk_contributions,
+            dates=oos_dates,
+        ),
     }
 
 
@@ -176,9 +469,16 @@ def validate_oos_metrics_contract(
     policy = validate_evaluation_policy(policy_value)
     test_split = next(item for item in splits if item["role"] == "test_oos")
     required = {
+        "warmupStartDate",
         "startDate",
         "endDate",
         "observations",
+        "openTradingDays",
+        "rebalanceCount",
+        "requestCount",
+        "executionCount",
+        "blockedCount",
+        "independentTradeCount",
         "totalReturn",
         "annualizedVolatility",
         "maxDrawdown",
@@ -187,6 +487,12 @@ def validate_oos_metrics_contract(
         "cumulativeTransactionCostRate",
         "blockedRequestRate",
         "maxSingleWeight",
+        "averageGrossExposure",
+        "endingGrossExposure",
+        "averageNetExposure",
+        "endingNetExposure",
+        "averageHhi",
+        "endingHhi",
         "var95",
         "es95",
         "yearly",
@@ -195,12 +501,14 @@ def validate_oos_metrics_contract(
         "parameterNeighborhood",
         "costStress",
         "capacity",
+        "riskSummary",
     }
     if (
         metrics.get("status") != "complete"
         or metrics.get("sampleRole") != "test_oos"
         or metrics.get("sampleStartDate") != test_split["startDate"]
         or metrics.get("sampleEndDate") != test_split["endDate"]
+        or metrics.get("warmupStartDate") != str(config["warmupStart"])
         or metrics.get("sampleSplitSha256") != canonical_sha256(splits)
         or metrics.get("evaluationPolicy") != policy
         or metrics.get("evaluationPolicySha256") != canonical_sha256(policy)
@@ -211,6 +519,20 @@ def validate_oos_metrics_contract(
         raise ValueError("OOS 指标缺少字段：" + ", ".join(missing))
     if not isinstance(metrics["yearly"], dict) or not metrics["yearly"]:
         raise ValueError("OOS 指标缺少逐年拆分")
+    for field in (
+        "observations",
+        "openTradingDays",
+        "rebalanceCount",
+        "requestCount",
+        "executionCount",
+        "blockedCount",
+        "independentTradeCount",
+    ):
+        value = metrics[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"OOS 计数字段无效：{field}")
+    if metrics["openTradingDays"] != metrics["observations"]:
+        raise ValueError("OOS 开市日数必须与 NAV 观察数一致")
     regimes = metrics["marketRegimes"]
     if not isinstance(regimes, dict) or regimes.get("policy") != policy["marketRegime"]:
         raise ValueError("OOS 市场环境拆分未绑定冻结策略")
@@ -232,6 +554,12 @@ def validate_oos_metrics_contract(
         or walk_forward["testObservationCount"] <= 0
     ):
         raise ValueError("OOS 指标缺少结构化 walk-forward 证据")
+    research_pass_policy = config.get("researchPassPolicy")
+    normalized_pass_policy = (
+        validate_research_pass_policy(research_pass_policy, config)
+        if research_pass_policy is not None
+        else None
+    )
     for field, label in (
         ("parameterNeighborhood", "参数邻域"),
         ("capacity", "容量"),
@@ -246,6 +574,28 @@ def validate_oos_metrics_contract(
             evidence.get("reason"), str
         ):
             raise ValueError(f"OOS {label}缺失必须说明原因")
+        if normalized_pass_policy is not None:
+            expected_policy = normalized_pass_policy[
+                "parameterNeighborhood" if field == "parameterNeighborhood" else "capacity"
+            ]
+            if evidence.get("policySha256") != canonical_sha256(expected_policy):
+                raise ValueError(f"OOS {label}证据未绑定冻结研究通过策略")
+    risk_summary = metrics["riskSummary"]
+    risk_policy = config.get("riskPolicy")
+    if (
+        not isinstance(risk_summary, dict)
+        or risk_summary.get("status") not in {"complete", "not_available"}
+    ):
+        raise ValueError("OOS 风险汇总状态无效")
+    if (
+        isinstance(risk_policy, Mapping)
+        and risk_policy.get("mode") != "none"
+        and (
+            risk_summary.get("status") != "complete"
+            or risk_summary.get("observations") != metrics["observations"]
+        )
+    ):
+        raise ValueError("OOS 风险汇总未完整覆盖冻结 test/OOS")
 
 
 def _yearly_metrics(

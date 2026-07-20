@@ -210,19 +210,38 @@ def summarize_execution_metrics(
     if (position_frame["close_weight"] < 0).any():
         raise ValueError("持仓权重不能为负")
     position_totals = position_frame.groupby("trade_date")["close_weight"].sum()
+    position_gross = position_frame.assign(
+        absolute_weight=position_frame["close_weight"].abs()
+    ).groupby("trade_date")["absolute_weight"].sum()
     holding_counts = position_frame.groupby("trade_date")["ts_code"].nunique()
     hhi = position_frame.assign(square=position_frame["close_weight"] ** 2).groupby("trade_date")["square"].sum()
     counts: list[float] = []
     hhi_values: list[float] = []
+    gross_values: list[float] = []
+    net_values: list[float] = []
     for row in nav_frame.itertuples(index=False):
         invested = float(position_totals.get(row.trade_date, 0.0))
         if abs(invested + float(row.cash_weight) - 1.0) > 1e-9:
             raise ValueError("每日现金和持仓权重不闭合")
         counts.append(float(holding_counts.get(row.trade_date, 0)))
         hhi_values.append(float(hhi.get(row.trade_date, 0.0)))
+        gross_values.append(float(position_gross.get(row.trade_date, 0.0)))
+        net_values.append(invested)
 
     total_requests = len(execution_frame)
+    executed = execution_frame["executed_change"].gt(1e-10)
+    blocked = execution_frame["blocked_change"].gt(1e-10)
     return {
+        "openTradingDays": int(len(nav_frame)),
+        "rebalanceCount": int(request_frame["execution_date"].nunique()),
+        "requestCount": int(total_requests),
+        "executionCount": int(executed.sum()),
+        "blockedCount": int(blocked.sum()),
+        "independentTradeCount": int(
+            execution_frame.loc[executed, ["execution_date", "ts_code"]]
+            .drop_duplicates()
+            .shape[0]
+        ),
         "averageOneWayTurnover": float(nav_frame["one_way_turnover"].mean()),
         "maxOneWayTurnover": float(nav_frame["one_way_turnover"].max()),
         "cumulativeTransactionCostRate": float(nav_frame["transaction_cost_rate"].sum()),
@@ -231,6 +250,11 @@ def summarize_execution_metrics(
         "maxSingleWeight": float(position_frame["close_weight"].max()) if not position_frame.empty else 0.0,
         "averageHhi": float(pd.Series(hhi_values).mean()),
         "maxHhi": float(max(hhi_values, default=0.0)),
+        "endingHhi": float(hhi_values[-1]) if hhi_values else 0.0,
+        "averageGrossExposure": float(pd.Series(gross_values).mean()),
+        "endingGrossExposure": float(gross_values[-1]) if gross_values else 0.0,
+        "averageNetExposure": float(pd.Series(net_values).mean()),
+        "endingNetExposure": float(net_values[-1]) if net_values else 0.0,
         "blockedRequestRate": (
             float(execution_frame["status"].eq("blocked").mean()) if total_requests else 0.0
         ),

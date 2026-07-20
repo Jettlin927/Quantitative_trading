@@ -64,23 +64,68 @@ APP_COMMIT = "c" * 40
 
 def valid_plan_payload() -> dict:
     config = json.loads(
-        (REPO_ROOT / "configs/research/etf_trend_baseline.json").read_text(
+        (
+            REPO_ROOT
+            / "configs/research/etf_volatility_managed_baseline.json"
+        ).read_text(
             encoding="utf-8"
         )
     )
     config["qualityRunId"] = "quality-ready"
+    config["startDate"] = "2025-12-01"
     config["validationPolicy"] = {
         "mode": "anchored",
         "trainPeriods": 60,
         "testPeriods": 20,
         "stepPeriods": 20,
     }
+    config["riskPolicy"] = {
+        "mode": "rolling_covariance",
+        "lookbackPeriods": 60,
+        "minPeriods": 20,
+    }
+    research_pass_policy = {
+        "parameterNeighborhood": {
+            "variants": [
+                {"id": "base", "changes": []},
+                {
+                    "id": "lower",
+                    "changes": [
+                        {
+                            "path": "featureParameters.exposurePower",
+                            "value": "0.5",
+                        }
+                    ],
+                },
+                {
+                    "id": "upper",
+                    "changes": [
+                        {
+                            "path": "featureParameters.realizedVarianceEstimator",
+                            "value": "trailing_3_month_mean",
+                        }
+                    ],
+                },
+            ],
+            "maximumAbsoluteOosReturnDifference": "0.20",
+            "minimumOosTotalReturn": "-0.20",
+        },
+        "capacity": {
+            "expectedCapital": "1000000",
+            "advLookbackPeriods": 20,
+            "minimumAdvObservations": 5,
+            "marketAmountScale": "1000",
+            "maximumAdvParticipationRate": "0.10",
+            "impactModel": {"type": "linear", "coefficient": "0.10"},
+            "maximumModeledImpactRate": "0.01",
+        },
+    }
     return {
-        "schemaVersion": "research-plan/v2",
+        "schemaVersion": "research-plan/v3",
         "strategy": {
             "id": config["strategyId"],
             "version": config["strategyVersion"],
-            "displayName": "ETF 趋势基线",
+            "displayName": "ETF 波动率管理基线",
             "codeCommit": APP_COMMIT,
         },
         "economicHypothesis": "中期趋势在承担显式成本后可能保持可复现的风险调整收益。",
@@ -105,10 +150,18 @@ def valid_plan_payload() -> dict:
         "reportContract": {
             "language": "zh-CN",
             "requiredArtifacts": [
-                "report.html",
-                "oos_metrics.json",
-                "metrics.json",
+                "benchmark_nav.csv.gz",
                 "manifest.json",
+                "metrics.json",
+                "oos_metrics.json",
+                "positions.csv.gz",
+                "rebalance_executions.csv.gz",
+                "rebalance_requests.csv.gz",
+                "report.html",
+                "risk_contributions.csv.gz",
+                "risk_exposures.csv.gz",
+                "walk_forward_metrics.csv.gz",
+                "walk_forward_windows.csv.gz",
             ],
             "conclusionValues": [
                 "研究通过",
@@ -127,6 +180,7 @@ def valid_plan_payload() -> dict:
                 },
                 "costStressMultiplier": "2",
             },
+            "researchPassPolicy": research_pass_policy,
         },
     }
 
@@ -184,19 +238,26 @@ class ResearchPlanContractTest(unittest.TestCase):
         )[0]
         payload = json.loads(machine_json.strip().removeprefix("```json").removesuffix("```").strip())
         valid = valid_plan_payload()
-        for field in ("strategy", "economicHypothesis", "runConfig", "sampleSplits"):
+        for field in (
+            "strategy",
+            "economicHypothesis",
+            "runConfig",
+            "sampleSplits",
+            "reportContract",
+        ):
             payload[field] = deepcopy(valid[field])
 
         prepared = prepare_research_plan(
             issue_body(payload), verify_universe_source=False
         )
 
-        self.assertEqual(prepared.normalized["schemaVersion"], "research-plan/v2")
+        self.assertEqual(prepared.normalized["schemaVersion"], "research-plan/v3")
         self.assertIn(
             "oos_metrics.json",
             prepared.normalized["reportContract"]["requiredArtifacts"],
         )
         self.assertIn("evaluationPolicy", prepared.normalized["reportContract"])
+        self.assertIn("researchPassPolicy", prepared.normalized["reportContract"])
 
     def test_canonical_hash_is_stable_for_key_and_set_order(self) -> None:
         payload = valid_plan_payload()
@@ -213,6 +274,13 @@ class ResearchPlanContractTest(unittest.TestCase):
         changed = deepcopy(payload)
         changed["economicHypothesis"] += " 新证据会推翻该假设。"
         self.assertNotEqual(first.plan_sha256, prepare(changed).plan_sha256)
+        changed_capacity = deepcopy(payload)
+        changed_capacity["reportContract"]["researchPassPolicy"]["capacity"][
+            "expectedCapital"
+        ] = "2000000"
+        self.assertNotEqual(
+            first.plan_sha256, prepare(changed_capacity).plan_sha256
+        )
 
     def test_float_and_over_budget_plan_are_rejected(self) -> None:
         floating = valid_plan_payload()
@@ -240,7 +308,7 @@ class ResearchPlanContractTest(unittest.TestCase):
             prepare(payload)
         payload = valid_plan_payload()
         payload["runConfig"]["executionPolicy"]["executionPrice"] = "close"
-        with self.assertRaisesRegex(ResearchPlanError, "下一交易日"):
+        with self.assertRaisesRegex(ResearchPlanError, "下一.*日"):
             prepare(payload)
 
         payload = valid_plan_payload()
@@ -261,6 +329,20 @@ class ResearchPlanContractTest(unittest.TestCase):
             prepare(payload)
 
         payload = valid_plan_payload()
+        payload["reportContract"]["researchPassPolicy"][
+            "parameterNeighborhood"
+        ]["variants"][1]["changes"][0]["path"] = "costModel.buyRate"
+        with self.assertRaisesRegex(ResearchPlanError, "参数邻域"):
+            prepare(payload)
+
+        payload = valid_plan_payload()
+        payload["reportContract"]["researchPassPolicy"][
+            "parameterNeighborhood"
+        ]["variants"][1]["changes"][0]["value"] = "1"
+        with self.assertRaisesRegex(ResearchPlanError, "不同的实际参数"):
+            prepare(payload)
+
+        payload = valid_plan_payload()
         payload["sampleSplits"][0]["startDate"] = "20251201"
         payload["runConfig"]["startDate"] = "20251201"
         with self.assertRaisesRegex(ResearchPlanError, "YYYY-MM-DD"):
@@ -271,7 +353,7 @@ class ResearchPlanContractTest(unittest.TestCase):
     ) -> None:
         body = (
             f"{PLAN_START_MARKER}\n"
-            '{"schemaVersion":"research-plan/v2","schemaVersion":"other"}'
+            '{"schemaVersion":"research-plan/v3","schemaVersion":"other"}'
             f"\n{PLAN_END_MARKER}"
         )
         with self.assertRaisesRegex(ResearchPlanError, "不允许重复键：schemaVersion"):

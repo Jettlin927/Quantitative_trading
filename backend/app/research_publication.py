@@ -52,7 +52,13 @@ from .models import (
 from .quant_research.artifacts import atomic_write_bytes
 from .quant_research.manifest import build_result_fingerprint
 from .quant_research.evaluation import validate_oos_metrics_contract
-from .quant_research.run_config import canonical_json_bytes, canonical_sha256
+from .quant_research.run_config import (
+    build_parameter_neighborhood_configs,
+    canonical_json_bytes,
+    canonical_run_config_sha256,
+    canonical_sha256,
+    validate_research_pass_policy,
+)
 from .quant_research.runner import validate_research_archive
 from .research_catalog import get_publication_projection, is_publication_effective
 from .research_orchestration import append_research_event, transition_orchestration
@@ -1759,9 +1765,16 @@ def _validate_research_pass_report_contract(
     runs: list[ResearchRun], plan: FrozenResearchPlan
 ) -> None:
     required_metrics = {
+        "warmupStartDate",
         "startDate",
         "endDate",
         "observations",
+        "openTradingDays",
+        "rebalanceCount",
+        "requestCount",
+        "executionCount",
+        "blockedCount",
+        "independentTradeCount",
         "totalReturn",
         "annualizedVolatility",
         "maxDrawdown",
@@ -1770,6 +1783,12 @@ def _validate_research_pass_report_contract(
         "cumulativeTransactionCostRate",
         "blockedRequestRate",
         "maxSingleWeight",
+        "averageGrossExposure",
+        "endingGrossExposure",
+        "averageNetExposure",
+        "endingNetExposure",
+        "averageHhi",
+        "endingHhi",
         "var95",
         "es95",
         "yearly",
@@ -1778,15 +1797,16 @@ def _validate_research_pass_report_contract(
         "parameterNeighborhood",
         "costStress",
         "capacity",
+        "riskSummary",
     }
     for run in runs:
         if run.status != "succeeded":
             continue
         root = Path(run.artifact_root)
         manifest = _read_canonical_json(root / "manifest.json", "manifest.json")
-        if manifest.get("artifactSchemaVersion", 1) < 4:
+        if manifest.get("artifactSchemaVersion", 1) < 5:
             raise PublicationConflictError(
-                "研究通过只接受含冻结 test/OOS 指标的归档 schema v4+"
+                "研究通过只接受由 Runner 生成冻结参数、容量与风险摘要的归档 schema v5+"
             )
         metrics = _read_canonical_json(
             root / "oos_metrics.json", "oos_metrics.json"
@@ -1806,6 +1826,7 @@ def _validate_research_pass_report_contract(
                 "evaluationSampleSplits",
                 "evaluationPolicy",
                 "riskPolicy",
+                "researchPassPolicy",
             }
             - set(config)
         )
@@ -1826,9 +1847,11 @@ def _validate_research_pass_report_contract(
             or not isinstance(report_contract, Mapping)
             or config.get("evaluationPolicy")
             != report_contract.get("evaluationPolicy")
+            or config.get("researchPassPolicy")
+            != report_contract.get("researchPassPolicy")
         ):
             raise PublicationConflictError(
-                "研究通过报告的 OOS 边界或评价策略与冻结研究计划不一致"
+                "研究通过报告的 OOS 边界、评价策略或研究通过策略与冻结计划不一致"
             )
         try:
             validate_oos_metrics_contract(metrics, config)
@@ -1847,9 +1870,12 @@ def _validate_research_pass_report_contract(
                 + ", ".join(missing_metrics)
             )
         _validate_research_pass_parameter_neighborhood(
-            metrics.get("parameterNeighborhood")
+            metrics.get("parameterNeighborhood"), config
         )
-        _validate_research_pass_capacity(metrics.get("capacity"))
+        _validate_research_pass_capacity(metrics.get("capacity"), config)
+        _validate_research_pass_risk_summary(
+            metrics.get("riskSummary"), metrics=metrics
+        )
         if not _read_canonical_benchmark_series(root, manifest):
             raise PublicationConflictError(
                 "研究通过报告缺少匹配基准的 canonical 净值路径"
@@ -1871,22 +1897,92 @@ def _validate_research_pass_report_contract(
             _validate_multiple_testing_metrics(metrics, max_trials=max_trials)
 
 
-def _validate_research_pass_parameter_neighborhood(value: Any) -> None:
+def _validate_research_pass_parameter_neighborhood(
+    value: Any, config: Mapping[str, Any]
+) -> None:
     if not isinstance(value, Mapping) or value.get("status") != "complete":
         raise PublicationConflictError(
             "研究通过报告必须冻结完整的 canonical 参数邻域证据"
         )
-    evaluated = value.get("evaluatedConfigurations")
-    conclusion = value.get("conclusion")
+    try:
+        policy = validate_research_pass_policy(
+            config.get("researchPassPolicy"), config
+        )["parameterNeighborhood"]
+        expected_configs = {
+            variant_id: candidate
+            for variant_id, candidate in build_parameter_neighborhood_configs(
+                config
+            )
+        }
+    except (TypeError, ValueError) as exc:
+        raise PublicationConflictError(
+            f"研究通过报告的冻结参数邻域策略无效：{exc}"
+        ) from exc
+    configurations = value.get("configurations")
     if (
-        isinstance(evaluated, bool)
-        or not isinstance(evaluated, int)
-        or evaluated < 3
-        or not isinstance(conclusion, str)
-        or not conclusion.strip()
+        value.get("policySha256") != canonical_sha256(policy)
+        or value.get("evaluatedConfigurations") != len(policy["variants"])
+        or value.get("maximumAllowedAbsoluteOosReturnDifference")
+        != policy["maximumAbsoluteOosReturnDifference"]
+        or value.get("minimumAllowedOosTotalReturn")
+        != policy["minimumOosTotalReturn"]
+        or not isinstance(configurations, list)
+        or len(configurations) != len(policy["variants"])
     ):
         raise PublicationConflictError(
-            "研究通过报告的参数邻域至少需要三个配置与明确结论"
+            "研究通过报告的参数邻域未逐项绑定冻结计划"
+        )
+    expected_variants = {item["id"]: item for item in policy["variants"]}
+    observed_returns: list[float] = []
+    seen_ids: set[str] = set()
+    for item in configurations:
+        if not isinstance(item, Mapping):
+            raise PublicationConflictError("研究通过报告包含无效参数邻域配置")
+        variant_id = item.get("id")
+        expected_variant = expected_variants.get(variant_id)
+        expected_config = expected_configs.get(variant_id)
+        if (
+            not isinstance(variant_id, str)
+            or variant_id in seen_ids
+            or expected_variant is None
+            or expected_config is None
+            or item.get("changes") != expected_variant["changes"]
+            or item.get("configSha256")
+            != canonical_run_config_sha256(expected_config)
+        ):
+            raise PublicationConflictError(
+                "研究通过报告的参数邻域配置身份与冻结计划不一致"
+            )
+        seen_ids.add(variant_id)
+        for field in ("totalReturn", "maxDrawdown"):
+            metric = item.get(field)
+            if (
+                isinstance(metric, bool)
+                or not isinstance(metric, (int, float))
+                or not math.isfinite(float(metric))
+            ):
+                raise PublicationConflictError(
+                    f"研究通过报告的参数邻域指标无效：{variant_id}/{field}"
+                )
+        observed_returns.append(float(item["totalReturn"]))
+    observed_difference = max(observed_returns) - min(observed_returns)
+    observed_minimum = min(observed_returns)
+    if (
+        seen_ids != set(expected_variants)
+        or not _numbers_close(
+            value.get("maximumObservedAbsoluteOosReturnDifference"),
+            observed_difference,
+        )
+        or not _numbers_close(
+            value.get("minimumObservedOosTotalReturn"), observed_minimum
+        )
+        or value.get("passed") is not True
+        or observed_difference
+        > float(policy["maximumAbsoluteOosReturnDifference"]) + 1e-12
+        or observed_minimum < float(policy["minimumOosTotalReturn"]) - 1e-12
+    ):
+        raise PublicationConflictError(
+            "研究通过报告的参数邻域结果未通过冻结阈值或汇总不闭合"
         )
 
 
@@ -1901,6 +1997,12 @@ def _validate_research_pass_market_regimes(
         "startDate",
         "endDate",
         "observations",
+        "openTradingDays",
+        "rebalanceCount",
+        "requestCount",
+        "executionCount",
+        "blockedCount",
+        "independentTradeCount",
         "totalReturn",
         "benchmarkTotalReturn",
         "activeTotalReturn",
@@ -1909,6 +2011,21 @@ def _validate_research_pass_market_regimes(
         "averageOneWayTurnover",
         "cumulativeTransactionCostRate",
         "blockedRequestRate",
+        "averageGrossExposure",
+        "endingGrossExposure",
+        "averageNetExposure",
+        "endingNetExposure",
+        "averageHhi",
+        "endingHhi",
+    }
+    count_fields = {
+        "observations",
+        "openTradingDays",
+        "rebalanceCount",
+        "requestCount",
+        "executionCount",
+        "blockedCount",
+        "independentTradeCount",
     }
     directions: set[str] = set()
     volatilities: set[str] = set()
@@ -1941,8 +2058,23 @@ def _validate_research_pass_market_regimes(
             raise PublicationConflictError(
                 f"研究通过报告的市场环境日期倒置：{name}"
             )
-        for field in required_fields - {"startDate", "endDate", "observations"}:
+        if any(
+            isinstance(cell[field], bool)
+            or not isinstance(cell[field], int)
+            or cell[field] < 0
+            for field in count_fields
+        ) or cell["openTradingDays"] != observations:
+            raise PublicationConflictError(
+                f"研究通过报告的市场环境计数字段无效：{name}"
+            )
+        for field in required_fields - {"startDate", "endDate"} - count_fields:
             metric = cell[field]
+            if (
+                field == "annualizedVolatility"
+                and metric is None
+                and observations == 1
+            ):
+                continue
             if isinstance(metric, bool) or not isinstance(metric, (int, float)):
                 raise PublicationConflictError(
                     f"研究通过报告的市场环境指标无效：{name}/{field}"
@@ -1977,16 +2109,42 @@ def _validate_research_pass_market_regimes(
         )
 
 
-def _validate_research_pass_capacity(value: Any) -> None:
+def _validate_research_pass_capacity(
+    value: Any, config: Mapping[str, Any]
+) -> None:
     if not isinstance(value, Mapping) or value.get("status") != "complete":
         raise PublicationConflictError(
             "研究通过报告必须冻结预期资金规模、ADV 参与率与冲击模型"
         )
+    try:
+        policy = validate_research_pass_policy(
+            config.get("researchPassPolicy"), config
+        )["capacity"]
+    except (TypeError, ValueError) as exc:
+        raise PublicationConflictError(
+            f"研究通过报告的冻结容量策略无效：{exc}"
+        ) from exc
+    if (
+        value.get("policySha256") != canonical_sha256(policy)
+        or value.get("expectedCapital") != policy["expectedCapital"]
+        or value.get("advLookbackPeriods") != policy["advLookbackPeriods"]
+        or value.get("minimumAdvObservations")
+        != policy["minimumAdvObservations"]
+        or value.get("marketAmountScale") != policy["marketAmountScale"]
+        or value.get("maximumAllowedAdvParticipationRate")
+        != policy["maximumAdvParticipationRate"]
+        or value.get("impactModel") != policy["impactModel"]
+        or value.get("maximumAllowedModeledImpactRate")
+        != policy["maximumModeledImpactRate"]
+    ):
+        raise PublicationConflictError(
+            "研究通过报告的容量合同与冻结计划不一致"
+        )
     required_numbers = (
-        "expectedCapital",
         "medianAdvParticipationRate",
         "p95AdvParticipationRate",
         "maxAdvParticipationRate",
+        "maxModeledImpactRate",
     )
     numbers: dict[str, float] = {}
     for field in required_numbers:
@@ -1997,15 +2155,199 @@ def _validate_research_pass_capacity(value: Any) -> None:
         if not math.isfinite(number) or number < 0:
             raise PublicationConflictError(f"研究通过报告的容量字段无效：{field}")
         numbers[field] = number
-    if numbers["expectedCapital"] <= 0 or not (
+    if not (
         numbers["medianAdvParticipationRate"]
         <= numbers["p95AdvParticipationRate"]
         <= numbers["maxAdvParticipationRate"]
     ):
         raise PublicationConflictError("研究通过报告的容量数值关系无效")
-    impact_model = value.get("impactModel")
-    if not isinstance(impact_model, str) or not impact_model.strip():
-        raise PublicationConflictError("研究通过报告缺少适用的冲击模型")
+    request_count = value.get("requestCount")
+    covered_count = value.get("coveredRequestCount")
+    observations = value.get("observations")
+    if (
+        isinstance(request_count, bool)
+        or not isinstance(request_count, int)
+        or request_count <= 0
+        or covered_count != request_count
+        or not isinstance(observations, list)
+        or len(observations) != request_count
+    ):
+        raise PublicationConflictError("研究通过报告的容量请求覆盖不完整")
+    observed_participation: list[float] = []
+    observed_impact: list[float] = []
+    for observation in observations:
+        if not isinstance(observation, Mapping):
+            raise PublicationConflictError("研究通过报告包含无效容量观察")
+        if (
+            not isinstance(observation.get("executionDate"), str)
+            or not isinstance(observation.get("tsCode"), str)
+            or isinstance(observation.get("advObservations"), bool)
+            or not isinstance(observation.get("advObservations"), int)
+            or observation["advObservations"] < policy["minimumAdvObservations"]
+            or observation["advObservations"] > policy["advLookbackPeriods"]
+        ):
+            raise PublicationConflictError("研究通过报告包含无效容量观察身份")
+        for field in (
+            "requestedChange",
+            "advAmount",
+            "participationRate",
+            "modeledImpactRate",
+        ):
+            metric = observation.get(field)
+            if (
+                isinstance(metric, bool)
+                or not isinstance(metric, (int, float))
+                or not math.isfinite(float(metric))
+                or float(metric) < 0
+            ):
+                raise PublicationConflictError(
+                    f"研究通过报告的容量观察字段无效：{field}"
+                )
+        requested_change = float(observation["requestedChange"])
+        adv_amount = float(observation["advAmount"])
+        if requested_change <= 0 or adv_amount <= 0:
+            raise PublicationConflictError("研究通过报告的容量请求或 ADV 必须大于零")
+        expected_participation = (
+            float(policy["expectedCapital"]) * requested_change / adv_amount
+        )
+        expected_impact = (
+            float(policy["impactModel"]["coefficient"])
+            * expected_participation
+        )
+        if not _numbers_close(
+            observation["participationRate"], expected_participation
+        ) or not _numbers_close(
+            observation["modeledImpactRate"], expected_impact
+        ):
+            raise PublicationConflictError(
+                "研究通过报告的容量观察未按冻结资金规模与冲击模型闭合"
+            )
+        observed_participation.append(float(observation["participationRate"]))
+        observed_impact.append(float(observation["modeledImpactRate"]))
+    maximum_participation = max(observed_participation)
+    maximum_impact = max(observed_impact)
+    if (
+        not _numbers_close(
+            numbers["medianAdvParticipationRate"],
+            _linear_quantile(observed_participation, 0.5),
+        )
+        or not _numbers_close(
+            numbers["p95AdvParticipationRate"],
+            _linear_quantile(observed_participation, 0.95),
+        )
+        or not _numbers_close(
+            numbers["maxAdvParticipationRate"], maximum_participation
+        )
+        or not _numbers_close(numbers["maxModeledImpactRate"], maximum_impact)
+        or value.get("passed") is not True
+        or maximum_participation
+        > float(policy["maximumAdvParticipationRate"]) + 1e-12
+        or maximum_impact > float(policy["maximumModeledImpactRate"]) + 1e-12
+    ):
+        raise PublicationConflictError(
+            "研究通过报告的容量结果未通过冻结阈值或汇总不闭合"
+        )
+
+
+def _validate_research_pass_risk_summary(
+    value: Any, *, metrics: Mapping[str, Any]
+) -> None:
+    expected_observations = metrics.get("observations")
+    if (
+        not isinstance(value, Mapping)
+        or value.get("status") != "complete"
+        or isinstance(expected_observations, bool)
+        or not isinstance(expected_observations, int)
+        or value.get("observations") != expected_observations
+        or value.get("riskContributionEndDate") != metrics.get("endDate")
+    ):
+        raise PublicationConflictError(
+            "研究通过报告的风险摘要未完整覆盖冻结 test/OOS"
+        )
+    for field in (
+        "averageGrossExposure",
+        "endingGrossExposure",
+        "averageNetExposure",
+        "endingNetExposure",
+        "averageHhi",
+        "endingHhi",
+        "averagePortfolioVolatility",
+        "endingPortfolioVolatility",
+    ):
+        metric = value.get(field)
+        if (
+            isinstance(metric, bool)
+            or not isinstance(metric, (int, float))
+            or not math.isfinite(float(metric))
+        ):
+            raise PublicationConflictError(
+                f"研究通过报告的风险摘要字段无效：{field}"
+            )
+    for risk_field, metric_field in (
+        ("averageGrossExposure", "averageGrossExposure"),
+        ("endingGrossExposure", "endingGrossExposure"),
+        ("averageNetExposure", "averageNetExposure"),
+        ("endingNetExposure", "endingNetExposure"),
+        ("averageHhi", "averageHhi"),
+        ("endingHhi", "endingHhi"),
+    ):
+        if not _numbers_close(value[risk_field], float(metrics[metric_field])):
+            raise PublicationConflictError(
+                "研究通过报告的风险摘要与持仓账本汇总不一致"
+            )
+    risk_observations = value.get("riskContributionObservations")
+    contributions = value.get("endingRiskContributions")
+    if (
+        isinstance(risk_observations, bool)
+        or not isinstance(risk_observations, int)
+        or risk_observations <= 0
+        or not isinstance(contributions, list)
+        or not contributions
+    ):
+        raise PublicationConflictError("研究通过报告缺少可用总风险贡献")
+    contribution_total = 0.0
+    for contribution in contributions:
+        if (
+            not isinstance(contribution, Mapping)
+            or not isinstance(contribution.get("tsCode"), str)
+            or not contribution["tsCode"].strip()
+        ):
+            raise PublicationConflictError("研究通过报告包含无效风险贡献身份")
+        for field in ("closeWeight", "totalRiskContribution"):
+            metric = contribution.get(field)
+            if (
+                isinstance(metric, bool)
+                or not isinstance(metric, (int, float))
+                or not math.isfinite(float(metric))
+            ):
+                raise PublicationConflictError(
+                    f"研究通过报告的风险贡献字段无效：{field}"
+                )
+        contribution_total += float(contribution["totalRiskContribution"])
+    if not _numbers_close(
+        contribution_total, value["endingPortfolioVolatility"]
+    ):
+        raise PublicationConflictError("研究通过报告的风险贡献之和与组合波动不闭合")
+
+
+def _numbers_close(value: Any, expected: float) -> bool:
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and math.isfinite(float(value))
+        and math.isclose(float(value), expected, rel_tol=1e-10, abs_tol=1e-12)
+    )
+
+
+def _linear_quantile(values: list[float], quantile: float) -> float:
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * quantile
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return ordered[lower]
+    weight = position - lower
+    return ordered[lower] * (1 - weight) + ordered[upper] * weight
 
 
 def _validate_multiple_testing_metrics(
@@ -3317,15 +3659,29 @@ def _run_execution_html(run: Mapping[str, Any]) -> str:
             if isinstance(config, Mapping)
             else "not_available"
         ),
-        "turnoverAndCosts": _select_mapping(
+        "executionFacts": _select_mapping(
             metrics,
             (
+                "warmupStartDate",
+                "sampleStartDate",
+                "sampleEndDate",
+                "observations",
+                "openTradingDays",
+                "rebalanceCount",
+                "requestCount",
+                "executionCount",
+                "blockedCount",
+                "independentTradeCount",
                 "averageOneWayTurnover",
                 "maxOneWayTurnover",
                 "cumulativeTransactionCostRate",
                 "blockedRequestRate",
                 "partialRequestRate",
                 "cumulativeBlockedChange",
+                "averageGrossExposure",
+                "endingGrossExposure",
+                "averageNetExposure",
+                "endingNetExposure",
             ),
         ),
     }
@@ -3418,6 +3774,7 @@ def _run_risk_html(run: Mapping[str, Any]) -> str:
                 "volatility",
                 "skew",
                 "kurtosis",
+                "risk",
             )
         )
     }
@@ -3613,9 +3970,18 @@ def _mapping_table(source: Mapping[str, Any]) -> str:
 
 def _metric_label(key: str) -> str:
     labels = {
+        "warmupStartDate": "预热开始日（warmupStartDate）",
+        "sampleStartDate": "样本外开始日（sampleStartDate）",
+        "sampleEndDate": "样本外结束日（sampleEndDate）",
         "startDate": "研究开始日（startDate）",
         "endDate": "研究结束日（endDate）",
         "observations": "样本数（observations）",
+        "openTradingDays": "开市日数（openTradingDays）",
+        "rebalanceCount": "调仓次数（rebalanceCount）",
+        "requestCount": "调仓请求数（requestCount）",
+        "executionCount": "成交请求数（executionCount）",
+        "blockedCount": "受阻请求数（blockedCount）",
+        "independentTradeCount": "独立交易数（independentTradeCount）",
         "totalReturn": "累计收益（totalReturn）",
         "annualizedReturn": "年化收益（annualizedReturn）",
         "annualizedVolatility": "年化波动率（annualizedVolatility）",
@@ -3625,10 +3991,17 @@ def _metric_label(key: str) -> str:
         "cumulativeTransactionCostRate": "累计交易成本率（cumulativeTransactionCostRate）",
         "blockedRequestRate": "受阻请求比率（blockedRequestRate）",
         "maxSingleWeight": "最大单一权重（maxSingleWeight）",
+        "averageGrossExposure": "平均总暴露（averageGrossExposure）",
+        "endingGrossExposure": "期末总暴露（endingGrossExposure）",
+        "averageNetExposure": "平均净暴露（averageNetExposure）",
+        "endingNetExposure": "期末净暴露（endingNetExposure）",
+        "averageHhi": "平均集中度 HHI（averageHhi）",
+        "endingHhi": "期末集中度 HHI（endingHhi）",
         "var95": "95% 风险价值（var95）",
         "es95": "95% 预期短缺（es95）",
         "grossExposure": "总暴露（grossExposure）",
         "cashWeight": "现金权重（cashWeight）",
+        "riskSummary": "组合风险与总风险贡献（riskSummary）",
     }
     return labels.get(key, f"原始指标（{key}）")
 
