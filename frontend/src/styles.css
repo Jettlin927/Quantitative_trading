@@ -1605,7 +1605,7 @@ button:disabled {
 .cockpit-metrics,
 .inventory-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(130px, 1fr));
+  grid-template-columns: repeat(6, minmax(130px, 1fr));
   border: 1px solid var(--line);
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -2117,14 +2117,29 @@ button:disabled {
   overflow: auto;
 }
 
-.catalog-list > div:not(.empty-state) {
+.catalog-list > button {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
   min-height: 47px;
+  border: 0;
   border-bottom: 1px solid var(--line-soft);
+  color: var(--ink);
+  background: #fff;
+  cursor: pointer;
   padding: 7px 11px;
+  text-align: left;
+}
+
+.catalog-list > button:hover {
+  background: #f3f8fa;
+}
+
+.catalog-list > button.active {
+  box-shadow: inset 3px 0 0 var(--cyan);
+  background: #eaf6fa;
 }
 
 .catalog-list span {
