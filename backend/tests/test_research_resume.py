@@ -17,6 +17,7 @@ from backend.app.database import alembic_config, expected_schema_heads
 from backend.app.models import ResearchRun
 from backend.app.quant_research.runner import (
     InjectedResearchInterruption,
+    ResearchStopRequested,
     ResumeIdentityError,
     ResumeIntegrityError,
     mark_stale_research_runs,
@@ -51,6 +52,29 @@ class ResearchResumeTest(unittest.TestCase):
         with patch("backend.app.quant_research.runner.freeze_input_snapshot") as snapshot_stage:
             result = self._resume(run_id)
         snapshot_stage.assert_not_called()
+        self._assert_succeeded(result)
+
+    def test_orchestrator_stop_at_safe_point_preserves_checkpoint_for_resume(self):
+        with Session(self.engine) as db:
+            with self.assertRaises(ResearchStopRequested):
+                run_quant_research(
+                    db,
+                    self.config,
+                    self.output_root,
+                    code_commit="golden-test-commit",
+                    schema_revision="test-schema",
+                    test_mode=True,
+                    capacity_policy=SnapshotCapacityPolicy(min_remaining_bytes=0),
+                    should_stop=lambda: True,
+                )
+            row = db.scalar(select(ResearchRun).where(ResearchRun.status == "interrupted"))
+            self.assertIsNotNone(row)
+            self.assertTrue(self._temporary_path(row.run_id).is_dir())
+            recovery = self._temporary_path(row.run_id) / "checkpoints" / "recovery.json"
+            self.assertTrue(recovery.is_file())
+            run_id = row.run_id
+
+        result = self._resume(run_id)
         self._assert_succeeded(result)
 
     def test_resume_reuses_registered_snapshot_across_output_roots(self):

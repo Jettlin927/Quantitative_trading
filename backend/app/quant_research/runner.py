@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -135,6 +135,10 @@ class InjectedResearchInterruption(BaseException):
     """测试专用的硬中断；故意绕过业务异常清理，模拟进程被杀。"""
 
 
+class ResearchStopRequested(RuntimeError):
+    """编排器在阶段安全点请求停止，保留 checkpoint 供审计或同身份恢复。"""
+
+
 @dataclass(frozen=True)
 class ResearchRunResult:
     run_id: str
@@ -152,6 +156,9 @@ def run_quant_research(
     test_mode: bool = False,
     capacity_policy: SnapshotCapacityPolicy | None = None,
     interrupt_after_stage: str | None = None,
+    formal_research_id: str | None = None,
+    orchestration_attempt_id: str | None = None,
+    should_stop: Callable[[], bool] | None = None,
 ) -> ResearchRunResult:
     _validate_interrupt_stage(interrupt_after_stage)
     normalized = validate_run_config(config)
@@ -175,6 +182,8 @@ def run_quant_research(
     now = datetime.now(timezone.utc)
     run = ResearchRun(
         run_id=run_id,
+        formal_research_id=formal_research_id,
+        orchestration_attempt_id=orchestration_attempt_id,
         reproducibility_key=None,
         strategy_id=normalized["strategyId"],
         status="running",
@@ -209,7 +218,11 @@ def run_quant_research(
             {},
             capacity_policy=capacity_policy,
             interrupt_after_stage=interrupt_after_stage,
+            should_stop=should_stop,
         )
+    except ResearchStopRequested as exc:
+        _mark_run_interrupted(registry_db, run_id, temporary, exc)
+        raise
     except Exception as exc:
         _mark_run_failed(registry_db, run_id, temporary, runs_root, exc)
         raise
@@ -225,6 +238,7 @@ def resume_quant_research(
     test_mode: bool = False,
     capacity_policy: SnapshotCapacityPolicy | None = None,
     interrupt_after_stage: str | None = None,
+    should_stop: Callable[[], bool] | None = None,
 ) -> ResearchRunResult:
     _validate_interrupt_stage(interrupt_after_stage)
     run = registry_db.get(ResearchRun, run_id)
@@ -292,7 +306,11 @@ def resume_quant_research(
             checkpoints,
             capacity_policy=capacity_policy,
             interrupt_after_stage=interrupt_after_stage,
+            should_stop=should_stop,
         )
+    except ResearchStopRequested as exc:
+        _mark_run_interrupted(registry_db, run_id, working, exc)
+        raise
     except Exception as exc:
         _mark_run_failed(registry_db, run_id, working, runs_root, exc)
         raise
@@ -359,9 +377,11 @@ def _execute_pipeline(
     *,
     capacity_policy: SnapshotCapacityPolicy | None,
     interrupt_after_stage: str | None,
+    should_stop: Callable[[], bool] | None,
 ) -> ResearchRunResult:
     config_artifact = _json_file_artifact(working / "config.json")
 
+    _raise_if_stop_requested(should_stop, "quality_gate")
     if "quality_gate" not in checkpoints:
         quality_contract = _quality_contract(validate_quality_gate(registry_db, normalized))
         quality_artifact = atomic_write_json(working / "quality.json", quality_contract)
@@ -379,6 +399,7 @@ def _execute_pipeline(
         quality_contract = _read_json(working / "quality.json", "quality.json")
         quality_artifact = _checkpoint_artifact(checkpoints, "quality_gate", "quality")
 
+    _raise_if_stop_requested(should_stop, "input_snapshot")
     if "input_snapshot" not in checkpoints:
         if run.data_snapshot_id:
             snapshot = _load_registered_snapshot(registry_db, run, snapshots_root)
@@ -419,6 +440,7 @@ def _execute_pipeline(
         table_artifacts = snapshot.manifest["tableArtifacts"]
         reproducibility_key = str(run.reproducibility_key)
 
+    _raise_if_stop_requested(should_stop, "features_targets")
     if "features_targets" not in checkpoints:
         targets = _build_strategy_targets(
             strategy,
@@ -449,6 +471,7 @@ def _execute_pipeline(
     else:
         targets_artifact = _checkpoint_artifact(checkpoints, "features_targets", "targets")
 
+    _raise_if_stop_requested(should_stop, "simulation")
     if "simulation" not in checkpoints:
         targets = read_canonical_csv_gz(working / "targets.csv.gz")
         simulation, _calendar = _simulate_strategy_targets(
@@ -505,6 +528,7 @@ def _execute_pipeline(
         executions_artifact = _checkpoint_artifact(checkpoints, "simulation", "rebalanceExecutions")
         positions_artifact = _checkpoint_artifact(checkpoints, "simulation", "positions")
 
+    _raise_if_stop_requested(should_stop, "metrics")
     if "metrics" not in checkpoints:
         nav = read_canonical_csv_gz(working / "nav.csv.gz")
         metrics = _summarize_strategy_metrics(
@@ -633,6 +657,7 @@ def _execute_pipeline(
                 ),
             }
 
+    _raise_if_stop_requested(should_stop, "manifest")
     if "manifest" not in checkpoints:
         artifact_hashes = {
             **{
@@ -698,6 +723,7 @@ def _execute_pipeline(
         manifest = _read_json(working / "manifest.json", "manifest.json")
         manifest_artifact = _checkpoint_artifact(checkpoints, "manifest", "manifest")
 
+    _raise_if_stop_requested(should_stop, "finalize")
     if "finalize" not in checkpoints:
         validate_research_archive(working)
         _write_checkpoint(
@@ -1942,6 +1968,42 @@ def _mark_run_failed(
         os.replace(working, failed_path)
         persisted.artifact_root = str(failed_path)
     registry_db.commit()
+
+
+def _mark_run_interrupted(
+    registry_db: Session,
+    run_id: str,
+    working: Path,
+    exc: ResearchStopRequested,
+) -> None:
+    registry_db.rollback()
+    persisted = registry_db.get(ResearchRun, run_id)
+    if persisted is None:
+        return
+    interrupted_at = datetime.now(timezone.utc)
+    if working.is_dir():
+        _append_recovery_event(
+            working,
+            {
+                "event": "orchestrator_stop_requested",
+                "runId": run_id,
+                "recordedAt": interrupted_at.isoformat(),
+                "reason": str(exc),
+            },
+        )
+    persisted.status = "interrupted"
+    persisted.error = f"ResearchStopRequested: {exc}"[:2000]
+    persisted.finished_at = interrupted_at
+    persisted.heartbeat_at = interrupted_at
+    registry_db.commit()
+
+
+def _raise_if_stop_requested(
+    should_stop: Callable[[], bool] | None,
+    next_stage: str,
+) -> None:
+    if should_stop is not None and should_stop():
+        raise ResearchStopRequested(f"在进入 {next_stage} 前按安全点停止")
 
 
 def _maybe_interrupt(requested_stage: str | None, completed_stage: str) -> None:

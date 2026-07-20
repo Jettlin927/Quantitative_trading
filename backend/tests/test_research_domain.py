@@ -17,7 +17,9 @@ from backend.app.models import (
     FORMAL_RESEARCH_PHASE_VALUES,
     PUBLICATION_STATUS_VALUES,
     RESEARCH_CONCLUSION_VALUES,
+    RESEARCH_ORCHESTRATION_STATE_VALUES,
     RESEARCH_RUN_STATUS_VALUES,
+    RESEARCH_WORK_STATUS_VALUES,
     RESEARCH_PLAN_ACTION_VALUES,
     STRATEGY_LIFECYCLE_VALUES,
     FollowUpResearchProposal,
@@ -193,6 +195,24 @@ class ResearchDomainTest(unittest.TestCase):
         self.assertEqual(STRATEGY_LIFECYCLE_VALUES, {"活跃", "暂停", "停止研究", "已归档"})
         self.assertEqual(RESEARCH_CONCLUSION_VALUES, {"研究通过", "有条件候选", "证据不足", "受阻", "不通过"})
         self.assertEqual(FORMAL_RESEARCH_PHASE_VALUES, {"approved", "active", "evaluating", "published", "stopped"})
+        self.assertEqual(
+            RESEARCH_ORCHESTRATION_STATE_VALUES,
+            {
+                "pending_approval",
+                "approved",
+                "queued",
+                "running",
+                "stopping",
+                "publishing",
+                "published",
+                "stopped",
+                "blocked",
+            },
+        )
+        self.assertEqual(
+            RESEARCH_WORK_STATUS_VALUES,
+            {"queued", "leased", "running", "succeeded", "failed", "interrupted"},
+        )
         self.assertEqual(PUBLICATION_STATUS_VALUES, {"pending", "published", "failed"})
         self.assertEqual(FOLLOW_UP_PROPOSAL_STATUS_VALUES, {"proposed", "accepted", "rejected", "converted"})
         self.assertEqual(

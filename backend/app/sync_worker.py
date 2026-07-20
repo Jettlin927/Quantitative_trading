@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 
 from .database import SessionLocal, assert_schema_revision_at_head, engine
 from .json_safety import json_safe_value
-from .models import DataSyncJob, SyncWorkerHeartbeat
+from .models import DataSyncJob, ResearchWorkItem, SyncWorkerHeartbeat
+from .work_coordination import try_acquire_heavy_work_claim_lock
 
 
 UTC = timezone.utc
@@ -64,6 +65,15 @@ def claim_next_job(
     claimed_at = now or utc_now()
     factory = session_factory or SessionLocal
     with factory.begin() as db:
+        if not try_acquire_heavy_work_claim_lock(db):
+            return None
+        active_research = db.scalar(
+            select(ResearchWorkItem.id)
+            .where(ResearchWorkItem.status.in_(("leased", "running")))
+            .limit(1)
+        )
+        if active_research is not None:
+            return None
         _fail_exhausted_jobs(db, claimed_at)
         eligible = or_(
             and_(
