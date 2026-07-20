@@ -10,6 +10,10 @@
 
 建设研究级美股日线、企业行动、历史 universe 和许可合同属于独立功能债；在其完成前不得淡化 sample 标识。
 
+## 数据源调研
+
+- [美股日线开源仓库与正式数据源调研（2026-07-21）](open-source-daily-data-source-survey.md)
+
 ## 外部数据技能边界
 
 - 仓库已收录 `.codex/skills/global-stock-data/`，用于检查新浪、Yahoo、东方财富和 SEC 等公开端点的字段与可用性。
