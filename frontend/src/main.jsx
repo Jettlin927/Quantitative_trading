@@ -65,6 +65,7 @@ export function App() {
   const catalogRequestId = useRef(0)
   const strategyRequestId = useRef(0)
   const researchRequestId = useRef(0)
+  const stockPageRequestRef = useRef({ id: 0, path: '' })
   const selectedCodeRef = useRef('')
   const selectedCatalogRef = useRef({ kind: '', code: '' })
   const selectedStrategyIdRef = useRef('')
@@ -75,13 +76,14 @@ export function App() {
     setResearchLoading(true)
     setGlobalError('')
     setResearchError('')
+    const stockPageRequest = beginStockPageRequest(buildStockScreenPath(query, 0))
     const requests = [
       ['health', '/api/health?include_counts=false'],
       ['progress', '/api/tushare/sync-progress?include_coverage=false'],
       ['stockReadiness', '/api/research/readiness?scope=a_share_cross_section'],
       ['etfReadiness', '/api/research/readiness?scope=etf_time_series'],
       ['overview', `/api/db/overview${refreshCoverage ? '?refresh=true' : ''}`],
-      ['stocks', buildStockScreenPath(query, 0)],
+      ['stocks', stockPageRequest.path],
       ['indices', '/api/indices?limit=1000'],
       ['funds', '/api/funds?limit=1000'],
       ['industries', '/api/industries?limit=1000'],
@@ -90,8 +92,13 @@ export function App() {
     ]
     const results = await Promise.allSettled(requests.map(([, path]) => fetchJson(path)))
     const failures = []
+    let stockPageRefreshed = true
     results.forEach((result, index) => {
       const key = requests[index][0]
+      if (key === 'stocks' && !isCurrentStockPageRequest(stockPageRequest)) {
+        stockPageRefreshed = false
+        return
+      }
       if (result.status === 'rejected') {
         if (key === 'strategies') {
           setResearchError(errorMessage(result.reason))
@@ -134,6 +141,7 @@ export function App() {
       }
     })
     const detailResults = refreshCoverage ? await Promise.all([
+      Promise.resolve(stockPageRefreshed),
       selectedCodeRef.current ? loadSelectedStockData(selectedCodeRef.current) : Promise.resolve(true),
       selectedCatalogRef.current.code ? loadSelectedCatalogData(selectedCatalogRef.current) : Promise.resolve(true),
       refreshSelectedResearchData(selectedStrategyIdRef.current),
@@ -152,7 +160,10 @@ export function App() {
   }
 
   function selectStock(tsCode) {
-    if (tsCode === selectedCodeRef.current) return
+    if (tsCode === selectedCodeRef.current) {
+      if (!tsCode) setDetailLoading(false)
+      return
+    }
     selectedCodeRef.current = tsCode
     stockRequestId.current += 1
     setSelectedCode(tsCode)
@@ -160,6 +171,7 @@ export function App() {
     setStockBars([])
     setStockDetail(null)
     setStockError('')
+    if (!tsCode) setDetailLoading(false)
   }
 
   function selectCatalog(kind, code) {
@@ -296,15 +308,27 @@ export function App() {
   }
 
   async function loadStocks(offset = 0) {
+    const request = beginStockPageRequest(buildStockScreenPath(query, offset))
     setLoading(true)
     setStockError('')
     try {
-      applyStockPage(await fetchJson(buildStockScreenPath(query, offset)))
+      const page = await fetchJson(request.path)
+      if (isCurrentStockPageRequest(request)) applyStockPage(page)
     } catch (err) {
-      setStockError(errorMessage(err))
+      if (isCurrentStockPageRequest(request)) setStockError(errorMessage(err))
     } finally {
-      setLoading(false)
+      if (isCurrentStockPageRequest(request)) setLoading(false)
     }
+  }
+
+  function beginStockPageRequest(path) {
+    const request = { id: stockPageRequestRef.current.id + 1, path }
+    stockPageRequestRef.current = request
+    return request
+  }
+
+  function isCurrentStockPageRequest(request) {
+    return request.id === stockPageRequestRef.current.id && request.path === stockPageRequestRef.current.path
   }
 
   function selectStrategy(strategyId) {

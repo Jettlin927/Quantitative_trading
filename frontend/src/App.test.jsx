@@ -63,7 +63,11 @@ const researchDetail = {
     { run_id: 'run-001', status: 'succeeded', stage: 'completed', result_fingerprint: 'c'.repeat(64), finished_at: '2026-07-20T00:30:00Z', error: null },
     { run_id: 'run-000', status: 'failed', stage: 'simulation', result_fingerprint: null, finished_at: '2026-07-20T00:20:00Z', error: '冻结输入缺失' },
   ],
-  events: [{ id: '44444444-4444-4444-8444-444444444444', sequence_no: 1, event_type: 'research_run_succeeded', payload_json: { runId: 'run-001', artifactRoot: '/artifacts/run-001' }, occurred_at: '2026-07-20T00:30:00Z' }],
+  events: [
+    { id: '44444444-4444-4444-8444-444444444441', sequence_no: 1, event_type: 'research_queued', payload_json: { workItemId: 'work-001', maxAttempts: 3, resourceBudget: { wallClockSeconds: 3600, cpuCores: '1.0', memoryMiB: 1024, artifactMiB: 2048, maxRetries: 2 } }, occurred_at: '2026-07-20T00:10:00Z' },
+    { id: '44444444-4444-4444-8444-444444444442', sequence_no: 2, event_type: 'research_run_succeeded', payload_json: { runId: 'run-001', artifactRoot: '/artifacts/run-001' }, occurred_at: '2026-07-20T00:30:00Z' },
+    { id: '44444444-4444-4444-8444-444444444443', sequence_no: 3, event_type: 'research_publication_failed', payload_json: { publicationId: PUBLICATION_ID, error: '读回失败', retryable: true, publicationStatus: 'published' }, occurred_at: '2026-07-20T00:35:00Z' },
+  ],
   evaluations: [{ id: EVALUATION_ID, version: 1, conclusion: '研究通过', supporting_evidence: [{ statement: 'OOS 净收益通过' }], opposing_evidence: [], missing_evidence: [], limitations: [{ statement: '仅覆盖既定区间' }], follow_up_recommendations: [] }],
   publications: [{ id: PUBLICATION_ID, evaluation_id: EVALUATION_ID, version: 1, status: 'published', created_at: '2026-07-20T00:40:00Z', published_at: '2026-07-20T00:41:00Z' }],
   follow_up_proposals: [{ id: PROPOSAL_ID, title: '扩大市场环境复核', rationale: '补足极端环境证据。', status: 'proposed', created_at: '2026-07-20T00:45:00Z' }],
@@ -138,6 +142,8 @@ describe('研究驾驶舱', () => {
     expect(screen.getByText('组合模拟')).toBeInTheDocument()
     expect(screen.getByText('研究运行完成')).toBeInTheDocument()
     expect(screen.getByText(/运行：run-001；工件目录：\/artifacts\/run-001/)).toBeInTheDocument()
+    expect(screen.getByText(/工作项：work-001.*最长运行秒数=3600.*CPU 核数=1.0.*内存上限 MiB=1024.*工件上限 MiB=2048.*最大重试次数=2/)).toBeInTheDocument()
+    expect(screen.getByText(/发布状态：已发布/)).toBeInTheDocument()
     expect(screen.getByText('扩大市场环境复核')).toBeInTheDocument()
     expect(screen.getAllByText('已提议').length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: /打开原始 HTML 证据/ })).toHaveAttribute('href', '/api/research/evaluations/report')
@@ -261,6 +267,52 @@ describe('研究驾驶舱', () => {
     expect(screen.getByText('甲股当前状态')).toBeInTheDocument()
   })
 
+  it('连续搜索只接受最新查询，空结果会结束旧明细加载', async () => {
+    const firstSearch = deferred()
+    const secondSearch = deferred()
+    const initialDetail = deferred()
+    const initialPage = {
+      items: [{ ts_code: '000001.SZ', symbol: '000001', name: '初始股票', close: 10, pct_chg: 0 }],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    }
+    installFetch({
+      coreOverrides: { '/api/stocks/screen?limit=50&offset=0': initialPage },
+      route: (path) => {
+        if (path === '/api/stocks/screen?limit=50&offset=0&q=first') return firstSearch.promise
+        if (path === '/api/stocks/screen?limit=50&offset=0&q=second') return secondSearch.promise
+        if (path === '/api/stocks/screen?limit=50&offset=0&q=empty') return ok({ items: [], total: 0, limit: 50, offset: 0 })
+        if (path === '/api/daily-bars?ts_code=000001.SZ') return initialDetail.promise
+        if (path === '/api/stocks/000001.SZ/detail') return initialDetail.promise
+        if (path === '/api/daily-bars?ts_code=000003.SZ') return ok([])
+        if (path === '/api/stocks/000003.SZ/detail') return ok({ listing: { listStatus: '最新查询状态' }, valuation_history: [], financial_history: [] })
+        return null
+      },
+    })
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
+    await screen.findByRole('button', { name: /000001.*初始股票/ })
+    const input = screen.getByPlaceholderText('代码 / 名称 / 拼音')
+
+    fireEvent.change(input, { target: { value: 'first' } })
+    fireEvent.click(screen.getByRole('button', { name: '查询' }))
+    fireEvent.change(input, { target: { value: 'second' } })
+    fireEvent.click(screen.getByRole('button', { name: '查询' }))
+    secondSearch.resolve(new Response(JSON.stringify({ items: [{ ts_code: '000003.SZ', symbol: '000003', name: '最新股票', close: 30, pct_chg: 3 }], total: 1, limit: 50, offset: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    await screen.findByText('最新查询状态')
+
+    firstSearch.resolve(new Response(JSON.stringify({ items: [{ ts_code: '000002.SZ', symbol: '000002', name: '过期股票', close: 20, pct_chg: 2 }], total: 1, limit: 50, offset: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    await waitFor(() => expect(screen.queryByText('过期股票')).not.toBeInTheDocument())
+    expect(screen.getByRole('heading', { name: '最新股票' })).toBeInTheDocument()
+
+    fireEvent.change(input, { target: { value: 'empty' } })
+    fireEvent.click(screen.getByRole('button', { name: '查询' }))
+    await screen.findByText('没有匹配的股票')
+    expect(document.querySelector('.security-meta')).not.toHaveTextContent('加载中')
+    expect(screen.getByText('未选择股票')).toBeInTheDocument()
+  })
+
   it('为图形行情提供中文摘要与可展开的数据表', async () => {
     const stockPage = {
       items: [{ ts_code: '000001.SZ', symbol: '000001', name: '甲公司', close: 11, pct_chg: 1 }],
@@ -269,6 +321,7 @@ describe('研究驾驶舱', () => {
       offset: 0,
     }
     const bars = [
+      { trade_date: '2024-01-02', open: 8, high: 9, low: 7, close: 8.5, vol: 800, amount: 1600 },
       { trade_date: '2026-07-17', open: 10, high: 11, low: 9, close: 10.5, vol: 1000, amount: 2000 },
       { trade_date: '2026-07-18', open: 10.5, high: 12, low: 10, close: 11, vol: 1200, amount: 2400 },
     ]
@@ -283,10 +336,16 @@ describe('研究驾驶舱', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
 
-    await screen.findByRole('img', { name: /价格图。日 K 线共 2 个交易日/ })
+    await screen.findByRole('img', { name: /价格图。近 180 日：日 K 线共 3 个交易日/ })
+    expect(screen.getByRole('button', { name: '近 180 日' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText(/当前只读 API 尚未提供按日期与标的定位的局部缺口质量结果/)).toBeInTheDocument()
-    fireEvent.click(screen.getByText(/查看最近 2 条行情数据表/))
-    expect(screen.getByRole('table', { name: /日 K 线共 2 个交易日/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByText('查看近 180 日行情数据表（3 条）'))
+    expect(screen.getByRole('table', { name: /近 180 日：日 K 线共 3 个交易日/ })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '近 1 年' }))
+    expect(screen.getByRole('button', { name: '近 1 年' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('img', { name: /价格图。近 1 年：日 K 线共 2 个交易日/ })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: /近 1 年：日 K 线共 2 个交易日/ })).toBeInTheDocument()
   })
 
   it('指数、ETF 与行业目录可读取历史和当前成员，单域失败不阻断页面', async () => {

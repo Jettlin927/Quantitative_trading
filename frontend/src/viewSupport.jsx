@@ -174,17 +174,17 @@ export function formatStructuredItem(item) {
   }
   const entries = Object.entries(item)
   if (!entries.length) return '无附加信息'
-  return entries.slice(0, 6).map(([key, value]) => `${structuredKeyLabel(key)}：${formatStructuredValue(value)}`).join('；')
+  return formatStructuredEntries(entries, '：', '；')
 }
 
 function structuredKeyLabel(key) {
   const labels = {
-    actorLogin: '操作人', approvalCommentId: '批准评论', artifactRoot: '工件目录', attemptCount: '尝试次数', commentId: '评论',
+    actorLogin: '操作人', approvalCommentId: '批准评论', artifactMiB: '工件上限 MiB', artifactRoot: '工件目录', attemptCount: '尝试次数', commentId: '评论', cpuCores: 'CPU 核数',
     conclusion: '结论', error: '错误', errorKind: '错误类型', evaluationId: '评价', evaluationSha256: '评价指纹',
-    issueCommentId: '议题评论', issueNumber: '议题', manifestUrl: '清单地址', maxAttempts: '最大尝试次数',
+    issueCommentId: '议题评论', issueNumber: '议题', manifestUrl: '清单地址', maxAttempts: '最大尝试次数', maxRetries: '最大重试次数', maxTrials: '最大试验次数', memoryMiB: '内存上限 MiB',
     newPlanSha256: '新计划指纹', planSha256: '计划指纹', previousWorker: '原 Worker', publicationId: '发布',
     publicationStatus: '发布状态', resourceBudget: '资源预算', resumeRunId: '恢复运行', retryable: '可重试', runId: '运行',
-    supersededByPlanId: '替代计划', supersedesPublicationId: '替代发布', workerId: 'Worker',
+    supersededByPlanId: '替代计划', supersedesPublicationId: '替代发布', wallClockSeconds: '最长运行秒数', workerId: 'Worker', workItemId: '工作项',
   }
   return labels[key] || key
 }
@@ -193,10 +193,17 @@ function formatStructuredValue(value) {
   if (value === null || value === undefined || value === '') return '-'
   if (Array.isArray(value)) return value.map(formatStructuredValue).join('、') || '-'
   if (typeof value === 'object') {
-    return Object.entries(value).slice(0, 4).map(([key, child]) => `${structuredKeyLabel(key)}=${formatStructuredValue(child)}`).join('，') || '无附加信息'
+    const entries = Object.entries(value)
+    return entries.length ? formatStructuredEntries(entries, '=', '，') : '无附加信息'
   }
   if (typeof value === 'boolean') return value ? '是' : '否'
-  return String(value)
+  return translateStatus(value)
+}
+
+function formatStructuredEntries(entries, keySeparator, itemSeparator) {
+  const visible = entries.slice(0, 8)
+  const summary = visible.map(([key, value]) => `${structuredKeyLabel(key)}${keySeparator}${formatStructuredValue(value)}`).join(itemSeparator)
+  return entries.length > visible.length ? `${summary}${itemSeparator}另 ${entries.length - visible.length} 项` : summary
 }
 
 export function conclusionTone(value) {

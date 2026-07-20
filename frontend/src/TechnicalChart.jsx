@@ -20,6 +20,10 @@ export function TechnicalChart({ bars }) {
   const volumeRef = useRef(null)
   const [range, setRange] = useState('recent')
   const series = useMemo(() => buildTechnicalSeries(bars), [bars])
+  const rangeLabel = CHART_RANGES.find((item) => item.id === range)?.label || '当前区间'
+  const visibleStart = chartRangeStartIndex(series.candles, range)
+  const visibleCandles = series.candles.slice(visibleStart)
+  const visibleBars = series.bars.slice(visibleStart)
 
   useEffect(() => {
     if (!series.candles.length) return undefined
@@ -35,10 +39,10 @@ export function TechnicalChart({ bars }) {
   }, [range, series])
 
   if (!series.candles.length) return <div className="chart-empty">暂无可绘制的日线数据</div>
-  const first = series.candles[0]
-  const latest = series.candles[series.candles.length - 1]
-  const accessibleBars = bars.filter((bar) => bar.trade_date).slice(-30).reverse()
-  const summary = `日 K 线共 ${series.candles.length} 个交易日，范围 ${first.time} 至 ${latest.time}，最新收盘 ${formatNumber(latest.close)}`
+  const first = visibleCandles[0]
+  const latest = visibleCandles[visibleCandles.length - 1]
+  const accessibleBars = [...visibleBars].reverse()
+  const summary = `${rangeLabel}：日 K 线共 ${visibleCandles.length} 个交易日，范围 ${first.time} 至 ${latest.time}，最新收盘 ${formatNumber(latest.close)}`
   return (
     <>
       <div className="chart-stack">
@@ -46,7 +50,7 @@ export function TechnicalChart({ bars }) {
           <div className="chart-legend"><span><i className="ma10" />MA10</span><span><i className="ma20" />MA20</span><span><i className="volume" />成交量</span></div>
           <div className="chart-ranges" aria-label="行情显示区间">
             {CHART_RANGES.map((item) => (
-              <button className={range === item.id ? 'active' : ''} key={item.id} onClick={() => setRange(item.id)}>{item.label}</button>
+              <button aria-pressed={range === item.id} className={range === item.id ? 'active' : ''} key={item.id} onClick={() => setRange(item.id)}>{item.label}</button>
             ))}
           </div>
         </div>
@@ -54,7 +58,7 @@ export function TechnicalChart({ bars }) {
         <div className="chart-pane volume" ref={volumeRef} role="img" aria-label={`成交量图。${summary}`} />
       </div>
       <details className="chart-accessible-table">
-        <summary>查看最近 {accessibleBars.length} 条行情数据表（共 {series.candles.length} 条）</summary>
+        <summary>查看{rangeLabel}行情数据表（{accessibleBars.length} 条）</summary>
         <div className="table-scroll compact-history">
           <table className="data-table">
             <caption className="sr-only">{summary}</caption>
@@ -70,15 +74,16 @@ export function TechnicalChart({ bars }) {
 }
 
 function buildTechnicalSeries(bars) {
-  const candles = bars
-    .filter((bar) => [bar.open, bar.high, bar.low, bar.close].every((value) => Number.isFinite(Number(value))))
+  const validBars = bars.filter((bar) => bar.trade_date && [bar.open, bar.high, bar.low, bar.close].every((value) => Number.isFinite(Number(value))))
+  const candles = validBars
     .map((bar) => ({ time: bar.trade_date, open: Number(bar.open), high: Number(bar.high), low: Number(bar.low), close: Number(bar.close) }))
   const closes = candles.map((bar) => bar.close)
   return {
+    bars: validBars,
     candles,
     ma10: calcSma(candles, closes, 10),
     ma20: calcSma(candles, closes, 20),
-    volume: bars.map((bar, index) => ({ time: bar.trade_date, value: Number(bar.vol || 0), color: candles[index]?.close >= candles[index]?.open ? '#d84b4b99' : '#07876199' })),
+    volume: validBars.map((bar, index) => ({ time: bar.trade_date, value: Number(bar.vol || 0), color: candles[index].close >= candles[index].open ? '#d84b4b99' : '#07876199' })),
   }
 }
 
@@ -116,17 +121,20 @@ function applyChartRange(charts, candles, range) {
     charts.forEach(({ chart }) => chart.timeScale().fitContent())
     return
   }
-  const years = { '1y': 1, '3y': 3, '5y': 5 }[range]
-  let from = Math.max(0, candles.length - 180)
-  if (years) {
-    const cutoff = new Date(`${candles[candles.length - 1].time}T00:00:00`)
-    cutoff.setFullYear(cutoff.getFullYear() - years)
-    const cutoffText = cutoff.toISOString().slice(0, 10)
-    const firstVisible = candles.findIndex((bar) => bar.time >= cutoffText)
-    from = firstVisible < 0 ? 0 : firstVisible
-  }
+  const from = chartRangeStartIndex(candles, range)
   const visibleRange = { from: Math.max(-0.5, from - 0.5), to: candles.length - 0.5 }
   charts.forEach(({ chart }) => chart.timeScale().setVisibleLogicalRange(visibleRange))
+}
+
+function chartRangeStartIndex(candles, range) {
+  if (!candles.length || range === 'all') return 0
+  const years = { '1y': 1, '3y': 3, '5y': 5 }[range]
+  if (!years) return Math.max(0, candles.length - 180)
+  const cutoff = new Date(`${candles[candles.length - 1].time}T00:00:00`)
+  cutoff.setFullYear(cutoff.getFullYear() - years)
+  const cutoffText = cutoff.toISOString().slice(0, 10)
+  const firstVisible = candles.findIndex((bar) => bar.time >= cutoffText)
+  return firstVisible < 0 ? 0 : firstVisible
 }
 
 function synchronizeChartRanges(charts) {
