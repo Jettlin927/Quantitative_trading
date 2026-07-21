@@ -150,7 +150,11 @@ def summarize_execution_metrics(
     execution_frame["reason"] = execution_frame["reason"].fillna("").astype(str)
     allowed_reasons = {
         "",
+        "adv_capacity",
         "cash_capacity",
+        "lot_size",
+        "missing_capacity",
+        "turnover_cap",
         "valuation_carried",
         "suspended_at_open",
         "limit_up",
@@ -173,7 +177,9 @@ def summarize_execution_metrics(
         | (execution_frame["status"].eq("partial") & (
             execution_frame["executed_change"].le(1e-10)
             | execution_frame["blocked_change"].le(1e-10)
-            | execution_frame["reason"].ne("cash_capacity")
+            | ~execution_frame["reason"].isin(
+                {"adv_capacity", "cash_capacity", "lot_size", "turnover_cap"}
+            )
         ))
         | (execution_frame["status"].eq("blocked") & (
             execution_frame["executed_change"].gt(1e-10)

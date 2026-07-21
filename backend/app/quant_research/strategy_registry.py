@@ -44,6 +44,16 @@ from .a_share_b1_trend_pullback import (
     summarize_a_share_b1_metrics,
     validate_a_share_b1_config,
 )
+from .a_share_value_quality_industry_strength import (
+    EXECUTION_ARTIFACT_COLUMNS,
+    REQUEST_ARTIFACT_COLUMNS,
+    TARGET_ARTIFACT_COLUMNS,
+    a_share_value_quality_limitations,
+    build_a_share_value_quality_targets,
+    simulate_a_share_value_quality_targets,
+    summarize_a_share_value_quality_metrics,
+    validate_a_share_value_quality_config,
+)
 
 
 StrategyCallable = Callable[..., Any]
@@ -63,6 +73,31 @@ class StrategyDefinition:
     simulate: StrategyCallable
     summarize_metrics: StrategyCallable
     limitations: Callable[[], list[str]]
+    target_columns: tuple[str, ...] = (
+        "signal_date",
+        "available_date",
+        "ts_code",
+        "target_weight",
+    )
+    request_columns: tuple[str, ...] = (
+        "execution_date",
+        "signal_date",
+        "ts_code",
+        "requested_change",
+        "side",
+    )
+    execution_columns: tuple[str, ...] = (
+        "execution_date",
+        "signal_date",
+        "ts_code",
+        "requested_change",
+        "executed_change",
+        "blocked_change",
+        "status",
+        "reason",
+        "transaction_cost_rate",
+    )
+    summarize_accepts_simulation: bool = False
 
 
 _STRATEGIES = {
@@ -197,6 +232,37 @@ _STRATEGIES = {
         simulate=simulate_a_share_b1_targets,
         summarize_metrics=summarize_a_share_b1_metrics,
         limitations=a_share_b1_limitations,
+    ),
+    "a_share_value_quality_industry_strength": StrategyDefinition(
+        strategy_id="a_share_value_quality_industry_strength",
+        strategy_version="1",
+        scope="a_share_cross_section",
+        example_config="configs/research/a_share_value_quality_industry_strength.json",
+        walk_forward_benchmark_source="config_market_reference",
+        required_tables=(
+            "trade_calendars",
+            "stock_listings",
+            "stock_daily_bars",
+            "stock_adjust_factors",
+            "stock_limit_prices",
+            "stock_suspend_events",
+            "industry_classifications",
+            "industry_members",
+            "stock_daily_basic",
+            "stock_financial_indicators",
+            "indices",
+            "index_daily_bars",
+            "universe",
+        ),
+        validate_config=validate_a_share_value_quality_config,
+        build_targets=build_a_share_value_quality_targets,
+        simulate=simulate_a_share_value_quality_targets,
+        summarize_metrics=summarize_a_share_value_quality_metrics,
+        limitations=a_share_value_quality_limitations,
+        target_columns=TARGET_ARTIFACT_COLUMNS,
+        request_columns=REQUEST_ARTIFACT_COLUMNS,
+        execution_columns=EXECUTION_ARTIFACT_COLUMNS,
+        summarize_accepts_simulation=True,
     ),
 }
 

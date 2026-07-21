@@ -1,0 +1,81 @@
+{
+  "allowedWarnings": [],
+  "benchmark": "H00985.CSI",
+  "costModel": {
+    "buyRate": "0.00035",
+    "sellRate": "0.00085",
+    "slippageRate": "0.001"
+  },
+  "costStressMultipliers": ["1", "2"],
+  "endDate": "2026-06-29",
+  "environmentBenchmark": "000985.CSI",
+  "executionPolicy": {
+    "allowFractional": false,
+    "calendarExchange": "SSE",
+    "enforceTPlusOne": true,
+    "executionPrice": "next_trade_open",
+    "lotSize": 100,
+    "signalPrice": "close"
+  },
+  "featureParameters": {
+    "financialAvailability": "available_from_lte_signal_date",
+    "financialPeriodPolicy": "latest_end_date",
+    "industryStrengthTopFraction": "0.5",
+    "industryStrengthWindow": 120,
+    "minimumListingOpenDays": 252,
+    "missingValuePolicy": "exclude_without_zero_fill",
+    "qualityFactors": ["roe", "netprofit_margin", "debt_to_assets"],
+    "qualityWeight": "0.5",
+    "valuationFactors": ["pe_ttm", "pb"],
+    "valueWeight": "0.5"
+  },
+  "initialCapital": "10000000",
+  "listingHistoryStart": "2010-01-04",
+  "liquidityPolicy": {
+    "advWindows": [20, 60],
+    "marketAmountScale": "1000",
+    "maxParticipationRate": "0.05",
+    "missingCapacityPolicy": "blocked"
+  },
+  "qualityRunId": "__REQUIRED_BY_CLI__",
+  "randomSeed": 7,
+  "riskPolicy": {
+    "lookbackPeriods": 120,
+    "minPeriods": 60,
+    "mode": "rolling_covariance"
+  },
+  "scope": "a_share_cross_section",
+  "startDate": "2012-07-03",
+  "strategyId": "a_share_value_quality_industry_strength",
+  "strategyVersion": "1",
+  "targetWeightParameters": {
+    "allocation": "equal_weight",
+    "entryRank": 20,
+    "exitRank": 30,
+    "industryCap": "0.20",
+    "insufficientCandidates": "hold_cash",
+    "maxOneWayTurnover": "0.25",
+    "rebalanceEveryOpenDays": 60,
+    "singleNameCap": "0.05",
+    "targetCount": 20
+  },
+  "timezone": "Asia/Shanghai",
+  "trialRegistry": [
+    {"id": "value_quality_baseline", "industryStrengthGate": false},
+    {"id": "value_quality_industry_strength", "industryStrengthGate": true}
+  ],
+  "universe": {
+    "classificationLevel": "L1",
+    "classificationSource": "SW2021",
+    "mode": "industry_level_membership",
+    "source": "industry_classifications+industry_members"
+  },
+  "validationPolicy": {
+    "mode": "anchored",
+    "stepPeriods": 252,
+    "testPeriods": 252,
+    "trainPeriods": 504
+  },
+  "variantId": "value_quality_industry_strength",
+  "warmupStart": "2012-01-04"
+}

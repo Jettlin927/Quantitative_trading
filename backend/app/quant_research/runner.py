@@ -45,6 +45,7 @@ from .manifest import (
     build_result_fingerprint,
 )
 from .metrics import summarize_execution_metrics
+from .portfolio import SimulationResult
 from .reporting import summarize_nav_window
 from .risk import (
     RISK_CONTRIBUTION_COLUMNS,
@@ -464,7 +465,7 @@ def _execute_pipeline(
         targets_artifact = write_dataframe_csv_gz(
             working / "targets.csv.gz",
             targets,
-            columns=TARGET_COLUMNS,
+            columns=_strategy_target_columns(strategy),
             natural_key=("signal_date", "ts_code"),
         )
         _write_checkpoint(
@@ -504,13 +505,13 @@ def _execute_pipeline(
         requests_artifact = write_dataframe_csv_gz(
             working / "rebalance_requests.csv.gz",
             simulation.rebalance_requests,
-            columns=REBALANCE_REQUEST_COLUMNS,
+            columns=_strategy_request_columns(strategy),
             natural_key=("execution_date", "ts_code"),
         )
         executions_artifact = write_dataframe_csv_gz(
             working / "rebalance_executions.csv.gz",
             simulation.rebalance_executions,
-            columns=REBALANCE_EXECUTION_COLUMNS,
+            columns=_strategy_execution_columns(strategy),
             natural_key=("execution_date", "ts_code"),
         )
         positions_artifact = write_dataframe_csv_gz(
@@ -543,6 +544,15 @@ def _execute_pipeline(
     _raise_if_stop_requested(should_stop, "metrics")
     if "metrics" not in checkpoints:
         nav = read_canonical_csv_gz(working / "nav.csv.gz")
+        requests = read_canonical_csv_gz(working / "rebalance_requests.csv.gz")
+        executions = read_canonical_csv_gz(working / "rebalance_executions.csv.gz")
+        positions = read_canonical_csv_gz(working / "positions.csv.gz")
+        persisted_simulation = SimulationResult(
+            nav=nav,
+            rebalance_requests=requests,
+            rebalance_executions=executions,
+            positions=positions,
+        )
         metrics = _summarize_strategy_metrics(
             strategy,
             working / "inputs",
@@ -550,10 +560,8 @@ def _execute_pipeline(
             nav,
             compressed=True,
             table_artifacts=table_artifacts,
+            simulation=persisted_simulation,
         )
-        requests = read_canonical_csv_gz(working / "rebalance_requests.csv.gz")
-        executions = read_canonical_csv_gz(working / "rebalance_executions.csv.gz")
-        positions = read_canonical_csv_gz(working / "positions.csv.gz")
         metrics.update(summarize_execution_metrics(nav, requests, executions, positions))
         benchmark_nav = _build_primary_benchmark_nav(
             strategy,
@@ -874,7 +882,7 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
     except Exception as exc:
         raise SnapshotIntegrityError("归档 config.json 无效") from exc
     try:
-        resolve_strategy_definition(config)
+        strategy = resolve_strategy_definition(config)
     except ValueError as exc:
         raise SnapshotIntegrityError("归档策略身份无效") from exc
     if manifest.get("runId") != run_path.name and not run_path.name.startswith(f".{manifest.get('runId')}."):
@@ -926,18 +934,18 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
     if build_result_fingerprint(expected) != manifest.get("resultFingerprint"):
         raise SnapshotIntegrityError("manifest resultFingerprint 与产物哈希不一致")
     csv_contracts = {
-        "targets.csv.gz": (TARGET_COLUMNS, ("signal_date", "ts_code")),
+        "targets.csv.gz": (_strategy_target_columns(strategy), ("signal_date", "ts_code")),
         "nav.csv.gz": (NAV_COLUMNS, ("trade_date",)),
     }
     if artifact_schema_version >= 2:
         csv_contracts.update(
             {
                 "rebalance_requests.csv.gz": (
-                    REBALANCE_REQUEST_COLUMNS,
+                    _strategy_request_columns(strategy),
                     ("execution_date", "ts_code"),
                 ),
                 "rebalance_executions.csv.gz": (
-                    REBALANCE_EXECUTION_COLUMNS,
+                    _strategy_execution_columns(strategy),
                     ("execution_date", "ts_code"),
                 ),
                 "positions.csv.gz": (POSITION_COLUMNS, ("trade_date", "ts_code")),
@@ -1061,7 +1069,7 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
         targets_artifact = write_dataframe_csv_gz(
             temporary / "targets.csv.gz",
             targets,
-            columns=TARGET_COLUMNS,
+            columns=_strategy_target_columns(strategy),
             natural_key=("signal_date", "ts_code"),
         )
         persisted_targets = read_canonical_csv_gz(temporary / "targets.csv.gz")
@@ -1090,13 +1098,13 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
             actual["rebalance_requests.csv.gz"] = write_dataframe_csv_gz(
                 temporary / "rebalance_requests.csv.gz",
                 simulation.rebalance_requests,
-                columns=REBALANCE_REQUEST_COLUMNS,
+                columns=_strategy_request_columns(strategy),
                 natural_key=("execution_date", "ts_code"),
             )
             actual["rebalance_executions.csv.gz"] = write_dataframe_csv_gz(
                 temporary / "rebalance_executions.csv.gz",
                 simulation.rebalance_executions,
-                columns=REBALANCE_EXECUTION_COLUMNS,
+                columns=_strategy_execution_columns(strategy),
                 natural_key=("execution_date", "ts_code"),
             )
             actual["positions.csv.gz"] = write_dataframe_csv_gz(
@@ -1276,11 +1284,30 @@ def _build_strategy_targets(strategy: StrategyDefinition, *args: Any, **kwargs: 
     return strategy.build_targets(*args, **kwargs)
 
 
+def _strategy_target_columns(strategy: StrategyDefinition) -> tuple[str, ...]:
+    return strategy.target_columns
+
+
+def _strategy_request_columns(strategy: StrategyDefinition) -> tuple[str, ...]:
+    return strategy.request_columns
+
+
+def _strategy_execution_columns(strategy: StrategyDefinition) -> tuple[str, ...]:
+    return strategy.execution_columns
+
+
 def _simulate_strategy_targets(strategy: StrategyDefinition, *args: Any, **kwargs: Any) -> Any:
     return strategy.simulate(*args, **kwargs)
 
 
-def _summarize_strategy_metrics(strategy: StrategyDefinition, *args: Any, **kwargs: Any) -> Any:
+def _summarize_strategy_metrics(
+    strategy: StrategyDefinition,
+    *args: Any,
+    simulation: SimulationResult | None = None,
+    **kwargs: Any,
+) -> Any:
+    if strategy.summarize_accepts_simulation:
+        kwargs["simulation"] = simulation
     return strategy.summarize_metrics(*args, **kwargs)
 
 
@@ -1308,6 +1335,7 @@ def _summarize_reproduction_metrics(
         nav,
         compressed=True,
         table_artifacts=table_artifacts,
+        simulation=simulation,
     )
     if artifact_schema_version >= 2:
         metrics.update(

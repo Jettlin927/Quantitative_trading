@@ -895,7 +895,21 @@ def _build_a_share_slices(
 ) -> tuple[TableSlice, ...]:
     members = membership.symbols
     benchmark = config["benchmark"]
+    index_codes = tuple(
+        sorted(
+            {
+                str(code).strip().upper()
+                for code in (benchmark, config.get("environmentBenchmark"))
+                if str(code or "").strip()
+            }
+        )
+    )
     start = date.fromisoformat(config["warmupStart"])
+    calendar_start = date.fromisoformat(
+        config.get("listingHistoryStart", config["warmupStart"])
+    )
+    if calendar_start > start:
+        raise SnapshotError("listingHistoryStart 不能晚于 warmupStart")
     end = date.fromisoformat(config["endDate"])
     exchange = str(config["executionPolicy"].get("calendarExchange", "SSE")).upper()
 
@@ -1014,7 +1028,7 @@ def _build_a_share_slices(
             select(*columns(TradeCalendar, calendar_columns))
             .where(
                 TradeCalendar.exchange == exchange,
-                TradeCalendar.cal_date >= start,
+                TradeCalendar.cal_date >= calendar_start,
                 TradeCalendar.cal_date <= end,
             )
             .order_by(TradeCalendar.exchange, TradeCalendar.cal_date),
@@ -1103,7 +1117,7 @@ def _build_a_share_slices(
             index_columns,
             ("ts_code",),
             select(*columns(Index, index_columns))
-            .where(Index.ts_code == benchmark)
+            .where(Index.ts_code.in_(index_codes))
             .order_by(Index.ts_code),
         ),
         TableSlice(
@@ -1112,7 +1126,7 @@ def _build_a_share_slices(
             ("ts_code", "trade_date"),
             select(*columns(IndexDailyBar, bar_columns))
             .where(
-                IndexDailyBar.ts_code == benchmark,
+                IndexDailyBar.ts_code.in_(index_codes),
                 IndexDailyBar.trade_date >= start,
                 IndexDailyBar.trade_date <= end,
             )
