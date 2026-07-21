@@ -24,6 +24,8 @@ docker-compose.server.yml
 artifacts/
 outputs/research-runs/
 outputs/quality-universes/
+/docs/research/strategy-results/ma-trend-reversal-20260629/events.csv
+/docs/research/strategy-results/ma-trend-reversal-20260629/signals.csv
 .agent/
 tmp/
 
