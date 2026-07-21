@@ -79,8 +79,9 @@ const publicationAnalytics = {
     beta: 0.72,
     trackingError: 0.118,
     informationRatio: -0.47,
-    turnover: 3.2,
-    cost: 0.018,
+    averageOneWayTurnover: 0.0062,
+    cumulativeOneWayTurnover: 21.2086,
+    cumulativeTransactionCostRate: 0.018,
     averageExposure: 0.76,
   },
   benchmark: { label: '沪深300全收益基准', totalReturn: 0.2288 },
@@ -99,6 +100,14 @@ const publicationAnalytics = {
     { direction: '上涨', volatility: '低波动', observations: 80, strategyReturn: 0.05, benchmarkReturn: 0.12, activeReturn: -0.07, maxDrawdown: -0.08 },
     { direction: '下跌', volatility: '高波动', observations: 45, strategyReturn: -0.18, benchmarkReturn: -0.21, activeReturn: 0.03, maxDrawdown: -0.22 },
   ],
+  robustness: {
+    walkForward: { status: 'complete', windowCount: 6, positiveWindowRate: 0.5 },
+    parameterNeighborhood: { status: 'not_applicable', reason: '固定单一规则，没有参数网格。' },
+    costStress: { status: 'complete', multiplier: '2', stressedTotalReturn: -0.14 },
+    dsr: { status: 'complete', probability: 0.8642, trialCount: 4 },
+    pbo: { status: 'complete', probability: 0.7714, combinations: 70 },
+  },
+  capacity: { status: 'not_available', reason: '未绑定目标资金规模与 ADV。' },
   availability: {
     metrics: { status: 'complete' },
     nav: { status: 'complete' },
@@ -228,6 +237,16 @@ describe('研究驾驶舱', () => {
     expect(screen.getByRole('heading', { name: '换手与成本' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '方向 × 波动率' })).toBeInTheDocument()
     expect(screen.getByText('下跌 · 高波动')).toBeInTheDocument()
+    expect(screen.getAllByText('累计单边换手').length).toBeGreaterThan(0)
+    expect(screen.getByText('21.21×')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '稳健性与过拟合' })).toBeInTheDocument()
+    expect(screen.getByText('Walk-forward')).toBeInTheDocument()
+    expect(screen.getByText('6 个窗口 · 正收益 50.00%')).toBeInTheDocument()
+    expect(screen.getByText('DSR')).toBeInTheDocument()
+    expect(screen.getByText('86.42%')).toBeInTheDocument()
+    expect(screen.getByText('PBO')).toBeInTheDocument()
+    expect(screen.getByText('77.14%')).toBeInTheDocument()
+    expect(screen.getByText(/not_available：未绑定目标资金规模与 ADV/)).toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenCalledWith(`/api/research/publications/${PUBLICATION_ID}/analytics`, expect.anything())
   })
 

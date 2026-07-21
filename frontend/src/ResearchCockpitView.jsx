@@ -262,6 +262,9 @@ function ResearchAnalyticsView({ analytics }) {
   }
   const metrics = analytics.metrics || {}
   const chart = analytics.chart_series || {}
+  const robustness = analytics.robustness || {}
+  const capacity = analytics.capacity || {}
+  const metricAvailability = analytics.availability?.metricFields || {}
   const hasExcessReturn = finite(metrics.excessTotalReturn)
   const activeMetric = metrics.excessTotalReturn ?? metrics.relativeWealth
   const activeLabel = hasExcessReturn ? '累计超额收益' : '相对财富差'
@@ -311,28 +314,38 @@ function ResearchAnalyticsView({ analytics }) {
 
       <div className="analytics-detail-grid">
         <MetricGroup title="收益与风险调整" rows={[
-          ['年化波动', formatPercent(metrics.annualizedVolatility)],
-          ['下行波动', formatPercent(metrics.downsideVolatility)],
-          ['Calmar', formatDecimal(metrics.calmar)],
-          ['信息比率', formatDecimal(metrics.informationRatio)],
-          ['跟踪误差', formatPercent(metrics.trackingError)],
-          ['Beta', formatDecimal(metrics.beta)],
+          ['年化波动', formatMetric(metrics.annualizedVolatility, metricAvailability.annualizedVolatility, formatPercent)],
+          ['下行波动', formatMetric(metrics.downsideVolatility, metricAvailability.downsideVolatility, formatPercent)],
+          ['Calmar', formatMetric(metrics.calmar, metricAvailability.calmar, formatDecimal)],
+          ['信息比率', formatMetric(metrics.informationRatio, metricAvailability.informationRatio, formatDecimal)],
+          ['跟踪误差', formatMetric(metrics.trackingError, metricAvailability.trackingError, formatPercent)],
+          ['Beta', formatMetric(metrics.beta, metricAvailability.beta, formatDecimal)],
         ]} />
         <MetricGroup title="尾部与形态" rows={[
-          ['VaR95', formatPercent(metrics.var95)],
-          ['ES95', formatPercent(metrics.es95)],
-          ['偏度', formatDecimal(metrics.skew)],
-          ['超额峰度', formatDecimal(metrics.excessKurtosis)],
-          ['最长回撤', formatDays(metrics.maxDrawdownDuration)],
-          ['最大回撤', formatRatio(metrics.maxDrawdown)],
+          ['VaR95', formatMetric(metrics.var95, metricAvailability.var95, formatPercent)],
+          ['ES95', formatMetric(metrics.es95, metricAvailability.es95, formatPercent)],
+          ['偏度', formatMetric(metrics.skew, metricAvailability.skew, formatDecimal)],
+          ['超额峰度', formatMetric(metrics.excessKurtosis, metricAvailability.excessKurtosis, formatDecimal)],
+          ['最长回撤', formatMetric(metrics.maxDrawdownDuration, metricAvailability.maxDrawdownDuration, formatDays)],
+          ['最大回撤', formatMetric(metrics.maxDrawdown, metricAvailability.maxDrawdown, formatRatio)],
         ]} />
         <MetricGroup title="交易、暴露与容量" rows={[
-          ['累计单边换手', formatMultiple(metrics.turnover)],
-          ['累计成本率', formatPercent(metrics.cost)],
-          ['平均暴露', formatPercent(metrics.averageExposure)],
-          ['最大权重', formatPercent(metrics.maximumWeight)],
-          ['平均 HHI', formatDecimal(metrics.averageHhi)],
-          ['阻塞率', formatPercent(metrics.blockedRequestRate)],
+          ['平均单边换手', formatMetric(metrics.averageOneWayTurnover, metricAvailability.averageOneWayTurnover, formatPercent)],
+          ['累计单边换手', formatMetric(metrics.cumulativeOneWayTurnover, metricAvailability.cumulativeOneWayTurnover, formatMultiple)],
+          ['累计成本率', formatMetric(metrics.cumulativeTransactionCostRate, metricAvailability.cumulativeTransactionCostRate, formatPercent)],
+          ['平均暴露', formatMetric(metrics.averageExposure, metricAvailability.averageExposure, formatPercent)],
+          ['最大权重', formatMetric(metrics.maximumWeight, metricAvailability.maximumWeight, formatPercent)],
+          ['平均 HHI', formatMetric(metrics.averageHhi, metricAvailability.averageHhi, formatDecimal)],
+          ['阻塞率', formatMetric(metrics.blockedRequestRate, metricAvailability.blockedRequestRate, formatPercent)],
+          ['ADV 参与率 P95', formatMetric(metrics.advParticipationP95, metricAvailability.advParticipationP95, formatPercent)],
+          ['容量证据', formatEvidenceStatus(capacity)],
+        ]} />
+        <MetricGroup title="稳健性与过拟合" rows={[
+          ['Walk-forward', formatWalkForward(robustness.walkForward)],
+          ['参数邻域', formatEvidenceStatus(robustness.parameterNeighborhood)],
+          ['成本压力', formatEvidenceStatus(robustness.costStress)],
+          ['DSR', formatProbabilityEvidence(robustness.dsr)],
+          ['PBO', formatProbabilityEvidence(robustness.pbo)],
         ]} />
       </div>
 
@@ -453,6 +466,32 @@ function ChartNote({ text }) {
 
 function availabilityReason(value) {
   return value?.reason ? `not_available：${value.reason}` : 'not_available：当前发布没有冻结该项证据'
+}
+
+function formatMetric(value, availability, formatter) {
+  return availability?.status === 'complete' || (!availability && finite(value))
+    ? formatter(value)
+    : availabilityReason(availability)
+}
+
+function formatEvidenceStatus(value) {
+  if (value?.status === 'complete') return '证据完整'
+  if (value?.status === 'not_applicable') return `not_applicable：${value.reason || '该策略不适用'}`
+  return `not_available：${value?.reason || '当前发布没有冻结该项证据'}`
+}
+
+function formatWalkForward(value) {
+  if (value?.status !== 'complete') return formatEvidenceStatus(value)
+  const count = value.windowCount
+  const positiveRate = value.positiveWindowRate ?? value.positiveRate
+  if (finite(count) && finite(positiveRate)) return `${formatInt(count)} 个窗口 · 正收益 ${formatPercent(positiveRate)}`
+  if (finite(count)) return `${formatInt(count)} 个窗口`
+  return '证据完整'
+}
+
+function formatProbabilityEvidence(value) {
+  if (value?.status !== 'complete') return formatEvidenceStatus(value)
+  return finite(value.probability) ? formatPercent(value.probability) : '证据完整'
 }
 
 function finite(value) {

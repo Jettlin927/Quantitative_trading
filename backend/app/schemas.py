@@ -438,6 +438,8 @@ class ResearchPublicationAnalyticsOut(BaseModel):
     chart_series: dict[str, Any] = Field(default_factory=dict)
     yearly: list[dict[str, Any]] = Field(default_factory=list)
     regimes: list[dict[str, Any]] = Field(default_factory=list)
+    robustness: dict[str, Any] = Field(default_factory=dict)
+    capacity: dict[str, Any] = Field(default_factory=dict)
     availability: dict[str, Any] = Field(default_factory=dict)
     provenance: dict[str, Any] = Field(default_factory=dict)
 

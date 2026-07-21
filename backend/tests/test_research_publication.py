@@ -75,6 +75,7 @@ from backend.app.research_catalog import (
     get_publication_projection,
     get_strategy_profile,
 )
+from backend.app.research_analytics import get_publication_analytics
 from backend.app.quant_research.manifest import build_result_fingerprint
 from backend.app.quant_research.evaluation import build_capacity_evidence
 from backend.app.quant_research.runner import (
@@ -1121,6 +1122,32 @@ class ResearchPublicationTest(unittest.TestCase):
             public_base_url="https://research.example.com",
             readback_client=self.readback,
         )
+
+    def test_native_publication_analytics_preserves_robustness_and_capacity(self) -> None:
+        formal_id, run_id, _ = self.seed_research(
+            151,
+            max_trials=3,
+            complete_multiple_testing=True,
+        )
+        projection = self.publish(formal_id, self.draft(run_id))
+
+        with self.Session() as db:
+            analytics = get_publication_analytics(db, str(projection.publication_id))
+
+        self.assertIsNotNone(analytics)
+        self.assertEqual(analytics.data_status, "complete")
+        self.assertAlmostEqual(analytics.metrics["averageOneWayTurnover"], 0.1)
+        self.assertAlmostEqual(analytics.metrics["cumulativeOneWayTurnover"], 0.0)
+        self.assertEqual(analytics.robustness["walkForward"]["windowCount"], 1)
+        self.assertEqual(
+            analytics.robustness["parameterNeighborhood"]["status"], "complete"
+        )
+        self.assertEqual(analytics.robustness["costStress"]["status"], "complete")
+        self.assertAlmostEqual(analytics.robustness["dsr"]["probability"], 0.96)
+        self.assertAlmostEqual(analytics.robustness["pbo"]["probability"], 0.2)
+        self.assertEqual(analytics.capacity["status"], "complete")
+        self.assertAlmostEqual(analytics.capacity["p95AdvParticipationRate"], 0.001)
+        self.assertAlmostEqual(analytics.metrics["advParticipationP95"], 0.001)
 
     def rewrite_oos_and_resign(self, run_id: str, mutate) -> None:
         self.rewrite_json_artifacts_and_resign(
