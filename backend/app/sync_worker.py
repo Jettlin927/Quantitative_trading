@@ -28,6 +28,8 @@ SUPPORTED_SYNC_ACTIONS = {
     "daily_market",
     "market_fundamentals",
     "us_sample",
+    "us_experiment_universe",
+    "us_experiment_prices",
 }
 
 

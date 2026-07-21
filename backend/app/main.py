@@ -87,6 +87,7 @@ from .schemas import (
     SyncStockListingsRequest,
     SyncSuspendEventsRequest,
     SyncTradeCalendarRequest,
+    SyncUsExperimentPricesRequest,
 )
 from .data_quality.contracts import QualityCheckContract
 from .data_quality.runner import list_quality_results, quality_run_to_dict, run_data_quality_check
@@ -105,6 +106,14 @@ from .research_publication import (
 )
 from .tushare_client import decimal_or_none, get_pro_api, parse_tushare_date, tushare_date
 from .us_research import build_us_research_import_preview, build_us_research_overview
+from .us_experiment import (
+    build_overview as build_us_experiment_overview,
+    list_daily_bars as list_us_experiment_daily_bars,
+    list_daily_checks as list_us_experiment_daily_checks,
+    list_instruments as list_us_experiment_instruments,
+    refresh_universe as refresh_us_experiment_universe,
+    sync_daily_prices as sync_us_experiment_daily_prices,
+)
 from .strategy_results import build_strategy_results_overview
 
 
@@ -294,6 +303,7 @@ def build_db_overview_payload(db: Session) -> dict[str, Any]:
     industries = query_entity_coverage(db, IndustryClassification.index_code)
     industry_members = db.scalar(select(func.count(IndustryMember.id))) or 0
     us_sample = build_us_research_db_overview(db)
+    us_experiment = build_us_experiment_overview(db)
     return {
         "source": "postgresql",
         "tables": {
@@ -319,6 +329,9 @@ def build_db_overview_payload(db: Session) -> dict[str, Any]:
             "assetDailyPrices": us_sample["counts"]["assetDailyPrices"],
             "watchlistItems": us_sample["counts"]["watchlistItems"],
             "portfolioSnapshots": us_sample["counts"]["portfolioSnapshots"],
+            "usExperimentInstruments": us_experiment["universe"]["total"],
+            "usExperimentDailyBars": us_experiment["coverage"]["dailyBars"],
+            "usExperimentDailyChecks": us_experiment["validation"]["checks"],
             "dataSyncRuns": db.scalar(select(func.count(DataSyncRun.id))) or 0,
             "dataSyncJobs": db.scalar(select(func.count(DataSyncJob.id))) or 0,
         },
@@ -341,6 +354,7 @@ def build_db_overview_payload(db: Session) -> dict[str, Any]:
             "industryMembers": industry_members,
         },
         "usSample": us_sample,
+        "usExperiment": us_experiment,
     }
 
 
@@ -1285,6 +1299,78 @@ def get_us_research_db_overview(db: Session = Depends(get_db)) -> dict[str, Any]
     return build_us_research_db_overview(db)
 
 
+@app.get("/api/us-experiment/overview")
+def get_us_experiment_overview(
+    refresh: bool = False,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    return build_us_experiment_overview(db, refresh=refresh)
+
+
+@app.get("/api/us-experiment/instruments")
+def get_us_experiment_instruments(
+    q: str | None = None,
+    current_only: bool = True,
+    limit: int = 200,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    return list_us_experiment_instruments(
+        db,
+        q=q,
+        current_only=current_only,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/api/us-experiment/daily-checks")
+def get_us_experiment_daily_checks(
+    source_code: str | None = None,
+    status: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    try:
+        return list_us_experiment_daily_checks(
+            db,
+            source_code=source_code,
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+            offset=offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/us-experiment/instruments/{source_code}/daily-bars")
+def get_us_experiment_daily_bars(
+    source_code: str,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    limit: int = 10000,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    return {
+        "isExperimental": True,
+        "researchEligible": False,
+        "executionEnabled": False,
+        "sourceCode": source_code.strip().upper(),
+        "bars": list_us_experiment_daily_bars(
+            db,
+            source_code,
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+        ),
+    }
+
+
 @app.get("/api/strategy-results/overview")
 def get_strategy_results_overview() -> dict[str, Any]:
     return build_strategy_results_overview(REPO_ROOT)
@@ -2080,7 +2166,7 @@ def chunked(rows: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]]
 
 def validate_sync_job_payload(action: str, payload: dict[str, Any]) -> dict[str, Any]:
     without_token = {key: value for key, value in payload.items() if key != "token"}
-    if action == "us_sample":
+    if action in {"us_sample", "us_experiment_universe"}:
         return {}
     request_models = {
         "stock_listings": SyncStockListingsRequest,
@@ -2088,6 +2174,7 @@ def validate_sync_job_payload(action: str, payload: dict[str, Any]) -> dict[str,
         "market_bundle": SyncMarketDataRequest,
         "daily_market": SyncMarketDataRequest,
         "market_fundamentals": SyncMarketFundamentalsRequest,
+        "us_experiment_prices": SyncUsExperimentPricesRequest,
     }
     try:
         request = request_models[action].model_validate(without_token)
@@ -2110,6 +2197,13 @@ def execute_sync_job_action(action: str, payload: dict[str, Any], db: Session) -
     if action == "us_sample":
         result = import_us_research_sample_to_db(db)
         return {**result, "rows_upserted": sum(int(value or 0) for value in result.get("summary", {}).values())}
+    if action == "us_experiment_universe":
+        return refresh_us_experiment_universe(db)
+    if action == "us_experiment_prices":
+        return sync_us_experiment_daily_prices(
+            db,
+            SyncUsExperimentPricesRequest.model_validate(payload),
+        )
     if action in {"market_bundle", "daily_market"}:
         return execute_market_sync_bundle(action, SyncMarketDataRequest.model_validate(payload), db)
     if action == "market_fundamentals":

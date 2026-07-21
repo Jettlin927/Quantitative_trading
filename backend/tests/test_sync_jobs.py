@@ -279,10 +279,10 @@ class SyncJobTest(unittest.TestCase):
             skip_existing=False,
         )
         with self.Session() as db, patch.object(main, "get_pro_api", return_value=pro), patch.object(
-            main.time,
-            "monotonic",
-            return_value=0.0,
-        ), patch.object(main.time, "sleep") as sleep:
+            main,
+            "utc_now",
+            return_value=datetime(2026, 7, 21, 14, 30, tzinfo=timezone.utc),
+        ), patch.object(main.time, "monotonic", return_value=0.0), patch.object(main.time, "sleep") as sleep:
             result = main.sync_market_fundamentals(payload, db)
 
         self.assertEqual(pro.fina_indicator.call_count, 2)

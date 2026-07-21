@@ -42,6 +42,21 @@ const coreResponses = {
   '/api/funds?limit=1000': [],
   '/api/industries?limit=1000': [],
   '/api/us-research/db-overview': { counts: { assets: 1, assetDailyPrices: 1 }, assets: [{ symbol: 'SAMPLE', name: '样例资产', instrumentType: 'sample' }] },
+  '/api/us-experiment/overview': {
+    isExperimental: true,
+    researchEligible: false,
+    targetStartDate: '2010-01-01',
+    sources: { primaryDaily: 'yfinance 1d auto_adjust=false' },
+    schedule: { timezone: 'Asia/Shanghai', dailyAt: '10:00' },
+    universe: { current: 13672, byMarket: { 105: 6035, 106: 2997, 107: 4640 }, selection: 'm:105,m:106,m:107 全量当前目录；不设人工票数上限' },
+    snapshotAt: '2026-07-21T02:16:00Z',
+    coverage: { currentInstrumentsWithBars: 8120, currentPercent: 59.39, dailyBars: 1234567, startDate: '2010-01-04', endDate: '2026-07-20' },
+    validation: { checks: 30, byStatus: { match: 28, mismatch: 1, source_missing: 1 }, startDate: '2026-07-01', endDate: '2026-07-20', priceTolerancePct: 0.5, volumeTolerancePct: 5, lastCheckedAt: '2026-07-21T02:15:00Z' },
+    recentJobs: [{ id: 'job-us-1', action: 'us_experiment_prices', status: 'partial', rowsUpserted: 20, finishedAt: '2026-07-21T02:15:00Z' }],
+    failedInstruments: [{ sourceCode: '106.BABA', name: '阿里巴巴', lastSyncAt: '2026-07-21T02:14:00Z', lastSyncError: '免费源限流' }],
+    recentValidationAlerts: [{ sourceCode: '105.AAPL', tradeDate: '2026-07-20', status: 'mismatch', yfinance: { open: 210, high: 215, low: 209, close: 214, volume: 1000 }, akshare: { open: 211, high: 216, low: 208, close: 213, volume: 900 }, maxPriceRelativeDiff: 0.0047, volumeRelativeDiff: 0.1, message: '成交量差异超过容差' }],
+    limitations: ['当前目录不是历史 point-in-time universe，退市与历史成分尚未补齐。'],
+  },
 }
 
 const strategySummary = {
@@ -185,7 +200,7 @@ describe('研究驾驶舱', () => {
     vi.restoreAllMocks()
   })
 
-  it('提供四个一级区域并显式标注美股功能债与 SAMPLE 边界', async () => {
+  it('提供四个一级区域并显式区分美股实验数据、研究门禁与 SAMPLE 边界', async () => {
     render(<App />)
     expect(screen.getByRole('button', { name: /研究驾驶舱/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /A 股数据/ })).toBeInTheDocument()
@@ -193,7 +208,15 @@ describe('研究驾驶舱', () => {
     expect(screen.getByRole('button', { name: /系统运维/ })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /美股数据/ }))
-    expect(screen.getByRole('heading', { name: '美股研究级实际数据尚未接入' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '美股日线实验数据已隔离接入' })).toBeInTheDocument()
+    expect(await screen.findByText('13,672')).toBeInTheDocument()
+    expect(screen.getByText('每日 10:00', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('实验可用 / 正式研究不可用')).toBeInTheDocument()
+    expect(screen.getByText('同日价格或成交量超出容差')).toBeInTheDocument()
+    expect(screen.getByText('近期同步任务')).toBeInTheDocument()
+    expect(screen.getByText('同步实验日线')).toBeInTheDocument()
+    expect(screen.getByText('免费源限流')).toBeInTheDocument()
+    expect(screen.getByText('成交量差异超过容差')).toBeInTheDocument()
     expect(screen.getByText('仅样例')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /导入/ })).not.toBeInTheDocument()
   })
