@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from contextlib import redirect_stdout
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import gzip
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from hashlib import sha256
@@ -224,6 +226,78 @@ class ResearchPublicationTest(unittest.TestCase):
         self.engine.dispose()
         self.tempdir.cleanup()
 
+    def run_historical_mapping_cli(self) -> tuple[int, dict]:
+        expiring_session = sessionmaker(bind=self.engine)
+        output = StringIO()
+        with (
+            patch.object(
+                register_historical_issue_mapping,
+                "assert_schema_revision_at_head",
+            ),
+            patch.object(
+                register_historical_issue_mapping.GitHubIssueClient,
+                "from_env",
+                return_value=self.github,
+            ),
+            patch.object(
+                register_historical_issue_mapping,
+                "SessionLocal",
+                expiring_session,
+            ),
+            redirect_stdout(output),
+        ):
+            status = register_historical_issue_mapping.main(
+                [
+                    "--strategy-id",
+                    "etf_volatility_managed",
+                    "--issue-number",
+                    "37",
+                ]
+            )
+        return status, json.loads(output.getvalue())
+
+    def test_historical_mapping_cli_reports_created_after_commit(self) -> None:
+        formal_id, _run_id, _issue_number = self.seed_research(
+            149,
+            origin="historical_import",
+            include_historical_issue_mapping=False,
+        )
+
+        status, payload = self.run_historical_mapping_cli()
+
+        self.assertEqual(status, 0)
+        self.assertEqual(
+            payload,
+            {
+                "formalResearchId": formal_id,
+                "issueNumber": 37,
+                "status": "created",
+                "strategyId": "etf_volatility_managed",
+            },
+        )
+
+    def test_historical_mapping_cli_reports_unchanged_after_commit(self) -> None:
+        formal_id, _run_id, _issue_number = self.seed_research(
+            149,
+            origin="historical_import",
+            include_historical_issue_mapping=False,
+        )
+        first_status, first_payload = self.run_historical_mapping_cli()
+
+        status, payload = self.run_historical_mapping_cli()
+
+        self.assertEqual((first_status, first_payload["status"]), (0, "created"))
+        self.assertEqual(status, 0)
+        self.assertEqual(
+            payload,
+            {
+                "formalResearchId": formal_id,
+                "issueNumber": 37,
+                "status": "unchanged",
+                "strategyId": "etf_volatility_managed",
+            },
+        )
+
     def seed_research(
         self,
         serial: int,
@@ -237,6 +311,7 @@ class ResearchPublicationTest(unittest.TestCase):
         invalid_walk_forward: bool = False,
         complete_parameter_neighborhood: bool = True,
         complete_capacity: bool = True,
+        include_historical_issue_mapping: bool = True,
     ) -> tuple[str, str, int]:
         suffix = f"{serial:012d}"
         historical = origin == "historical_import"
@@ -883,12 +958,13 @@ class ResearchPublicationTest(unittest.TestCase):
                 db.flush()
                 run.formal_research_id = formal_id
                 db.flush()
-                db.add(
-                    ResearchPublicationIssueMapping(
-                        formal_research_id=formal_id,
-                        issue_number=issue_number,
+                if include_historical_issue_mapping:
+                    db.add(
+                        ResearchPublicationIssueMapping(
+                            formal_research_id=formal_id,
+                            issue_number=issue_number,
+                        )
                     )
-                )
             else:
                 db.add(formal)
                 db.flush()
