@@ -101,6 +101,37 @@ class AShareResearchSnapshotTest(unittest.TestCase):
         )
         self.assertEqual(coverage["failedRows"], 0)
 
+    def test_quality_does_not_require_limit_price_after_industry_membership_ends(self):
+        with Session(self.engine) as db:
+            member = db.scalar(
+                select(IndustryMember).where(
+                    IndustryMember.con_code == "SYN001.SZ"
+                )
+            )
+            member.out_date = date(2026, 1, 2)
+            limit_price = db.scalar(
+                select(StockLimitPrice).where(
+                    StockLimitPrice.ts_code == "SYN001.SZ",
+                    StockLimitPrice.trade_date == date(2026, 1, 5),
+                )
+            )
+            db.delete(limit_price)
+            db.commit()
+
+            report = run_data_quality_check(
+                db,
+                self._contract(),
+                code_commit="a-share-test",
+            )
+
+        self.assertEqual(report["status"], "ready")
+        coverage = next(
+            item
+            for item in report["results"]
+            if item["ruleId"] == "calendar.limit_price_coverage"
+        )
+        self.assertEqual(coverage["failedRows"], 0)
+
     def test_snapshot_re_resolves_membership_and_rejects_old_quality_after_change(self):
         with Session(self.engine) as db:
             report = run_data_quality_check(db, self._contract(), code_commit="a-share-test")

@@ -253,7 +253,7 @@ def check_calendar_coverage(db: Session, contract: QualityCheckContract) -> list
                     dependent=StockLimitPrice,
                     table_name="stock_limit_prices",
                     rule_id="calendar.limit_price_coverage",
-                    start_at_first_membership=contract.universe_type
+                    restrict_to_membership_periods=contract.universe_type
                     in {"industry_membership", "industry_level_membership"},
                 ),
             ]
@@ -859,19 +859,24 @@ def _same_key_coverage(
     dependent: type[Any],
     table_name: str,
     rule_id: str,
-    start_at_first_membership: bool = False,
+    restrict_to_membership_periods: bool = False,
 ) -> QualityRuleResult:
     filters = list(_scope_filters(primary, contract))
-    if start_at_first_membership:
-        first_membership_query = select(func.min(IndustryMember.in_date)).where(
+    if restrict_to_membership_periods:
+        active_membership = select(1).where(
             IndustryMember.con_code == primary.ts_code,
+            IndustryMember.in_date <= primary.trade_date,
+            or_(
+                IndustryMember.out_date.is_(None),
+                IndustryMember.out_date >= primary.trade_date,
+            ),
         )
         if contract.universe_type == "industry_membership":
-            first_membership_query = first_membership_query.where(
+            active_membership = active_membership.where(
                 IndustryMember.index_code == contract.universe_source_key,
             )
         else:
-            first_membership_query = first_membership_query.where(
+            active_membership = active_membership.where(
                 IndustryMember.index_code.in_(
                     select(IndustryClassification.index_code).where(
                         IndustryClassification.src == contract.universe_classification_src,
@@ -879,8 +884,7 @@ def _same_key_coverage(
                     )
                 )
             )
-        first_membership_date = first_membership_query.scalar_subquery()
-        filters.append(primary.trade_date >= first_membership_date)
+        filters.append(exists(active_membership))
     missing = ~exists(
         select(1).where(
             dependent.ts_code == primary.ts_code,
