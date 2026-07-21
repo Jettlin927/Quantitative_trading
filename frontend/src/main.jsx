@@ -78,6 +78,7 @@ export function App() {
     setResearchLoading(true)
     setGlobalError('')
     setResearchError('')
+    const { startDate: catalogStartDate, endDate: catalogEndDate } = recentCatalogRange()
     const stockPageRequest = beginStockPageRequest(buildStockScreenPath(appliedStockQueryRef.current, 0))
     const requests = [
       ['health', '/api/health?include_counts=false'],
@@ -87,7 +88,7 @@ export function App() {
       ['overview', `/api/db/overview${refreshCoverage ? '?refresh=true' : ''}`],
       ['stocks', stockPageRequest.path],
       ['indices', '/api/indices?limit=1000'],
-      ['funds', '/api/funds?limit=1000'],
+      ['funds', `/api/funds?limit=1000&daily_start_date=${catalogStartDate}&daily_end_date=${catalogEndDate}`],
       ['industries', '/api/industries?limit=1000'],
       ['usDb', '/api/us-research/db-overview'],
       ['strategies', '/api/research/strategies'],
@@ -126,7 +127,12 @@ export function App() {
       }
       if (key === 'funds') {
         setCatalogs((current) => ({ ...current, funds: value }))
-        if (!selectedCatalogRef.current.code && value.length) selectCatalog('fund', value[0].tsCode)
+        const current = selectedCatalogRef.current
+        if (current.kind === 'fund' && !value.some((item) => item.tsCode === current.code)) {
+          selectCatalog('fund', value[0]?.tsCode || '')
+        } else if (!current.code && value.length) {
+          selectCatalog('fund', value[0].tsCode)
+        }
       }
       if (key === 'industries') {
         setCatalogs((current) => ({ ...current, industries: value }))
@@ -564,8 +570,9 @@ function buildStockScreenPath(query, offset) {
 function recentCatalogRange() {
   const end = new Date()
   const start = new Date(end)
-  start.setUTCFullYear(start.getUTCFullYear() - 1)
-  return { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) }
+  start.setFullYear(start.getFullYear() - 1)
+  const formatLocalDate = (value) => [value.getFullYear(), String(value.getMonth() + 1).padStart(2, '0'), String(value.getDate()).padStart(2, '0')].join('-')
+  return { startDate: formatLocalDate(start), endDate: formatLocalDate(end) }
 }
 
 function errorMessage(error) {

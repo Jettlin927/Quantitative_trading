@@ -1146,9 +1146,27 @@ def get_index_daily_bars(ts_code: str, start_date: date, end_date: date, db: Ses
 
 
 @app.get("/api/funds")
-def list_funds(q: str | None = None, market: str | None = None, limit: int = 200, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def list_funds(
+    q: str | None = None,
+    market: str | None = None,
+    limit: int = 200,
+    daily_start_date: date | None = None,
+    daily_end_date: date | None = None,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
     stmt = select(Fund).order_by(Fund.ts_code).limit(min(max(limit, 1), 1000))
     filters = build_catalog_filters(Fund.ts_code, Fund.name, q=q, market_column=Fund.market, market=market)
+    daily_filters = []
+    if daily_start_date:
+        daily_filters.append(FundDailyBar.trade_date >= daily_start_date)
+    if daily_end_date:
+        daily_filters.append(FundDailyBar.trade_date <= daily_end_date)
+    if daily_filters:
+        filters.append(
+            select(FundDailyBar.id)
+            .where(FundDailyBar.ts_code == Fund.ts_code, *daily_filters)
+            .exists()
+        )
     if filters:
         stmt = stmt.where(*filters)
     return [fund_to_dict(row) for row in db.scalars(stmt).all()]
