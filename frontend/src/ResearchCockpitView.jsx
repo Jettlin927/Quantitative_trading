@@ -28,6 +28,7 @@ export function ResearchCockpitView({
   setSelectedResearchId,
   researchDetail,
   publication,
+  analytics,
   loading,
   error,
 }) {
@@ -39,6 +40,7 @@ export function ResearchCockpitView({
   const runningResearches = (researchDetail?.runs || []).filter((item) => ['running', 'retrying'].includes(item.status)).length
   const missingEvidence = evaluation?.missing_evidence?.length || 0
   const latestPublishedAt = publication?.published_at || publishedRecord?.published_at
+  const legacyOnly = strategyProfile?.metadata_json?.archiveClass === 'legacy'
   return (
     <div className="view-stack enter research-cockpit">
       <section className="section-heading cockpit-heading">
@@ -109,8 +111,10 @@ export function ResearchCockpitView({
                 {!formalResearches.length ? <div className="research-empty">该策略暂无正式研究记录</div> : null}
               </nav>
 
-              {researchDetail ? (
-                <ResearchDetailView detail={researchDetail} evaluation={evaluation} publication={publicationFact} />
+              {legacyOnly ? (
+                <LegacyArchiveNotice profile={strategyProfile} />
+              ) : researchDetail ? (
+                <ResearchDetailView detail={researchDetail} evaluation={evaluation} publication={publicationFact} analytics={analytics} />
               ) : formalResearches.length && !error ? <div className="loading-state"><RefreshCw className="spin" size={18} />正在读取研究时间线…</div> : null}
             </>
           ) : !error ? <div className="loading-state">选择策略后查看结构化研究档案</div> : null}
@@ -120,7 +124,7 @@ export function ResearchCockpitView({
   )
 }
 
-function ResearchDetailView({ detail, evaluation, publication }) {
+function ResearchDetailView({ detail, evaluation, publication, analytics }) {
   const plan = detail.plan || {}
   const runs = detail.runs || []
   const events = [...(detail.events || [])].sort((left, right) => left.sequence_no - right.sequence_no)
@@ -128,6 +132,7 @@ function ResearchDetailView({ detail, evaluation, publication }) {
   const proposals = [...(detail.follow_up_proposals || [])].sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || '')))
   return (
     <div className="research-detail-grid">
+      <ResearchAnalyticsView analytics={analytics} />
       <Panel title="计划与授权" eyebrow={`议题 #${plan.issue_number || '-'}`} className="research-plan-panel">
         <div className="research-facts">
           <FactGroup title="冻结计划">
@@ -219,4 +224,269 @@ function ResearchDetailView({ detail, evaluation, publication }) {
       </Panel>
     </div>
   )
+}
+
+function LegacyArchiveNotice({ profile }) {
+  return (
+    <section className="legacy-archive-notice">
+      <div>
+        <span>LEGACY PROVENANCE ONLY</span>
+        <h2>仅追溯，未按当前标准评价</h2>
+        <p>{profile.economic_thesis}</p>
+      </div>
+      <dl>
+        <dt>结构化结论</dt><dd>not_available</dd>
+        <dt>指标与图表</dt><dd>legacy_provenance_only</dd>
+        <dt>展示规则</dt><dd>缺失指标不会显示为 0，也不会推断为策略有效</dd>
+      </dl>
+    </section>
+  )
+}
+
+function ResearchAnalyticsView({ analytics }) {
+  if (!analytics) {
+    return (
+      <section className="analytics-unavailable">
+        <b>规范指标投影暂不可用</b>
+        <span>结论与证据仍可查看；缺失数字不会被填成 0。</span>
+      </section>
+    )
+  }
+  if (analytics.data_status !== 'complete') {
+    return (
+      <section className="analytics-unavailable">
+        <b>当前评价没有完整的规范指标</b>
+        <span>{availabilityReason(analytics.availability?.metrics)}</span>
+      </section>
+    )
+  }
+  const metrics = analytics.metrics || {}
+  const chart = analytics.chart_series || {}
+  const hasExcessReturn = finite(metrics.excessTotalReturn)
+  const activeMetric = metrics.excessTotalReturn ?? metrics.relativeWealth
+  const activeLabel = hasExcessReturn ? '累计超额收益' : '相对财富差'
+  return (
+    <section className="research-analytics" aria-label="量化评价指标与图表">
+      <header className="analytics-header">
+        <div><span>QUANTITATIVE EVIDENCE</span><h2>数字指标与图表</h2></div>
+        <div><b>{analytics.primary_label || analytics.primary_run_id}</b><small>评价 v{analytics.evaluation_version} · 同一冻结证据投影</small></div>
+      </header>
+
+      <div className="analytics-kpis">
+        <AnalyticsKpi label="累计净收益" value={formatRatio(metrics.totalReturn)} tone={numberTone(metrics.totalReturn)} />
+        <AnalyticsKpi label="年化收益（CAGR）" value={formatRatio(metrics.cagr)} tone={numberTone(metrics.cagr)} />
+        <AnalyticsKpi label="基准累计收益" value={formatRatio(metrics.benchmarkTotalReturn)} tone="benchmark" />
+        <AnalyticsKpi label={activeLabel} value={formatRatio(activeMetric)} tone={numberTone(activeMetric)} />
+        <AnalyticsKpi label="最大回撤" value={formatRatio(metrics.maxDrawdown)} tone="bad" />
+        <AnalyticsKpi label="夏普比率（Sharpe）" value={formatDecimal(metrics.sharpe)} tone={numberTone(metrics.sharpe)} />
+        <AnalyticsKpi label="索提诺比率（Sortino）" value={formatDecimal(metrics.sortino)} tone={numberTone(metrics.sortino)} />
+        <AnalyticsKpi label="预期损失（ES95）" value={formatPercent(metrics.es95)} tone="risk" />
+      </div>
+
+      <div className="analytics-chart-grid">
+        <AnalyticsChartPanel title="净值与基准" eyebrow="WEALTH PATH" availability={analytics.availability?.nav}>
+          <LineChart
+            ariaLabel="策略与基准净值对比图"
+            series={[
+              { label: analytics.primary_label || '策略净值', values: chart.nav, color: '#087ea4' },
+              { label: analytics.benchmark?.label || '匹配基准', values: chart.benchmarkNav, color: '#d78a17' },
+            ]}
+          />
+          {analytics.availability?.benchmarkNav?.status !== 'complete' ? <ChartNote text={availabilityReason(analytics.availability?.benchmarkNav)} /> : null}
+        </AnalyticsChartPanel>
+        <AnalyticsChartPanel title="回撤曲线" eyebrow="DRAWDOWN" availability={analytics.availability?.drawdown}>
+          <LineChart ariaLabel="策略回撤曲线图" series={[{ label: '策略回撤', values: chart.drawdown, color: '#d84b4b' }]} zeroLine />
+        </AnalyticsChartPanel>
+        <AnalyticsChartPanel title="换手与成本" eyebrow="FRICTION" availability={analytics.availability?.turnoverCost}>
+          <LineChart
+            ariaLabel="累计换手与交易成本图"
+            series={[
+              { label: '累计单边换手', values: chart.cumulativeTurnover, color: '#087ea4' },
+              { label: '累计成本率', values: chart.cumulativeCost, color: '#d78a17' },
+            ]}
+          />
+        </AnalyticsChartPanel>
+        <YearlyReturnChart rows={analytics.yearly || []} />
+      </div>
+
+      <div className="analytics-detail-grid">
+        <MetricGroup title="收益与风险调整" rows={[
+          ['年化波动', formatPercent(metrics.annualizedVolatility)],
+          ['下行波动', formatPercent(metrics.downsideVolatility)],
+          ['Calmar', formatDecimal(metrics.calmar)],
+          ['信息比率', formatDecimal(metrics.informationRatio)],
+          ['跟踪误差', formatPercent(metrics.trackingError)],
+          ['Beta', formatDecimal(metrics.beta)],
+        ]} />
+        <MetricGroup title="尾部与形态" rows={[
+          ['VaR95', formatPercent(metrics.var95)],
+          ['ES95', formatPercent(metrics.es95)],
+          ['偏度', formatDecimal(metrics.skew)],
+          ['超额峰度', formatDecimal(metrics.excessKurtosis)],
+          ['最长回撤', formatDays(metrics.maxDrawdownDuration)],
+          ['最大回撤', formatRatio(metrics.maxDrawdown)],
+        ]} />
+        <MetricGroup title="交易、暴露与容量" rows={[
+          ['累计单边换手', formatMultiple(metrics.turnover)],
+          ['累计成本率', formatPercent(metrics.cost)],
+          ['平均暴露', formatPercent(metrics.averageExposure)],
+          ['最大权重', formatPercent(metrics.maximumWeight)],
+          ['平均 HHI', formatDecimal(metrics.averageHhi)],
+          ['阻塞率', formatPercent(metrics.blockedRequestRate)],
+        ]} />
+      </div>
+
+      <RegimeMatrix rows={analytics.regimes || []} />
+      <footer className="analytics-provenance">
+        <span>数据状态：{analytics.data_status}</span>
+        <span>运行：{analytics.primary_run_id || 'not_available'}</span>
+        <span>来源指纹：{shortHash(analytics.provenance?.sha256 || analytics.provenance?.manifestSha256)}</span>
+        <span>结果指纹：{shortHash(analytics.provenance?.resultFingerprint)}</span>
+      </footer>
+    </section>
+  )
+}
+
+function AnalyticsKpi({ label, value, tone = '' }) {
+  return <article className={`analytics-kpi ${tone}`}><span>{label}</span><b>{value}</b></article>
+}
+
+function AnalyticsChartPanel({ title, eyebrow, availability, children }) {
+  const ready = availability?.status === 'complete'
+  return (
+    <section className="analytics-chart-panel">
+      <header><span>{eyebrow}</span><h3>{title}</h3></header>
+      {ready ? children : <div className="analytics-chart-empty">{availabilityReason(availability)}</div>}
+    </section>
+  )
+}
+
+function LineChart({ ariaLabel, series, zeroLine = false }) {
+  const available = (series || []).filter((item) => item.values?.length)
+  if (!available.length) return <div className="analytics-chart-empty">not_available：没有冻结序列</div>
+  const width = 720
+  const height = 230
+  const padding = { left: 34, right: 16, top: 18, bottom: 28 }
+  const allValues = available.flatMap((item) => item.values.map((point) => Number(point.value))).filter(Number.isFinite)
+  const low = Math.min(...allValues, zeroLine ? 0 : Number.POSITIVE_INFINITY)
+  const high = Math.max(...allValues, zeroLine ? 0 : Number.NEGATIVE_INFINITY)
+  const spread = high - low || 1
+  const points = (values) => values.map((point, index) => {
+    const x = padding.left + (index / Math.max(values.length - 1, 1)) * (width - padding.left - padding.right)
+    const y = padding.top + ((high - Number(point.value)) / spread) * (height - padding.top - padding.bottom)
+    return `${x.toFixed(2)},${y.toFixed(2)}`
+  }).join(' ')
+  const zeroY = padding.top + ((high - 0) / spread) * (height - padding.top - padding.bottom)
+  return (
+    <div className="analytics-line-chart">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
+        {[0, 1, 2, 3].map((index) => {
+          const y = padding.top + index * ((height - padding.top - padding.bottom) / 3)
+          return <line key={index} x1={padding.left} x2={width - padding.right} y1={y} y2={y} className="chart-grid-line" />
+        })}
+        {zeroLine && zeroY >= padding.top && zeroY <= height - padding.bottom ? <line x1={padding.left} x2={width - padding.right} y1={zeroY} y2={zeroY} className="chart-zero-line" /> : null}
+        {available.map((item) => <polyline key={item.label} points={points(item.values)} fill="none" stroke={item.color} strokeWidth="2.4" vectorEffect="non-scaling-stroke" />)}
+      </svg>
+      <div className="analytics-chart-legend">
+        {available.map((item) => <span key={item.label}><i style={{ background: item.color }} />{item.label}<b>{formatChartEnd(item.values)}</b></span>)}
+      </div>
+    </div>
+  )
+}
+
+function YearlyReturnChart({ rows }) {
+  const visible = rows.filter((row) => row.year && finite(row.strategyReturn)).slice(-12)
+  return (
+    <section className="analytics-chart-panel yearly-return-panel">
+      <header><span>CALENDAR</span><h3>逐年收益</h3></header>
+      {visible.length ? (
+        <div className="yearly-bars" role="img" aria-label="策略与基准逐年收益对比图">
+          {visible.map((row) => {
+            const benchmark = row.benchmarkReturn ?? row.passiveReturn
+            const scale = Math.max(Math.abs(Number(row.strategyReturn)), Math.abs(Number(benchmark || 0)), 0.01)
+            return (
+              <div className="yearly-bar-row" key={row.year}>
+                <b>{row.year}</b>
+                <span><i className={numberTone(row.strategyReturn)} style={{ width: `${Math.min(100, Math.abs(Number(row.strategyReturn)) / scale * 100)}%` }} />{formatRatio(row.strategyReturn)}</span>
+                <span><i className="benchmark" style={{ width: `${Math.min(100, Math.abs(Number(benchmark || 0)) / scale * 100)}%` }} />{formatRatio(benchmark)}</span>
+              </div>
+            )
+          })}
+        </div>
+      ) : <div className="analytics-chart-empty">not_available：没有冻结逐年结果</div>}
+    </section>
+  )
+}
+
+function MetricGroup({ title, rows }) {
+  return (
+    <section className="analytics-metric-group"><h3>{title}</h3><dl>
+      {rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+    </dl></section>
+  )
+}
+
+function RegimeMatrix({ rows }) {
+  return (
+    <section className="regime-panel">
+      <header><span>MARKET REGIMES</span><h3>方向 × 波动率</h3></header>
+      {rows.length ? <div className="regime-grid">
+        {rows.map((row, index) => {
+          const strategyReturn = row.strategyReturn
+          const benchmarkReturn = row.benchmarkReturn ?? row.passiveReturn
+          const activeReturn = row.activeReturn
+          return <article className={numberTone(strategyReturn)} key={`${row.direction}-${row.volatility}-${index}`}>
+            <span>{row.direction || '未分类'} · {row.volatility || '未分类'}</span>
+            <b>{formatRatio(strategyReturn)}</b>
+            <small>基准 {formatRatio(benchmarkReturn)} · 主动 {formatRatio(activeReturn)}</small>
+            <em>{formatInt(row.observations || row.months || 0)} 个观察</em>
+          </article>
+        })}
+      </div> : <div className="analytics-chart-empty">not_available：没有冻结市场环境矩阵</div>}
+    </section>
+  )
+}
+
+function ChartNote({ text }) {
+  return <p className="analytics-chart-note">{text}</p>
+}
+
+function availabilityReason(value) {
+  return value?.reason ? `not_available：${value.reason}` : 'not_available：当前发布没有冻结该项证据'
+}
+
+function finite(value) {
+  return value !== null && value !== undefined && Number.isFinite(Number(value))
+}
+
+function formatRatio(value) {
+  if (!finite(value)) return 'not_available'
+  const number = Number(value) * 100
+  return `${number > 0 ? '+' : ''}${number.toFixed(2)}%`
+}
+
+function formatDecimal(value) {
+  return finite(value) ? Number(value).toFixed(3) : 'not_available'
+}
+
+function formatPercent(value) {
+  return finite(value) ? `${(Number(value) * 100).toFixed(2)}%` : 'not_available'
+}
+
+function formatDays(value) {
+  return finite(value) ? `${formatInt(value)} 日` : 'not_available'
+}
+
+function formatMultiple(value) {
+  return finite(value) ? `${Number(value).toFixed(2)}×` : 'not_available'
+}
+
+function formatChartEnd(values) {
+  const value = values?.[values.length - 1]?.value
+  return finite(value) ? Number(value).toFixed(3) : 'not_available'
+}
+
+function numberTone(value) {
+  if (!finite(value)) return 'neutral'
+  return Number(value) > 0 ? 'good' : Number(value) < 0 ? 'bad' : 'neutral'
 }
