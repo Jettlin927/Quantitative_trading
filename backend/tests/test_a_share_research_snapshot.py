@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 import tempfile
 import unittest
@@ -15,7 +15,9 @@ from backend.app.models import (
     IndustryClassification,
     IndustryMember,
     StockAdjustFactor,
+    StockDailyBasic,
     StockDailyBar,
+    StockFinancialIndicator,
     StockLimitPrice,
     StockListing,
     TradeCalendar,
@@ -231,6 +233,76 @@ class AShareResearchSnapshotTest(unittest.TestCase):
             ["trade_date", "ts_code", "industry_index_code"],
         )
         self.assertEqual(set(universe["industry_index_code"]), {"SYNIND.SI"})
+
+    def test_snapshot_conditionally_freezes_valuation_and_verified_financial_revisions(self):
+        trade_dates = (date(2026, 1, 2), date(2026, 1, 5))
+        with Session(self.engine) as db:
+            for code in ("SYN001.SZ", "SYN002.SH"):
+                for trade_date in trade_dates:
+                    db.add(
+                        StockDailyBasic(
+                            ts_code=code,
+                            trade_date=trade_date,
+                            close=10,
+                            pe_ttm=12,
+                            pb=1.5,
+                        )
+                    )
+                db.add(
+                    StockFinancialIndicator(
+                        ts_code=code,
+                        ann_date=date(2025, 12, 31),
+                        end_date=date(2025, 9, 30),
+                        roe=10,
+                        source_update_flag="1",
+                        source_revision_sha256=("a" if code.endswith("SZ") else "b") * 64,
+                        source_observed_at=datetime(
+                            2025,
+                            12,
+                            31,
+                            10,
+                            tzinfo=timezone.utc,
+                        ),
+                        available_from=date(2026, 1, 2),
+                        revision_status="observed",
+                    )
+                )
+            db.commit()
+            contract = self._contract(
+                required_datasets=[
+                    "stock_daily_basic",
+                    "stock_financial_indicators",
+                ]
+            )
+            report = run_data_quality_check(db, contract, code_commit="a-share-test")
+            self.assertEqual(report["status"], "ready")
+            snapshot = freeze_input_snapshot(
+                db,
+                self._config(report["qualityRunId"]),
+                Path(self.tmp.name) / "fundamental-snapshots",
+                capacity_policy=SnapshotCapacityPolicy(min_remaining_bytes=0),
+            )
+
+        self.assertIn("stock_daily_basic", snapshot.manifest["tableArtifacts"])
+        self.assertIn(
+            "stock_financial_indicators",
+            snapshot.manifest["tableArtifacts"],
+        )
+        self.assertEqual(
+            snapshot.manifest["requiredDatasets"],
+            ["stock_daily_basic", "stock_financial_indicators"],
+        )
+        financial = read_canonical_csv_gz(
+            snapshot.path / "inputs" / "stock_financial_indicators.csv.gz"
+        )
+        self.assertTrue(
+            {
+                "source_revision_sha256",
+                "source_observed_at",
+                "available_from",
+                "revision_status",
+            }.issubset(financial.columns)
+        )
 
     def test_snapshot_excludes_raw_member_delisted_before_window(self):
         with Session(self.engine) as db:

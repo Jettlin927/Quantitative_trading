@@ -101,6 +101,33 @@ class SchemaMigrationTest(unittest.TestCase):
             self.assertIn("research_publication_issue_mappings", Base.metadata.tables)
             self.assertIn("research_orchestrations", Base.metadata.tables)
             self.assertIn("research_work_items", Base.metadata.tables)
+            financial_columns = {
+                column["name"]
+                for column in inspect(engine).get_columns("stock_financial_indicators")
+            }
+            self.assertTrue(
+                {
+                    "source_update_flag",
+                    "source_revision_sha256",
+                    "source_observed_at",
+                    "available_from",
+                    "revision_status",
+                }.issubset(financial_columns)
+            )
+            financial_unique_constraints = {
+                constraint["name"]
+                for constraint in inspect(engine).get_unique_constraints(
+                    "stock_financial_indicators"
+                )
+            }
+            self.assertIn(
+                "uq_stock_financial_indicator_revision",
+                financial_unique_constraints,
+            )
+            self.assertNotIn(
+                "uq_stock_financial_indicator_period",
+                financial_unique_constraints,
+            )
             actual_indexes = {
                 index["name"]
                 for table_name in Base.metadata.tables

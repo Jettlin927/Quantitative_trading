@@ -10,6 +10,7 @@ from pathlib import Path
 import time
 from typing import Any
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -134,7 +135,8 @@ DAILY_BASIC_FIELDS = (
 FINA_INDICATOR_FIELDS = (
     "ts_code,ann_date,end_date,eps,dt_eps,bps,netprofit_margin,grossprofit_margin,"
     "roe,roe_waa,roa,debt_to_assets,current_ratio,quick_ratio,assets_turn,"
-    "basic_eps_yoy,op_yoy,netprofit_yoy,tr_yoy,or_yoy,q_sales_yoy,q_profit_yoy"
+    "basic_eps_yoy,op_yoy,netprofit_yoy,tr_yoy,or_yoy,q_sales_yoy,q_profit_yoy,"
+    "update_flag"
 )
 TRADE_CALENDAR_FIELDS = "exchange,cal_date,is_open,pretrade_date"
 ADJUST_FACTOR_FIELDS = "ts_code,trade_date,adj_factor"
@@ -608,15 +610,22 @@ def sync_fundamentals(payload: SyncFundamentalsRequest, db: Session = Depends(ge
     daily_basic_df = pro.daily_basic(ts_code=payload.ts_code, start_date=tushare_date(payload.start_date), end_date=tushare_date(payload.end_date), fields=DAILY_BASIC_FIELDS)
     daily_rows = [row for item in daily_basic_df.to_dict("records") if (row := daily_basic_record_to_row(item))]
     financial_df = pro.fina_indicator(ts_code=payload.ts_code, start_date=tushare_date(payload.start_date), end_date=tushare_date(payload.end_date), fields=FINA_INDICATOR_FIELDS)
-    financial_rows = [row for item in financial_df.to_dict("records") if (row := financial_indicator_record_to_row(item))]
+    observed_at = utc_now()
+    available_from = next_financial_available_date(db, observed_at)
+    financial_rows = [
+        row
+        for item in financial_df.to_dict("records")
+        if (
+            row := financial_indicator_record_to_row(
+                item,
+                source_observed_at=observed_at,
+                available_from=available_from,
+            )
+        )
+    ]
 
     daily_upserted = upsert_rows(db, StockDailyBasic, dedupe_rows(daily_rows, ("ts_code", "trade_date")), ["ts_code", "trade_date"])
-    financial_upserted = upsert_rows(
-        db,
-        StockFinancialIndicator,
-        dedupe_rows(financial_rows, ("ts_code", "end_date", "ann_date")),
-        ["ts_code", "end_date", "ann_date"],
-    )
+    financial_upserted = insert_financial_revision_rows(db, financial_rows)
     total = daily_upserted + financial_upserted
     record_sync_run(
         db,
@@ -673,6 +682,7 @@ def sync_market_fundamentals(payload: SyncMarketFundamentalsRequest, db: Session
                     StockFinancialIndicator.ts_code == ts_code,
                     StockFinancialIndicator.ann_date >= payload.start_date,
                     StockFinancialIndicator.ann_date <= payload.end_date,
+                    StockFinancialIndicator.revision_status == "observed",
                 )
             )
             if existing:
@@ -685,13 +695,20 @@ def sync_market_fundamentals(payload: SyncMarketFundamentalsRequest, db: Session
                     time.sleep(wait_seconds)
             last_request_at = time.monotonic()
             df = pro.fina_indicator(ts_code=ts_code, start_date=tushare_date(payload.start_date), end_date=tushare_date(payload.end_date), fields=FINA_INDICATOR_FIELDS)
-            rows = [row for item in df.to_dict("records") if (row := financial_indicator_record_to_row(item))]
-            rows_upserted += upsert_rows(
-                db,
-                StockFinancialIndicator,
-                dedupe_rows(rows, ("ts_code", "end_date", "ann_date")),
-                ["ts_code", "end_date", "ann_date"],
-            )
+            observed_at = utc_now()
+            available_from = next_financial_available_date(db, observed_at)
+            rows = [
+                row
+                for item in df.to_dict("records")
+                if (
+                    row := financial_indicator_record_to_row(
+                        item,
+                        source_observed_at=observed_at,
+                        available_from=available_from,
+                    )
+                )
+            ]
+            rows_upserted += insert_financial_revision_rows(db, rows)
         except Exception as exc:  # noqa: BLE001
             failed_stocks.append(f"{ts_code}:{exc}")
 
@@ -1741,7 +1758,38 @@ def daily_basic_record_to_row(item: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def financial_indicator_record_to_row(item: dict[str, Any]) -> dict[str, Any] | None:
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def next_financial_available_date(
+    db: Session,
+    source_observed_at: datetime,
+) -> date:
+    normalized = (
+        source_observed_at
+        if source_observed_at.tzinfo is not None
+        else source_observed_at.replace(tzinfo=timezone.utc)
+    )
+    observed_date = normalized.astimezone(ZoneInfo("Asia/Shanghai")).date()
+    available_from = db.scalar(
+        select(func.min(TradeCalendar.cal_date)).where(
+            TradeCalendar.exchange == "SSE",
+            TradeCalendar.is_open.is_(True),
+            TradeCalendar.cal_date > observed_date,
+        )
+    )
+    if available_from is None:
+        raise ValueError("缺少首次观测日之后的 SSE 官方开市日，不能冻结财务可用日")
+    return available_from
+
+
+def financial_indicator_record_to_row(
+    item: dict[str, Any],
+    *,
+    source_observed_at: datetime | None = None,
+    available_from: date | None = None,
+) -> dict[str, Any] | None:
     ts_code = item.get("ts_code")
     end_date = parse_tushare_date(item.get("end_date"))
     ann_date = parse_tushare_date(item.get("ann_date"))
@@ -1768,9 +1816,92 @@ def financial_indicator_record_to_row(item: dict[str, Any]) -> dict[str, Any] | 
         "q_sales_yoy",
         "q_profit_yoy",
     ]
+    if (source_observed_at is None) != (available_from is None):
+        raise ValueError("source_observed_at 与 available_from 必须同时提供")
     row = {"ts_code": str(ts_code), "ann_date": ann_date, "end_date": end_date}
     row.update({field: decimal_or_none(item.get(field)) for field in numeric_fields})
+    if source_observed_at is None:
+        row.update(
+            {
+                "source_update_flag": item.get("update_flag"),
+                "source_revision_sha256": None,
+                "source_observed_at": None,
+                "available_from": None,
+                "revision_status": "legacy_unverified",
+            }
+        )
+        return row
+    normalized_observed_at = (
+        source_observed_at
+        if source_observed_at.tzinfo is not None
+        else source_observed_at.replace(tzinfo=timezone.utc)
+    )
+    identity = {
+        key: (
+            value.isoformat()
+            if isinstance(value, (date, datetime))
+            else format(value, "f")
+            if isinstance(value, Decimal)
+            else value
+        )
+        for key, value in row.items()
+    }
+    row.update(
+        {
+            "source_update_flag": str(item.get("update_flag") or "") or None,
+            "source_revision_sha256": sha256(
+                json.dumps(
+                    identity,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest(),
+            "source_observed_at": normalized_observed_at,
+            "available_from": available_from,
+            "revision_status": "observed",
+        }
+    )
     return row
+
+
+def insert_financial_revision_rows(
+    db: Session,
+    rows: list[dict[str, Any]],
+) -> int:
+    keys = ("ts_code", "end_date", "ann_date", "source_revision_sha256")
+    deduped = dedupe_rows([row for row in rows if row], keys)
+    observed = [row for row in deduped if row.get("revision_status") == "observed"]
+    if not observed:
+        return 0
+    if db.bind and db.bind.dialect.name == "postgresql":
+        inserted = 0
+        for chunk in chunked(observed, 1000):
+            result = db.execute(
+                pg_insert(StockFinancialIndicator.__table__)
+                .values(chunk)
+                .on_conflict_do_nothing(index_elements=list(keys))
+            )
+            inserted += max(0, int(result.rowcount or 0))
+        db.commit()
+        return inserted
+
+    inserted = 0
+    for row in observed:
+        existing = db.scalar(
+            select(StockFinancialIndicator.id).where(
+                StockFinancialIndicator.ts_code == row["ts_code"],
+                StockFinancialIndicator.end_date == row["end_date"],
+                StockFinancialIndicator.ann_date == row["ann_date"],
+                StockFinancialIndicator.source_revision_sha256
+                == row["source_revision_sha256"],
+            )
+        )
+        if existing is None:
+            db.add(StockFinancialIndicator(**row))
+            inserted += 1
+    db.commit()
+    return inserted
 
 
 def trade_calendar_record_to_row(item: dict[str, Any], fallback_exchange: str = "SSE") -> dict[str, Any] | None:
@@ -2187,6 +2318,9 @@ def query_stock_financial_history(
             stmt.order_by(
                 StockFinancialIndicator.ann_date.desc(),
                 StockFinancialIndicator.end_date.desc(),
+                StockFinancialIndicator.available_from.desc(),
+                StockFinancialIndicator.source_observed_at.desc(),
+                StockFinancialIndicator.id.desc(),
             ).limit(min(max(limit, 1), 1000))
         ).all()
     )
@@ -2242,6 +2376,13 @@ def financial_indicator_to_dict(row: StockFinancialIndicator | None) -> dict[str
         "orYoy": decimal_to_float(row.or_yoy),
         "qSalesYoy": decimal_to_float(row.q_sales_yoy),
         "qProfitYoy": decimal_to_float(row.q_profit_yoy),
+        "sourceUpdateFlag": row.source_update_flag,
+        "sourceRevisionSha256": row.source_revision_sha256,
+        "sourceObservedAt": (
+            row.source_observed_at.isoformat() if row.source_observed_at else None
+        ),
+        "availableFrom": row.available_from.isoformat() if row.available_from else None,
+        "revisionStatus": row.revision_status,
     }
 
 

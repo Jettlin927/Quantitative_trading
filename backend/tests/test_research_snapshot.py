@@ -155,6 +155,12 @@ class ResearchSnapshotTest(unittest.TestCase):
             ("source issue", {"universeSourceIssue": "missing"}, None, "keep"),
             ("source hash", {"universeSourceSha256": "f" * 64}, None, "keep"),
             ("registry hash", {"universeHash": "f" * 64}, None, "keep"),
+            (
+                "required dataset drift",
+                {"requiredDatasets": ["stock_financial_indicators"]},
+                None,
+                "keep",
+            ),
             ("summary status", {}, {"status": "blocked"}, "keep"),
             ("summary blockers", {}, {"blockers": [{"ruleId": "forged"}]}, "keep"),
             ("unfinished", {}, None, None),
@@ -272,6 +278,51 @@ class ResearchSnapshotTest(unittest.TestCase):
                     row.status = "complete"
                     db.commit()
 
+    def test_legacy_v1_snapshot_identity_remains_verifiable(self):
+        with Session(self.engine) as db:
+            snapshot = freeze_input_snapshot(
+                db,
+                self.config,
+                self.snapshot_root,
+                capacity_policy=self.capacity,
+            )
+        manifest = json.loads(
+            (snapshot.path / "snapshot.json").read_text(encoding="utf-8")
+        )
+        legacy_identity = {
+            "scope": manifest["scope"],
+            "warmupStart": manifest["warmupStart"],
+            "startDate": manifest["startDate"],
+            "endDate": manifest["endDate"],
+            "benchmark": manifest["benchmark"],
+            "universeHash": manifest["universeHash"],
+            "transaction": manifest["transaction"],
+            "tableArtifacts": {
+                name: {
+                    "contentSha256": artifact["contentSha256"],
+                    "columns": artifact["columns"],
+                    "naturalKey": artifact["naturalKey"],
+                    "rowCount": artifact["rowCount"],
+                }
+                for name, artifact in sorted(manifest["tableArtifacts"].items())
+            },
+        }
+        legacy_id = canonical_sha256(legacy_identity)
+        legacy_path = snapshot.path.with_name(legacy_id)
+        snapshot.path.rename(legacy_path)
+        manifest["schemaVersion"] = 1
+        manifest["snapshotId"] = legacy_id
+        manifest.pop("requiredDatasets")
+        (legacy_path / "snapshot.json").write_text(
+            json.dumps(manifest),
+            encoding="utf-8",
+        )
+
+        verified = verify_snapshot(legacy_path)
+
+        self.assertEqual(verified["schemaVersion"], 1)
+        self.assertNotIn("requiredDatasets", verified)
+
     def test_reuse_rejects_valid_but_different_transaction_identity_from_registry(self):
         with Session(self.engine) as db:
             snapshot = freeze_input_snapshot(
@@ -294,6 +345,7 @@ class ResearchSnapshotTest(unittest.TestCase):
                 "endDate": manifest["endDate"],
                 "benchmark": manifest["benchmark"],
                 "universeHash": manifest["universeHash"],
+                "requiredDatasets": manifest["requiredDatasets"],
                 "transaction": manifest["transaction"],
                 "tableArtifacts": {
                     name: {

@@ -247,6 +247,84 @@ class QuantResearchDatasetTest(unittest.TestCase):
             extended.iloc[:2][["trade_date", "ann_date", "available_date", "end_date", "roe"]].reset_index(drop=True),
         )
 
+    def test_observed_financial_revisions_use_explicit_availability_without_changing_history(self):
+        panel = pd.DataFrame(
+            [
+                {"ts_code": "000001.SZ", "trade_date": "2026-01-05"},
+                {"ts_code": "000001.SZ", "trade_date": "2026-01-07"},
+                {"ts_code": "000001.SZ", "trade_date": "2026-01-08"},
+            ]
+        )
+        first_revision = {
+            "ts_code": "000001.SZ",
+            "ann_date": "2026-01-03",
+            "end_date": "2025-12-31",
+            "roe": 10.0,
+            "source_revision_sha256": "a" * 64,
+            "source_observed_at": "2026-01-04T08:00:00+00:00",
+            "available_from": "2026-01-05",
+            "revision_status": "observed",
+        }
+        revised = {
+            **first_revision,
+            "roe": 12.0,
+            "source_revision_sha256": "b" * 64,
+            "source_observed_at": "2026-01-07T08:00:00+00:00",
+            "available_from": "2026-01-08",
+        }
+        official_calendar = calendar_for_dates(
+            ["2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08"]
+        )
+
+        baseline = attach_fundamentals_asof(
+            panel.iloc[:2],
+            pd.DataFrame([first_revision]),
+            trade_calendar=official_calendar,
+        )
+        extended = attach_fundamentals_asof(
+            panel,
+            pd.DataFrame([first_revision, revised]),
+            trade_calendar=official_calendar,
+        )
+
+        self.assertEqual(extended["roe"].tolist(), [10.0, 10.0, 12.0])
+        self.assertEqual(
+            extended["source_revision_sha256"].tolist(),
+            ["a" * 64, "a" * 64, "b" * 64],
+        )
+        pd.testing.assert_frame_equal(
+            baseline[["trade_date", "available_date", "roe", "source_revision_sha256"]],
+            extended.iloc[:2][
+                ["trade_date", "available_date", "roe", "source_revision_sha256"]
+            ].reset_index(drop=True),
+        )
+
+    def test_explicit_financial_revision_contract_rejects_legacy_rows(self):
+        panel = pd.DataFrame(
+            [{"ts_code": "000001.SZ", "trade_date": "2026-01-05"}]
+        )
+        legacy = pd.DataFrame(
+            [
+                {
+                    "ts_code": "000001.SZ",
+                    "ann_date": "2026-01-03",
+                    "end_date": "2025-12-31",
+                    "roe": 10.0,
+                    "source_revision_sha256": None,
+                    "source_observed_at": None,
+                    "available_from": None,
+                    "revision_status": "legacy_unverified",
+                }
+            ]
+        )
+
+        with self.assertRaisesRegex(ValueError, "修订证据"):
+            attach_fundamentals_asof(
+                panel,
+                legacy,
+                trade_calendar=calendar_for_dates(["2026-01-05"]),
+            )
+
     def test_fundamentals_require_explicit_official_trade_calendar(self):
         panel = pd.DataFrame([{"ts_code": "000001.SZ", "trade_date": "2026-01-09"}])
         fundamentals = pd.DataFrame(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import date
+from datetime import date, datetime, timezone
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -386,6 +386,33 @@ class DataQualityRulesTest(unittest.TestCase):
 
         without_financials = self.evaluate()
         self.assertFalse(any(result.rule_id.startswith("point_in_time.") for result in without_financials))
+
+    def test_verified_observed_financial_revisions_pass_point_in_time_gate(self):
+        with Session(self.engine) as db:
+            row = main.financial_indicator_record_to_row(
+                {
+                    "ts_code": "000001.SZ",
+                    "ann_date": "20251231",
+                    "end_date": "20250930",
+                    "roe": "10.5",
+                    "update_flag": "1",
+                },
+                source_observed_at=datetime(2025, 12, 31, 10, 0, tzinfo=timezone.utc),
+                available_from=date(2026, 1, 2),
+            )
+            main.insert_financial_revision_rows(db, [row])
+
+        results = self.evaluate(
+            self.contract(required_datasets=["stock_financial_indicators"])
+        )
+        revision = next(
+            result
+            for result in results
+            if result.rule_id == "point_in_time.financial_revision_history"
+        )
+
+        self.assertEqual(revision.status, "passed")
+        self.assertEqual(revision.failed_rows, 0)
 
     def test_null_volume_or_amount_is_reported_as_warning_not_hidden(self):
         with Session(self.engine) as db:

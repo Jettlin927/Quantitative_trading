@@ -25,7 +25,9 @@ from ..models import (
     IndustryClassification,
     IndustryMember,
     StockAdjustFactor,
+    StockDailyBasic,
     StockDailyBar,
+    StockFinancialIndicator,
     StockLimitPrice,
     StockListing,
     StockSuspendEvent,
@@ -71,6 +73,10 @@ A_SHARE_SNAPSHOT_TABLES = {
 }
 A_SHARE_INDUSTRY_LEVEL_SNAPSHOT_TABLES = A_SHARE_SNAPSHOT_TABLES | {
     "industry_classifications"
+}
+A_SHARE_OPTIONAL_SNAPSHOT_TABLES = {
+    "stock_daily_basic",
+    "stock_financial_indicators",
 }
 
 
@@ -121,6 +127,14 @@ def freeze_input_snapshot(
 ) -> SnapshotResult:
     normalized = validate_run_config(config)
     quality_run = validate_quality_gate(registry_db, normalized)
+    required_datasets = tuple(
+        sorted(
+            {
+                str(name)
+                for name in (quality_run.config or {}).get("requiredDatasets", [])
+            }
+        )
+    )
     snapshot_root = Path(snapshot_root).expanduser().resolve()
     snapshot_root.mkdir(parents=True, exist_ok=True)
     capacity = capacity_policy or SnapshotCapacityPolicy()
@@ -201,7 +215,11 @@ def freeze_input_snapshot(
                         "format": normalized["universe"]["sourceArtifact"]["format"],
                         "sha256": normalized["universe"]["sourceArtifact"]["sha256"],
                     }
-                slices = _build_snapshot_slices(normalized, membership)
+                slices = _build_snapshot_slices(
+                    normalized,
+                    membership,
+                    required_datasets=required_datasets,
+                )
                 estimates = {
                     item.name: int(
                         source_db.scalar(
@@ -258,6 +276,7 @@ def freeze_input_snapshot(
             "endDate": normalized["endDate"],
             "benchmark": normalized["benchmark"],
             "universeHash": universe_hash,
+            "requiredDatasets": list(required_datasets),
             "transaction": transaction_contract,
             "tableArtifacts": {
                 name: {
@@ -273,7 +292,7 @@ def freeze_input_snapshot(
         registered_snapshot_id = snapshot_id
         final_path = snapshot_root / snapshot_id
         manifest = {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "snapshotId": snapshot_id,
             "qualityRunId": quality_run.id,
             "scope": normalized["scope"],
@@ -283,6 +302,7 @@ def freeze_input_snapshot(
             "benchmark": normalized["benchmark"],
             "universeHash": universe_hash,
             "universeSourceArtifact": universe_source_artifact,
+            "requiredDatasets": list(required_datasets),
             "transaction": transaction_contract,
             "tableArtifacts": table_artifacts,
             "rowCounts": row_counts,
@@ -369,6 +389,9 @@ def verify_snapshot(path: Path) -> dict[str, Any]:
 
 
 def verify_snapshot_identity(manifest: dict[str, Any]) -> None:
+    schema_version = manifest.get("schemaVersion", 1)
+    if schema_version not in {1, 2}:
+        raise SnapshotIntegrityError("snapshot schemaVersion 不受支持")
     required = {
         "snapshotId",
         "scope",
@@ -380,19 +403,17 @@ def verify_snapshot_identity(manifest: dict[str, Any]) -> None:
         "transaction",
         "tableArtifacts",
     }
+    if schema_version >= 2:
+        required.add("requiredDatasets")
     missing = sorted(required - set(manifest))
     if missing:
         raise SnapshotIntegrityError(f"snapshot identity 缺少字段：{', '.join(missing)}")
     artifacts = manifest["tableArtifacts"]
-    expected_tables = {
-        "etf_time_series": ETF_SNAPSHOT_TABLES,
-        "a_share_cross_section": (
-            A_SHARE_INDUSTRY_LEVEL_SNAPSHOT_TABLES
-            if (manifest.get("universeSourceArtifact") or {}).get("format")
-            == "database_industry_level_membership_v1"
-            else A_SHARE_SNAPSHOT_TABLES
-        ),
-    }.get(manifest.get("scope"))
+    expected_tables = _expected_snapshot_tables(
+        manifest.get("scope"),
+        manifest.get("universeSourceArtifact"),
+        manifest.get("requiredDatasets", []) if schema_version >= 2 else [],
+    )
     if (
         expected_tables is None
         or not isinstance(artifacts, dict)
@@ -406,7 +427,7 @@ def verify_snapshot_identity(manifest: dict[str, Any]) -> None:
         expected_counts = {name: artifact["rowCount"] for name, artifact in artifacts.items()}
         if manifest["rowCounts"] != expected_counts:
             raise SnapshotIntegrityError("snapshot rowCounts 与 tableArtifacts 不一致")
-    identity = {
+    identity: dict[str, Any] = {
         "scope": manifest["scope"],
         "warmupStart": manifest["warmupStart"],
         "startDate": manifest["startDate"],
@@ -424,6 +445,8 @@ def verify_snapshot_identity(manifest: dict[str, Any]) -> None:
             for name, artifact in sorted(manifest["tableArtifacts"].items())
         },
     }
+    if schema_version >= 2:
+        identity["requiredDatasets"] = manifest["requiredDatasets"]
     if canonical_sha256(identity) != manifest["snapshotId"]:
         raise SnapshotIntegrityError("snapshotId 与 canonical 输入身份不一致")
 
@@ -446,11 +469,7 @@ def verify_materialized_inputs(
     table_artifacts: dict[str, dict[str, Any]],
 ) -> None:
     try:
-        if frozenset(table_artifacts) not in {
-            frozenset(ETF_SNAPSHOT_TABLES),
-            frozenset(A_SHARE_SNAPSHOT_TABLES),
-            frozenset(A_SHARE_INDUSTRY_LEVEL_SNAPSHOT_TABLES),
-        }:
+        if not _is_valid_materialized_table_set(set(table_artifacts)):
             raise SnapshotIntegrityError("冻结输入表集不完整")
         for name, artifact in table_artifacts.items():
             _validate_table_artifact(name, artifact)
@@ -613,6 +632,15 @@ def _validate_quality_result_summary(
         and sorted(summary[name]) == expected
         for name, expected in expected_references.items()
     )
+    config_required = (run.config or {}).get("requiredDatasets")
+    summary_required = summary.get("requiredDatasets")
+    required_datasets_match = (
+        isinstance(config_required, list)
+        and isinstance(summary_required, list)
+        and all(isinstance(name, str) for name in config_required)
+        and config_required == sorted(set(config_required))
+        and summary_required == config_required
+    )
     if (
         run.status != derived_status
         or summary.get("status") != derived_status
@@ -621,6 +649,7 @@ def _validate_quality_result_summary(
             for name, value in expected_counts.items()
         )
         or not references_match
+        or not required_datasets_match
     ):
         raise SnapshotError("质量运行 registry/summary 与持久化明细不一致")
     if counts["blocked"] or counts["failed"]:
@@ -737,13 +766,19 @@ def _validate_snapshot_membership_identity(
 def _build_snapshot_slices(
     config: dict[str, Any],
     membership: IndustryMembershipResolution | IndustryLevelMembershipResolution | None,
+    *,
+    required_datasets: tuple[str, ...],
 ) -> tuple[TableSlice, ...]:
     if config["scope"] == "etf_time_series":
         if membership is not None:
             raise SnapshotError("ETF snapshot 不接受行业成员解析结果")
         return _build_etf_slices(config)
     if config["scope"] == "a_share_cross_section" and membership is not None:
-        return _build_a_share_slices(config, membership)
+        return _build_a_share_slices(
+            config,
+            membership,
+            required_datasets=required_datasets,
+        )
     raise SnapshotError("snapshot scope 或 universe 解析结果无效")
 
 
@@ -855,6 +890,8 @@ def _build_etf_slices(config: dict[str, Any]) -> tuple[TableSlice, ...]:
 def _build_a_share_slices(
     config: dict[str, Any],
     membership: IndustryMembershipResolution | IndustryLevelMembershipResolution,
+    *,
+    required_datasets: tuple[str, ...],
 ) -> tuple[TableSlice, ...]:
     members = membership.symbols
     benchmark = config["benchmark"]
@@ -919,6 +956,55 @@ def _build_a_share_slices(
         "category",
         "base_date",
         "list_date",
+    )
+    daily_basic_columns = (
+        "ts_code",
+        "trade_date",
+        "close",
+        "turnover_rate",
+        "turnover_rate_f",
+        "volume_ratio",
+        "pe",
+        "pe_ttm",
+        "pb",
+        "ps",
+        "ps_ttm",
+        "dv_ratio",
+        "dv_ttm",
+        "total_share",
+        "float_share",
+        "free_share",
+        "total_mv",
+        "circ_mv",
+    )
+    financial_columns = (
+        "ts_code",
+        "ann_date",
+        "end_date",
+        "eps",
+        "dt_eps",
+        "bps",
+        "netprofit_margin",
+        "grossprofit_margin",
+        "roe",
+        "roe_waa",
+        "roa",
+        "debt_to_assets",
+        "current_ratio",
+        "quick_ratio",
+        "assets_turn",
+        "basic_eps_yoy",
+        "op_yoy",
+        "netprofit_yoy",
+        "tr_yoy",
+        "or_yoy",
+        "q_sales_yoy",
+        "q_profit_yoy",
+        "source_update_flag",
+        "source_revision_sha256",
+        "source_observed_at",
+        "available_from",
+        "revision_status",
     )
     slices = (
         TableSlice(
@@ -1045,8 +1131,87 @@ def _build_a_share_slices(
             )
             .order_by(IndustryClassification.index_code),
         )
-        return (*slices[:6], classification_slice, *slices[6:])
-    return slices
+        slices = (*slices[:6], classification_slice, *slices[6:])
+    optional_slices: list[TableSlice] = []
+    if "stock_daily_basic" in required_datasets:
+        optional_slices.append(
+            TableSlice(
+                "stock_daily_basic",
+                daily_basic_columns,
+                ("ts_code", "trade_date"),
+                select(*columns(StockDailyBasic, daily_basic_columns))
+                .where(
+                    StockDailyBasic.ts_code.in_(members),
+                    StockDailyBasic.trade_date >= start,
+                    StockDailyBasic.trade_date <= end,
+                )
+                .order_by(StockDailyBasic.ts_code, StockDailyBasic.trade_date),
+            )
+        )
+    if "stock_financial_indicators" in required_datasets:
+        optional_slices.append(
+            TableSlice(
+                "stock_financial_indicators",
+                financial_columns,
+                (
+                    "ts_code",
+                    "end_date",
+                    "ann_date",
+                    "source_revision_sha256",
+                ),
+                select(*columns(StockFinancialIndicator, financial_columns))
+                .where(
+                    StockFinancialIndicator.ts_code.in_(members),
+                    StockFinancialIndicator.revision_status == "observed",
+                    StockFinancialIndicator.available_from <= end,
+                )
+                .order_by(
+                    StockFinancialIndicator.ts_code,
+                    StockFinancialIndicator.end_date,
+                    StockFinancialIndicator.ann_date,
+                    StockFinancialIndicator.source_revision_sha256,
+                ),
+            )
+        )
+    return (*slices, *optional_slices)
+
+
+def _expected_snapshot_tables(
+    scope: Any,
+    universe_source_artifact: Any,
+    required_datasets: Any,
+) -> set[str] | None:
+    if not isinstance(required_datasets, list) or any(
+        not isinstance(name, str) for name in required_datasets
+    ):
+        return None
+    if required_datasets != sorted(set(required_datasets)):
+        return None
+    if scope == "etf_time_series":
+        return (
+            set(ETF_SNAPSHOT_TABLES)
+            if set(required_datasets) <= ETF_SNAPSHOT_TABLES
+            else None
+        )
+    if scope != "a_share_cross_section":
+        return None
+    expected = (
+        set(A_SHARE_INDUSTRY_LEVEL_SNAPSHOT_TABLES)
+        if (universe_source_artifact or {}).get("format")
+        == "database_industry_level_membership_v1"
+        else set(A_SHARE_SNAPSHOT_TABLES)
+    )
+    expected.update(set(required_datasets) & A_SHARE_OPTIONAL_SNAPSHOT_TABLES)
+    return expected if set(required_datasets) <= expected else None
+
+
+def _is_valid_materialized_table_set(actual: set[str]) -> bool:
+    if actual == ETF_SNAPSHOT_TABLES:
+        return True
+    for base in (A_SHARE_SNAPSHOT_TABLES, A_SHARE_INDUSTRY_LEVEL_SNAPSHOT_TABLES):
+        if base <= actual and actual - base <= A_SHARE_OPTIONAL_SNAPSHOT_TABLES:
+            return True
+    return False
 
 
 def _enforce_capacity(

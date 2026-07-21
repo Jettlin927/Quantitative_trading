@@ -67,9 +67,6 @@ def attach_fundamentals_asof(
     left["trade_date"] = pd.to_datetime(left["trade_date"])
     right["ann_date"] = pd.to_datetime(right["ann_date"])
     right["end_date"] = pd.to_datetime(right["end_date"])
-    right = right.sort_values(["ts_code", "ann_date", "end_date"]).drop_duplicates(
-        ["ts_code", "end_date", "ann_date"], keep="last"
-    )
     if period_policy not in {None, "latest_end_date"}:
         raise ValueError(f"不支持的 period_policy：{period_policy}")
 
@@ -78,7 +75,77 @@ def attach_fundamentals_asof(
     if outside_calendar:
         sample = ", ".join(value.date().isoformat() for value in outside_calendar[:5])
         raise ValueError(f"研究面板包含非官方开市日：{sample}")
-    right["available_date"] = right["ann_date"].map(lambda value: _next_trade_date(calendar, value))
+
+    revision_columns = {
+        "source_revision_sha256",
+        "source_observed_at",
+        "available_from",
+        "revision_status",
+    }
+    uses_revision_contract = bool(revision_columns & set(right.columns))
+    if uses_revision_contract:
+        _require_columns(right, revision_columns, "财务修订证据")
+        right["source_observed_at"] = pd.to_datetime(
+            right["source_observed_at"],
+            errors="coerce",
+            utc=True,
+        )
+        right["available_from"] = pd.to_datetime(
+            right["available_from"],
+            errors="coerce",
+        )
+        valid_hash = right["source_revision_sha256"].astype("string").str.fullmatch(
+            r"[0-9a-f]{64}",
+            na=False,
+        )
+        invalid_revision = (
+            right["revision_status"].ne("observed")
+            | ~valid_hash
+            | right["source_observed_at"].isna()
+            | right["available_from"].isna()
+        )
+        if invalid_revision.any():
+            sample = right.loc[
+                invalid_revision,
+                [
+                    "ts_code",
+                    "ann_date",
+                    "end_date",
+                    "revision_status",
+                    "source_revision_sha256",
+                    "source_observed_at",
+                    "available_from",
+                ],
+            ].head(5)
+            raise ValueError(
+                "财务修订证据不完整，禁止回退到公告日推算："
+                f"{sample.to_dict('records')}"
+            )
+        right = right.sort_values(
+            [
+                "ts_code",
+                "ann_date",
+                "end_date",
+                "available_from",
+                "source_observed_at",
+                "source_revision_sha256",
+            ]
+        ).drop_duplicates(
+            ["ts_code", "end_date", "ann_date", "source_revision_sha256"],
+            keep="first",
+        )
+        right["available_date"] = right["available_from"]
+        right = right.drop_duplicates(
+            ["ts_code", "end_date", "ann_date", "available_date"],
+            keep="last",
+        )
+    else:
+        right = right.sort_values(["ts_code", "ann_date", "end_date"]).drop_duplicates(
+            ["ts_code", "end_date", "ann_date"], keep="last"
+        )
+        right["available_date"] = right["ann_date"].map(
+            lambda value: _next_trade_date(calendar, value)
+        )
 
     duplicate_available = right["available_date"].notna() & right.duplicated(
         ["ts_code", "available_date"], keep=False

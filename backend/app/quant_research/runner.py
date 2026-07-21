@@ -788,6 +788,7 @@ def _execute_pipeline(
             config=normalized,
             config_sha256=run.config_sha256,
             data_snapshot={
+                "schemaVersion": snapshot.manifest["schemaVersion"],
                 "snapshotId": snapshot.snapshot_id,
                 "relativePath": "inputs",
                 "scope": snapshot.manifest["scope"],
@@ -796,6 +797,10 @@ def _execute_pipeline(
                 "endDate": snapshot.manifest["endDate"],
                 "benchmark": snapshot.manifest["benchmark"],
                 "universeHash": snapshot.manifest["universeHash"],
+                "universeSourceArtifact": snapshot.manifest[
+                    "universeSourceArtifact"
+                ],
+                "requiredDatasets": snapshot.manifest["requiredDatasets"],
                 "tableArtifacts": table_artifacts,
                 "rowCounts": snapshot.manifest["rowCounts"],
                 "transaction": snapshot.manifest["transaction"],

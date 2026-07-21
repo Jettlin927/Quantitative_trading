@@ -122,7 +122,24 @@ class StockDailyBasic(Base):
 class StockFinancialIndicator(Base):
     __tablename__ = "stock_financial_indicators"
     __table_args__ = (
-        UniqueConstraint("ts_code", "end_date", "ann_date", name="uq_stock_financial_indicator_period"),
+        UniqueConstraint(
+            "ts_code",
+            "end_date",
+            "ann_date",
+            "source_revision_sha256",
+            name="uq_stock_financial_indicator_revision",
+        ),
+        CheckConstraint(
+            "(revision_status = 'legacy_unverified' "
+            "AND source_revision_sha256 IS NULL "
+            "AND source_observed_at IS NULL "
+            "AND available_from IS NULL) OR "
+            "(revision_status = 'observed' "
+            "AND source_revision_sha256 IS NOT NULL "
+            "AND source_observed_at IS NOT NULL "
+            "AND available_from IS NOT NULL)",
+            name="ck_stock_financial_indicator_revision_evidence",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -148,6 +165,16 @@ class StockFinancialIndicator(Base):
     or_yoy: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
     q_sales_yoy: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
     q_profit_yoy: Mapped[Decimal | None] = mapped_column(Numeric(20, 4))
+    source_update_flag: Mapped[str | None] = mapped_column(String(8))
+    source_revision_sha256: Mapped[str | None] = mapped_column(String(64))
+    source_observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    available_from: Mapped[date | None] = mapped_column(Date, index=True)
+    revision_status: Mapped[str] = mapped_column(
+        String(24),
+        default="legacy_unverified",
+        server_default="legacy_unverified",
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

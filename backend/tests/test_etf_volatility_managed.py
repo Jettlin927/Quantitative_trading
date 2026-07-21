@@ -231,6 +231,7 @@ class EtfVolatilityManagedTest(unittest.TestCase):
                         "warnings": [],
                         "failedRules": [],
                         "limitations": [],
+                        "requiredDatasets": [],
                         "benchmark": "SYNIDX.SH",
                     },
                     code_commit="volatility-test",

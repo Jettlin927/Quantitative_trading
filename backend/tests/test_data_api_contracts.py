@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import unittest
-from datetime import date
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from backend.app import main
@@ -22,6 +22,7 @@ from backend.app.models import (
     StockLimitPrice,
     StockListing,
     StockSuspendEvent,
+    TradeCalendar,
 )
 from backend.app.schemas import DataQualityRunRequest
 
@@ -181,6 +182,118 @@ class DataApiContractTest(unittest.TestCase):
         self.assertEqual(detail.latest_limit_price["tradeDate"], "2026-05-29")
         self.assertEqual(detail.latest_suspend_event["tradeDate"], "2026-05-28")
         self.assertEqual(detail.latest_adjust_factor["adjFactor"], 3.14)
+
+    def test_financial_revisions_use_content_identity_and_never_overwrite(self):
+        observed_at = datetime(2026, 7, 21, 10, 0, tzinfo=timezone.utc)
+        available_from = date(2026, 7, 22)
+        source = {
+            "ts_code": "688981.SH",
+            "ann_date": "20260720",
+            "end_date": "20260630",
+            "eps": "0.25",
+            "roe": "4.20",
+            "update_flag": "1",
+        }
+        first = main.financial_indicator_record_to_row(
+            source,
+            source_observed_at=observed_at,
+            available_from=available_from,
+        )
+        same_content_other_flag = main.financial_indicator_record_to_row(
+            {**source, "update_flag": "0"},
+            source_observed_at=observed_at,
+            available_from=available_from,
+        )
+        revised = main.financial_indicator_record_to_row(
+            {**source, "eps": "0.30", "roe": "4.80", "update_flag": "1"},
+            source_observed_at=datetime(2026, 7, 22, 10, 0, tzinfo=timezone.utc),
+            available_from=date(2026, 7, 23),
+        )
+
+        self.assertEqual(
+            first["source_revision_sha256"],
+            same_content_other_flag["source_revision_sha256"],
+        )
+        self.assertNotEqual(first["source_revision_sha256"], revised["source_revision_sha256"])
+        with self.Session() as db:
+            self.assertEqual(
+                main.insert_financial_revision_rows(
+                    db,
+                    [first, same_content_other_flag],
+                ),
+                1,
+            )
+            self.assertEqual(main.insert_financial_revision_rows(db, [revised]), 1)
+            self.assertEqual(main.insert_financial_revision_rows(db, [first, revised]), 0)
+            rows = main.query_stock_financial_history(
+                db,
+                "688981.SH",
+                None,
+                None,
+                10,
+            )
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual([row["eps"] for row in rows], [0.25, 0.3])
+        self.assertEqual(
+            [row["availableFrom"] for row in rows],
+            ["2026-07-22", "2026-07-23"],
+        )
+        self.assertTrue(all(row["revisionStatus"] == "observed" for row in rows))
+
+    def test_fundamental_sync_observes_one_immutable_revision_for_duplicate_flags(self):
+        observed_at = datetime(2026, 7, 21, 10, 0, tzinfo=timezone.utc)
+        pro = Mock()
+        pro.daily_basic.return_value = FakeFrame([])
+        source = {
+            "ts_code": "688981.SH",
+            "ann_date": "20260720",
+            "end_date": "20260630",
+            "eps": "0.25",
+            "roe": "4.20",
+        }
+        pro.fina_indicator.return_value = FakeFrame(
+            [
+                {**source, "update_flag": "0"},
+                {**source, "update_flag": "1"},
+            ]
+        )
+        with self.Session() as db:
+            db.add(
+                TradeCalendar(
+                    exchange="SSE",
+                    cal_date=date(2026, 7, 22),
+                    is_open=True,
+                )
+            )
+            db.commit()
+            with patch.object(main, "get_pro_api", return_value=pro), patch.object(
+                main,
+                "utc_now",
+                return_value=observed_at,
+                create=True,
+            ):
+                result = main.sync_fundamentals(
+                    main.SyncFundamentalsRequest(
+                        ts_code="688981.SH",
+                        start_date=date(2026, 7, 1),
+                        end_date=date(2026, 7, 21),
+                    ),
+                    db,
+                )
+            rows = list(
+                db.scalars(
+                    select(StockFinancialIndicator).where(
+                        StockFinancialIndicator.ts_code == "688981.SH"
+                    )
+                )
+            )
+
+        self.assertEqual(result["financial_indicator_rows"], 1)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].available_from, date(2026, 7, 22))
+        self.assertEqual(rows[0].revision_status, "observed")
+        self.assertIn("update_flag", pro.fina_indicator.call_args.kwargs["fields"])
 
     def test_fund_catalog_can_be_limited_to_the_requested_daily_bar_window(self):
         with self.open_session() as db:
