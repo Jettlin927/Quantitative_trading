@@ -171,6 +171,35 @@ class SyncSuspendEventsRequest(BaseModel):
     max_trade_dates: int = Field(default=0, ge=0)
 
 
+class SyncUsExperimentPricesRequest(BaseModel):
+    start_date: date
+    end_date: date
+    source_codes: list[str] = Field(min_length=1, max_length=100)
+    validation_source_codes: list[str] = Field(default_factory=list, max_length=100)
+
+    @field_validator("source_codes", "validation_source_codes")
+    @classmethod
+    def normalize_us_source_codes(cls, values: list[str]) -> list[str]:
+        normalized: list[str] = []
+        for value in values:
+            code = value.strip().upper()
+            market, separator, symbol = code.partition(".")
+            if separator != "." or market not in {"105", "106", "107"} or not symbol:
+                raise ValueError("美股实验代码必须使用 105/106/107 前缀，例如 105.AAPL")
+            if code not in normalized:
+                normalized.append(code)
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "SyncUsExperimentPricesRequest":
+        if self.start_date > self.end_date:
+            raise ValueError("start_date 不能晚于 end_date")
+        unknown = set(self.validation_source_codes) - set(self.source_codes)
+        if unknown:
+            raise ValueError("validation_source_codes 必须包含在 source_codes 中")
+        return self
+
+
 class SyncJobCreate(BaseModel):
     action: Literal[
         "stock_listings",
@@ -179,6 +208,8 @@ class SyncJobCreate(BaseModel):
         "daily_market",
         "market_fundamentals",
         "us_sample",
+        "us_experiment_universe",
+        "us_experiment_prices",
     ]
     payload: dict[str, Any] = Field(default_factory=dict)
 

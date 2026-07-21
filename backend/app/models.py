@@ -420,6 +420,86 @@ class AssetDailyPrice(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class UsExperimentInstrument(Base):
+    __tablename__ = "us_experiment_instruments"
+
+    source_code: Mapped[str] = mapped_column(String(40), primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    yahoo_symbol: Mapped[str] = mapped_column(String(32), index=True)
+    name: Mapped[str | None] = mapped_column(String(200))
+    market_code: Mapped[str] = mapped_column(String(3), index=True)
+    market_name: Mapped[str] = mapped_column(String(24))
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", index=True)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    history_start_date: Mapped[date | None] = mapped_column(Date)
+    history_end_date: Mapped[date | None] = mapped_column(Date)
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_sync_status: Mapped[str | None] = mapped_column(String(24), index=True)
+    last_sync_error: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class UsExperimentDailyBar(Base):
+    __tablename__ = "us_experiment_daily_bars"
+    __table_args__ = (
+        UniqueConstraint("source_code", "trade_date", name="uq_us_experiment_daily_bar_code_date"),
+        SqlIndex("ix_us_experiment_daily_bars_date_code", "trade_date", "source_code"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    source_code: Mapped[str] = mapped_column(
+        ForeignKey("us_experiment_instruments.source_code", ondelete="CASCADE"),
+        index=True,
+    )
+    trade_date: Mapped[date] = mapped_column(Date, index=True)
+    open: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    high: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    low: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    close: Mapped[Decimal] = mapped_column(Numeric(24, 8))
+    adj_close: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    volume: Mapped[int | None] = mapped_column(BigInteger)
+    cash_dividend: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    split_ratio: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    source: Mapped[str] = mapped_column(String(24), default="yfinance", server_default="yfinance")
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class UsExperimentDailyCheck(Base):
+    __tablename__ = "us_experiment_daily_checks"
+    __table_args__ = (
+        UniqueConstraint("source_code", "trade_date", name="uq_us_experiment_daily_check_code_date"),
+        SqlIndex("ix_us_experiment_daily_checks_status_date", "status", "trade_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    source_code: Mapped[str] = mapped_column(
+        ForeignKey("us_experiment_instruments.source_code", ondelete="CASCADE"),
+        index=True,
+    )
+    trade_date: Mapped[date] = mapped_column(Date, index=True)
+    yfinance_open: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    yfinance_high: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    yfinance_low: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    yfinance_close: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    yfinance_volume: Mapped[int | None] = mapped_column(BigInteger)
+    akshare_open: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    akshare_high: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    akshare_low: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    akshare_close: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    akshare_volume: Mapped[int | None] = mapped_column(BigInteger)
+    max_price_relative_diff: Mapped[Decimal | None] = mapped_column(Numeric(18, 10))
+    volume_relative_diff: Mapped[Decimal | None] = mapped_column(Numeric(18, 10))
+    status: Mapped[str] = mapped_column(String(24), index=True)
+    message: Mapped[str | None] = mapped_column(String(500))
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class WatchlistItem(Base):
     __tablename__ = "watchlist_items"
     __table_args__ = (UniqueConstraint("watchlist_name", "asset_natural_key", name="uq_watchlist_item_name_asset"),)

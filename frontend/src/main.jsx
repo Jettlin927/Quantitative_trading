@@ -43,6 +43,7 @@ export function App() {
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState('')
   const [usDb, setUsDb] = useState(null)
+  const [usExperiment, setUsExperiment] = useState(null)
   const [strategies, setStrategies] = useState([])
   const [selectedStrategyId, setSelectedStrategyId] = useState('')
   const [strategyProfile, setStrategyProfile] = useState(null)
@@ -92,6 +93,7 @@ export function App() {
       ['funds', `/api/funds?limit=1000&daily_start_date=${catalogStartDate}&daily_end_date=${catalogEndDate}`],
       ['industries', '/api/industries?limit=1000'],
       ['usDb', '/api/us-research/db-overview'],
+      ['usExperiment', '/api/us-experiment/overview'],
       ['strategies', '/api/research/strategies'],
     ]
     const results = await Promise.allSettled(requests.map(([, path]) => fetchJson(path)))
@@ -140,6 +142,7 @@ export function App() {
         if (!selectedCatalogRef.current.code && value.length) selectCatalog('industry', value[0].indexCode)
       }
       if (key === 'usDb') setUsDb(value)
+      if (key === 'usExperiment') setUsExperiment(value)
       if (key === 'strategies') {
         setStrategies(value)
         const current = selectedStrategyIdRef.current
@@ -482,7 +485,7 @@ export function App() {
               error={[stockListError, stockDetailError].filter(Boolean).join('；')}
             />
           ) : null}
-          {activeView === 'us-data' ? <USDataBoundaryView usDb={usDb} /> : null}
+          {activeView === 'us-data' ? <USDataBoundaryView usDb={usDb} usExperiment={usExperiment} /> : null}
           {activeView === 'operations' ? <OperationsView health={health} readiness={readiness} coverageRows={coverageRows} syncRuns={syncRuns} /> : null}
         </main>
       </div>

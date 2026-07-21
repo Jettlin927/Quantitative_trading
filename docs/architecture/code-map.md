@@ -28,6 +28,7 @@
 - `scripts/ops/`：部署、同步、巡检、备份与隔离验证入口。
 - `scripts/research/`：正式研究 CLI 与报告组装；不得复制研究核心公式。
 - `my_quant/us_research/`：美股 sample/实验夹具，不是研究级实际市场数据。
+- `backend/app/us_experiment.py`：美股免费实验目录、yfinance 主日线、AKShare 独立校验、覆盖投影与只读查询；不得把实验状态提升为正式研究资格。
 
 ## 工件与报告
 
