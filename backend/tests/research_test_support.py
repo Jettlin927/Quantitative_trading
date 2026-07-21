@@ -149,6 +149,7 @@ def seed_golden_database(db: Session) -> tuple[str, str]:
                 "warnings": [],
                 "failedRules": [],
                 "limitations": [],
+                "requiredDatasets": [],
                 "benchmark": "SYNIDX.SH",
             },
             code_commit="golden",

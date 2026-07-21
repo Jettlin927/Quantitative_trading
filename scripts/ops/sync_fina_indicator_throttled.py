@@ -50,27 +50,15 @@ def load_stock_codes(max_stocks: int, start_after: str) -> list[str]:
         return list(db.scalars(stmt).all())
 
 
-def has_existing_rows(ts_code: str, start_date: date, end_date: date) -> bool:
-    from sqlalchemy import func, select
-
-    from backend.app.database import SessionLocal
-    from backend.app.models import StockFinancialIndicator
-
-    with SessionLocal() as db:
-        existing = db.scalar(
-            select(func.count(StockFinancialIndicator.id)).where(
-                StockFinancialIndicator.ts_code == ts_code,
-                StockFinancialIndicator.ann_date >= start_date,
-                StockFinancialIndicator.ann_date <= end_date,
-            )
-        )
-        return bool(existing)
-
-
 def sync_one_stock(pro: Any, ts_code: str, start_date: date, end_date: date) -> int:
     from backend.app.database import SessionLocal
-    from backend.app.main import FINA_INDICATOR_FIELDS, dedupe_rows, financial_indicator_record_to_row, upsert_rows
-    from backend.app.models import StockFinancialIndicator
+    from backend.app.main import (
+        FINA_INDICATOR_FIELDS,
+        financial_indicator_record_to_row,
+        insert_financial_revision_rows,
+        next_financial_available_date,
+        utc_now,
+    )
     from backend.app.tushare_client import tushare_date
 
     df = pro.fina_indicator(
@@ -79,10 +67,21 @@ def sync_one_stock(pro: Any, ts_code: str, start_date: date, end_date: date) -> 
         end_date=tushare_date(end_date),
         fields=FINA_INDICATOR_FIELDS,
     )
-    rows = [row for item in df.to_dict("records") if (row := financial_indicator_record_to_row(item))]
-    rows = dedupe_rows(rows, ("ts_code", "end_date", "ann_date"))
+    observed_at = utc_now()
     with SessionLocal() as db:
-        return upsert_rows(db, StockFinancialIndicator, rows, ["ts_code", "end_date", "ann_date"])
+        available_from = next_financial_available_date(db, observed_at)
+        rows = [
+            row
+            for item in df.to_dict("records")
+            if (
+                row := financial_indicator_record_to_row(
+                    item,
+                    source_observed_at=observed_at,
+                    available_from=available_from,
+                )
+            )
+        ]
+        return insert_financial_revision_rows(db, rows)
 
 
 def print_progress(payload: dict[str, Any]) -> None:
@@ -157,12 +156,8 @@ def main() -> int:
         next_allowed_at = request_started_at + interval_seconds
 
         try:
-            if args.skip_existing and has_existing_rows(ts_code, args.start_date, args.end_date):
-                skipped_stocks += 1
-                upserted = 0
-            else:
-                upserted = sync_one_stock(pro, ts_code, args.start_date, args.end_date)
-                rows_upserted += upserted
+            upserted = sync_one_stock(pro, ts_code, args.start_date, args.end_date)
+            rows_upserted += upserted
         except Exception as exc:  # noqa: BLE001
             failed_stocks.append(f"{ts_code}:{exc}")
             upserted = 0

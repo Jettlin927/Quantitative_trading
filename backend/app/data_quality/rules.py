@@ -45,7 +45,10 @@ TABLE_SPECS: dict[str, TableSpec] = {
     "industry_classifications": TableSpec(IndustryClassification, ("index_code",)),
     "industry_members": TableSpec(IndustryMember, ("index_code", "con_code", "in_date")),
     "stock_daily_basic": TableSpec(StockDailyBasic, ("ts_code", "trade_date")),
-    "stock_financial_indicators": TableSpec(StockFinancialIndicator, ("ts_code", "end_date", "ann_date")),
+    "stock_financial_indicators": TableSpec(
+        StockFinancialIndicator,
+        ("ts_code", "end_date", "ann_date", "source_revision_sha256"),
+    ),
     "funds": TableSpec(Fund, ("ts_code",)),
     "fund_daily_bars": TableSpec(FundDailyBar, ("ts_code", "trade_date")),
     "fund_adjust_factors": TableSpec(FundAdjustFactor, ("ts_code", "trade_date")),
@@ -63,7 +66,7 @@ def evaluate_quality_rules(db: Session, contract: QualityCheckContract) -> list[
     results.extend(check_domain(db, contract))
     results.extend(check_referential_integrity(db, contract))
     results.extend(check_calendar_coverage(db, contract))
-    results.extend(check_point_in_time_contract(contract))
+    results.extend(check_point_in_time_contract(db, contract))
     results.extend(check_value_sanity(db, contract))
     results.extend(check_adjustment_continuity(db, contract))
     results.extend(check_freshness(db, contract))
@@ -321,21 +324,69 @@ def check_value_sanity(db: Session, contract: QualityCheckContract) -> list[Qual
     return results
 
 
-def check_point_in_time_contract(contract: QualityCheckContract) -> list[QualityRuleResult]:
+def check_point_in_time_contract(
+    db: Session,
+    contract: QualityCheckContract,
+) -> list[QualityRuleResult]:
     if "stock_financial_indicators" not in contract.required_datasets:
         return []
+    filters = (
+        StockFinancialIndicator.ts_code.in_(contract.universe),
+        StockFinancialIndicator.ann_date <= contract.end_date,
+    )
+    invalid = or_(
+        StockFinancialIndicator.revision_status != "observed",
+        StockFinancialIndicator.source_revision_sha256.is_(None),
+        StockFinancialIndicator.source_observed_at.is_(None),
+        StockFinancialIndicator.available_from.is_(None),
+        StockFinancialIndicator.available_from > contract.end_date,
+    )
+    checked_rows = int(
+        db.scalar(
+            select(func.count()).select_from(StockFinancialIndicator).where(*filters)
+        )
+        or 0
+    )
+    failed_rows = int(
+        db.scalar(
+            select(func.count())
+            .select_from(StockFinancialIndicator)
+            .where(*filters, invalid)
+        )
+        or 0
+    )
+    samples = [
+        {
+            "tsCode": row.ts_code,
+            "endDate": row.end_date.isoformat(),
+            "annDate": row.ann_date.isoformat(),
+            "revisionStatus": row.revision_status,
+            "issue": "financial_revision_evidence_incomplete",
+        }
+        for row in db.execute(
+            select(
+                StockFinancialIndicator.ts_code,
+                StockFinancialIndicator.end_date,
+                StockFinancialIndicator.ann_date,
+                StockFinancialIndicator.revision_status,
+            )
+            .where(*filters, invalid)
+            .order_by(
+                StockFinancialIndicator.ts_code,
+                StockFinancialIndicator.end_date,
+                StockFinancialIndicator.ann_date,
+            )
+            .limit(MAX_SAMPLE_ISSUES)
+        ).all()
+    ]
     return [
-        QualityRuleResult.blocked(
-            "point_in_time.financial_revision_history",
-            "stock_financial_indicators",
-            checked_rows=len(contract.universe),
-            failed_rows=len(contract.universe),
-            sample_issues=[
-                {
-                    "issue": "financial_revision_history_unavailable",
-                    "limitation": "vendor_revisions_are_overwritten_by_natural_key_upsert",
-                }
-            ],
+        _quality_result(
+            rule_id="point_in_time.financial_revision_history",
+            table_name="stock_financial_indicators",
+            severity="blocker",
+            checked_rows=checked_rows,
+            failed_rows=failed_rows,
+            samples=samples,
         )
     ]
 

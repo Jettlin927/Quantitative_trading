@@ -226,6 +226,7 @@ class EtfTrendBaselineTest(unittest.TestCase):
                         "warnings": [],
                         "failedRules": [],
                         "limitations": [],
+                        "requiredDatasets": [],
                         "benchmark": "SYNIDX.SH",
                     },
                     code_commit="trend-test",
