@@ -27,6 +27,7 @@ const RESEARCH_ID = '11111111-1111-4111-8111-111111111111'
 const PUBLICATION_ID = '22222222-2222-4222-8222-222222222222'
 const EVALUATION_ID = '55555555-5555-4555-8555-555555555555'
 const PROPOSAL_ID = '77777777-7777-4777-8777-777777777777'
+const recentFundCatalogPath = /^\/api\/funds\?limit=1000&daily_start_date=\d{4}-\d{2}-\d{2}&daily_end_date=\d{4}-\d{2}-\d{2}$/
 
 const coreResponses = {
   '/api/health?include_counts=false': {
@@ -100,6 +101,7 @@ function installFetch(options = {}) {
     if (path === `/api/research/publications/${PUBLICATION_ID}`) {
       return ok({ status: 'published', conclusion: '研究通过', evaluation_id: EVALUATION_ID, evaluation_version: 1, published_at: '2026-07-20T00:41:00Z', report_url: '/api/research/evaluations/report' })
     }
+    if (recentFundCatalogPath.test(path)) return ok([])
     return ok(coreOverrides[path] ?? coreResponses[path] ?? {})
   })
 }
@@ -434,11 +436,11 @@ describe('研究驾驶舱', () => {
     installFetch({
       coreOverrides: {
         '/api/indices?limit=1000': indices,
-        '/api/funds?limit=1000': funds,
         '/api/industries?limit=1000': industries,
         '/api/tushare/sync-progress?include_coverage=false': { runs: [{ id: 9, target: 'fund_daily', status: 'partial', message: '2 个标的失败', createdAt: '2026-07-20T00:00:00Z' }] },
       },
       route: (path) => {
+        if (recentFundCatalogPath.test(path)) return ok(funds)
         if (path.startsWith('/api/indices/000001.SH/daily-bars?')) return ok([{ tradeDate: '2026-07-18', close: 3210.12, pctChg: 0.5, amount: 100000 }])
         if (path.startsWith('/api/funds/510300.SH/daily-bars?')) return delayFundRefresh ? fundBars.promise : ok([{ tradeDate: '2026-07-18', close: 4.56, pctChg: -0.4, amount: 80000 }])
         if (path.startsWith('/api/funds/510300.SH/adjust-factors?')) return delayFundRefresh ? fundAdjustments.promise : ok([{ tradeDate: '2026-07-18', adjFactor: 1.23 }])
@@ -452,11 +454,13 @@ describe('研究驾驶舱', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
     await screen.findByText('3,210.12')
+    const fetchMock = vi.mocked(globalThis.fetch)
+    expect(fetchMock.mock.calls.some(([path]) => recentFundCatalogPath.test(String(path)))).toBe(true)
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/funds?limit=1000', expect.anything())
     expect(screen.getByText('2 个标的失败')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /沪深 300 ETF.*510300.SH/ }))
     await screen.findByText('1.23')
-    const fetchMock = vi.mocked(globalThis.fetch)
     const fundCallsBeforeRefresh = fetchMock.mock.calls.filter(([path]) => String(path).startsWith('/api/funds/510300.SH/daily-bars?')).length
     delayFundRefresh = true
     fireEvent.click(screen.getByRole('button', { name: /全局刷新/ }))

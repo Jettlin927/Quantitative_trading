@@ -12,6 +12,8 @@ from backend.app import main
 from backend.app.database import Base
 from backend.app.models import (
     DataOverviewSnapshot,
+    Fund,
+    FundDailyBar,
     Stock,
     StockAdjustFactor,
     StockDailyBar,
@@ -179,6 +181,28 @@ class DataApiContractTest(unittest.TestCase):
         self.assertEqual(detail.latest_limit_price["tradeDate"], "2026-05-29")
         self.assertEqual(detail.latest_suspend_event["tradeDate"], "2026-05-28")
         self.assertEqual(detail.latest_adjust_factor["adjFactor"], 3.14)
+
+    def test_fund_catalog_can_be_limited_to_the_requested_daily_bar_window(self):
+        with self.open_session() as db:
+            db.add_all(
+                [
+                    Fund(ts_code="150008.SZ", name="瑞和小康", market="E"),
+                    Fund(ts_code="512480.SH", name="半导体 ETF", market="E"),
+                    FundDailyBar(ts_code="150008.SZ", trade_date=date(2015, 4, 30), close=1.02),
+                    FundDailyBar(ts_code="512480.SH", trade_date=date(2026, 5, 29), close=1.23),
+                ]
+            )
+            db.commit()
+
+            unfiltered = main.list_funds(db=db)
+            recent = main.list_funds(
+                daily_start_date=date(2025, 7, 21),
+                daily_end_date=date(2026, 7, 21),
+                db=db,
+            )
+
+        self.assertEqual([row["tsCode"] for row in unfiltered], ["150008.SZ", "512480.SH"])
+        self.assertEqual([row["tsCode"] for row in recent], ["512480.SH"])
 
     def test_strategy_and_backtest_routes_are_gone(self):
         paths = {route.path for route in main.app.routes}
