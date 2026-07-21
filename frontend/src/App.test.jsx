@@ -117,6 +117,7 @@ describe('研究驾驶舱', () => {
   beforeEach(() => installFetch())
   afterEach(() => {
     cleanup()
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -478,5 +479,46 @@ describe('研究驾驶舱', () => {
     fireEvent.click(screen.getByRole('button', { name: /半导体.*801081.SI/ }))
     await screen.findByText('行业成员暂不可用')
     expect(screen.getByRole('heading', { name: 'A 股实际市场数据' })).toBeInTheDocument()
+  })
+
+  it('ETF 目录按浏览器本地日期计算近一年窗口', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-21T00:30:00+08:00'))
+    render(<App />)
+
+    await vi.runAllTimersAsync()
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/funds?limit=1000&daily_start_date=2025-07-21&daily_end_date=2026-07-21',
+      expect.anything(),
+    )
+  })
+
+  it('刷新 ETF 目录后切换到仍有近一年行情的标的', async () => {
+    const historicalFund = { tsCode: '150008.SZ', name: '瑞和小康', fundType: '历史基金' }
+    const currentFund = { tsCode: '512480.SH', name: '半导体 ETF', fundType: '股票型' }
+    let funds = [historicalFund, currentFund]
+    let historicalBars = [{ tradeDate: '2026-07-18', close: 1.11, pctChg: 0.1, amount: 1000 }]
+    installFetch({
+      route: (path) => {
+        if (recentFundCatalogPath.test(path)) return ok(funds)
+        if (path.startsWith('/api/funds/150008.SZ/daily-bars?')) return ok(historicalBars)
+        if (path.startsWith('/api/funds/150008.SZ/adjust-factors?')) return ok([])
+        if (path.startsWith('/api/funds/512480.SH/daily-bars?')) return ok([{ tradeDate: '2026-07-18', close: 2.22, pctChg: 0.2, amount: 2000 }])
+        if (path.startsWith('/api/funds/512480.SH/adjust-factors?')) return ok([])
+        return null
+      },
+    })
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
+    await screen.findByText('1.11')
+
+    funds = [currentFund]
+    historicalBars = []
+    fireEvent.click(screen.getByRole('button', { name: /全局刷新/ }))
+
+    await screen.findByText('2.22')
+    expect(screen.queryByRole('button', { name: /瑞和小康.*150008.SZ/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '512480.SH' })).toBeInTheDocument()
   })
 })
