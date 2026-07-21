@@ -28,7 +28,7 @@ http://127.0.0.1:15173
 
 结束访问时在 SSH 命令所在终端按 `Ctrl-C`。该方式不改变服务器监听地址，也不需要域名、TLS 证书或外部身份平台。
 
-Windows 家庭电脑的一次性密钥、SSH config、登录后自动隧道和本地验证步骤见[生产部署、受控切换与家庭电脑访问](production-deployment-and-home-access.md)。常驻隧道只提供连接，不会启动新服务器应用或迁移数据。
+macOS 与 Windows 家庭电脑的独立密钥、SSH config、临时隧道、Windows 登录后自动隧道和本地验证步骤见[生产部署、受控切换与家庭电脑访问](production-deployment-and-home-access.md)。多台设备可以同时建立独立隧道；常驻隧道只提供连接，不会启动新服务器应用或迁移数据。
 
 如需临时访问 API，必须同样通过显式 SSH 端口转发连接远端 `127.0.0.1:18000`；不得为了方便而开放公网监听。PostgreSQL 仍不作为普通浏览器访问路径。
 

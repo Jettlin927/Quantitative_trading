@@ -93,7 +93,10 @@ class DocumentationContractTest(unittest.TestCase):
         self.assertIn("不构成生产授权", handoff)
         self.assertIn("不得复制运行中的 PostgreSQL volume", handoff)
         self.assertIn("旧服务器保持完整", handoff)
+        self.assertIn("多台设备同时访问", handoff)
+        self.assertIn("macOS 电脑", handoff)
         self.assertIn("Windows 家庭电脑", handoff)
+        self.assertIn("127.0.0.1:25173", handoff)
         self.assertIn("SSH 隧道只提供连接", handoff)
         self.assertIn(str(handoff_path.relative_to(REPO_ROOT)), agents)
 

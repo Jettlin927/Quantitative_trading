@@ -108,6 +108,74 @@
 - 新服务器验证失败时，先停止其 API、Worker 和前端，完整保留失败现场；再按已验证的旧提交和配置恢复旧服务器服务，读回 API、Worker、前端与数据库事实。
 - 删除新服务器失败数据、清理旧服务器或改变回滚保留期都需要新的明确批准。
 
+## 多台设备同时访问
+
+新服务器可以同时接受多条 SSH 隧道。Mac 与 Windows 各自建立独立 SSH 连接，并都转发到服务器 loopback 的 `127.0.0.1:15173`；两台电脑可以同时使用本机 `25173`，因为本机端口空间彼此独立。任一电脑休眠、断网或关闭隧道，只影响该设备。
+
+每台设备必须生成自己的 SSH 密钥，只把各自公钥加入服务器，不能在设备间复制私钥。这样设备丢失或停用时可以单独撤销对应公钥，不影响另一台设备。新增或撤销服务器公钥仍属于凭据变更，必须由用户明确批准。
+
+## macOS 电脑：访问新服务器前端
+
+### 一次性准备
+
+1. 在终端运行 `ssh -V`，确认系统 OpenSSH 可用。
+2. 如果这台 Mac 还没有独立密钥，生成带口令的 Ed25519 密钥；不要复制 Windows 或其他电脑的私钥。
+3. 把 `.pub` 公钥交给获授权的运维会话加入服务器；私钥只保留在本机。
+4. 在 `~/.ssh/config` 配置本机别名。真实服务器地址、用户、端口和私钥路径不写入仓库。
+5. 首次连接时人工核对服务器主机密钥指纹；主机指纹意外变化时停止连接并先查明原因。
+
+生成独立密钥：
+
+```bash
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+ssh-keygen -t ed25519 -a 64 -f ~/.ssh/quant-trading-mac-tunnel-ed25519 -C "quant-trading-mac-tunnel"
+chmod 600 ~/.ssh/quant-trading-mac-tunnel-ed25519
+chmod 644 ~/.ssh/quant-trading-mac-tunnel-ed25519.pub
+```
+
+`~/.ssh/config` 示例中的占位值只能在本机替换：
+
+```sshconfig
+Host quant-trading-new-tunnel
+  HostName <在本机填写新服务器地址>
+  User <在本机填写登录用户>
+  Port 22
+  IdentityFile ~/.ssh/quant-trading-mac-tunnel-ed25519
+  IdentitiesOnly yes
+  ServerAliveInterval 30
+  ServerAliveCountMax 3
+```
+
+配置后限制文件权限并测试 SSH 身份：
+
+```bash
+chmod 600 ~/.ssh/config
+ssh -v quant-trading-new-tunnel
+```
+
+如果服务器为该公钥配置了“只允许端口转发、禁止 shell”，身份验证成功后 shell 被拒绝是预期结果；直接执行下面的隧道命令即可。
+
+### 建立隧道并访问
+
+```bash
+ssh -NT \
+  -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -L 127.0.0.1:25173:127.0.0.1:15173 \
+  quant-trading-new-tunnel
+```
+
+保持终端运行，然后打开前端并检查同源 API：
+
+```bash
+open http://127.0.0.1:25173
+curl -fsS http://127.0.0.1:25173/api/health
+```
+
+结束访问时在 SSH 终端按 `Ctrl-C`。如果本机 `25173` 已被占用，只改第一个本机端口，例如映射为 `35173:127.0.0.1:15173`，随后访问 `http://127.0.0.1:35173`；远端端口仍固定为 `15173`。
+
 ## Windows 家庭电脑：常态访问新服务器前端
 
 ### 一次性准备
@@ -118,10 +186,23 @@
 4. 在 `%USERPROFILE%\.ssh\config` 本地配置 `quant-trading-new`（运维）与 `quant-trading-new-tunnel`（仅隧道）别名。`HostName`、`User`、`Port` 和 `IdentityFile` 的真实值不写入仓库。
 5. 首次连接要人工核对服务器主机密钥指纹，确认后再写入 `known_hosts`；不得盲目接受变化后的主机密钥。
 
-新建运维密钥的本地示例：
+新建独立隧道密钥的本地示例：
 
 ```powershell
-ssh-keygen -t ed25519 -a 64 -f "$env:USERPROFILE\.ssh\quant-trading-home-ops-ed25519" -C "quant-trading-home-ops"
+ssh-keygen -t ed25519 -a 64 -f "$env:USERPROFILE\.ssh\quant-trading-home-tunnel-ed25519" -C "quant-trading-home-tunnel"
+```
+
+`%USERPROFILE%\.ssh\config` 示例中的占位值只能在本机替换：
+
+```sshconfig
+Host quant-trading-new-tunnel
+  HostName <在本机填写新服务器地址>
+  User <在本机填写登录用户>
+  Port 22
+  IdentityFile ~/.ssh/quant-trading-home-tunnel-ed25519
+  IdentitiesOnly yes
+  ServerAliveInterval 30
+  ServerAliveCountMax 3
 ```
 
 如果本地需要保存部署 `.env`，先确认它被 Git 忽略，再限制为当前 Windows 用户可读写：
@@ -135,35 +216,35 @@ icacls .env /inheritance:r /grant:r "$($env:USERNAME):(R,W)"
 
 ### 临时隧道
 
-前端使用本机 `15173`：
-
-```powershell
-ssh -NT -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 127.0.0.1:15173:127.0.0.1:15173 quant-trading-new-tunnel
-```
-
-如果本机 `15173` 已被本地开发环境占用，可把新服务器映射到本机 `25173`：
+推荐统一使用本机 `25173`，避免与本机开发环境的 `15173` 冲突：
 
 ```powershell
 ssh -NT -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 127.0.0.1:25173:127.0.0.1:15173 quant-trading-new-tunnel
 ```
 
-隧道保持运行时访问 `http://127.0.0.1:15173` 或 `http://127.0.0.1:25173`。浏览器看到的是本机 loopback HTTP，电脑到服务器的链路由 SSH 加密；服务器应用端口仍未开放公网。
+如果本机 `25173` 已被占用，可改用 `35173`：
+
+```powershell
+ssh -NT -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 127.0.0.1:35173:127.0.0.1:15173 quant-trading-new-tunnel
+```
+
+隧道保持运行时访问 `http://127.0.0.1:25173`，或使用实际选择的本机端口。浏览器看到的是本机 loopback HTTP，电脑到服务器的链路由 SSH 加密；服务器应用端口仍未开放公网。
 
 ### 登录后自动建立隧道
 
 先手工验证隧道、前端与数据读回，再在 Windows 任务计划程序创建当前用户登录时运行的任务：
 
 - 程序：`C:\Windows\System32\OpenSSH\ssh.exe`
-- 参数：`-NT -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 127.0.0.1:15173:127.0.0.1:15173 quant-trading-new-tunnel`
+- 参数：`-NT -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 127.0.0.1:25173:127.0.0.1:15173 quant-trading-new-tunnel`
 - 仅在当前用户登录时运行，不使用最高权限；失败后每 1 分钟重试，并禁止同一任务并发启动多个实例。
 - 口令保护的隧道密钥应由当前用户的 Windows `ssh-agent` 管理；不要为了无人值守而移除口令或把私钥写进脚本。
 
 本地检查：
 
 ```powershell
-Test-NetConnection 127.0.0.1 -Port 15173
-Invoke-WebRequest http://127.0.0.1:15173/api/health -UseBasicParsing
-Start-Process http://127.0.0.1:15173
+Test-NetConnection 127.0.0.1 -Port 25173
+Invoke-WebRequest http://127.0.0.1:25173/api/health -UseBasicParsing
+Start-Process http://127.0.0.1:25173
 ```
 
 端口不通先检查计划任务与 SSH 进程；端口通但页面无数据，要检查新服务器 `frontend`、`api`、PostgreSQL 和 Worker 的现场状态。SSH 隧道只提供连接，不会部署应用、迁移数据库或生成数据。
