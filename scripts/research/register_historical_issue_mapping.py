@@ -78,11 +78,12 @@ def main(argv: list[str] | None = None) -> int:
                     "策略必须唯一对应一项历史导入正式研究"
                 )
             formal = formals[0]
-            existing = db.get(ResearchPublicationIssueMapping, formal.id)
+            formal_id = formal.id
+            existing = db.get(ResearchPublicationIssueMapping, formal_id)
             if existing is None:
                 db.add(
                     ResearchPublicationIssueMapping(
-                        formal_research_id=formal.id,
+                        formal_research_id=formal_id,
                         issue_number=args.issue_number,
                     )
                 )
@@ -98,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "status": status,
                     "strategyId": args.strategy_id,
-                    "formalResearchId": formal.id,
+                    "formalResearchId": formal_id,
                     "issueNumber": args.issue_number,
                 },
                 ensure_ascii=False,
