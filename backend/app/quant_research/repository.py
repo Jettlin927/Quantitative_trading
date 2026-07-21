@@ -10,6 +10,7 @@ from ..models import IndexDailyBar, StockAdjustFactor, StockDailyBar, StockLimit
 from .dataset import build_adjusted_price_panel
 from .universe import (
     evaluate_universe_provenance,
+    resolve_industry_level_membership,
     resolve_industry_membership,
     resolve_universe_members,
 )
@@ -26,14 +27,23 @@ def load_stock_research_panel(
         raise ValueError("start_date 不能晚于 end_date")
     if not isinstance(universe, dict):
         raise ValueError("universe 必须是已验证的来源定义")
-    if universe.get("mode") == "industry_membership":
+    if universe.get("mode") in {"industry_membership", "industry_level_membership"}:
         with Session(engine) as db:
-            resolution = resolve_industry_membership(
-                db,
-                str(universe.get("sourceKey") or ""),
-                start_date,
-                end_date,
-            )
+            if universe.get("mode") == "industry_membership":
+                resolution = resolve_industry_membership(
+                    db,
+                    str(universe.get("sourceKey") or ""),
+                    start_date,
+                    end_date,
+                )
+            else:
+                resolution = resolve_industry_level_membership(
+                    db,
+                    str(universe.get("classificationSource") or ""),
+                    str(universe.get("classificationLevel") or ""),
+                    start_date,
+                    end_date,
+                )
         symbols = list(resolution.symbols)
         historical_members = pd.DataFrame(resolution.rows())
         historical_members["trade_date"] = pd.to_datetime(

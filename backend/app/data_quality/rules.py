@@ -15,6 +15,7 @@ from ..models import (
     FundDailyBar,
     Index as MarketIndex,
     IndexDailyBar,
+    IndustryClassification,
     IndustryMember,
     StockAdjustFactor,
     StockDailyBar,
@@ -41,6 +42,7 @@ TABLE_SPECS: dict[str, TableSpec] = {
     "stock_adjust_factors": TableSpec(StockAdjustFactor, ("ts_code", "trade_date")),
     "stock_limit_prices": TableSpec(StockLimitPrice, ("ts_code", "trade_date")),
     "stock_suspend_events": TableSpec(StockSuspendEvent, ("ts_code", "trade_date", "suspend_type", "suspend_timing")),
+    "industry_classifications": TableSpec(IndustryClassification, ("index_code",)),
     "industry_members": TableSpec(IndustryMember, ("index_code", "con_code", "in_date")),
     "stock_daily_basic": TableSpec(StockDailyBasic, ("ts_code", "trade_date")),
     "stock_financial_indicators": TableSpec(StockFinancialIndicator, ("ts_code", "end_date", "ann_date")),
@@ -251,7 +253,8 @@ def check_calendar_coverage(db: Session, contract: QualityCheckContract) -> list
                     dependent=StockLimitPrice,
                     table_name="stock_limit_prices",
                     rule_id="calendar.limit_price_coverage",
-                    start_at_first_membership=contract.universe_type == "industry_membership",
+                    start_at_first_membership=contract.universe_type
+                    in {"industry_membership", "industry_level_membership"},
                 ),
             ]
         )
@@ -517,6 +520,34 @@ def check_universe_provenance(contract: QualityCheckContract) -> QualityRuleResu
             failed_rows=len(issues),
             samples=issues,
         )
+    if contract.universe_type == "industry_level_membership":
+        issues: list[dict[str, Any]] = []
+        if contract.universe_source != "industry_classifications+industry_members":
+            issues.append({"issue": "industry_level_membership_source_invalid"})
+        if not contract.universe_classification_src:
+            issues.append({"issue": "industry_classification_source_required"})
+        if contract.universe_classification_level not in {"L1", "L2", "L3"}:
+            issues.append({"issue": "industry_classification_level_invalid"})
+        if not contract.universe_source_verified or contract.universe_source_issue:
+            issues.append(
+                {"issue": contract.universe_source_issue or "industry_level_membership_unverified"}
+            )
+        if (
+            not contract.universe_classification_sha256
+            or contract.universe_source_sha256 != contract.universe_classification_sha256
+            or not contract.universe_member_sha256
+            or contract.universe_member_count != len(contract.universe_membership_records)
+            or contract.universe_unique_member_count != len(contract.universe)
+        ):
+            issues.append({"issue": "industry_level_membership_audit_identity_invalid"})
+        return _quality_result(
+            rule_id="universe.provenance",
+            table_name="industry_classifications+industry_members",
+            severity="blocker",
+            checked_rows=contract.universe_member_count,
+            failed_rows=len(issues),
+            samples=issues,
+        )
     if contract.scope == "a_share_cross_section" and contract.universe_type == "static_current":
         return QualityRuleResult.blocked(
             "universe.survivorship_risk",
@@ -640,6 +671,24 @@ def _calendar_primary_coverage(
                 )
             )
         )
+    elif contract.universe_type == "industry_level_membership":
+        classification_codes = select(IndustryClassification.index_code).where(
+            IndustryClassification.src == contract.universe_classification_src,
+            IndustryClassification.level == contract.universe_classification_level,
+        )
+        count_stmt = count_stmt.where(
+            exists(
+                select(1).where(
+                    IndustryMember.index_code.in_(classification_codes),
+                    IndustryMember.con_code == primary.ts_code,
+                    IndustryMember.in_date <= primary.trade_date,
+                    or_(
+                        IndustryMember.out_date.is_(None),
+                        IndustryMember.out_date >= primary.trade_date,
+                    ),
+                )
+            )
+        )
     if hasattr(master, "delist_date"):
         count_stmt = count_stmt.where(or_(master.delist_date.is_(None), primary.trade_date < master.delist_date))
     actual_counts = dict(db.execute(count_stmt.group_by(primary.ts_code)).all())
@@ -665,7 +714,7 @@ def _calendar_primary_coverage(
                 actual_exempt_dates.setdefault(code, set()).add(trade_date)
 
     membership_dates: dict[str, list[date]] = {}
-    if contract.universe_type == "industry_membership":
+    if contract.universe_type in {"industry_membership", "industry_level_membership"}:
         for trade_date, code in contract.universe_membership_records:
             membership_dates.setdefault(code, []).append(trade_date)
     expected_windows: dict[str, tuple[list[date], int]] = {}
@@ -674,7 +723,7 @@ def _calendar_primary_coverage(
     failed_rows = 0
     checked_rows = 0
     for row in master_rows:
-        if contract.universe_type == "industry_membership":
+        if contract.universe_type in {"industry_membership", "industry_level_membership"}:
             expected_dates = [
                 trade_date
                 for trade_date in membership_dates.get(row.ts_code, [])
@@ -814,14 +863,23 @@ def _same_key_coverage(
 ) -> QualityRuleResult:
     filters = list(_scope_filters(primary, contract))
     if start_at_first_membership:
-        first_membership_date = (
-            select(func.min(IndustryMember.in_date))
-            .where(
-                IndustryMember.index_code == contract.universe_source_key,
-                IndustryMember.con_code == primary.ts_code,
-            )
-            .scalar_subquery()
+        first_membership_query = select(func.min(IndustryMember.in_date)).where(
+            IndustryMember.con_code == primary.ts_code,
         )
+        if contract.universe_type == "industry_membership":
+            first_membership_query = first_membership_query.where(
+                IndustryMember.index_code == contract.universe_source_key,
+            )
+        else:
+            first_membership_query = first_membership_query.where(
+                IndustryMember.index_code.in_(
+                    select(IndustryClassification.index_code).where(
+                        IndustryClassification.src == contract.universe_classification_src,
+                        IndustryClassification.level == contract.universe_classification_level,
+                    )
+                )
+            )
+        first_membership_date = first_membership_query.scalar_subquery()
         filters.append(primary.trade_date >= first_membership_date)
     missing = ~exists(
         select(1).where(

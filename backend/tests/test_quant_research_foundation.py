@@ -35,6 +35,8 @@ from backend.app.quant_research.repository import load_stock_research_panel
 from backend.app.quant_research.universe import (
     build_explicit_universe,
     build_historical_membership_panel,
+    build_historical_industry_level_panel,
+    build_industry_level_membership_universe,
     build_industry_membership_universe,
     evaluate_universe_provenance,
 )
@@ -461,6 +463,91 @@ class QuantResearchDatasetTest(unittest.TestCase):
         )
         self.assertEqual(panel.attrs["universeProvenance"]["status"], "ready")
 
+    def test_repository_preserves_point_in_time_industry_level_identity(self):
+        engine = create_engine("sqlite+pysqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        day = pd.Timestamp("2026-01-05").date()
+        with Session(engine) as db:
+            db.add_all(
+                [
+                    IndustryClassification(
+                        index_code="801010.SI",
+                        industry_name="农林牧渔",
+                        level="L1",
+                        src="SW2021",
+                    ),
+                    IndustryClassification(
+                        index_code="801030.SI",
+                        industry_name="基础化工",
+                        level="L1",
+                        src="SW2021",
+                    ),
+                ]
+            )
+            db.add_all(
+                [
+                    IndustryMember(
+                        index_code="801010.SI",
+                        con_code="A.SZ",
+                        in_date=day,
+                    ),
+                    IndustryMember(
+                        index_code="801030.SI",
+                        con_code="B.SZ",
+                        in_date=day,
+                    ),
+                ]
+            )
+            db.add(TradeCalendar(exchange="SSE", cal_date=day, is_open=True))
+            for code in ("A.SZ", "B.SZ"):
+                db.add(
+                    StockListing(
+                        ts_code=code,
+                        symbol=code[0],
+                        name=f"合成{code[0]}",
+                        list_status="L",
+                        list_date=pd.Timestamp("2020-01-01").date(),
+                    )
+                )
+                db.add(
+                    StockDailyBar(
+                        ts_code=code,
+                        trade_date=day,
+                        open=10,
+                        high=10,
+                        low=10,
+                        close=10,
+                        pre_close=10,
+                    )
+                )
+                db.add(StockAdjustFactor(ts_code=code, trade_date=day, adj_factor=1))
+                db.add(
+                    StockLimitPrice(
+                        ts_code=code,
+                        trade_date=day,
+                        pre_close=10,
+                        up_limit=11,
+                        down_limit=9,
+                    )
+                )
+            db.commit()
+
+        panel = load_stock_research_panel(
+            engine,
+            build_industry_level_membership_universe("SW2021", "L1"),
+            day,
+            day,
+        )
+
+        self.assertEqual(
+            panel[["ts_code", "industry_index_code"]].to_dict("records"),
+            [
+                {"ts_code": "A.SZ", "industry_index_code": "801010.SI"},
+                {"ts_code": "B.SZ", "industry_index_code": "801030.SI"},
+            ],
+        )
+        self.assertEqual(panel.attrs["universeProvenance"]["status"], "ready")
+
 
 class QuantResearchUniverseTest(unittest.TestCase):
     def test_explicit_universe_hash_is_order_independent(self):
@@ -546,6 +633,95 @@ class QuantResearchUniverseTest(unittest.TestCase):
         self.assertEqual(evaluate_universe_provenance(universe, "a_share_cross_section", "2026-01-05")["status"], "ready")
         tampered = {**universe, "members": ["A"]}
         self.assertEqual(evaluate_universe_provenance(tampered, "a_share_cross_section", "2026-01-05")["status"], "blocked")
+
+    def test_builds_point_in_time_industry_level_membership_panel(self):
+        classifications = pd.DataFrame(
+            [
+                {"index_code": "801010.SI", "src": "SW2021", "level": "L1"},
+                {"index_code": "801030.SI", "src": "SW2021", "level": "L1"},
+                {"index_code": "801011.SI", "src": "SW2021", "level": "L2"},
+            ]
+        )
+        memberships = pd.DataFrame(
+            [
+                {"index_code": "801010.SI", "con_code": "A", "in_date": "2026-01-01", "out_date": None},
+                {"index_code": "801030.SI", "con_code": "B", "in_date": "2026-01-05", "out_date": None},
+                {"index_code": "801011.SI", "con_code": "IGNORED", "in_date": "2026-01-01", "out_date": None},
+            ]
+        )
+        listings = pd.DataFrame(
+            [
+                {"ts_code": "A", "list_date": "2020-01-01", "delist_date": None},
+                {"ts_code": "B", "list_date": "2026-01-06", "delist_date": None},
+                {"ts_code": "IGNORED", "list_date": "2020-01-01", "delist_date": None},
+            ]
+        )
+
+        panel = build_historical_industry_level_panel(
+            classifications,
+            memberships,
+            listings,
+            ["2026-01-05", "2026-01-06"],
+            classification_src="SW2021",
+            classification_level="L1",
+        )
+
+        self.assertEqual(
+            panel.to_dict("records"),
+            [
+                {
+                    "trade_date": pd.Timestamp("2026-01-05"),
+                    "ts_code": "A",
+                    "industry_index_code": "801010.SI",
+                },
+                {
+                    "trade_date": pd.Timestamp("2026-01-06"),
+                    "ts_code": "A",
+                    "industry_index_code": "801010.SI",
+                },
+                {
+                    "trade_date": pd.Timestamp("2026-01-06"),
+                    "ts_code": "B",
+                    "industry_index_code": "801030.SI",
+                },
+            ],
+        )
+        self.assertEqual(
+            build_industry_level_membership_universe("sw2021", "l1"),
+            {
+                "mode": "industry_level_membership",
+                "source": "industry_classifications+industry_members",
+                "classificationSource": "SW2021",
+                "classificationLevel": "L1",
+            },
+        )
+
+    def test_rejects_cross_industry_duplicate_on_same_trade_date(self):
+        classifications = pd.DataFrame(
+            [
+                {"index_code": "801010.SI", "src": "SW2021", "level": "L1"},
+                {"index_code": "801030.SI", "src": "SW2021", "level": "L1"},
+            ]
+        )
+        memberships = pd.DataFrame(
+            [
+                {"index_code": "801010.SI", "con_code": "A", "in_date": "2026-01-01", "out_date": None},
+                {"index_code": "801030.SI", "con_code": "A", "in_date": "2026-01-01", "out_date": None},
+            ]
+        )
+        listings = pd.DataFrame(
+            [{"ts_code": "A", "list_date": "2020-01-01", "delist_date": None}]
+        )
+
+        with self.assertRaisesRegex(ValueError, "同日映射到多个行业"):
+            build_historical_industry_level_panel(
+                classifications,
+                memberships,
+                listings,
+                ["2026-01-05"],
+                classification_src="SW2021",
+                classification_level="L1",
+            )
 
 
 class QuantResearchPortfolioTest(unittest.TestCase):

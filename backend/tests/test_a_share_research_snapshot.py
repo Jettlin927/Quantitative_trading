@@ -12,6 +12,7 @@ from backend.app.data_quality.contracts import QualityCheckContract
 from backend.app.data_quality.runner import run_data_quality_check
 from backend.app.database import Base
 from backend.app.models import (
+    IndustryClassification,
     IndustryMember,
     StockAdjustFactor,
     StockDailyBar,
@@ -26,7 +27,10 @@ from backend.app.quant_research.snapshot import (
     SnapshotError,
     freeze_input_snapshot,
 )
-from backend.app.quant_research.universe import build_industry_membership_universe
+from backend.app.quant_research.universe import (
+    build_industry_level_membership_universe,
+    build_industry_membership_universe,
+)
 from backend.tests.research_test_support import seed_a_share_snapshot_database
 
 
@@ -154,6 +158,48 @@ class AShareResearchSnapshotTest(unittest.TestCase):
                 fresh_snapshot.manifest["universeHash"],
                 fresh_report["universeHash"],
             )
+
+    def test_snapshot_freezes_industry_classification_and_daily_industry_identity(self):
+        with Session(self.engine) as db:
+            classification = db.get(IndustryClassification, "SYNIND.SI")
+            classification.src = "SW2021"
+            db.commit()
+            contract = QualityCheckContract.create(
+                scope="a_share_cross_section",
+                start_date=date(2026, 1, 2),
+                end_date=date(2026, 1, 5),
+                universe=[],
+                benchmark="SYNIDX.SH",
+                universe_type="industry_level_membership",
+                universe_source="industry_classifications+industry_members",
+                universe_classification_src="SW2021",
+                universe_classification_level="L1",
+            )
+            report = run_data_quality_check(db, contract, code_commit="a-share-test")
+            self.assertEqual(report["status"], "ready")
+            config = self._config(report["qualityRunId"])
+            config["universe"] = build_industry_level_membership_universe(
+                "SW2021",
+                "L1",
+            )
+            snapshot = freeze_input_snapshot(
+                db,
+                config,
+                Path(self.tmp.name) / "industry-level-snapshots",
+                capacity_policy=SnapshotCapacityPolicy(min_remaining_bytes=0),
+            )
+
+        self.assertIn("industry_classifications", snapshot.manifest["tableArtifacts"])
+        self.assertEqual(
+            snapshot.manifest["universeSourceArtifact"]["format"],
+            "database_industry_level_membership_v1",
+        )
+        universe = read_canonical_csv_gz(snapshot.path / "inputs" / "universe.csv.gz")
+        self.assertEqual(
+            list(universe.columns),
+            ["trade_date", "ts_code", "industry_index_code"],
+        )
+        self.assertEqual(set(universe["industry_index_code"]), {"SYNIND.SI"})
 
     def test_snapshot_excludes_raw_member_delisted_before_window(self):
         with Session(self.engine) as db:

@@ -9,9 +9,12 @@ from .readiness import evaluate_quality_run_readiness, evaluate_research_readine
 from .repository import load_index_benchmark, load_stock_research_panel
 from .universe import (
     build_explicit_universe,
+    build_historical_industry_level_panel,
     build_historical_membership_panel,
+    build_industry_level_membership_universe,
     build_industry_membership_universe,
     evaluate_universe_provenance,
+    resolve_industry_level_membership,
     resolve_industry_membership,
 )
 from .strategy_registry import list_strategy_definitions, resolve_strategy_definition
@@ -38,13 +41,16 @@ __all__ = [
     "build_open_trade_calendar",
     "build_explicit_universe",
     "build_historical_membership_panel",
+    "build_historical_industry_level_panel",
     "cross_section_percentile_rank",
     "cross_section_winsorize",
     "equal_weight_targets",
     "interval_returns",
     "list_strategy_definitions",
     "resolve_strategy_definition",
+    "resolve_industry_level_membership",
     "resolve_industry_membership",
+    "build_industry_level_membership_universe",
     "build_industry_membership_universe",
     "build_run_manifest",
     "build_walk_forward_windows",

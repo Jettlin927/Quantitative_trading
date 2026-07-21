@@ -207,9 +207,16 @@ class DataQualityRunRequest(BaseModel):
     start_date: date
     end_date: date
     universe: list[str] = Field(default_factory=list, max_length=5000)
-    universe_type: Literal["explicit_snapshot", "static_current", "industry_membership"] = "explicit_snapshot"
+    universe_type: Literal[
+        "explicit_snapshot",
+        "static_current",
+        "industry_membership",
+        "industry_level_membership",
+    ] = "explicit_snapshot"
     universe_source: str | None = Field(default=None, max_length=200)
     universe_source_key: str | None = Field(default=None, max_length=32)
+    universe_classification_src: str | None = Field(default=None, max_length=32)
+    universe_classification_level: str | None = Field(default=None, max_length=2)
     universe_as_of_date: date | None = None
     required_datasets: list[str] = Field(default_factory=list, max_length=20)
     benchmark: str | None = None
@@ -247,12 +254,38 @@ class DataQualityRunRequest(BaseModel):
                 raise ValueError("industry_membership 必须提供 universe_source_key")
             if self.universe_as_of_date is not None:
                 raise ValueError("industry_membership 禁止 universe_as_of_date")
+            if self.universe_classification_src is not None or self.universe_classification_level is not None:
+                raise ValueError("industry_membership 不接受行业分类范围")
             self.universe_source_key = self.universe_source_key.strip().upper()
+        elif self.universe_type == "industry_level_membership":
+            if self.scope != "a_share_cross_section":
+                raise ValueError("industry_level_membership 只允许 A 股横截面")
+            if self.universe:
+                raise ValueError("industry_level_membership 禁止 inline 当前成员列表")
+            if self.universe_source != "industry_classifications+industry_members":
+                raise ValueError(
+                    "industry_level_membership universe_source 必须为 "
+                    "industry_classifications+industry_members"
+                )
+            if self.universe_source_key is not None:
+                raise ValueError("industry_level_membership 不接受 universe_source_key")
+            if self.universe_as_of_date is not None:
+                raise ValueError("industry_level_membership 禁止 universe_as_of_date")
+            source = str(self.universe_classification_src or "").strip().upper()
+            level = str(self.universe_classification_level or "").strip().upper()
+            if not source:
+                raise ValueError("industry_level_membership 必须提供 universe_classification_src")
+            if level not in {"L1", "L2", "L3"}:
+                raise ValueError("universe_classification_level 只允许 L1、L2 或 L3")
+            self.universe_classification_src = source
+            self.universe_classification_level = level
         else:
             if not self.universe:
                 raise ValueError("universe 必须包含至少一个有效代码")
             if self.universe_source_key is not None:
                 raise ValueError("非 industry_membership 不接受 universe_source_key")
+            if self.universe_classification_src is not None or self.universe_classification_level is not None:
+                raise ValueError("非 industry_level_membership 不接受行业分类范围")
         return self
 
 

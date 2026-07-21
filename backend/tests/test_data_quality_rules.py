@@ -27,6 +27,8 @@ from backend.app.models import (
     FundDailyBar,
     Index,
     IndexDailyBar,
+    IndustryClassification,
+    IndustryMember,
     StockAdjustFactor,
     StockDailyBar,
     StockFinancialIndicator,
@@ -439,6 +441,55 @@ class DataQualityRulesTest(unittest.TestCase):
             self.assertEqual(failed["status"], "failed")
             self.assertEqual(failed_row.status, "failed")
 
+    def test_runner_resolves_industry_level_membership_and_persists_both_hashes(self):
+        with Session(self.engine) as db:
+            db.add(
+                IndustryClassification(
+                    index_code="801780.SI",
+                    industry_name="银行",
+                    level="L1",
+                    src="SW2021",
+                )
+            )
+            db.add(
+                IndustryMember(
+                    index_code="801780.SI",
+                    con_code="000001.SZ",
+                    in_date=date(2020, 1, 1),
+                )
+            )
+            db.commit()
+            contract = QualityCheckContract.create(
+                scope="a_share_cross_section",
+                start_date=date(2026, 1, 2),
+                end_date=date(2026, 1, 5),
+                universe=[],
+                universe_type="industry_level_membership",
+                universe_source="industry_classifications+industry_members",
+                universe_classification_src="SW2021",
+                universe_classification_level="L1",
+                benchmark="000300.SH",
+            )
+            resolved: list[QualityCheckContract] = []
+
+            def capture(_db: Session, value: QualityCheckContract) -> list[QualityRuleResult]:
+                resolved.append(value)
+                return [QualityRuleResult.passed("universe.provenance", "industry_members")]
+
+            report = run_data_quality_check(db, contract, evaluator=capture)
+
+        self.assertEqual(report["status"], "ready")
+        self.assertEqual(resolved[0].universe, ("000001.SZ",))
+        self.assertEqual(
+            report["config"]["universeSourceSha256"],
+            report["config"]["universeClassificationSha256"],
+        )
+        self.assertRegex(report["config"]["universeMemberSha256"], r"^[0-9a-f]{64}$")
+        self.assertNotEqual(
+            report["config"]["universeMemberSha256"],
+            report["config"]["universeClassificationSha256"],
+        )
+
     def test_api_runs_quality_and_research_readiness_requires_quality_run(self):
         payload = DataQualityRunRequest(
             scope="a_share_cross_section",
@@ -551,6 +602,31 @@ class DataQualityRulesTest(unittest.TestCase):
         )
         self.assertEqual(args.universe, [])
         self.assertEqual(args.universe_source_key, "801080.SI")
+
+    def test_cli_accepts_industry_classification_scope_without_inline_members(self):
+        args = parse_quality_cli_args(
+            [
+                "--scope",
+                "a_share_cross_section",
+                "--start-date",
+                "2025-06-02",
+                "--end-date",
+                "2026-06-29",
+                "--universe-type",
+                "industry_level_membership",
+                "--universe-source",
+                "industry_classifications+industry_members",
+                "--universe-classification-src",
+                "SW2021",
+                "--universe-classification-level",
+                "L1",
+                "--benchmark",
+                "H00985.CSI",
+            ]
+        )
+        self.assertEqual(args.universe, [])
+        self.assertEqual(args.universe_classification_src, "SW2021")
+        self.assertEqual(args.universe_classification_level, "L1")
 
 
 class DataQualityRegistryAndReadinessTest(unittest.TestCase):

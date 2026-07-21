@@ -242,6 +242,43 @@ class DataApiContractTest(unittest.TestCase):
             with self.subTest(override=override), self.assertRaises(ValueError):
                 DataQualityRunRequest(**values)
 
+    def test_industry_level_membership_quality_request_freezes_source_and_level(self):
+        request = DataQualityRunRequest(
+            scope="a_share_cross_section",
+            start_date=date(2026, 1, 2),
+            end_date=date(2026, 1, 5),
+            universe_type="industry_level_membership",
+            universe_source="industry_classifications+industry_members",
+            universe_classification_src="sw2021",
+            universe_classification_level="l1",
+            benchmark="000985.csi",
+        )
+
+        self.assertEqual(request.universe, [])
+        self.assertEqual(request.universe_classification_src, "SW2021")
+        self.assertEqual(request.universe_classification_level, "L1")
+        self.assertEqual(request.benchmark, "000985.CSI")
+        for override in (
+            {"universe": ["000001.SZ"]},
+            {"universe_source": "industry_members"},
+            {"universe_classification_src": None},
+            {"universe_classification_level": "L4"},
+            {"universe_source_key": "801010.SI"},
+            {"universe_as_of_date": date(2026, 1, 2)},
+        ):
+            values = {
+                "scope": "a_share_cross_section",
+                "start_date": date(2026, 1, 2),
+                "end_date": date(2026, 1, 5),
+                "universe_type": "industry_level_membership",
+                "universe_source": "industry_classifications+industry_members",
+                "universe_classification_src": "SW2021",
+                "universe_classification_level": "L1",
+                **override,
+            }
+            with self.subTest(override=override), self.assertRaises(ValueError):
+                DataQualityRunRequest(**values)
+
     def test_p0_table_contracts_and_mappers_exist(self):
         for table_name in [
             "trade_calendars",
