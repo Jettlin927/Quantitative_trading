@@ -56,7 +56,7 @@ export function AShareDataView(props) {
       <FundamentalsHistory detail={stockDetail} />
       <section className="catalog-grid">
         <CatalogPanel title="指数目录" eyebrow="指数基准" kind="index" rows={catalogs.indices} codeKey="tsCode" metaKey="category" selected={selectedCatalog} onSelect={setSelectedCatalog} />
-        <CatalogPanel title="ETF 目录" eyebrow="ETF 范围" kind="fund" rows={catalogs.funds} codeKey="tsCode" metaKey="fundType" selected={selectedCatalog} onSelect={setSelectedCatalog} />
+        <CatalogPanel title="ETF 目录" eyebrow="近一年有行情" kind="fund" rows={catalogs.funds} codeKey="tsCode" metaKey="fundType" selected={selectedCatalog} onSelect={setSelectedCatalog} />
         <CatalogPanel title="行业分类" eyebrow="申万 2021 行业" kind="industry" rows={catalogs.industries} codeKey="indexCode" nameKey="industryName" metaKey="level" selected={selectedCatalog} onSelect={setSelectedCatalog} />
       </section>
       {catalogError ? <DomainFailure title="目录明细读取失败" detail={catalogError} /> : null}
