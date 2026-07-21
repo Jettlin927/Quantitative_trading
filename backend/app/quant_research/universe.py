@@ -12,7 +12,7 @@ import pandas as pd
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from ..models import IndustryMember, StockListing, TradeCalendar
+from ..models import IndustryClassification, IndustryMember, StockListing, TradeCalendar
 
 
 @dataclass(frozen=True)
@@ -30,6 +30,32 @@ class IndustryMembershipResolution:
             {"trade_date": trade_date, "ts_code": ts_code}
             for trade_date, ts_code in self.records
         ]
+
+
+@dataclass(frozen=True)
+class IndustryLevelMembershipResolution:
+    classification_source: str
+    classification_level: str
+    start_date: date
+    end_date: date
+    records: tuple[tuple[date, str, str], ...]
+    symbols: tuple[str, ...]
+    classification_sha256: str
+    member_sha256: str
+    universe_hash: str
+
+    def rows(self) -> list[dict[str, object]]:
+        return [
+            {
+                "trade_date": trade_date,
+                "ts_code": ts_code,
+                "industry_index_code": industry_index_code,
+            }
+            for trade_date, ts_code, industry_index_code in self.records
+        ]
+
+    def membership_records(self) -> tuple[tuple[date, str], ...]:
+        return tuple((trade_date, ts_code) for trade_date, ts_code, _ in self.records)
 
 
 def build_explicit_universe(
@@ -67,6 +93,24 @@ def build_industry_membership_universe(source_key: str) -> dict[str, str]:
         "mode": "industry_membership",
         "source": "industry_members",
         "sourceKey": normalized,
+    }
+
+
+def build_industry_level_membership_universe(
+    classification_source: str,
+    classification_level: str,
+) -> dict[str, str]:
+    normalized_source = str(classification_source or "").strip().upper()
+    normalized_level = str(classification_level or "").strip().upper()
+    if not normalized_source or len(normalized_source) > 32:
+        raise ValueError("industry_level_membership classificationSource 必须非空")
+    if normalized_level not in {"L1", "L2", "L3"}:
+        raise ValueError("industry_level_membership classificationLevel 只允许 L1、L2 或 L3")
+    return {
+        "mode": "industry_level_membership",
+        "source": "industry_classifications+industry_members",
+        "classificationSource": normalized_source,
+        "classificationLevel": normalized_level,
     }
 
 
@@ -161,6 +205,139 @@ def resolve_industry_membership(
     )
 
 
+def resolve_industry_level_membership(
+    db: Session,
+    classification_source: str,
+    classification_level: str,
+    start_date: date,
+    end_date: date,
+) -> IndustryLevelMembershipResolution:
+    universe = build_industry_level_membership_universe(
+        classification_source,
+        classification_level,
+    )
+    if start_date > end_date:
+        raise ValueError("industry_level_membership start_date 不能晚于 end_date")
+    trade_dates = list(
+        db.scalars(
+            select(TradeCalendar.cal_date)
+            .where(
+                TradeCalendar.exchange == "SSE",
+                TradeCalendar.is_open.is_(True),
+                TradeCalendar.cal_date >= start_date,
+                TradeCalendar.cal_date <= end_date,
+            )
+            .distinct()
+            .order_by(TradeCalendar.cal_date)
+        ).all()
+    )
+    if not trade_dates:
+        raise ValueError("industry_level_membership 区间内没有官方开市日")
+    classification_rows = db.execute(
+        select(
+            IndustryClassification.index_code,
+            IndustryClassification.industry_name,
+            IndustryClassification.industry_code,
+            IndustryClassification.parent_code,
+            IndustryClassification.src,
+            IndustryClassification.level,
+        )
+        .where(
+            IndustryClassification.src == universe["classificationSource"],
+            IndustryClassification.level == universe["classificationLevel"],
+        )
+        .order_by(IndustryClassification.index_code)
+    ).mappings().all()
+    if not classification_rows:
+        raise ValueError("industry_level_membership 没有匹配的行业分类")
+    index_codes = sorted({str(row["index_code"]).strip().upper() for row in classification_rows})
+    membership_rows = db.execute(
+        select(
+            IndustryMember.index_code,
+            IndustryMember.con_code,
+            IndustryMember.in_date,
+            IndustryMember.out_date,
+        )
+        .where(
+            IndustryMember.index_code.in_(index_codes),
+            IndustryMember.in_date <= end_date,
+            or_(IndustryMember.out_date.is_(None), IndustryMember.out_date >= start_date),
+        )
+        .order_by(IndustryMember.index_code, IndustryMember.con_code, IndustryMember.in_date)
+    ).mappings().all()
+    if not membership_rows:
+        raise ValueError("industry_level_membership 研究区间内没有历史成员")
+    symbols = sorted({str(row["con_code"]).strip().upper() for row in membership_rows})
+    listing_rows = db.execute(
+        select(
+            StockListing.ts_code,
+            StockListing.list_status,
+            StockListing.list_date,
+            StockListing.delist_date,
+        )
+        .where(StockListing.ts_code.in_(symbols))
+        .order_by(StockListing.ts_code)
+    ).mappings().all()
+    panel = build_historical_industry_level_panel(
+        pd.DataFrame(classification_rows),
+        pd.DataFrame(membership_rows),
+        pd.DataFrame(listing_rows),
+        trade_dates,
+        classification_src=universe["classificationSource"],
+        classification_level=universe["classificationLevel"],
+    )
+    missing_dates = sorted(set(pd.DatetimeIndex(trade_dates)) - set(panel["trade_date"]))
+    if missing_dates:
+        sample = ", ".join(value.date().isoformat() for value in missing_dates[:5])
+        raise ValueError(f"industry_level_membership 逐日成员存在空档：{sample}")
+    records = tuple(
+        (row.trade_date.date(), str(row.ts_code), str(row.industry_index_code))
+        for row in panel.itertuples(index=False)
+    )
+    classification_payload = [
+        {
+            "indexCode": str(row["index_code"]).strip().upper(),
+            "industryName": str(row["industry_name"] or "").strip(),
+            "industryCode": str(row["industry_code"] or "").strip().upper(),
+            "parentCode": str(row["parent_code"] or "").strip().upper(),
+            "source": str(row["src"]).strip().upper(),
+            "level": str(row["level"]).strip().upper(),
+        }
+        for row in classification_rows
+    ]
+    classification_sha256 = _canonical_hash(classification_payload)
+    member_sha256 = _canonical_hash(
+        [
+            {
+                "tradeDate": trade_date.isoformat(),
+                "tsCode": ts_code,
+                "industryIndexCode": industry_index_code,
+            }
+            for trade_date, ts_code, industry_index_code in records
+        ]
+    )
+    universe_hash = _canonical_hash(
+        {
+            **universe,
+            "startDate": start_date.isoformat(),
+            "endDate": end_date.isoformat(),
+            "classificationSha256": classification_sha256,
+            "memberSha256": member_sha256,
+        }
+    )
+    return IndustryLevelMembershipResolution(
+        classification_source=universe["classificationSource"],
+        classification_level=universe["classificationLevel"],
+        start_date=start_date,
+        end_date=end_date,
+        records=records,
+        symbols=tuple(sorted({ts_code for _, ts_code, _ in records})),
+        classification_sha256=classification_sha256,
+        member_sha256=member_sha256,
+        universe_hash=universe_hash,
+    )
+
+
 def build_historical_membership_panel(
     memberships: pd.DataFrame,
     listings: pd.DataFrame,
@@ -239,6 +416,59 @@ def build_historical_membership_panel(
     return panel.sort_values(["trade_date", "ts_code"]).reset_index(drop=True)
 
 
+def build_historical_industry_level_panel(
+    classifications: pd.DataFrame,
+    memberships: pd.DataFrame,
+    listings: pd.DataFrame,
+    trade_dates: Iterable[object],
+    *,
+    classification_src: str,
+    classification_level: str,
+) -> pd.DataFrame:
+    classification_required = {"index_code", "src", "level"}
+    missing = sorted(classification_required - set(classifications.columns))
+    if missing:
+        raise ValueError(f"行业分类缺少字段：{', '.join(missing)}")
+    universe = build_industry_level_membership_universe(
+        classification_src,
+        classification_level,
+    )
+    frame = classifications.copy()
+    frame["index_code"] = frame["index_code"].astype(str).str.strip().str.upper()
+    frame["src"] = frame["src"].astype(str).str.strip().str.upper()
+    frame["level"] = frame["level"].astype(str).str.strip().str.upper()
+    selected = frame[
+        (frame["src"] == universe["classificationSource"])
+        & (frame["level"] == universe["classificationLevel"])
+    ]
+    if selected.empty:
+        raise ValueError("没有匹配的行业分类")
+    if selected["index_code"].eq("").any() or selected["index_code"].duplicated().any():
+        raise ValueError("行业分类 index_code 必须非空且唯一")
+
+    panels: list[pd.DataFrame] = []
+    for index_code in sorted(selected["index_code"]):
+        panel = build_historical_membership_panel(
+            memberships,
+            listings,
+            trade_dates,
+            index_code,
+        )
+        if not panel.empty:
+            panel["industry_index_code"] = index_code
+            panels.append(panel)
+    if not panels:
+        return pd.DataFrame(columns=["trade_date", "ts_code", "industry_index_code"])
+    result = pd.concat(panels, ignore_index=True)
+    duplicated = result.duplicated(["trade_date", "ts_code"], keep=False)
+    if duplicated.any():
+        sample = result.loc[duplicated, "ts_code"].iloc[0]
+        raise ValueError(f"历史成员同日映射到多个行业：{sample}")
+    return result.sort_values(
+        ["trade_date", "ts_code", "industry_index_code"]
+    ).reset_index(drop=True)
+
+
 def evaluate_universe_provenance(
     universe: dict[str, Any],
     scope: str,
@@ -297,6 +527,21 @@ def evaluate_universe_provenance(
         source_key = str(universe.get("sourceKey") or "").strip().upper()
         if not source_key or source_key != universe.get("sourceKey"):
             blockers.append("invalid_industry_membership_source_key")
+    elif mode == "industry_level_membership":
+        if set(universe) != {
+            "mode",
+            "source",
+            "classificationSource",
+            "classificationLevel",
+        }:
+            blockers.append("invalid_industry_level_membership_fields")
+        if source != "industry_classifications+industry_members":
+            blockers.append("invalid_industry_level_membership_source")
+        classification_source = str(universe.get("classificationSource") or "").strip().upper()
+        if not classification_source or classification_source != universe.get("classificationSource"):
+            blockers.append("invalid_industry_classification_source")
+        if universe.get("classificationLevel") not in {"L1", "L2", "L3"}:
+            blockers.append("invalid_industry_classification_level")
     else:
         blockers.append("unsupported_universe_mode")
         survivorship_risk = True
@@ -321,7 +566,7 @@ def resolve_universe_members(
         raise ValueError(f"universe 来源门禁未通过：{', '.join(result['blockers'])}")
     if universe["mode"] == "explicit_snapshot":
         return list(universe["members"]), None, result
-    raise ValueError("industry_membership 必须在同一数据库事务内解析逐日成员")
+    raise ValueError("历史行业 universe 必须在同一数据库事务内解析逐日成员")
 
 
 def _artifact_matches(artifact: object, content: object, expected_format: str) -> bool:

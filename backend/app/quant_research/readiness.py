@@ -148,7 +148,12 @@ def evaluate_quality_run_readiness(run: Any, results: Iterable[Any]) -> dict[str
     status = run.status
     if run.scope == "a_share_cross_section":
         universe_type = config.get("universeType")
-        if universe_type not in {"explicit_snapshot", "static_current", "industry_membership"}:
+        if universe_type not in {
+            "explicit_snapshot",
+            "static_current",
+            "industry_membership",
+            "industry_level_membership",
+        }:
             blockers.append("universe.provenance:stock_listings")
         if universe_type == "static_current":
             blockers.append("universe.survivorship_risk:stock_listings")
@@ -164,6 +169,15 @@ def evaluate_quality_run_readiness(run: Any, results: Iterable[Any]) -> dict[str
             blockers.append("universe.provenance:stock_listings")
         if universe_type == "industry_membership":
             blockers.append("universe.provenance:industry_members")
+        if universe_type == "industry_level_membership" and (
+            config.get("universeSource") != "industry_classifications+industry_members"
+            or not config.get("universeClassificationSource")
+            or config.get("universeClassificationLevel") not in {"L1", "L2", "L3"}
+            or config.get("universeSourceVerified") is not True
+            or not config.get("universeClassificationSha256")
+            or not config.get("universeMemberSha256")
+        ):
+            blockers.append("universe.provenance:industry_classifications+industry_members")
     blockers = list(dict.fromkeys(blockers))
     if blockers and status in {"ready", "ready_with_warnings"}:
         status = "blocked"

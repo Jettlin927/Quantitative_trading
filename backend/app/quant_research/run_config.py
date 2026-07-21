@@ -661,6 +661,33 @@ def _validate_universe(
         if result["status"] == "blocked":
             raise ValueError(f"universe 来源门禁未通过：{', '.join(result['blockers'])}")
         return
+    if universe.get("mode") == "industry_level_membership":
+        if set(universe) != {
+            "mode",
+            "source",
+            "classificationSource",
+            "classificationLevel",
+        }:
+            raise ValueError(
+                "industry_level_membership universe 只允许 "
+                "mode/source/classificationSource/classificationLevel"
+            )
+        if scope != "a_share_cross_section":
+            raise ValueError("industry_level_membership 只允许 A 股横截面研究")
+        if universe.get("source") != "industry_classifications+industry_members":
+            raise ValueError(
+                "industry_level_membership source 必须为 "
+                "industry_classifications+industry_members"
+            )
+        source = str(universe.get("classificationSource") or "").strip().upper()
+        if not source or source != universe.get("classificationSource") or len(source) > 32:
+            raise ValueError("industry_level_membership classificationSource 必须规范化")
+        if universe.get("classificationLevel") not in {"L1", "L2", "L3"}:
+            raise ValueError("industry_level_membership classificationLevel 无效")
+        result = evaluate_universe_provenance(universe, scope, start_date)
+        if result["status"] == "blocked":
+            raise ValueError(f"universe 来源门禁未通过：{', '.join(result['blockers'])}")
+        return
     required = {
         "mode",
         "source",

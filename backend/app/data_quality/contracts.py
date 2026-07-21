@@ -17,6 +17,7 @@ SUPPORTED_DATASETS = {
     "stock_adjust_factors",
     "stock_limit_prices",
     "stock_suspend_events",
+    "industry_classifications",
     "industry_members",
     "stock_daily_basic",
     "stock_financial_indicators",
@@ -47,7 +48,12 @@ BASE_DATASETS = {
         "index_daily_bars",
     },
 }
-UNIVERSE_TYPES = {"explicit_snapshot", "static_current", "industry_membership"}
+UNIVERSE_TYPES = {
+    "explicit_snapshot",
+    "static_current",
+    "industry_membership",
+    "industry_level_membership",
+}
 
 
 @dataclass(frozen=True)
@@ -61,6 +67,9 @@ class QualityCheckContract:
     universe_type: str
     universe_source: str | None
     universe_source_key: str | None
+    universe_classification_src: str | None
+    universe_classification_level: str | None
+    universe_classification_sha256: str | None
     universe_source_sha256: str | None
     universe_source_verified: bool
     universe_source_issue: str | None
@@ -86,6 +95,8 @@ class QualityCheckContract:
         universe_type: str = "explicit_snapshot",
         universe_source: str | None = None,
         universe_source_key: str | None = None,
+        universe_classification_src: str | None = None,
+        universe_classification_level: str | None = None,
         universe_as_of_date: date | None = None,
         statement_timeout_ms: int = 30_000,
     ) -> "QualityCheckContract":
@@ -95,11 +106,11 @@ class QualityCheckContract:
             raise ValueError(f"未知质量范围：{scope}")
         if start_date > end_date:
             raise ValueError("start_date 不能晚于 end_date")
-        if universe_type == "industry_membership":
+        if universe_type in {"industry_membership", "industry_level_membership"}:
             if scope != "a_share_cross_section":
-                raise ValueError("industry_membership 只允许 A 股横截面质量范围")
+                raise ValueError(f"{universe_type} 只允许 A 股横截面质量范围")
             if normalized_universe:
-                raise ValueError("industry_membership 禁止伪造 inline 当前成员列表")
+                raise ValueError(f"{universe_type} 禁止伪造 inline 当前成员列表")
         elif not normalized_universe:
             raise ValueError("universe 必须显式提供至少一个代码")
         if len(normalized_universe) > 5000:
@@ -109,7 +120,13 @@ class QualityCheckContract:
             raise ValueError(f"未知数据集：{', '.join(unknown_datasets)}")
         allowed_datasets = set(BASE_DATASETS[scope])
         if scope == "a_share_cross_section":
-            allowed_datasets.update({"stock_daily_basic", "stock_financial_indicators"})
+            allowed_datasets.update(
+                {
+                    "industry_classifications",
+                    "stock_daily_basic",
+                    "stock_financial_indicators",
+                }
+            )
         incompatible = sorted(set(normalized_required) - allowed_datasets)
         if incompatible:
             raise ValueError(f"当前 scope 不支持数据集：{', '.join(incompatible)}")
@@ -125,6 +142,16 @@ class QualityCheckContract:
             if universe_source_key and universe_source_key.strip()
             else None
         )
+        normalized_classification_src = (
+            universe_classification_src.strip().upper()
+            if universe_classification_src and universe_classification_src.strip()
+            else None
+        )
+        normalized_classification_level = (
+            universe_classification_level.strip().upper()
+            if universe_classification_level and universe_classification_level.strip()
+            else None
+        )
         if normalized_source and len(normalized_source) > 200:
             raise ValueError("universe_source 最多 200 个字符")
         normalized_as_of, as_of_issue = _normalize_optional_date(universe_as_of_date)
@@ -135,12 +162,33 @@ class QualityCheckContract:
                 raise ValueError("industry_membership 必须提供唯一 sourceKey 行业代码")
             if normalized_as_of is not None or as_of_issue is not None:
                 raise ValueError("industry_membership 禁止 universe_as_of_date")
+            if normalized_classification_src is not None or normalized_classification_level is not None:
+                raise ValueError("industry_membership 不接受行业分类范围")
             source_sha256 = None
             source_verified = False
             source_issue = "industry_membership_not_resolved"
+        elif universe_type == "industry_level_membership":
+            if normalized_source != "industry_classifications+industry_members":
+                raise ValueError(
+                    "industry_level_membership source 必须固定为 "
+                    "industry_classifications+industry_members"
+                )
+            if normalized_source_key is not None:
+                raise ValueError("industry_level_membership 不接受 universe_source_key")
+            if not normalized_classification_src or len(normalized_classification_src) > 32:
+                raise ValueError("industry_level_membership 必须提供行业分类来源")
+            if normalized_classification_level not in {"L1", "L2", "L3"}:
+                raise ValueError("industry_level_membership 行业层级只允许 L1、L2 或 L3")
+            if normalized_as_of is not None or as_of_issue is not None:
+                raise ValueError("industry_level_membership 禁止 universe_as_of_date")
+            source_sha256 = None
+            source_verified = False
+            source_issue = "industry_level_membership_not_resolved"
         else:
             if normalized_source_key is not None:
                 raise ValueError("非 industry_membership 不接受 universe_source_key")
+            if normalized_classification_src is not None or normalized_classification_level is not None:
+                raise ValueError("非 industry_level_membership 不接受行业分类范围")
             source_sha256, source_verified, source_issue = _verify_universe_source(
                 normalized_source,
                 normalized_universe,
@@ -151,6 +199,8 @@ class QualityCheckContract:
                 "type": universe_type,
                 "source": normalized_source,
                 "sourceKey": normalized_source_key,
+                "classificationSource": normalized_classification_src,
+                "classificationLevel": normalized_classification_level,
                 "sourceSha256": source_sha256,
                 "asOfDate": normalized_as_of.isoformat() if normalized_as_of else None,
                 "codes": normalized_universe,
@@ -169,6 +219,9 @@ class QualityCheckContract:
             universe_type=universe_type,
             universe_source=normalized_source,
             universe_source_key=normalized_source_key,
+            universe_classification_src=normalized_classification_src,
+            universe_classification_level=normalized_classification_level,
+            universe_classification_sha256=None,
             universe_source_sha256=source_sha256,
             universe_source_verified=source_verified,
             universe_source_issue=source_issue,
@@ -184,7 +237,10 @@ class QualityCheckContract:
 
     @property
     def datasets(self) -> tuple[str, ...]:
-        return tuple(sorted(BASE_DATASETS[self.scope] | set(self.required_datasets)))
+        datasets = BASE_DATASETS[self.scope] | set(self.required_datasets)
+        if self.universe_type == "industry_level_membership":
+            datasets = datasets | {"industry_classifications"}
+        return tuple(sorted(datasets))
 
     def to_config(self) -> dict[str, Any]:
         return {
@@ -195,6 +251,9 @@ class QualityCheckContract:
             "universeType": self.universe_type,
             "universeSource": self.universe_source,
             "universeSourceKey": self.universe_source_key,
+            "universeClassificationSource": self.universe_classification_src,
+            "universeClassificationLevel": self.universe_classification_level,
+            "universeClassificationSha256": self.universe_classification_sha256,
             "universeSourceSha256": self.universe_source_sha256,
             "universeSourceVerified": self.universe_source_verified,
             "universeSourceIssue": self.universe_source_issue,

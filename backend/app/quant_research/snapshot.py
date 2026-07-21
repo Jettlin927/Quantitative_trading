@@ -22,6 +22,7 @@ from ..models import (
     FundDailyBar,
     Index,
     IndexDailyBar,
+    IndustryClassification,
     IndustryMember,
     StockAdjustFactor,
     StockDailyBar,
@@ -37,7 +38,12 @@ from .artifacts import (
     write_canonical_csv_gz,
 )
 from .run_config import canonical_sha256, validate_run_config
-from .universe import IndustryMembershipResolution, resolve_industry_membership
+from .universe import (
+    IndustryLevelMembershipResolution,
+    IndustryMembershipResolution,
+    resolve_industry_level_membership,
+    resolve_industry_membership,
+)
 
 
 GIB = 1024**3
@@ -62,6 +68,9 @@ A_SHARE_SNAPSHOT_TABLES = {
     "industry_members",
     "indices",
     "index_daily_bars",
+}
+A_SHARE_INDUSTRY_LEVEL_SNAPSHOT_TABLES = A_SHARE_SNAPSHOT_TABLES | {
+    "industry_classifications"
 }
 
 
@@ -126,28 +135,59 @@ def freeze_input_snapshot(
         with Session(bind=registry_db.get_bind(), autoflush=False, expire_on_commit=False) as source_db:
             with source_db.begin():
                 _configure_snapshot_transaction(source_db, statement_timeout_ms)
-                membership: IndustryMembershipResolution | None = None
+                membership: (
+                    IndustryMembershipResolution
+                    | IndustryLevelMembershipResolution
+                    | None
+                ) = None
                 if normalized["scope"] == "a_share_cross_section":
-                    membership = resolve_industry_membership(
-                        source_db,
-                        normalized["universe"]["sourceKey"],
-                        date.fromisoformat(normalized["warmupStart"]),
-                        date.fromisoformat(normalized["endDate"]),
-                    )
+                    if normalized["universe"]["mode"] == "industry_membership":
+                        membership = resolve_industry_membership(
+                            source_db,
+                            normalized["universe"]["sourceKey"],
+                            date.fromisoformat(normalized["warmupStart"]),
+                            date.fromisoformat(normalized["endDate"]),
+                        )
+                    else:
+                        membership = resolve_industry_level_membership(
+                            source_db,
+                            normalized["universe"]["classificationSource"],
+                            normalized["universe"]["classificationLevel"],
+                            date.fromisoformat(normalized["warmupStart"]),
+                            date.fromisoformat(normalized["endDate"]),
+                        )
                     _validate_snapshot_membership_identity(quality_run, membership)
                     universe_hash = membership.universe_hash
-                    universe_columns = ("trade_date", "ts_code")
-                    universe_key = ("trade_date", "ts_code")
+                    if isinstance(membership, IndustryLevelMembershipResolution):
+                        universe_columns = (
+                            "trade_date",
+                            "ts_code",
+                            "industry_index_code",
+                        )
+                        universe_key = universe_columns
+                        universe_source_artifact = {
+                            "format": "database_industry_level_membership_v1",
+                            "source": "industry_classifications+industry_members",
+                            "classificationSource": membership.classification_source,
+                            "classificationLevel": membership.classification_level,
+                            "classificationSha256": membership.classification_sha256,
+                            "memberSha256": membership.member_sha256,
+                            "memberCount": len(membership.records),
+                            "uniqueMemberCount": len(membership.symbols),
+                        }
+                    else:
+                        universe_columns = ("trade_date", "ts_code")
+                        universe_key = ("trade_date", "ts_code")
+                        universe_source_artifact = {
+                            "format": "database_industry_membership_v1",
+                            "source": "industry_members",
+                            "sourceKey": membership.source_key,
+                            "memberSha256": membership.member_sha256,
+                            "memberCount": len(membership.records),
+                            "uniqueMemberCount": len(membership.symbols),
+                        }
                     universe_rows: Iterable[dict[str, object]] = membership.rows()
                     universe_pair_count = len(membership.records)
-                    universe_source_artifact = {
-                        "format": "database_industry_membership_v1",
-                        "source": "industry_members",
-                        "sourceKey": membership.source_key,
-                        "memberSha256": membership.member_sha256,
-                        "memberCount": len(membership.records),
-                        "uniqueMemberCount": len(membership.symbols),
-                    }
                 else:
                     universe_hash = normalized["universe"]["universeHash"]
                     universe_columns = ("ts_code",)
@@ -346,7 +386,12 @@ def verify_snapshot_identity(manifest: dict[str, Any]) -> None:
     artifacts = manifest["tableArtifacts"]
     expected_tables = {
         "etf_time_series": ETF_SNAPSHOT_TABLES,
-        "a_share_cross_section": A_SHARE_SNAPSHOT_TABLES,
+        "a_share_cross_section": (
+            A_SHARE_INDUSTRY_LEVEL_SNAPSHOT_TABLES
+            if (manifest.get("universeSourceArtifact") or {}).get("format")
+            == "database_industry_level_membership_v1"
+            else A_SHARE_SNAPSHOT_TABLES
+        ),
     }.get(manifest.get("scope"))
     if (
         expected_tables is None
@@ -404,6 +449,7 @@ def verify_materialized_inputs(
         if frozenset(table_artifacts) not in {
             frozenset(ETF_SNAPSHOT_TABLES),
             frozenset(A_SHARE_SNAPSHOT_TABLES),
+            frozenset(A_SHARE_INDUSTRY_LEVEL_SNAPSHOT_TABLES),
         }:
             raise SnapshotIntegrityError("冻结输入表集不完整")
         for name, artifact in table_artifacts.items():
@@ -433,7 +479,10 @@ def validate_quality_gate(registry_db: Session, config: dict[str, Any]) -> DataQ
         raise SnapshotError("质量运行 scope 与研究配置不一致")
     warmup_start = date.fromisoformat(config["warmupStart"])
     end_date = date.fromisoformat(config["endDate"])
-    if config["universe"]["mode"] == "industry_membership":
+    if config["universe"]["mode"] in {
+        "industry_membership",
+        "industry_level_membership",
+    }:
         if run.start_date != warmup_start or run.end_date != end_date:
             raise SnapshotError("A 股质量运行日期必须精确等于 warmupStart 到 endDate")
     elif run.start_date > warmup_start or run.end_date < end_date:
@@ -461,6 +510,27 @@ def validate_quality_gate(registry_db: Session, config: dict[str, Any]) -> DataQ
             or int(quality_config.get("universeUniqueMemberCount") or 0) <= 0
         ):
             raise SnapshotError("质量运行 industry_membership 身份不完整")
+    elif config["universe"]["mode"] == "industry_level_membership":
+        if (
+            quality_config.get("universeSource")
+            != "industry_classifications+industry_members"
+            or quality_config.get("universeClassificationSource")
+            != config["universe"]["classificationSource"]
+            or quality_config.get("universeClassificationLevel")
+            != config["universe"]["classificationLevel"]
+            or quality_config.get("universeAsOfDate") is not None
+            or quality_config.get("universeSourceSha256")
+            != quality_config.get("universeClassificationSha256")
+            or not SHA256_PATTERN.fullmatch(
+                str(quality_config.get("universeClassificationSha256") or "")
+            )
+            or not SHA256_PATTERN.fullmatch(
+                str(quality_config.get("universeMemberSha256") or "")
+            )
+            or int(quality_config.get("universeMemberCount") or 0) <= 0
+            or int(quality_config.get("universeUniqueMemberCount") or 0) <= 0
+        ):
+            raise SnapshotError("质量运行 industry_level_membership 身份不完整")
     else:
         if (
             quality_config.get("universeSourceSha256")
@@ -634,18 +704,31 @@ def _configure_snapshot_transaction(db: Session, statement_timeout_ms: int) -> N
 
 def _validate_snapshot_membership_identity(
     quality_run: DataQualityRun,
-    membership: IndustryMembershipResolution,
+    membership: IndustryMembershipResolution | IndustryLevelMembershipResolution,
 ) -> None:
     quality_config = quality_run.config or {}
-    expected = {
-        "universeSource": "industry_members",
-        "universeSourceKey": membership.source_key,
-        "universeSourceSha256": membership.member_sha256,
-        "universeMemberSha256": membership.member_sha256,
-        "universeMemberCount": len(membership.records),
-        "universeUniqueMemberCount": len(membership.symbols),
-        "universeHash": membership.universe_hash,
-    }
+    if isinstance(membership, IndustryLevelMembershipResolution):
+        expected = {
+            "universeSource": "industry_classifications+industry_members",
+            "universeClassificationSource": membership.classification_source,
+            "universeClassificationLevel": membership.classification_level,
+            "universeSourceSha256": membership.classification_sha256,
+            "universeClassificationSha256": membership.classification_sha256,
+            "universeMemberSha256": membership.member_sha256,
+            "universeMemberCount": len(membership.records),
+            "universeUniqueMemberCount": len(membership.symbols),
+            "universeHash": membership.universe_hash,
+        }
+    else:
+        expected = {
+            "universeSource": "industry_members",
+            "universeSourceKey": membership.source_key,
+            "universeSourceSha256": membership.member_sha256,
+            "universeMemberSha256": membership.member_sha256,
+            "universeMemberCount": len(membership.records),
+            "universeUniqueMemberCount": len(membership.symbols),
+            "universeHash": membership.universe_hash,
+        }
     actual = {key: quality_config.get(key) for key in expected}
     if actual != expected or quality_run.universe_hash != membership.universe_hash:
         raise SnapshotError("历史成员已变化，旧质量运行 universe 身份不可用于 snapshot")
@@ -653,7 +736,7 @@ def _validate_snapshot_membership_identity(
 
 def _build_snapshot_slices(
     config: dict[str, Any],
-    membership: IndustryMembershipResolution | None,
+    membership: IndustryMembershipResolution | IndustryLevelMembershipResolution | None,
 ) -> tuple[TableSlice, ...]:
     if config["scope"] == "etf_time_series":
         if membership is not None:
@@ -771,7 +854,7 @@ def _build_etf_slices(config: dict[str, Any]) -> tuple[TableSlice, ...]:
 
 def _build_a_share_slices(
     config: dict[str, Any],
-    membership: IndustryMembershipResolution,
+    membership: IndustryMembershipResolution | IndustryLevelMembershipResolution,
 ) -> tuple[TableSlice, ...]:
     members = membership.symbols
     benchmark = config["benchmark"]
@@ -816,6 +899,18 @@ def _build_a_share_slices(
         "out_date",
         "is_new",
     )
+    classification_columns = (
+        "index_code",
+        "industry_name",
+        "level",
+        "industry_code",
+        "parent_code",
+        "src",
+    )
+    if isinstance(membership, IndustryLevelMembershipResolution):
+        industry_codes = tuple(sorted({record[2] for record in membership.records}))
+    else:
+        industry_codes = (membership.source_key,)
     index_columns = (
         "ts_code",
         "name",
@@ -825,7 +920,7 @@ def _build_a_share_slices(
         "base_date",
         "list_date",
     )
-    return (
+    slices = (
         TableSlice(
             "trade_calendars",
             calendar_columns,
@@ -906,7 +1001,7 @@ def _build_a_share_slices(
             ("index_code", "con_code", "in_date"),
             select(*columns(IndustryMember, membership_columns))
             .where(
-                IndustryMember.index_code == membership.source_key,
+                IndustryMember.index_code.in_(industry_codes),
                 IndustryMember.con_code.in_(members),
                 IndustryMember.in_date <= end,
                 or_(IndustryMember.out_date.is_(None), IndustryMember.out_date >= start),
@@ -938,6 +1033,22 @@ def _build_a_share_slices(
             .order_by(IndexDailyBar.ts_code, IndexDailyBar.trade_date),
         ),
     )
+    if isinstance(membership, IndustryLevelMembershipResolution):
+        classification_slice = TableSlice(
+            "industry_classifications",
+            classification_columns,
+            ("index_code",),
+            select(*columns(IndustryClassification, classification_columns))
+            .where(
+                IndustryClassification.src == membership.classification_source,
+                IndustryClassification.level == membership.classification_level,
+            )
+            .order_by(IndustryClassification.index_code),
+        )
+        return (*slices[:6], classification_slice, *slices[6:])
+    return slices
+
+
 def _enforce_capacity(
     root: Path,
     slices: Iterable[TableSlice],

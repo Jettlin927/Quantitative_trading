@@ -9,7 +9,10 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from ..models import DataQualityResult, DataQualityRun
-from ..quant_research.universe import resolve_industry_membership
+from ..quant_research.universe import (
+    resolve_industry_level_membership,
+    resolve_industry_membership,
+)
 from .contracts import QualityCheckContract, QualityRuleResult, result_reference, summarize_quality_status
 from .rules import evaluate_quality_rules
 
@@ -84,6 +87,39 @@ def run_data_quality_check(
                             universe_hash=resolution.universe_hash,
                         )
                         results = evaluator(inspection_db, resolved_contract)
+                elif contract.universe_type == "industry_level_membership":
+                    try:
+                        resolution = resolve_industry_level_membership(
+                            inspection_db,
+                            contract.universe_classification_src or "",
+                            contract.universe_classification_level or "",
+                            contract.start_date,
+                            contract.end_date,
+                        )
+                    except ValueError as exc:
+                        results = [
+                            QualityRuleResult.blocked(
+                                "universe.membership_resolution",
+                                "industry_classifications+industry_members",
+                                failed_rows=1,
+                                sample_issues=[{"issue": str(exc)}],
+                            )
+                        ]
+                    else:
+                        resolved_contract = replace(
+                            contract,
+                            universe=resolution.symbols,
+                            universe_source_sha256=resolution.classification_sha256,
+                            universe_source_verified=True,
+                            universe_source_issue=None,
+                            universe_classification_sha256=resolution.classification_sha256,
+                            universe_member_sha256=resolution.member_sha256,
+                            universe_member_count=len(resolution.records),
+                            universe_unique_member_count=len(resolution.symbols),
+                            universe_membership_records=resolution.membership_records(),
+                            universe_hash=resolution.universe_hash,
+                        )
+                        results = evaluator(inspection_db, resolved_contract)
                 else:
                     results = evaluator(inspection_db, contract)
     except Exception as exc:  # noqa: BLE001
@@ -145,6 +181,9 @@ def build_quality_summary(results: list[QualityRuleResult], contract: QualityChe
         "benchmark": contract.benchmark,
         "universeHash": contract.universe_hash,
         "universeSourceKey": contract.universe_source_key,
+        "universeClassificationSource": contract.universe_classification_src,
+        "universeClassificationLevel": contract.universe_classification_level,
+        "universeClassificationSha256": contract.universe_classification_sha256,
         "universeMemberSha256": contract.universe_member_sha256,
         "universeMemberCount": contract.universe_member_count,
         "universeUniqueMemberCount": contract.universe_unique_member_count,
