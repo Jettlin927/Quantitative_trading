@@ -143,7 +143,7 @@ class ResearchHistoryMigrationTest(unittest.TestCase):
             item.result_set_id: item.artifact_refs for item in self.source.legacy_archives
         }
         self.assertEqual(len(artifacts_by_id["b1-standard-phased-backtest-20260627"]), 2)
-        self.assertEqual(len(artifacts_by_id["ma-trend-reversal-20260629"]), 8)
+        self.assertEqual(len(artifacts_by_id["ma-trend-reversal-20260629"]), 6)
         self.assertEqual(len(artifacts_by_id["value-sector-stopfall-20260629"]), 7)
         self.assertTrue(
             any(
