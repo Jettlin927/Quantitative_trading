@@ -3,9 +3,13 @@ from __future__ import annotations
 from alembic import command
 from contextlib import redirect_stdout
 from datetime import datetime
+import gzip
+from hashlib import sha256
 from io import StringIO
+import json
 import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 from uuid import NAMESPACE_URL, uuid5
@@ -36,6 +40,7 @@ from backend.app.research_history_migration import (
     render_migration_report_markdown,
 )
 from backend.app.research_analytics import get_publication_analytics
+from backend.app.quant_research.manifest import build_result_fingerprint
 from scripts.research import migrate_research_history as migration_cli
 
 
@@ -286,24 +291,79 @@ class ResearchHistoryMigrationTest(unittest.TestCase):
 
     def test_publication_analytics_reads_the_same_historical_evaluation(self) -> None:
         self.seed_runs()
-        with Session(self.engine) as db:
-            plan = build_history_migration_plan(db, self.source)
-            apply_history_migration(db, plan)
-            db.commit()
+        with TemporaryDirectory() as temporary_name:
+            with Session(self.engine) as db:
+                plan = build_history_migration_plan(db, self.source)
+                apply_history_migration(db, plan)
+                db.commit()
 
-            publication_id = db.scalar(
-                select(ResearchPublication.id)
-                .join(
-                    FormalResearch,
-                    FormalResearch.id == ResearchPublication.formal_research_id,
+                publication_id = db.scalar(
+                    select(ResearchPublication.id)
+                    .join(
+                        FormalResearch,
+                        FormalResearch.id == ResearchPublication.formal_research_id,
+                    )
+                    .join(
+                        FrozenResearchPlan,
+                        FrozenResearchPlan.id == FormalResearch.plan_id,
+                    )
+                    .where(FrozenResearchPlan.strategy_id == "etf_trend_120d")
                 )
-                .join(
-                    FrozenResearchPlan,
-                    FrozenResearchPlan.id == FormalResearch.plan_id,
+                run = db.get(
+                    ResearchRun,
+                    "73c82e27-754f-4f6a-bc85-4fc43c4b5be3",
                 )
-                .where(FrozenResearchPlan.strategy_id == "etf_trend_120d")
-            )
-            analytics = get_publication_analytics(db, str(publication_id))
+                root = Path(temporary_name)
+                nav_path = root / "nav.csv.gz"
+                with gzip.open(nav_path, "wt", encoding="utf-8", newline="") as handle:
+                    handle.write(
+                        "trade_date,nav,one_way_turnover,transaction_cost_rate,"
+                        "gross_exposure,cash_weight\n"
+                        "2025-01-02,1.0,0.0,0.0,0.0,1.0\n"
+                        "2025-01-03,0.9,0.5,0.01,0.5,0.5\n"
+                    )
+                with gzip.open(nav_path, "rb") as handle:
+                    content_sha256 = sha256(handle.read()).hexdigest()
+                targets_path = root / "targets.csv.gz"
+                targets_path.write_bytes(gzip.compress(b"targets"))
+                metrics_path = root / "metrics.json"
+                metrics_path.write_text("{}", encoding="utf-8")
+                artifact_hashes = {
+                    "nav.csv.gz": {
+                        "fileSha256": sha256(nav_path.read_bytes()).hexdigest(),
+                        "contentSha256": content_sha256,
+                    },
+                    "targets.csv.gz": {
+                        "fileSha256": sha256(targets_path.read_bytes()).hexdigest(),
+                        "contentSha256": sha256(b"targets").hexdigest(),
+                    },
+                    "metrics.json": {
+                        "fileSha256": sha256(metrics_path.read_bytes()).hexdigest(),
+                        "contentSha256": sha256(metrics_path.read_bytes()).hexdigest(),
+                    },
+                }
+                run.artifact_root = str(root)
+                run.result_fingerprint = build_result_fingerprint(artifact_hashes)
+                (root / "manifest.json").write_text(
+                    json.dumps(
+                        {
+                            "artifactSchemaVersion": 2,
+                            "runId": run.run_id,
+                            "strategyId": run.strategy_id,
+                            "codeCommit": run.code_commit,
+                            "configSha256": run.config_sha256,
+                            "randomSeed": run.random_seed,
+                            "reproducibilityKey": run.reproducibility_key,
+                            "resultFingerprint": run.result_fingerprint,
+                            "environment": {"sha256": run.environment_sha256},
+                            "dataSnapshot": {"snapshotId": run.data_snapshot_id},
+                            "artifactHashes": artifact_hashes,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                db.commit()
+                analytics = get_publication_analytics(db, str(publication_id))
 
         self.assertIsNotNone(analytics)
         self.assertEqual(analytics.data_status, "complete")
@@ -322,7 +382,11 @@ class ResearchHistoryMigrationTest(unittest.TestCase):
         self.assertTrue(analytics.yearly)
         self.assertTrue(analytics.regimes)
         self.assertEqual(analytics.availability["metrics"]["status"], "complete")
-        self.assertEqual(analytics.availability["nav"]["status"], "not_available")
+        self.assertEqual(analytics.availability["nav"]["status"], "complete")
+        self.assertEqual(analytics.chart_series["nav"][-1]["value"], 0.9)
+        self.assertEqual(
+            analytics.chart_series["cumulativeTurnover"][-1]["value"], 0.5
+        )
 
     def test_apply_keeps_mismatched_canonical_run_unpublished_and_records_gap(self) -> None:
         self.seed_runs(corrupt_first_fingerprint=True)

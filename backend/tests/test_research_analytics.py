@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import gzip
 from hashlib import sha256
 import json
@@ -75,6 +76,72 @@ class HistoricalResearchAnalyticsTest(unittest.TestCase):
                 self.assertTrue(analytics["regimes"])
                 self.assertEqual(analytics["provenance"]["sha256"], sha256(payload).hexdigest())
                 self.assertGreaterEqual(len(analytics["comparisons"]), 2)
+
+        volatility = build_historical_source_analytics(
+            "etf_volatility_managed",
+            json.loads(
+                (
+                    REPO_ROOT
+                    / by_strategy["etf_volatility_managed"].summary_uri.removeprefix(
+                        "repo://"
+                    )
+                ).read_text(encoding="utf-8")
+            ),
+            source_uri=by_strategy["etf_volatility_managed"].summary_uri,
+            source_sha256=by_strategy["etf_volatility_managed"].summary_sha256,
+        )
+        self.assertAlmostEqual(
+            volatility["metrics"]["averageOneWayTurnover"],
+            0.006197712755435061,
+        )
+        self.assertAlmostEqual(
+            volatility["metrics"]["cumulativeOneWayTurnover"],
+            21.20857304909878,
+        )
+        self.assertAlmostEqual(volatility["metrics"]["var95"], 0.01292668827761822)
+        self.assertAlmostEqual(volatility["metrics"]["maximumWeight"], 1.0)
+        self.assertAlmostEqual(
+            volatility["metrics"]["averageHhi"], 0.6755228131589232
+        )
+        self.assertEqual(volatility["capacity"]["status"], "not_available")
+        self.assertEqual(
+            volatility["capacity"]["reason"],
+            "未绑定目标资金规模与冲击模型",
+        )
+        self.assertEqual(volatility["robustness"]["walkForward"]["status"], "complete")
+        self.assertEqual(volatility["robustness"]["walkForward"]["windowCount"], 6)
+        self.assertEqual(volatility["robustness"]["dsr"]["status"], "complete")
+        self.assertEqual(volatility["robustness"]["pbo"]["status"], "complete")
+
+    def test_missing_benchmark_is_not_reported_as_complete(self) -> None:
+        source = next(
+            item
+            for item in self.source.current_research
+            if item.strategy_id == "etf_volatility_managed"
+        )
+        summary_path = REPO_ROOT / source.summary_uri.removeprefix("repo://")
+        summary = deepcopy(json.loads(summary_path.read_text(encoding="utf-8")))
+        passive = next(
+            item for item in summary["comparison"] if item["label"] == "被动 ETF"
+        )
+        del passive["totalReturn"]
+
+        analytics = build_historical_source_analytics(
+            source.strategy_id,
+            summary,
+            source_uri=source.summary_uri,
+            source_sha256=source.summary_sha256,
+        )
+
+        self.assertEqual(analytics["dataStatus"], "not_available")
+        self.assertEqual(
+            analytics["metricAvailability"]["benchmarkTotalReturn"]["status"],
+            "not_available",
+        )
+        self.assertIn(
+            "匹配基准累计收益",
+            analytics["metricAvailability"]["benchmarkTotalReturn"]["reason"],
+        )
 
     def test_unknown_historical_strategy_is_not_inferred(self) -> None:
         with self.assertRaisesRegex(HistoricalAnalyticsError, "没有冻结适配器"):
