@@ -357,6 +357,74 @@ class SyncJobTest(unittest.TestCase):
             {"legacy_unverified", "observed"},
         )
 
+    def test_market_fundamentals_refreshes_stocks_with_observed_revisions(self):
+        class Frame:
+            @staticmethod
+            def to_dict(_kind):
+                return [
+                    {
+                        "ts_code": "000001.SZ",
+                        "ann_date": "20260711",
+                        "end_date": "20260630",
+                        "roe": "12.0",
+                        "update_flag": "1",
+                    }
+                ]
+
+        pro = Mock()
+        pro.fina_indicator.return_value = Frame()
+        with self.Session.begin() as db:
+            db.add_all(
+                [
+                    Stock(ts_code="000001.SZ", name="A"),
+                    StockFinancialIndicator(
+                        ts_code="000001.SZ",
+                        ann_date=date(2026, 7, 11),
+                        end_date=date(2026, 6, 30),
+                        roe=10,
+                        source_revision_sha256="a" * 64,
+                        source_observed_at=datetime(
+                            2026,
+                            7,
+                            20,
+                            10,
+                            tzinfo=timezone.utc,
+                        ),
+                        available_from=date(2026, 7, 21),
+                        revision_status="observed",
+                    ),
+                    TradeCalendar(
+                        exchange="SSE",
+                        cal_date=date(2026, 7, 22),
+                        is_open=True,
+                    ),
+                ]
+            )
+        payload = SyncMarketFundamentalsRequest(
+            start_date=date(2026, 7, 11),
+            end_date=date(2026, 7, 11),
+            max_stocks=1,
+            rate_per_minute=120,
+            skip_existing=True,
+        )
+
+        with self.Session() as db, patch.object(
+            main,
+            "get_pro_api",
+            return_value=pro,
+        ), patch.object(
+            main,
+            "utc_now",
+            return_value=datetime(2026, 7, 21, 10, tzinfo=timezone.utc),
+        ):
+            result = main.sync_market_fundamentals(payload, db)
+            history = main.get_stock_financial_history("000001.SZ", db=db)
+
+        self.assertEqual(pro.fina_indicator.call_count, 1)
+        self.assertEqual(result["skipped_stocks"], 0)
+        self.assertEqual(result["rows_upserted"], 1)
+        self.assertEqual([row["roe"] for row in history], [10.0, 12.0])
+
     def test_missing_job_and_invalid_payload_are_rejected(self):
         with self.Session() as db:
             with self.assertRaises(HTTPException) as missing:

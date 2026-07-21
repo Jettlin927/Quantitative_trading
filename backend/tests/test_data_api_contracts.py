@@ -241,6 +241,54 @@ class DataApiContractTest(unittest.TestCase):
         )
         self.assertTrue(all(row["revisionStatus"] == "observed" for row in rows))
 
+    def test_latest_fundamentals_returns_the_latest_available_revision(self):
+        with self.Session.begin() as db:
+            db.add_all(
+                [
+                    StockFinancialIndicator(
+                        ts_code="000001.SZ",
+                        ann_date=date(2026, 7, 20),
+                        end_date=date(2026, 6, 30),
+                        eps="0.25",
+                        source_revision_sha256="a" * 64,
+                        source_observed_at=datetime(
+                            2026,
+                            7,
+                            21,
+                            10,
+                            tzinfo=timezone.utc,
+                        ),
+                        available_from=date(2026, 7, 22),
+                        revision_status="observed",
+                    ),
+                    StockFinancialIndicator(
+                        ts_code="000001.SZ",
+                        ann_date=date(2026, 7, 20),
+                        end_date=date(2026, 6, 30),
+                        eps="0.30",
+                        source_revision_sha256="b" * 64,
+                        source_observed_at=datetime(
+                            2026,
+                            7,
+                            22,
+                            10,
+                            tzinfo=timezone.utc,
+                        ),
+                        available_from=date(2026, 7, 23),
+                        revision_status="observed",
+                    ),
+                ]
+            )
+
+        with self.Session() as db:
+            fundamentals = main.get_stock_fundamentals("000001.SZ", db=db)
+
+        self.assertEqual(fundamentals.financial["eps"], 0.3)
+        self.assertEqual(
+            fundamentals.financial["sourceRevisionSha256"],
+            "b" * 64,
+        )
+
     def test_fundamental_sync_observes_one_immutable_revision_for_duplicate_flags(self):
         observed_at = datetime(2026, 7, 21, 10, 0, tzinfo=timezone.utc)
         pro = Mock()

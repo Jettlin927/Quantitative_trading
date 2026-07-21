@@ -676,18 +676,6 @@ def sync_market_fundamentals(payload: SyncMarketFundamentalsRequest, db: Session
     request_interval = 60.0 / payload.rate_per_minute
     last_request_at: float | None = None
     for ts_code in stocks:
-        if payload.skip_existing:
-            existing = db.scalar(
-                select(func.count(StockFinancialIndicator.id)).where(
-                    StockFinancialIndicator.ts_code == ts_code,
-                    StockFinancialIndicator.ann_date >= payload.start_date,
-                    StockFinancialIndicator.ann_date <= payload.end_date,
-                    StockFinancialIndicator.revision_status == "observed",
-                )
-            )
-            if existing:
-                skipped_stocks += 1
-                continue
         try:
             if last_request_at is not None:
                 wait_seconds = request_interval - (time.monotonic() - last_request_at)
@@ -988,7 +976,18 @@ def get_daily_bars(
 def get_stock_fundamentals(ts_code: str, db: Session = Depends(get_db)) -> StockFundamentalsOut:
     code = ts_code.upper()
     valuation = db.scalars(select(StockDailyBasic).where(StockDailyBasic.ts_code == code).order_by(StockDailyBasic.trade_date.desc()).limit(1)).first()
-    financial = db.scalars(select(StockFinancialIndicator).where(StockFinancialIndicator.ts_code == code).order_by(StockFinancialIndicator.ann_date.desc()).limit(1)).first()
+    financial = db.scalars(
+        select(StockFinancialIndicator)
+        .where(StockFinancialIndicator.ts_code == code)
+        .order_by(
+            StockFinancialIndicator.ann_date.desc(),
+            StockFinancialIndicator.end_date.desc(),
+            StockFinancialIndicator.available_from.desc().nullslast(),
+            StockFinancialIndicator.source_observed_at.desc().nullslast(),
+            StockFinancialIndicator.id.desc(),
+        )
+        .limit(1)
+    ).first()
     return StockFundamentalsOut(ts_code=code, valuation=daily_basic_to_dict(valuation), financial=financial_indicator_to_dict(financial))
 
 
@@ -2318,8 +2317,8 @@ def query_stock_financial_history(
             stmt.order_by(
                 StockFinancialIndicator.ann_date.desc(),
                 StockFinancialIndicator.end_date.desc(),
-                StockFinancialIndicator.available_from.desc(),
-                StockFinancialIndicator.source_observed_at.desc(),
+                StockFinancialIndicator.available_from.desc().nullslast(),
+                StockFinancialIndicator.source_observed_at.desc().nullslast(),
                 StockFinancialIndicator.id.desc(),
             ).limit(min(max(limit, 1), 1000))
         ).all()

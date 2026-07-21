@@ -50,24 +50,6 @@ def load_stock_codes(max_stocks: int, start_after: str) -> list[str]:
         return list(db.scalars(stmt).all())
 
 
-def has_existing_rows(ts_code: str, start_date: date, end_date: date) -> bool:
-    from sqlalchemy import func, select
-
-    from backend.app.database import SessionLocal
-    from backend.app.models import StockFinancialIndicator
-
-    with SessionLocal() as db:
-        existing = db.scalar(
-            select(func.count(StockFinancialIndicator.id)).where(
-                StockFinancialIndicator.ts_code == ts_code,
-                StockFinancialIndicator.ann_date >= start_date,
-                StockFinancialIndicator.ann_date <= end_date,
-                StockFinancialIndicator.revision_status == "observed",
-            )
-        )
-        return bool(existing)
-
-
 def sync_one_stock(pro: Any, ts_code: str, start_date: date, end_date: date) -> int:
     from backend.app.database import SessionLocal
     from backend.app.main import (
@@ -174,12 +156,8 @@ def main() -> int:
         next_allowed_at = request_started_at + interval_seconds
 
         try:
-            if args.skip_existing and has_existing_rows(ts_code, args.start_date, args.end_date):
-                skipped_stocks += 1
-                upserted = 0
-            else:
-                upserted = sync_one_stock(pro, ts_code, args.start_date, args.end_date)
-                rows_upserted += upserted
+            upserted = sync_one_stock(pro, ts_code, args.start_date, args.end_date)
+            rows_upserted += upserted
         except Exception as exc:  # noqa: BLE001
             failed_stocks.append(f"{ts_code}:{exc}")
             upserted = 0
