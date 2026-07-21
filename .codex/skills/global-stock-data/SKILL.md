@@ -6,7 +6,7 @@ version: 1.0.1
 ---
 
 > 📦 项目主页：https://github.com/simonlin1212/global-stock-data — 更新、反馈、支持作者
-> 
+>
 > 作者：Simon 林 · 抖音「Simon林」· 公众号「硅基世纪」
 
 # 美股港股全栈数据工具包 V1.0.1
@@ -133,18 +133,18 @@ def get_yahoo_session() -> requests.Session:
     global _yahoo_session
     if _yahoo_session and hasattr(_yahoo_session, '_crumb'):
         return _yahoo_session
-    
+
     s = requests.Session()
     s.headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-    
+
     # Step 1: 获取 cookie
     s.get('https://fc.yahoo.com', timeout=10)
-    
+
     # Step 2: 获取 crumb
     r = s.get('https://query2.finance.yahoo.com/v1/test/getcrumb', timeout=10)
     r.raise_for_status()
     s._crumb = r.text
-    
+
     _yahoo_session = s
     return s
 
@@ -206,15 +206,15 @@ def us_stock_quote_sina(ticker: str) -> dict:
     }, timeout=10)
     r.encoding = "gbk"
     text = r.text
-    
+
     m = re.search(r'"(.+)"', text)
     if not m:
         return {}
-    
+
     fields = m.group(1).split(",")
     if len(fields) < 30:
         return {}
-    
+
     return {
         "name": fields[0],           # 中文名
         "price": float(fields[1]),    # 最新价
@@ -242,15 +242,15 @@ def us_stock_quote_tencent(ticker: str) -> dict:
     r = requests.get(url, timeout=10)
     r.encoding = "gbk"
     text = r.text
-    
+
     m = re.search(r'"(.+)"', text)
     if not m:
         return {}
-    
+
     fields = m.group(1).split("~")
     if len(fields) < 50:
         return {}
-    
+
     return {
         "name": fields[1],           # 中文名
         "name_en": fields[27],       # 英文名
@@ -282,15 +282,15 @@ def hk_stock_quote_tencent(code: str) -> dict:
     r = requests.get(url, timeout=10)
     r.encoding = "gbk"
     text = r.text
-    
+
     m = re.search(r'"(.+)"', text)
     if not m:
         return {}
-    
+
     fields = m.group(1).split("~")
     if len(fields) < 50:
         return {}
-    
+
     return {
         "name": fields[1],           # 中文名
         "name_en": fields[2],        # 英文名
@@ -323,15 +323,15 @@ def hk_stock_quote_sina(code: str) -> dict:
     }, timeout=10)
     r.encoding = "gbk"
     text = r.text
-    
+
     m = re.search(r'"(.+)"', text)
     if not m:
         return {}
-    
+
     fields = m.group(1).split(",")
     if len(fields) < 15:
         return {}
-    
+
     return {
         "name_en": fields[0],
         "name": fields[1],           # 中文名
@@ -359,7 +359,7 @@ def stock_quote_eastmoney(ticker_or_code: str, secid_prefix: int = 105) -> dict:
           stock_quote_eastmoney("BABA", 106)  # NYSE
     港股: stock_quote_eastmoney("00700", 116)
     返回: 最新价/开高低收/成交量/成交额/换手率/涨跌幅/中文名
-    
+
     secid_prefix 说明: 105=NASDAQ, 106=NYSE, 107=US_ETF, 116=港股
     如不确定前缀，先调 stock_search() 获取 mkt_num
     """
@@ -372,17 +372,17 @@ def stock_quote_eastmoney(ticker_or_code: str, secid_prefix: int = 105) -> dict:
     d = r.json().get("data")
     if not d:
         return {}
-    
+
     # f59 = 小数位数, 价格字段需除以 10^f59 还原真实值
     dec = d.get("f59", 3)
     divisor = 10 ** dec
-    
+
     def _p(key):
         v = d.get(key)
         if v is None or v == "-":
             return None
         return round(v / divisor, dec)
-    
+
     return {
         "code": d.get("f57"),           # 股票代码
         "name": d.get("f58"),           # 中文名
@@ -419,13 +419,13 @@ def us_stock_kline_sina(ticker: str, num: int = 120) -> list[dict]:
     params = {"symbol": ticker.upper(), "num": num}
     r = requests.get(url, params=params, headers={"Referer": "https://finance.sina.com.cn/"}, timeout=15)
     text = r.text
-    
+
     # 解析 JSONP: var=([{...},...])
     import json
     m = re.search(r'\((\[.+\])\)', text)
     if not m:
         return []
-    
+
     items = json.loads(m.group(1))
     result = []
     for item in items:
@@ -455,12 +455,12 @@ def stock_kline_yahoo(symbol: str, interval: str = "1d",
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
     }, timeout=15)
     r.raise_for_status()
-    
+
     d = r.json()
     chart = d.get("chart", {}).get("result", [{}])[0]
     timestamps = chart.get("timestamp", [])
     quote = chart.get("indicators", {}).get("quote", [{}])[0]
-    
+
     from datetime import datetime
     result = []
     for i, ts in enumerate(timestamps):
@@ -518,11 +518,11 @@ def calc_ma(klines: list[dict], periods: list[int] = None) -> list[dict]:
     if periods is None:
         periods = [5, 10, 20, 60]
     closes = [k["close"] for k in klines]
-    
+
     # EMA 12/26（MACD 常用）
     ema12 = _ema(closes, 12)
     ema26 = _ema(closes, 26)
-    
+
     result = []
     for i, k in enumerate(klines):
         row = {"date": k["date"], "close": k["close"]}
@@ -547,7 +547,7 @@ def calc_macd(klines: list[dict], fast: int = 12, slow: int = 26,
     klines: K线数据
     fast/slow/signal: 快线/慢线/信号线周期（默认 12/26/9）
     返回: [{date, close, dif, dea, macd_hist}, ...]
-    
+
     dif = EMA(fast) - EMA(slow)        金叉/死叉看 dif 穿越 dea
     dea = EMA(signal) of dif           信号线
     macd_hist = (dif - dea) * 2        柱状图（红涨绿跌）
@@ -555,10 +555,10 @@ def calc_macd(klines: list[dict], fast: int = 12, slow: int = 26,
     closes = [k["close"] for k in klines]
     ema_fast = _ema(closes, fast)
     ema_slow = _ema(closes, slow)
-    
+
     dif = [round(f - s, 4) for f, s in zip(ema_fast, ema_slow)]
     dea = _ema(dif, signal)
-    
+
     result = []
     for i, k in enumerate(klines):
         result.append({
@@ -581,19 +581,19 @@ def calc_rsi(klines: list[dict],
     klines: K线数据
     periods: 周期列表（默认 [6, 12, 24]）
     返回: [{date, close, rsi6, rsi12, rsi24}, ...]
-    
+
     RSI > 70 超买区（可能回调）
     RSI < 30 超卖区（可能反弹）
     """
     if periods is None:
         periods = [6, 12, 24]
     closes = [k["close"] for k in klines]
-    
+
     # 涨跌额序列
     changes = [0.0] + [closes[i] - closes[i - 1] for i in range(1, len(closes))]
     gains = [max(c, 0) for c in changes]
     losses = [max(-c, 0) for c in changes]
-    
+
     result = []
     for i, k in enumerate(klines):
         row = {"date": k["date"], "close": k["close"]}
@@ -623,29 +623,29 @@ def calc_kdj(klines: list[dict], n: int = 9,
     n: RSV 周期（默认9）
     m1/m2: K/D 平滑系数（默认3/3）
     返回: [{date, close, k, d, j}, ...]
-    
+
     K/D > 80 超买，K/D < 20 超卖
     J > 100 或 J < 0 为极端信号
     金叉: K 上穿 D；死叉: K 下穿 D
     """
     k_val, d_val = 50.0, 50.0
     result = []
-    
+
     for i, kline in enumerate(klines):
         if i < n - 1:
             result.append({"date": kline["date"], "close": kline["close"],
                            "k": None, "d": None, "j": None})
             continue
-        
+
         window = klines[i - n + 1:i + 1]
         high_n = max(w["high"] for w in window)
         low_n = min(w["low"] for w in window)
-        
+
         rsv = (kline["close"] - low_n) / (high_n - low_n) * 100 if high_n != low_n else 50.0
         k_val = (1 / m1) * rsv + (1 - 1 / m1) * k_val
         d_val = (1 / m2) * k_val + (1 - 1 / m2) * d_val
         j_val = 3 * k_val - 2 * d_val
-        
+
         result.append({
             "date": kline["date"],
             "close": kline["close"],
@@ -667,27 +667,27 @@ def calc_boll(klines: list[dict], period: int = 20,
     period: 中轨 MA 周期（默认20）
     num_std: 标准差倍数（默认2）
     返回: [{date, close, upper, middle, lower, bandwidth}, ...]
-    
+
     价格触及 upper → 可能超买
     价格触及 lower → 可能超卖
     bandwidth 收窄 → 即将变盘
     """
     closes = [k["close"] for k in klines]
     result = []
-    
+
     for i, k in enumerate(klines):
         if i < period - 1:
             result.append({"date": k["date"], "close": k["close"],
                            "upper": None, "middle": None, "lower": None,
                            "bandwidth": None})
             continue
-        
+
         window = closes[i - period + 1:i + 1]
         ma = sum(window) / period
         std = (sum((x - ma) ** 2 for x in window) / period) ** 0.5
         upper = ma + num_std * std
         lower = ma - num_std * std
-        
+
         result.append({
             "date": k["date"],
             "close": k["close"],
@@ -715,7 +715,7 @@ def financial_statements_eastmoney(secucode: str, statement: str = "balance",
     secucode: "AAPL.O" (NASDAQ) / "BABA.N" (NYSE) / "00700.HK" (港股)
     statement: "balance" / "income" / "cashflow"
     返回: [{ITEM_NAME, AMOUNT, YOY_RATIO, REPORT, REPORT_DATE, ...}, ...]
-    
+
     注意: 数据按科目行展开，每行一个科目（如"流动资产合计"、"营业收入"等），
     同一期报告有多行。用 REPORT_DATE 分组可还原整张报表。
     """
@@ -725,10 +725,10 @@ def financial_statements_eastmoney(secucode: str, statement: str = "balance",
         "income":  {"us": "RPT_USF10_FN_INCOME",  "hk": "RPT_HKF10_FN_INCOME"},
         "cashflow": {"us": "RPT_USSK_FN_CASHFLOW", "hk": "RPT_HKSK_FN_CASHFLOW"},
     }
-    
+
     market = "hk" if secucode.endswith(".HK") else "us"
     report_name = report_map[statement][market]
-    
+
     return eastmoney_datacenter(
         report_name=report_name,
         filter_str=f'(SECUCODE="{secucode}")',
@@ -755,19 +755,19 @@ def key_indicators_eastmoney(secucode: str, page_size: int = 4) -> list[dict]:
     secucode: "AAPL.O" (NASDAQ) / "BABA.N" (NYSE) / "00700.HK" (港股)
     page_size: 返回最近几期报告（默认4期=一年）
     返回: [{REPORT_DATE, OPERATE_INCOME, BASIC_EPS, ROE_AVG, ROA, ...}, ...]
-    
+
     美股核心字段(49): OPERATE_INCOME(营收), GROSS_PROFIT(毛利), GROSS_PROFIT_RATIO(毛利率%),
       PARENT_HOLDER_NETPROFIT(归母净利), NET_PROFIT_RATIO(净利率%), BASIC_EPS, DILUTED_EPS,
       ROE_AVG(平均ROE%), ROA(%), CURRENT_RATIO(流动比率), DEBT_ASSET_RATIO(资产负债率%),
       OPERATE_INCOME_YOY(营收同比%), BASIC_EPS_YOY(EPS同比%)
-    
+
     港股额外字段(75): BPS(每股净资产), ROIC(投入资本回报率), EQUITY_RATIO(产权比率),
       HOLDER_PROFIT(股东应占溢利), OCF_SALES(经营现金流/营收%), DPS_HKD(每股股息),
       DIVI_RATIO(股息率%), PER_NETCASH_OPERATE(每股经营现金流)
     """
     market = "hk" if secucode.endswith(".HK") else "us"
     report_name = f"RPT_{'HK' if market == 'hk' else 'US'}F10_FN_GMAININDICATOR"
-    
+
     return eastmoney_datacenter(
         report_name=report_name,
         filter_str=f'(SECUCODE="{secucode}")',
@@ -789,15 +789,15 @@ def key_statistics(symbol: str) -> dict:
     返回: PE/PB/EV/EBITDA/利润率/目标价/ROE/Beta 等
     """
     data = yahoo_quote_summary(symbol, ["financialData", "defaultKeyStatistics", "summaryDetail"])
-    
+
     fd = data.get("financialData", {})
     ks = data.get("defaultKeyStatistics", {})
     sd = data.get("summaryDetail", {})
-    
+
     def _val(d, key):
         v = d.get(key, {})
         return v.get("raw") if isinstance(v, dict) else v
-    
+
     return {
         # 价格相关
         "current_price": _val(fd, "currentPrice"),
@@ -805,7 +805,7 @@ def key_statistics(symbol: str) -> dict:
         "target_low": _val(fd, "targetLowPrice"),
         "target_mean": _val(fd, "targetMeanPrice"),
         "recommendation": fd.get("recommendationKey"),  # buy/hold/sell
-        
+
         # 估值指标
         "trailing_pe": _val(sd, "trailingPE"),
         "forward_pe": _val(ks, "forwardPE"),
@@ -814,26 +814,26 @@ def key_statistics(symbol: str) -> dict:
         "enterprise_value": _val(ks, "enterpriseValue"),
         "ev_to_ebitda": _val(ks, "enterpriseToEbitda"),
         "ev_to_revenue": _val(ks, "enterpriseToRevenue"),
-        
+
         # 盈利能力
         "profit_margin": _val(ks, "profitMargins"),
         "operating_margin": _val(fd, "operatingMargins"),
         "gross_margin": _val(fd, "grossMargins"),
         "return_on_equity": _val(fd, "returnOnEquity"),
         "return_on_assets": _val(fd, "returnOnAssets"),
-        
+
         # 成长性
         "earnings_growth": _val(fd, "earningsGrowth"),
         "revenue_growth": _val(fd, "revenueGrowth"),
-        
+
         # 风险
         "beta": _val(ks, "beta"),
         "short_ratio": _val(ks, "shortRatio"),
-        
+
         # 股息
         "dividend_yield": _val(sd, "dividendYield"),
         "payout_ratio": _val(ks, "payoutRatio"),
-        
+
         # 规模
         "market_cap": _val(sd, "marketCap"),
         "total_revenue": _val(fd, "totalRevenue"),
@@ -854,7 +854,7 @@ def analyst_estimates(symbol: str) -> dict:
         "earningsTrend", "recommendationTrend", "upgradeDowngradeHistory",
         "earnings", "earningsHistory",
     ])
-    
+
     # EPS 趋势
     et = data.get("earningsTrend", {}).get("trend", [])
     eps_trend = []
@@ -868,7 +868,7 @@ def analyst_estimates(symbol: str) -> dict:
             "revenue_estimate": t.get("revenueEstimate", {}).get("avg", {}).get("raw"),
             "num_analysts": t.get("earningsEstimate", {}).get("numberOfAnalysts", {}).get("raw"),
         })
-    
+
     # 评级趋势 (最近4个月)
     rt = data.get("recommendationTrend", {}).get("trend", [])
     rating_trend = []
@@ -881,7 +881,7 @@ def analyst_estimates(symbol: str) -> dict:
             "sell": r_.get("sell"),
             "strong_sell": r_.get("strongSell"),
         })
-    
+
     # 升降级历史 (最近20条)
     udh = data.get("upgradeDowngradeHistory", {}).get("history", [])[:20]
     upgrades = []
@@ -893,7 +893,7 @@ def analyst_estimates(symbol: str) -> dict:
             "from_grade": u.get("fromGrade"),
             "action": u.get("action"),  # up/down/main/init
         })
-    
+
     return {
         "eps_trend": eps_trend,
         "rating_trend": rating_trend,
@@ -910,20 +910,20 @@ def institutional_holders(symbol: str) -> dict:
     symbol: "AAPL" 或 "0700.HK"
     """
     data = yahoo_quote_summary(symbol, ["institutionOwnership", "majorHoldersBreakdown"])
-    
+
     # 持股比例总览
     mhb = data.get("majorHoldersBreakdown", {})
     def _val(d, key):
         v = d.get(key, {})
         return v.get("raw") if isinstance(v, dict) else v
-    
+
     overview = {
         "insiders_pct": _val(mhb, "insidersPercentHeld"),
         "institutions_pct": _val(mhb, "institutionsPercentHeld"),
         "institutions_float_pct": _val(mhb, "institutionsFloatPercentHeld"),
         "institutions_count": _val(mhb, "institutionsCount"),
     }
-    
+
     # 前10大机构
     io = data.get("institutionOwnership", {}).get("ownershipList", [])
     top_holders = []
@@ -935,7 +935,7 @@ def institutional_holders(symbol: str) -> dict:
             "pct_held": _val(h, "pctHeld"),
             "report_date": h.get("reportDate", {}).get("fmt") if isinstance(h.get("reportDate"), dict) else None,
         })
-    
+
     return {"overview": overview, "top_holders": top_holders}
 ```
 
@@ -958,7 +958,7 @@ def financial_statements_yahoo(symbol: str,
         f"balanceSheetHistory{suffix}",
         f"cashflowStatementHistory{suffix}",
     ])
-    
+
     def _extract(statements):
         result = []
         for stmt in statements:
@@ -972,11 +972,11 @@ def financial_statements_yahoo(symbol: str,
                     row[k] = v
             result.append(row)
         return result
-    
+
     income_key = f"incomeStatementHistory{suffix}"
     balance_key = f"balanceSheetHistory{suffix}"
     cashflow_key = f"cashflowStatementHistory{suffix}"
-    
+
     return {
         "income": _extract(data.get(income_key, {}).get("incomeStatementHistory", [])),
         "balance": _extract(data.get(balance_key, {}).get("balanceSheetStatements", [])),
@@ -1013,7 +1013,7 @@ def fund_flow_daily(ticker_or_code: str, secid_prefix: int = 105,
     data = d.get("data")
     if not data or not data.get("klines"):
         return []
-    
+
     result = []
     for line in data["klines"]:
         parts = line.split(",")
@@ -1049,16 +1049,16 @@ def options_chain(symbol: str, expiration: int = None) -> dict:
     params = {"crumb": s._crumb}
     if expiration:
         params["date"] = expiration
-    
+
     r = s.get(f"https://query2.finance.yahoo.com/v7/finance/options/{symbol}",
               params=params, timeout=15)
     r.raise_for_status()
-    
+
     oc = r.json().get("optionChain", {}).get("result", [{}])[0]
-    
+
     exp_dates = oc.get("expirationDates", [])
     options = oc.get("options", [{}])[0] if oc.get("options") else {}
-    
+
     def _parse_options(opts):
         result = []
         for o in opts:
@@ -1078,7 +1078,7 @@ def options_chain(symbol: str, expiration: int = None) -> dict:
                 "contract_symbol": o.get("contractSymbol"),
             })
         return result
-    
+
     return {
         "expiration_dates": exp_dates,  # Unix timestamps, 可依次传入获取各期
         "calls": _parse_options(options.get("calls", [])),
@@ -1107,16 +1107,16 @@ def sec_filings(cik: str, form_type: str = None) -> dict:
     url = f"https://data.sec.gov/submissions/CIK{cik}.json"
     r = requests.get(url, headers=SEC_HEADERS, timeout=15)
     r.raise_for_status()
-    
+
     data = r.json()
     recent = data.get("filings", {}).get("recent", {})
-    
+
     forms = recent.get("form", [])
     dates = recent.get("filingDate", [])
     accessions = recent.get("accessionNumber", [])
     primary_docs = recent.get("primaryDocument", [])
     descriptions = recent.get("primaryDocDescription", [])
-    
+
     filings = []
     for i in range(len(forms)):
         if form_type and forms[i] != form_type:
@@ -1129,7 +1129,7 @@ def sec_filings(cik: str, form_type: str = None) -> dict:
             "description": descriptions[i] if i < len(descriptions) else "",
             "url": f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accessions[i].replace('-', '')}/{primary_docs[i]}" if i < len(primary_docs) and primary_docs[i] else "",
         })
-    
+
     return {
         "company_name": data.get("name"),
         "cik": cik,
@@ -1150,16 +1150,16 @@ def sec_xbrl_facts(cik: str, metrics: list[str] = None) -> dict:
     metrics: 要提取的指标名，如 ["RevenueFromContractWithCustomerExcludingAssessedTax",
              "NetIncomeLoss", "EarningsPerShareDiluted"]
              不传则返回所有可用指标名列表
-    
+
     返回: {"company": ..., "metrics": {"Revenue": [{end, val, form, filed}, ...], ...}}
     """
     url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
     r = requests.get(url, headers=SEC_HEADERS, timeout=15)
     r.raise_for_status()
-    
+
     facts = r.json()
     us_gaap = facts.get("facts", {}).get("us-gaap", {})
-    
+
     # 如果不传 metrics，返回所有可用指标
     if not metrics:
         available = []
@@ -1172,7 +1172,7 @@ def sec_xbrl_facts(cik: str, metrics: list[str] = None) -> dict:
             "total_metrics": len(available),
             "available_metrics": available,
         }
-    
+
     # 提取指定指标
     result = {}
     for metric_name in metrics:
@@ -1180,14 +1180,14 @@ def sec_xbrl_facts(cik: str, metrics: list[str] = None) -> dict:
         if not metric:
             result[metric_name] = []
             continue
-        
+
         # 自动选择单位（USD 或 USD/shares）
         units = metric.get("units", {})
         unit_key = "USD" if "USD" in units else list(units.keys())[0] if units else None
         if not unit_key:
             result[metric_name] = []
             continue
-        
+
         entries = units[unit_key]
         # 只取 10-K 和 10-Q
         filtered = [e for e in entries if e.get("form") in ("10-K", "10-Q")]
@@ -1199,7 +1199,7 @@ def sec_xbrl_facts(cik: str, metrics: list[str] = None) -> dict:
             "fy": e.get("fy"),
             "fp": e.get("fp"),
         } for e in filtered[-20:]]  # 最近20条
-    
+
     return {
         "company": facts.get("entityName"),
         "metrics": result,
@@ -1237,7 +1237,7 @@ def stock_search(keyword: str, count: int = 10) -> list[dict]:
     东财股票搜索 — 支持中英文，返回代码+市场+中文名
     keyword: "AAPL" / "苹果" / "Tencent" / "00700" / "特斯拉"
     返回: [{code, name, mkt_num, market_name, security_type}, ...]
-    
+
     mkt_num 即 push2/push2his 的 secid 前缀:
     105=NASDAQ, 106=NYSE, 107=美股ETF, 116=港股
     """
@@ -1253,7 +1253,7 @@ def stock_search(keyword: str, count: int = 10) -> list[dict]:
     }
     r = requests.get(url, params=params, timeout=10)
     d = r.json()
-    
+
     suggestions = d.get("QuotationCodeTable", {}).get("Data", [])
     result = []
     for s in suggestions:
@@ -1261,7 +1261,7 @@ def stock_search(keyword: str, count: int = 10) -> list[dict]:
         # 只保留美股和港股
         if str(mkt) not in ("105", "106", "107", "116"):
             continue
-        
+
         market_map = {"105": "NASDAQ", "106": "NYSE", "107": "US_OTHER", "116": "HK"}
         result.append({
             "code": s.get("Code"),
@@ -1286,12 +1286,12 @@ def stock_news(keyword: str, count: int = 10) -> list[dict]:
     s = requests.Session()
     s.headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
     s.get("https://fc.yahoo.com", timeout=10)  # 获取 cookie
-    
+
     url = "https://query2.finance.yahoo.com/v1/finance/search"
     params = {"q": keyword, "quotesCount": 0, "newsCount": count}
     r = s.get(url, params=params, timeout=10)
     r.raise_for_status()
-    
+
     news = r.json().get("news", [])
     result = []
     for n in news:
@@ -1315,7 +1315,7 @@ def ticker_to_cik(ticker: str) -> dict:
     SEC EDGAR ticker → CIK 映射
     ticker: 如 "AAPL", "TSLA", "MSFT"
     返回: {"ticker": "AAPL", "cik": "0000320193", "company": "Apple Inc."}
-    
+
     首次调用下载完整映射表(~10KB JSON, 10000+公司)并缓存。
     """
     global _cik_cache
@@ -1324,7 +1324,7 @@ def ticker_to_cik(ticker: str) -> dict:
                          headers=SEC_HEADERS, timeout=15)
         r.raise_for_status()
         _cik_cache = r.json()
-    
+
     ticker_upper = ticker.upper()
     for _, v in _cik_cache.items():
         if v.get("ticker") == ticker_upper:
@@ -1351,7 +1351,7 @@ def market_stock_list(market: str = "us_nasdaq", sort_field: str = "f3",
     sort_desc: True=降序(默认), False=升序
     page/page_size: 分页（默认第1页，每页20条）
     返回: {"total": 5925, "stocks": [{code, name, price, change_pct, volume, ...}, ...]}
-    
+
     典型用途:
     - 今日涨幅 TOP 20: market_stock_list("us_nasdaq", "f3", True)
     - 今日跌幅 TOP 20: market_stock_list("us_nasdaq", "f3", False)
@@ -1360,7 +1360,7 @@ def market_stock_list(market: str = "us_nasdaq", sort_field: str = "f3",
     """
     market_map = {"us_nasdaq": "m:105", "us_nyse": "m:106", "us_etf": "m:107", "hk": "m:116"}
     fs = market_map.get(market, market)
-    
+
     url = "https://push2.eastmoney.com/api/qt/clist/get"
     params = {
         "fs": fs,
@@ -1373,14 +1373,14 @@ def market_stock_list(market: str = "us_nasdaq", sort_field: str = "f3",
     r = requests.get(url, params=params, timeout=15)
     d = r.json()
     data = d.get("data", {})
-    
+
     total = data.get("total", 0)
     diff = data.get("diff", [])
     # 东财 push2 的 diff 有时是 list、有时是按序号为键的 dict（如 {"0":{...},"1":{...}}）。
     # 直接 for item in diff 遇到 dict 会拿到字符串键 → AttributeError，统一成列表。
     if isinstance(diff, dict):
         diff = list(diff.values())
-    
+
     stocks = []
     for item in diff:
         stocks.append({
@@ -1397,7 +1397,7 @@ def market_stock_list(market: str = "us_nasdaq", sort_field: str = "f3",
             "open": item.get("f17"),         # 开盘(原始值)
             "prev_close": item.get("f18"),   # 昨收(原始值)
         })
-    
+
     return {"total": total, "stocks": stocks}
 ```
 
