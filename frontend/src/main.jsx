@@ -78,6 +78,7 @@ export function App() {
     setResearchLoading(true)
     setGlobalError('')
     setResearchError('')
+    const { startDate: catalogStartDate, endDate: catalogEndDate } = recentCatalogRange()
     const stockPageRequest = beginStockPageRequest(buildStockScreenPath(appliedStockQueryRef.current, 0))
     const requests = [
       ['health', '/api/health?include_counts=false'],
@@ -87,7 +88,7 @@ export function App() {
       ['overview', `/api/db/overview${refreshCoverage ? '?refresh=true' : ''}`],
       ['stocks', stockPageRequest.path],
       ['indices', '/api/indices?limit=1000'],
-      ['funds', '/api/funds?limit=1000'],
+      ['funds', `/api/funds?limit=1000&daily_start_date=${catalogStartDate}&daily_end_date=${catalogEndDate}`],
       ['industries', '/api/industries?limit=1000'],
       ['usDb', '/api/us-research/db-overview'],
       ['strategies', '/api/research/strategies'],
