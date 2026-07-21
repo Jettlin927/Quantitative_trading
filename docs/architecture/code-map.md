@@ -18,6 +18,7 @@
 - `backend/app/sync_worker.py`：数据任务租约、心跳、退避和恢复。
 - `backend/app/data_quality/`：研究范围质量、canonical 输入快照和质量运行。
 - `backend/app/quant_research/`：无券商副作用的研究协议、模拟、指标、复现和报告统计。
+- `backend/app/research_analytics.py`：把同一评价版本的 canonical 工件或已校验历史冻结来源投影为只读指标与图表数据；不计算新研究结论。
 - `backend/app/strategy_results.py`：现有结果的只读兼容投影。
 - `backend/migrations/`：Alembic revision；不得由 API 启动隐式执行生产 migration。
 

@@ -49,6 +49,7 @@ export function App() {
   const [selectedResearchId, setSelectedResearchId] = useState('')
   const [researchDetail, setResearchDetail] = useState(null)
   const [publication, setPublication] = useState(null)
+  const [publicationAnalytics, setPublicationAnalytics] = useState(null)
   const [query, setQuery] = useState('')
   const [selectedCode, setSelectedCode] = useState('')
   const [stockBars, setStockBars] = useState([])
@@ -149,6 +150,7 @@ export function App() {
           setStrategyProfile(null)
           setResearchDetail(null)
           setPublication(null)
+          setPublicationAnalytics(null)
         }
       }
     })
@@ -275,10 +277,12 @@ export function App() {
         setSelectedResearchId(nextResearchId)
         setResearchDetail(null)
         setPublication(null)
+        setPublicationAnalytics(null)
       }
       if (!profile.formal_researches.length) {
         setResearchDetail(null)
         setPublication(null)
+        setPublicationAnalytics(null)
       }
       return { ok: true, researchId: nextResearchId }
     } catch (err) {
@@ -299,11 +303,21 @@ export function App() {
         .filter((item) => item.status === 'published')
         .sort((left, right) => right.version - left.version)[0]
       const projection = latest ? await fetchJson(`/api/research/publications/${encodeURIComponent(latest.id)}`) : null
+      let analytics = null
+      let analyticsError = ''
+      if (projection?.analytics_url) {
+        try {
+          analytics = await fetchJson(projection.analytics_url)
+        } catch (err) {
+          analyticsError = errorMessage(err)
+        }
+      }
       if (requestId !== researchRequestId.current || researchId !== selectedResearchIdRef.current) return false
-      setResearchError('')
+      setResearchError(analyticsError)
       setResearchDetail(detail)
       setPublication(projection)
-      return true
+      setPublicationAnalytics(analytics)
+      return !analyticsError
     } catch (err) {
       if (requestId === researchRequestId.current) setResearchError(errorMessage(err))
       return false
@@ -359,6 +373,7 @@ export function App() {
     setSelectedResearchId('')
     setResearchDetail(null)
     setPublication(null)
+    setPublicationAnalytics(null)
     setSelectedStrategyId(strategyId)
   }
 
@@ -370,6 +385,7 @@ export function App() {
     setResearchError('')
     setResearchDetail(null)
     setPublication(null)
+    setPublicationAnalytics(null)
     setSelectedResearchId(researchId)
   }
 
@@ -434,6 +450,7 @@ export function App() {
               setSelectedResearchId={selectResearch}
               researchDetail={researchDetail}
               publication={publication}
+              analytics={publicationAnalytics}
               loading={researchLoading}
               error={researchError}
             />

@@ -56,6 +56,69 @@ const strategyProfile = {
   formal_researches: [{ id: RESEARCH_ID, plan_id: '33333333-3333-4333-8333-333333333333', origin: 'native', phase: 'published', run_count: 1, latest_publication_status: 'published', latest_publication_conclusion: '研究通过' }],
 }
 
+const publicationAnalytics = {
+  publication_id: PUBLICATION_ID,
+  evaluation_id: EVALUATION_ID,
+  evaluation_version: 1,
+  data_status: 'complete',
+  primary_run_id: 'run-001',
+  metrics: {
+    totalReturn: -0.1234,
+    cagr: -0.0312,
+    benchmarkTotalReturn: 0.2288,
+    relativeWealth: -0.2867,
+    annualizedVolatility: 0.1942,
+    downsideVolatility: 0.1411,
+    sharpe: -0.18,
+    sortino: -0.24,
+    maxDrawdown: -0.3521,
+    maxDrawdownDuration: 318,
+    calmar: -0.09,
+    var95: 0.021,
+    es95: 0.032,
+    beta: 0.72,
+    trackingError: 0.118,
+    informationRatio: -0.47,
+    averageOneWayTurnover: 0.0062,
+    cumulativeOneWayTurnover: 21.2086,
+    cumulativeTransactionCostRate: 0.018,
+    averageExposure: 0.76,
+  },
+  benchmark: { label: '沪深300全收益基准', totalReturn: 0.2288 },
+  comparisons: [],
+  chart_series: {
+    nav: [{ date: '2025-01-01', value: 1 }, { date: '2025-06-01', value: 0.94 }, { date: '2025-12-31', value: 0.8766 }],
+    benchmarkNav: [{ date: '2025-01-01', value: 1 }, { date: '2025-06-01', value: 1.08 }, { date: '2025-12-31', value: 1.2288 }],
+    drawdown: [{ date: '2025-01-01', value: 0 }, { date: '2025-06-01', value: -0.12 }, { date: '2025-12-31', value: -0.3521 }],
+    cumulativeTurnover: [{ date: '2025-01-01', value: 0 }, { date: '2025-12-31', value: 3.2 }],
+    cumulativeCost: [{ date: '2025-01-01', value: 0 }, { date: '2025-12-31', value: 0.018 }],
+  },
+  yearly: [
+    { year: 2025, strategyReturn: -0.1234, benchmarkReturn: 0.2288, activeReturn: -0.3522, maxDrawdown: -0.3521 },
+  ],
+  regimes: [
+    { direction: '上涨', volatility: '低波动', observations: 80, strategyReturn: 0.05, benchmarkReturn: 0.12, activeReturn: -0.07, maxDrawdown: -0.08 },
+    { direction: '下跌', volatility: '高波动', observations: 45, strategyReturn: -0.18, benchmarkReturn: -0.21, activeReturn: 0.03, maxDrawdown: -0.22 },
+  ],
+  robustness: {
+    walkForward: { status: 'complete', windowCount: 6, positiveWindowRate: 0.5 },
+    parameterNeighborhood: { status: 'not_applicable', reason: '固定单一规则，没有参数网格。' },
+    costStress: { status: 'complete', multiplier: '2', stressedTotalReturn: -0.14 },
+    dsr: { status: 'complete', probability: 0.8642, trialCount: 4 },
+    pbo: { status: 'complete', probability: 0.7714, combinations: 70 },
+  },
+  capacity: { status: 'not_available', reason: '未绑定目标资金规模与 ADV。' },
+  availability: {
+    metrics: { status: 'complete' },
+    nav: { status: 'complete' },
+    benchmarkNav: { status: 'complete' },
+    drawdown: { status: 'complete' },
+    turnoverCost: { status: 'complete' },
+    regimes: { status: 'complete' },
+  },
+  provenance: { kind: 'canonical', sha256: 'f'.repeat(64), resultFingerprint: 'c'.repeat(64) },
+}
+
 const researchDetail = {
   id: RESEARCH_ID, origin: 'native', phase: 'published', created_at: '2026-07-20T00:00:00Z', completed_at: '2026-07-20T01:00:00Z',
   plan: { id: '33333333-3333-4333-8333-333333333333', strategy_id: 'momentum-v1', issue_number: 37, version: 1, schema_version: '1', plan_sha256: 'b'.repeat(64), code_commit: 'a'.repeat(40), plan_json: {} },
@@ -99,9 +162,10 @@ function installFetch(options = {}) {
     if (path === '/api/research/strategies/momentum-v1') return ok(strategyProfile)
     if (path === `/api/research/formal-researches/${RESEARCH_ID}`) return ok(detail)
     if (path === `/api/research/publications/${PUBLICATION_ID}`) {
-      return ok({ status: 'published', conclusion: '研究通过', evaluation_id: EVALUATION_ID, evaluation_version: 1, published_at: '2026-07-20T00:41:00Z', report_url: '/api/research/evaluations/report' })
+      return ok({ status: 'published', conclusion: '研究通过', evaluation_id: EVALUATION_ID, evaluation_version: 1, published_at: '2026-07-20T00:41:00Z', report_url: '/api/research/evaluations/report', analytics_url: `/api/research/publications/${PUBLICATION_ID}/analytics` })
     }
     if (recentFundCatalogPath.test(path)) return ok([])
+    if (path === `/api/research/publications/${PUBLICATION_ID}/analytics`) return ok(publicationAnalytics)
     return ok(coreOverrides[path] ?? coreResponses[path] ?? {})
   })
 }
@@ -150,6 +214,65 @@ describe('研究驾驶舱', () => {
     expect(screen.getByText('扩大市场环境复核')).toBeInTheDocument()
     expect(screen.getAllByText('已提议').length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: /打开原始 HTML 证据/ })).toHaveAttribute('href', '/api/research/evaluations/report')
+  })
+
+  it('用同一发布分析投影展示规范指标、净值、回撤、成本和市场环境', async () => {
+    render(<App />)
+
+    expect(await screen.findByText('累计净收益')).toBeInTheDocument()
+    expect(screen.getAllByText('-12.34%').length).toBeGreaterThan(0)
+    expect(screen.getByText('基准累计收益')).toBeInTheDocument()
+    expect(screen.getAllByText('+22.88%').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('最大回撤').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('-35.21%').length).toBeGreaterThan(0)
+    expect(screen.getByText('年化收益（CAGR）')).toBeInTheDocument()
+    expect(screen.getByText('夏普比率（Sharpe）')).toBeInTheDocument()
+    expect(screen.getByText('索提诺比率（Sortino）')).toBeInTheDocument()
+    expect(screen.getByText('预期损失（ES95）')).toBeInTheDocument()
+    expect(screen.getByText('ES95')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '净值与基准' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: '策略与基准净值对比图' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '回撤曲线' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: '策略回撤曲线图' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '换手与成本' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '方向 × 波动率' })).toBeInTheDocument()
+    expect(screen.getByText('下跌 · 高波动')).toBeInTheDocument()
+    expect(screen.getAllByText('累计单边换手').length).toBeGreaterThan(0)
+    expect(screen.getByText('21.21×')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '稳健性与过拟合' })).toBeInTheDocument()
+    expect(screen.getByText('Walk-forward')).toBeInTheDocument()
+    expect(screen.getByText('6 个窗口 · 正收益 50.00%')).toBeInTheDocument()
+    expect(screen.getByText('DSR')).toBeInTheDocument()
+    expect(screen.getByText('86.42%')).toBeInTheDocument()
+    expect(screen.getByText('PBO')).toBeInTheDocument()
+    expect(screen.getByText('77.14%')).toBeInTheDocument()
+    expect(screen.getByText(/not_available：未绑定目标资金规模与 ADV/)).toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenCalledWith(`/api/research/publications/${PUBLICATION_ID}/analytics`, expect.anything())
+  })
+
+  it('真正 legacy 档案明确为仅追溯且不展示伪造指标', async () => {
+    const legacySummary = {
+      strategy_id: 'legacy-ma', display_name: '均线历史档案', lifecycle_status: '已归档', registry_version: 'history-import-v1',
+      code_commit: 'unknown-legacy-source', formal_research_count: 0, latest_publication_status: null, latest_publication_conclusion: null,
+    }
+    const legacyProfile = {
+      ...legacySummary,
+      economic_thesis: '历史来源仅保留原始档案，未按当前研究合同重新评价。',
+      metadata_json: { archiveClass: 'legacy', structuredConclusion: null },
+      formal_researches: [], follow_up_proposals: [],
+    }
+    installFetch({
+      route: (path) => {
+        if (path === '/api/research/strategies') return ok([legacySummary])
+        if (path === '/api/research/strategies/legacy-ma') return ok(legacyProfile)
+        return null
+      },
+    })
+    render(<App />)
+
+    expect(await screen.findByText('仅追溯，未按当前标准评价')).toBeInTheDocument()
+    expect(screen.getByText(/缺失指标不会显示为 0/)).toBeInTheDocument()
+    expect(screen.queryByText('累计净收益')).not.toBeInTheDocument()
   })
 
   it('已发布结论只绑定同一 evaluation_id 的证据，不拼接待发布新版本', async () => {

@@ -418,10 +418,30 @@ class ResearchPublicationProjectionOut(BaseModel):
     runs: list[ResearchPublicationRunOut] = Field(default_factory=list)
     manifest_url: str
     summary_url: str
+    analytics_url: str
     report_url: str
     issue_number: int
     issue_comment_id: int | None = None
     published_at: datetime | None = None
+
+
+class ResearchPublicationAnalyticsOut(BaseModel):
+    publication_id: UUID
+    evaluation_id: UUID
+    evaluation_version: int
+    data_status: Literal["complete", "not_available", "not_applicable", "legacy_provenance_only"]
+    primary_run_id: str | None = None
+    primary_label: str | None = None
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    benchmark: dict[str, Any] = Field(default_factory=dict)
+    comparisons: list[dict[str, Any]] = Field(default_factory=list)
+    chart_series: dict[str, Any] = Field(default_factory=dict)
+    yearly: list[dict[str, Any]] = Field(default_factory=list)
+    regimes: list[dict[str, Any]] = Field(default_factory=list)
+    robustness: dict[str, Any] = Field(default_factory=dict)
+    capacity: dict[str, Any] = Field(default_factory=dict)
+    availability: dict[str, Any] = Field(default_factory=dict)
+    provenance: dict[str, Any] = Field(default_factory=dict)
 
 
 class FollowUpResearchProposalOut(BaseModel):
