@@ -7,9 +7,11 @@ from typing import Any, Protocol
 
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .models import (
+    DataOverviewSnapshot,
     DataSyncJob,
     DataSyncRun,
     UsExperimentDailyBar,
@@ -23,6 +25,8 @@ TARGET_START_DATE = date(2010, 1, 1)
 MARKET_NAMES = {"105": "NASDAQ", "106": "NYSE", "107": "US_OTHER"}
 PRICE_RELATIVE_TOLERANCE = Decimal("0.005")
 VOLUME_RELATIVE_TOLERANCE = Decimal("0.05")
+OVERVIEW_SNAPSHOT_KEY = "us_experiment"
+VALIDATION_STATUSES = {"match", "mismatch", "source_missing", "error"}
 
 
 class UniverseProvider(Protocol):
@@ -71,7 +75,8 @@ class YFinanceProvider:
             group_by="ticker",
             auto_adjust=False,
             actions=True,
-            threads=True,
+            # 免费源请求必须串行，批次级限速和退避由回填编排器负责。
+            threads=False,
             progress=False,
             repair=False,
             keepna=False,
@@ -284,18 +289,11 @@ def sync_daily_prices(
     }
 
 
-def build_overview(db: Session) -> dict[str, Any]:
+def refresh_overview_snapshot(db: Session) -> DataOverviewSnapshot:
+    """显式刷新重型覆盖聚合；普通页面读取只消费已持久化快照。"""
     current_instruments = int(
         db.scalar(select(func.count()).select_from(UsExperimentInstrument).where(UsExperimentInstrument.is_current.is_(True)))
         or 0
-    )
-    total_instruments = int(db.scalar(select(func.count()).select_from(UsExperimentInstrument)) or 0)
-    by_market = dict(
-        db.execute(
-            select(UsExperimentInstrument.market_code, func.count())
-            .where(UsExperimentInstrument.is_current.is_(True))
-            .group_by(UsExperimentInstrument.market_code)
-        ).all()
     )
     bar_stats = db.execute(
         select(
@@ -308,10 +306,7 @@ def build_overview(db: Session) -> dict[str, Any]:
     current_priced = int(
         db.scalar(
             select(func.count(func.distinct(UsExperimentDailyBar.source_code)))
-            .join(
-                UsExperimentInstrument,
-                UsExperimentInstrument.source_code == UsExperimentDailyBar.source_code,
-            )
+            .join(UsExperimentInstrument, UsExperimentInstrument.source_code == UsExperimentDailyBar.source_code)
             .where(UsExperimentInstrument.is_current.is_(True))
         )
         or 0
@@ -323,19 +318,107 @@ def build_overview(db: Session) -> dict[str, Any]:
             .group_by(UsExperimentInstrument.last_sync_status)
         ).all()
     )
+    check_stats = db.execute(
+        select(
+            func.count(UsExperimentDailyCheck.id),
+            func.min(UsExperimentDailyCheck.trade_date),
+            func.max(UsExperimentDailyCheck.trade_date),
+            func.max(UsExperimentDailyCheck.checked_at),
+        )
+    ).one()
     check_statuses = dict(
+        db.execute(select(UsExperimentDailyCheck.status, func.count()).group_by(UsExperimentDailyCheck.status)).all()
+    )
+    payload = {
+        "coverage": {
+            "instrumentsWithBars": int(bar_stats[1] or 0),
+            "currentInstrumentsWithBars": current_priced,
+            "currentPercent": round(current_priced / current_instruments * 100, 2) if current_instruments else 0.0,
+            "dailyBars": int(bar_stats[0] or 0),
+            "startDate": bar_stats[2].isoformat() if bar_stats[2] else None,
+            "endDate": bar_stats[3].isoformat() if bar_stats[3] else None,
+            "syncStatuses": {str(key or "never"): int(value) for key, value in sync_statuses.items()},
+        },
+        "validation": {
+            "checks": int(check_stats[0] or 0),
+            "byStatus": {str(key): int(value) for key, value in check_statuses.items()},
+            "startDate": check_stats[1].isoformat() if check_stats[1] else None,
+            "endDate": check_stats[2].isoformat() if check_stats[2] else None,
+            "lastCheckedAt": check_stats[3].isoformat() if check_stats[3] else None,
+        },
+    }
+    snapshot = db.get(DataOverviewSnapshot, OVERVIEW_SNAPSHOT_KEY)
+    snapshot = snapshot or DataOverviewSnapshot(key=OVERVIEW_SNAPSHOT_KEY, payload=payload)
+    snapshot.payload = payload
+    db.add(snapshot)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        snapshot = db.get(DataOverviewSnapshot, OVERVIEW_SNAPSHOT_KEY)
+        if snapshot is None:
+            raise
+        snapshot.payload = payload
+        db.commit()
+    db.refresh(snapshot)
+    return snapshot
+
+
+def build_overview(db: Session, *, refresh: bool = False) -> dict[str, Any]:
+    current_instruments = int(
+        db.scalar(select(func.count()).select_from(UsExperimentInstrument).where(UsExperimentInstrument.is_current.is_(True)))
+        or 0
+    )
+    total_instruments = int(db.scalar(select(func.count()).select_from(UsExperimentInstrument)) or 0)
+    by_market = dict(
         db.execute(
-            select(UsExperimentDailyCheck.status, func.count()).group_by(UsExperimentDailyCheck.status)
+            select(UsExperimentInstrument.market_code, func.count())
+            .where(UsExperimentInstrument.is_current.is_(True))
+            .group_by(UsExperimentInstrument.market_code)
         ).all()
     )
-    check_count = int(db.scalar(select(func.count()).select_from(UsExperimentDailyCheck)) or 0)
-    last_checked_at = db.scalar(select(func.max(UsExperimentDailyCheck.checked_at)))
+    snapshot = refresh_overview_snapshot(db) if refresh else db.get(DataOverviewSnapshot, OVERVIEW_SNAPSHOT_KEY)
+    snapshot_payload = dict(snapshot.payload) if snapshot else {}
+    coverage = dict(snapshot_payload.get("coverage") or {})
+    validation = dict(snapshot_payload.get("validation") or {})
+    coverage.setdefault("instrumentsWithBars", 0)
+    coverage.setdefault("currentInstrumentsWithBars", 0)
+    coverage.setdefault("currentPercent", 0.0)
+    coverage.setdefault("dailyBars", 0)
+    coverage.setdefault("startDate", None)
+    coverage.setdefault("endDate", None)
+    coverage.setdefault("syncStatuses", {})
+    validation.setdefault("checks", 0)
+    validation.setdefault("byStatus", {})
+    validation.setdefault("startDate", None)
+    validation.setdefault("endDate", None)
+    validation.setdefault("lastCheckedAt", None)
+    validation.update({
+        "priceTolerancePct": float(PRICE_RELATIVE_TOLERANCE * 100),
+        "volumeTolerancePct": float(VOLUME_RELATIVE_TOLERANCE * 100),
+    })
     jobs = list(
         db.scalars(
             select(DataSyncJob)
             .where(DataSyncJob.action.in_(("us_experiment_universe", "us_experiment_prices")))
             .order_by(DataSyncJob.created_at.desc())
             .limit(8)
+        )
+    )
+    failed_instruments = list(
+        db.scalars(
+            select(UsExperimentInstrument)
+            .where(UsExperimentInstrument.is_current.is_(True), UsExperimentInstrument.last_sync_status == "failed")
+            .order_by(UsExperimentInstrument.last_sync_at.desc(), UsExperimentInstrument.source_code)
+            .limit(20)
+        )
+    )
+    validation_alerts = list(
+        db.scalars(
+            select(UsExperimentDailyCheck)
+            .where(UsExperimentDailyCheck.status.in_(("mismatch", "source_missing", "error")))
+            .order_by(UsExperimentDailyCheck.trade_date.desc(), UsExperimentDailyCheck.source_code)
+            .limit(20)
         )
     )
     return {
@@ -349,6 +432,8 @@ def build_overview(db: Session) -> dict[str, Any]:
         },
         "schedule": {"timezone": "Asia/Shanghai", "dailyAt": "10:00"},
         "targetStartDate": TARGET_START_DATE.isoformat(),
+        "snapshotAt": snapshot.updated_at.isoformat() if snapshot and snapshot.updated_at else None,
+        "snapshotStatus": "ready" if snapshot else "pending_refresh",
         "universe": {
             "total": total_instruments,
             "current": current_instruments,
@@ -356,22 +441,10 @@ def build_overview(db: Session) -> dict[str, Any]:
             "selection": "m:105,m:106,m:107 全量当前目录；不设人工票数上限",
             "historicalUniverse": False,
         },
-        "coverage": {
-            "instrumentsWithBars": int(bar_stats[1] or 0),
-            "currentInstrumentsWithBars": current_priced,
-            "currentPercent": round(current_priced / current_instruments * 100, 2) if current_instruments else 0.0,
-            "dailyBars": int(bar_stats[0] or 0),
-            "startDate": bar_stats[2].isoformat() if bar_stats[2] else None,
-            "endDate": bar_stats[3].isoformat() if bar_stats[3] else None,
-            "syncStatuses": {str(key or "never"): int(value) for key, value in sync_statuses.items()},
-        },
-        "validation": {
-            "checks": check_count,
-            "byStatus": {str(key): int(value) for key, value in check_statuses.items()},
-            "lastCheckedAt": last_checked_at.isoformat() if last_checked_at else None,
-            "priceTolerancePct": float(PRICE_RELATIVE_TOLERANCE * 100),
-            "volumeTolerancePct": float(VOLUME_RELATIVE_TOLERANCE * 100),
-        },
+        "coverage": coverage,
+        "validation": validation,
+        "failedInstruments": [instrument_to_dict(item) for item in failed_instruments],
+        "recentValidationAlerts": [check_to_dict(item) for item in validation_alerts],
         "recentJobs": [
             {
                 "id": job.id,
@@ -432,6 +505,49 @@ def list_instruments(
         "total": total,
         "limit": min(max(limit, 1), 1000),
         "offset": max(offset, 0),
+    }
+
+
+def list_daily_checks(
+    db: Session,
+    *,
+    source_code: str | None,
+    status: str | None,
+    start_date: date | None,
+    end_date: date | None,
+    limit: int,
+    offset: int,
+) -> dict[str, Any]:
+    filters: list[Any] = []
+    if source_code and source_code.strip():
+        filters.append(UsExperimentDailyCheck.source_code == source_code.strip().upper())
+    if status:
+        if status not in VALIDATION_STATUSES:
+            raise ValueError(f"未知校验状态：{status}")
+        filters.append(UsExperimentDailyCheck.status == status)
+    if start_date:
+        filters.append(UsExperimentDailyCheck.trade_date >= start_date)
+    if end_date:
+        filters.append(UsExperimentDailyCheck.trade_date <= end_date)
+    page_limit = min(max(limit, 1), 500)
+    page_offset = max(offset, 0)
+    rows = list(
+        db.scalars(
+            select(UsExperimentDailyCheck)
+            .where(*filters)
+            .order_by(UsExperimentDailyCheck.trade_date.desc(), UsExperimentDailyCheck.source_code)
+            .offset(page_offset)
+            .limit(page_limit + 1)
+        )
+    )
+    return {
+        "isExperimental": True,
+        "researchEligible": False,
+        "executionEnabled": False,
+        "items": [check_to_dict(item) for item in rows[:page_limit]],
+        "limit": page_limit,
+        "offset": page_offset,
+        "hasMore": len(rows) > page_limit,
     }
 
 
@@ -593,6 +709,26 @@ def instrument_to_dict(item: UsExperimentInstrument) -> dict[str, Any]:
         "lastSyncAt": item.last_sync_at.isoformat() if item.last_sync_at else None,
         "lastSyncStatus": item.last_sync_status,
         "lastSyncError": item.last_sync_error,
+    }
+
+
+def check_to_dict(row: UsExperimentDailyCheck) -> dict[str, Any]:
+    return {
+        "sourceCode": row.source_code,
+        "tradeDate": row.trade_date.isoformat(),
+        "yfinance": {
+            key: decimal_to_float(getattr(row, f"yfinance_{key}"))
+            for key in ("open", "high", "low", "close")
+        } | {"volume": row.yfinance_volume},
+        "akshare": {
+            key: decimal_to_float(getattr(row, f"akshare_{key}"))
+            for key in ("open", "high", "low", "close")
+        } | {"volume": row.akshare_volume},
+        "maxPriceRelativeDiff": decimal_to_float(row.max_price_relative_diff),
+        "volumeRelativeDiff": decimal_to_float(row.volume_relative_diff),
+        "status": row.status,
+        "message": row.message,
+        "checkedAt": row.checked_at.isoformat() if row.checked_at else None,
     }
 
 

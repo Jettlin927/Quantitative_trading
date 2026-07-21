@@ -109,6 +109,7 @@ from .us_research import build_us_research_import_preview, build_us_research_ove
 from .us_experiment import (
     build_overview as build_us_experiment_overview,
     list_daily_bars as list_us_experiment_daily_bars,
+    list_daily_checks as list_us_experiment_daily_checks,
     list_instruments as list_us_experiment_instruments,
     refresh_universe as refresh_us_experiment_universe,
     sync_daily_prices as sync_us_experiment_daily_prices,
@@ -1299,8 +1300,11 @@ def get_us_research_db_overview(db: Session = Depends(get_db)) -> dict[str, Any]
 
 
 @app.get("/api/us-experiment/overview")
-def get_us_experiment_overview(db: Session = Depends(get_db)) -> dict[str, Any]:
-    return build_us_experiment_overview(db)
+def get_us_experiment_overview(
+    refresh: bool = False,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    return build_us_experiment_overview(db, refresh=refresh)
 
 
 @app.get("/api/us-experiment/instruments")
@@ -1318,6 +1322,30 @@ def get_us_experiment_instruments(
         limit=limit,
         offset=offset,
     )
+
+
+@app.get("/api/us-experiment/daily-checks")
+def get_us_experiment_daily_checks(
+    source_code: str | None = None,
+    status: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    try:
+        return list_us_experiment_daily_checks(
+            db,
+            source_code=source_code,
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+            offset=offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/us-experiment/instruments/{source_code}/daily-bars")

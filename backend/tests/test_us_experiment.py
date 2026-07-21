@@ -19,6 +19,7 @@ from backend.app.models import (
 from backend.app.schemas import SyncUsExperimentPricesRequest
 from backend.app.us_experiment import (
     build_overview,
+    list_daily_checks,
     list_instruments,
     refresh_universe,
     sync_daily_prices,
@@ -192,6 +193,48 @@ class UsExperimentTest(unittest.TestCase):
             )
             self.assertEqual(db.scalar(select(func.count(UsExperimentDailyBar.id))), 2)
             self.assertEqual(db.scalar(select(func.count(UsExperimentDailyCheck.id))), 2)
+            page = list_daily_checks(
+                db,
+                source_code="105.AAPL",
+                status="match",
+                start_date=None,
+                end_date=None,
+                limit=10,
+                offset=0,
+            )
+
+        self.assertEqual(len(page["items"]), 1)
+        self.assertEqual(page["items"][0]["yfinance"]["close"], 215.0)
+        self.assertEqual(page["items"][0]["akshare"]["close"], 215.0)
+        self.assertFalse(page["hasMore"])
+
+    def test_overview_uses_explicit_persisted_coverage_snapshot(self):
+        self.seed_universe()
+        with self.Session() as db:
+            sync_daily_prices(
+                db,
+                SyncUsExperimentPricesRequest(
+                    start_date=date(2026, 7, 20),
+                    end_date=date(2026, 7, 21),
+                    source_codes=["105.AAPL"],
+                    validation_source_codes=["105.AAPL"],
+                ),
+                price_provider=FakeYFinance(),
+                validation_provider=FakeAkshare(),
+                observed_at=NOW,
+            )
+            before_refresh = build_overview(db)
+            refreshed = build_overview(db, refresh=True)
+            cached = build_overview(db)
+
+        self.assertEqual(before_refresh["snapshotStatus"], "pending_refresh")
+        self.assertEqual(before_refresh["coverage"]["dailyBars"], 0)
+        self.assertEqual(refreshed["snapshotStatus"], "ready")
+        self.assertEqual(refreshed["coverage"]["dailyBars"], 2)
+        self.assertEqual(refreshed["validation"]["startDate"], "2026-07-21")
+        self.assertEqual(refreshed["validation"]["endDate"], "2026-07-21")
+        self.assertEqual(cached["coverage"], refreshed["coverage"])
+        self.assertIsNotNone(cached["snapshotAt"])
 
     def test_overview_and_listing_keep_experimental_research_gate(self):
         self.seed_universe()
@@ -225,6 +268,7 @@ class UsExperimentTest(unittest.TestCase):
         paths = {route.path for route in main.app.routes}
         self.assertIn("/api/us-experiment/overview", paths)
         self.assertIn("/api/us-experiment/instruments", paths)
+        self.assertIn("/api/us-experiment/daily-checks", paths)
         self.assertIn("/api/us-experiment/instruments/{source_code}/daily-bars", paths)
 
         with self.Session() as db:

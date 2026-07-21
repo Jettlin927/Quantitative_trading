@@ -19,6 +19,9 @@ export function USDataBoundaryView({ usDb, usExperiment }) {
   const schedule = usExperiment?.schedule || {}
   const byMarket = universe.byMarket || {}
   const validationStatuses = Object.entries(validation.byStatus || {})
+  const recentJobs = usExperiment?.recentJobs || []
+  const failedInstruments = usExperiment?.failedInstruments || []
+  const validationAlerts = usExperiment?.recentValidationAlerts || []
   const marketDetail = [
     'NASDAQ ' + formatInt(byMarket['105']),
     'NYSE ' + formatInt(byMarket['106']),
@@ -48,7 +51,7 @@ export function USDataBoundaryView({ usDb, usExperiment }) {
         <SummaryMetric label="当前目录" value={formatInt(universe.current)} detail={marketDetail} />
         <SummaryMetric label="已有行情标的" value={formatInt(coverage.currentInstrumentsWithBars)} detail={'当前目录覆盖 ' + formatPercent(coverage.currentPercent)} />
         <SummaryMetric label="日线记录" value={formatInt(coverage.dailyBars)} detail={[coverage.startDate, coverage.endDate].filter(Boolean).join(' → ') || '尚未回填'} />
-        <SummaryMetric label="独立校验" value={formatInt(validation.checks)} detail={'最近 ' + formatDateTime(validation.lastCheckedAt)} />
+        <SummaryMetric label="独立校验" value={formatInt(validation.checks)} detail={[validation.startDate, validation.endDate].filter(Boolean).join(' → ') || '尚未校验'} />
       </section>
 
       <div className="us-experiment-grid">
@@ -72,6 +75,43 @@ export function USDataBoundaryView({ usDb, usExperiment }) {
         </Panel>
       </div>
 
+      <div className="us-experiment-grid operational-evidence-grid">
+        <Panel title="近期同步任务" eyebrow={'覆盖快照 ' + formatDateTime(usExperiment?.snapshotAt)}>
+          <div className="table-scroll">
+            <table className="data-table compact">
+              <thead><tr><th>任务</th><th>状态</th><th>写入</th><th>完成时间</th></tr></thead>
+              <tbody>
+                {recentJobs.map((job) => <tr key={job.id}><td><b>{jobActionLabel(job.action)}</b><small className="mono evidence-id">{job.id}</small></td><td><Badge value={job.status} /></td><td className="mono">{formatInt(job.rowsUpserted)}</td><td>{formatDateTime(job.finishedAt || job.createdAt)}</td></tr>)}
+                {!recentJobs.length ? <EmptyRow colSpan={4} /> : null}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+        <Panel title="失败标的" eyebrow="仅展示最近 20 项；完整目录可通过只读 API 查询">
+          <div className="table-scroll">
+            <table className="data-table compact">
+              <thead><tr><th>源代码</th><th>名称</th><th>最近同步</th><th>错误</th></tr></thead>
+              <tbody>
+                {failedInstruments.map((item) => <tr key={item.sourceCode}><td className="mono strong">{item.sourceCode}</td><td>{item.name || '-'}</td><td>{formatDateTime(item.lastSyncAt)}</td><td className="error-detail">{item.lastSyncError || '-'}</td></tr>)}
+                {!failedInstruments.length ? <EmptyRow colSpan={4} /> : null}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      </div>
+
+      <Panel title="校验异常明细" eyebrow="yfinance 与 AKShare 逐票同日事实；不自动覆盖主源">
+        <div className="table-scroll">
+          <table className="data-table validation-detail-table">
+            <thead><tr><th>标的 / 日期</th><th>状态</th><th>yfinance OHLCV</th><th>AKShare OHLCV</th><th>最大价格差</th><th>成交量差</th><th>错误 / 解释</th></tr></thead>
+            <tbody>
+              {validationAlerts.map((item) => <tr key={`${item.sourceCode}-${item.tradeDate}`}><td><b className="mono">{item.sourceCode}</b><small>{item.tradeDate}</small></td><td><Badge value={item.status} /></td><td className="mono">{ohlcvSummary(item.yfinance)}</td><td className="mono">{ohlcvSummary(item.akshare)}</td><td className="mono">{relativePercent(item.maxPriceRelativeDiff)}</td><td className="mono">{relativePercent(item.volumeRelativeDiff)}</td><td className="error-detail">{item.message || validationLabel(item.status)}</td></tr>)}
+              {!validationAlerts.length ? <EmptyRow colSpan={7} /> : null}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
       <Panel title="实验边界与缺口" eyebrow="不得解释为研究结论或交易指令">
         <ul className="experiment-limitations">
           {(usExperiment?.limitations || [
@@ -91,6 +131,22 @@ export function USDataBoundaryView({ usDb, usExperiment }) {
       </Panel>
     </div>
   )
+}
+
+function jobActionLabel(action) {
+  if (action === 'us_experiment_universe') return '刷新当前目录'
+  if (action === 'us_experiment_prices') return '同步实验日线'
+  return action || '-'
+}
+
+function ohlcvSummary(row) {
+  if (!row) return '-'
+  return [row.open, row.high, row.low, row.close, row.volume].map((value) => value ?? '-').join(' / ')
+}
+
+function relativePercent(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
+  return formatPercent(Number(value) * 100)
 }
 
 function validationLabel(status) {

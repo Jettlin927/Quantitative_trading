@@ -46,6 +46,11 @@ class UsExperimentBackfillTest(unittest.TestCase):
             def current_source_codes(self):
                 return ["105.AAPL"]
 
+            def request(self, method, path, payload=None):
+                del method, payload
+                self.refreshed = path == "/api/us-experiment/overview?refresh=true"
+                return {}
+
             def submit_and_wait(self, action, payload):
                 self.price_calls += 1
                 if self.price_calls == 1:
@@ -63,9 +68,11 @@ class UsExperimentBackfillTest(unittest.TestCase):
                 start_date=date(2026, 7, 20),
                 end_date=date(2026, 7, 21),
                 batch_size=50,
+                batch_delay_seconds=0,
                 validation_sample_size=1,
                 max_symbols=0,
                 retry_attempts=2,
+                retry_base_delay_seconds=1,
                 poll_seconds=1,
                 job_timeout_seconds=30,
                 checkpoint=Path(temporary) / "checkpoint.json",
@@ -75,10 +82,107 @@ class UsExperimentBackfillTest(unittest.TestCase):
                 BACKFILL,
                 "ApiClient",
                 return_value=fake_client,
-            ):
+            ), patch.object(BACKFILL.time, "sleep") as sleep:
                 self.assertEqual(BACKFILL.main(), 0)
 
         self.assertEqual(fake_client.price_calls, 2)
+        self.assertTrue(fake_client.refreshed)
+        sleep.assert_called_once_with(1)
+
+    def test_remaining_failures_return_partial_exit_code_and_refresh_snapshot(self):
+        class FakeClient:
+            def __init__(self):
+                self.refreshed = False
+
+            def current_source_codes(self):
+                return ["105.AAPL"]
+
+            def request(self, method, path, payload=None):
+                del method, payload
+                self.refreshed = path == "/api/us-experiment/overview?refresh=true"
+                return {}
+
+            def submit_and_wait(self, action, payload):
+                del action
+                code = payload["source_codes"][0]
+                return {
+                    "id": "partial-job",
+                    "status": "partial",
+                    "result": {
+                        "successfulSourceCodes": [],
+                        "failed": [{"sourceCode": code, "error": "rate limited"}],
+                    },
+                }
+
+        fake_client = FakeClient()
+        with tempfile.TemporaryDirectory() as temporary:
+            args = Namespace(
+                api_base="http://test",
+                start_date=date(2026, 7, 20),
+                end_date=date(2026, 7, 21),
+                batch_size=20,
+                batch_delay_seconds=0,
+                validation_sample_size=0,
+                max_symbols=0,
+                retry_attempts=2,
+                retry_base_delay_seconds=1,
+                poll_seconds=1,
+                job_timeout_seconds=30,
+                checkpoint=Path(temporary) / "checkpoint.json",
+                skip_universe_refresh=True,
+            )
+            with patch.object(BACKFILL, "parse_args", return_value=args), patch.object(
+                BACKFILL,
+                "ApiClient",
+                return_value=fake_client,
+            ), patch.object(BACKFILL.time, "sleep"):
+                self.assertEqual(BACKFILL.main(), 2)
+
+        self.assertTrue(fake_client.refreshed)
+
+    def test_validation_alert_returns_partial_even_when_all_symbols_succeed(self):
+        class FakeClient:
+            def current_source_codes(self):
+                return ["105.AAPL"]
+
+            def request(self, method, path, payload=None):
+                del method, path, payload
+                return {}
+
+            def submit_and_wait(self, action, payload):
+                del action
+                return {
+                    "id": "validation-alert",
+                    "status": "partial",
+                    "result": {
+                        "successfulSourceCodes": payload["source_codes"],
+                        "failed": [],
+                        "validationAlerts": [{"sourceCode": "105.AAPL", "status": "mismatch"}],
+                    },
+                }
+
+        with tempfile.TemporaryDirectory() as temporary:
+            args = Namespace(
+                api_base="http://test",
+                start_date=date(2026, 7, 20),
+                end_date=date(2026, 7, 21),
+                batch_size=20,
+                batch_delay_seconds=0,
+                validation_sample_size=1,
+                max_symbols=0,
+                retry_attempts=2,
+                retry_base_delay_seconds=1,
+                poll_seconds=1,
+                job_timeout_seconds=30,
+                checkpoint=Path(temporary) / "checkpoint.json",
+                skip_universe_refresh=True,
+            )
+            with patch.object(BACKFILL, "parse_args", return_value=args), patch.object(
+                BACKFILL,
+                "ApiClient",
+                return_value=FakeClient(),
+            ):
+                self.assertEqual(BACKFILL.main(), 2)
 
 
 if __name__ == "__main__":

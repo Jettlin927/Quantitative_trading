@@ -2779,6 +2779,41 @@ button:disabled {
   font-weight: 700;
 }
 
+.operational-evidence-grid .table-scroll {
+  max-height: 310px;
+}
+
+.evidence-id,
+.validation-detail-table td small {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-faint);
+  font-size: 8px;
+}
+
+.error-detail {
+  max-width: 320px;
+  overflow-wrap: anywhere;
+  color: #8b3d31;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.validation-detail-table {
+  min-width: 1080px;
+}
+
+.validation-detail-table td {
+  vertical-align: top;
+}
+
+.validation-detail-table td:nth-child(3),
+.validation-detail-table td:nth-child(4) {
+  color: #435862;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
 .experiment-limitations {
   display: grid;
   gap: 0;

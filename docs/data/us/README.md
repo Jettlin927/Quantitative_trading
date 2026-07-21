@@ -16,8 +16,9 @@
 - `us_experiment_instruments`：当前目录、数据源代码、Yahoo 映射和逐标的同步状态。
 - `us_experiment_daily_bars`：yfinance 主日线。
 - `us_experiment_daily_checks`：AKShare 独立对照。
-- `GET /api/us-experiment/overview`
+- `GET /api/us-experiment/overview`：只读取已持久化的重型覆盖汇总、近期任务、失败标的和校验异常；`refresh=true` 仅供同步完成后显式刷新覆盖快照。
 - `GET /api/us-experiment/instruments`
+- `GET /api/us-experiment/daily-checks`：分页读取逐票两源 OHLCV、差异、状态与错误，可按代码、状态和日期过滤。
 - `GET /api/us-experiment/instruments/{source_code}/daily-bars`
 
 ## 回填与每日同步
@@ -28,7 +29,9 @@
 python3 scripts/ops/backfill_us_experiment.py --start-date 2010-01-01 --end-date 2026-07-21
 ```
 
-checkpoint 位于被 Git 忽略的 `outputs/us-experiment-checkpoints/`。每日任务使用最近 10 个日历日的短窗口，以覆盖周末、节假日和短暂停机：
+回填默认每批 20 票、批间等待 5 秒，重试采用 15 秒起的指数退避；yfinance 内部线程关闭，避免批次外并发绕过限速。仍有失败标的或校验异常时脚本返回退出码 `2`，shell/cron 不会打印完整成功。
+
+checkpoint 位于被 Git 忽略的 `outputs/us-experiment-checkpoints/`。整轮结束后只执行一次覆盖快照聚合，普通页面读取不会扫描全量日线和校验表。每日任务使用最近 10 个日历日的短窗口，以覆盖周末、节假日和短暂停机：
 
 ```bash
 scripts/ops/sync_us_experiment_daily.sh

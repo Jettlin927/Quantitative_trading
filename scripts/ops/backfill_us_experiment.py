@@ -21,10 +21,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-base", default="http://127.0.0.1:18000")
     parser.add_argument("--start-date", type=date.fromisoformat, default=DEFAULT_START_DATE)
     parser.add_argument("--end-date", type=date.fromisoformat, default=date.today())
-    parser.add_argument("--batch-size", type=int, default=50)
+    parser.add_argument("--batch-size", type=int, default=20)
+    parser.add_argument("--batch-delay-seconds", type=float, default=5.0)
     parser.add_argument("--validation-sample-size", type=int, default=30)
     parser.add_argument("--max-symbols", type=int, default=0)
     parser.add_argument("--retry-attempts", type=int, default=3)
+    parser.add_argument("--retry-base-delay-seconds", type=float, default=15.0)
     parser.add_argument("--poll-seconds", type=int, default=5)
     parser.add_argument("--job-timeout-seconds", type=int, default=7200)
     parser.add_argument("--checkpoint", type=Path)
@@ -133,9 +135,11 @@ def save_checkpoint(path: Path, checkpoint: dict[str, Any]) -> None:
 def validate_args(args: argparse.Namespace) -> None:
     if args.start_date > args.end_date:
         raise ValueError("start-date 不能晚于 end-date")
-    for name in ("batch_size", "retry_attempts", "poll_seconds", "job_timeout_seconds"):
+    for name in ("batch_size", "retry_attempts", "retry_base_delay_seconds", "poll_seconds", "job_timeout_seconds"):
         if getattr(args, name) <= 0:
             raise ValueError(f"{name.replace('_', '-')} 必须大于 0")
+    if args.batch_delay_seconds < 0:
+        raise ValueError("batch-delay-seconds 不能为负数")
     if args.batch_size > 100:
         raise ValueError("batch-size 不能超过 API 合同上限 100")
     if args.validation_sample_size < 0 or args.max_symbols < 0:
@@ -163,8 +167,10 @@ def main() -> int:
     completed = set(checkpoint.get("completedSourceCodes") or [])
     failures = dict(checkpoint.get("failures") or {})
     validation_sample = deterministic_validation_sample(source_codes, args.end_date, args.validation_sample_size)
+    saw_validation_alert = False
+    batches = chunked(source_codes, args.batch_size)
 
-    for batch in chunked(source_codes, args.batch_size):
+    for batch_index, batch in enumerate(batches):
         pending = [code for code in batch if code not in completed]
         for attempt in range(1, args.retry_attempts + 1):
             if not pending:
@@ -180,6 +186,9 @@ def main() -> int:
                 },
             )
             result = job.get("result") or {}
+            saw_validation_alert = saw_validation_alert or bool(
+                result.get("validationAlerts") or result.get("validationErrors")
+            )
             successful = set(result.get("successfulSourceCodes") or [])
             completed.update(successful)
             for code in successful:
@@ -212,16 +221,27 @@ def main() -> int:
             )
             save_checkpoint(checkpoint_path, checkpoint)
             if pending and attempt < args.retry_attempts:
-                print(f"RETRY attempt={attempt + 1} pending={len(pending)}", flush=True)
+                retry_delay = args.retry_base_delay_seconds * (2 ** (attempt - 1))
+                print(
+                    f"RETRY attempt={attempt + 1} pending={len(pending)} delay_seconds={retry_delay:g}",
+                    flush=True,
+                )
+                time.sleep(retry_delay)
+        if batch_index < len(batches) - 1 and args.batch_delay_seconds:
+            print(f"RATE_LIMIT next_batch_delay_seconds={args.batch_delay_seconds:g}", flush=True)
+            time.sleep(args.batch_delay_seconds)
 
     remaining = [code for code in source_codes if code not in completed]
-    status = "ok" if not remaining else "partial"
+    is_partial = bool(remaining) or saw_validation_alert
+    # 只在整轮结束后执行一次重型聚合；普通前端读取始终消费该持久化快照。
+    client.request("GET", "/api/us-experiment/overview?refresh=true")
+    status = "partial" if is_partial else "ok"
     print(
         f"FINISH status={status} universe={len(source_codes)} completed={len(completed)} "
         f"remaining={len(remaining)} checkpoint={checkpoint_path}",
         flush=True,
     )
-    return 0
+    return 2 if is_partial else 0
 
 
 if __name__ == "__main__":
