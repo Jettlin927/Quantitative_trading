@@ -156,6 +156,24 @@ class SyncWorkerPostgresTest(unittest.TestCase):
         self.assertEqual(rows, 1)
         self.assertEqual(duplicate_groups, 0)
 
+    def test_financial_revision_insert_reports_exact_postgres_count(self) -> None:
+        row = main.financial_indicator_record_to_row(
+            {
+                "ts_code": "688981.SH",
+                "ann_date": "20260720",
+                "end_date": "20260630",
+                "eps": "0.25",
+                "roe": "4.20",
+                "update_flag": "1",
+            },
+            source_observed_at=datetime(2026, 7, 21, 10, 0, tzinfo=timezone.utc),
+            available_from=date(2026, 7, 22),
+        )
+
+        with self.Session() as db:
+            self.assertEqual(main.insert_financial_revision_rows(db, [row]), 1)
+            self.assertEqual(main.insert_financial_revision_rows(db, [row]), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1880,8 +1880,9 @@ def insert_financial_revision_rows(
                 pg_insert(StockFinancialIndicator.__table__)
                 .values(chunk)
                 .on_conflict_do_nothing(index_elements=list(keys))
+                .returning(StockFinancialIndicator.id)
             )
-            inserted += max(0, int(result.rowcount or 0))
+            inserted += len(result.scalars().all())
         db.commit()
         return inserted
 
