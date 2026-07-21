@@ -57,6 +57,7 @@ from .schemas import (
     DailyBarOut,
     DataQualityRunRequest,
     FormalResearchDetailOut,
+    ResearchPublicationAnalyticsOut,
     ResearchPublicationProjectionOut,
     StrategyProfileOut,
     StrategyProfileSummaryOut,
@@ -95,6 +96,7 @@ from .research_catalog import (
     get_strategy_profile,
     list_strategy_profiles,
 )
+from .research_analytics import HistoricalAnalyticsError, get_publication_analytics
 from .research_publication import (
     get_evaluation_artifact_path,
     render_evaluation_report,
@@ -1313,6 +1315,23 @@ def get_research_publication(
     if projection is None:
         raise HTTPException(status_code=404, detail="研究发布不存在")
     return projection
+
+
+@app.get(
+    "/api/research/publications/{publication_id}/analytics",
+    response_model=ResearchPublicationAnalyticsOut,
+)
+def get_research_publication_analytics(
+    publication_id: UUID,
+    db: Session = Depends(get_db),
+) -> ResearchPublicationAnalyticsOut:
+    try:
+        analytics = get_publication_analytics(db, str(publication_id))
+    except HistoricalAnalyticsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if analytics is None:
+        raise HTTPException(status_code=404, detail="研究发布不存在")
+    return analytics
 
 
 @app.get("/api/research/evaluations/{evaluation_id}/artifacts/{filename}")

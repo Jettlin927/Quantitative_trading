@@ -206,6 +206,7 @@ def get_publication_projection(
         ],
         manifest_url=publication.artifact_manifest_uri,
         summary_url=f"{artifact_base}/summary.json",
+        analytics_url=f"/api/research/publications/{publication.id}/analytics",
         report_url=f"/api/research/evaluations/{evaluation.id}/report",
         issue_number=publication.issue_number,
         issue_comment_id=publication.issue_comment_id,

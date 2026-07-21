@@ -35,6 +35,7 @@ from backend.app.research_history_migration import (
     migration_report,
     render_migration_report_markdown,
 )
+from backend.app.research_analytics import get_publication_analytics
 from scripts.research import migrate_research_history as migration_cli
 
 
@@ -282,6 +283,46 @@ class ResearchHistoryMigrationTest(unittest.TestCase):
         self.assertIn("未发布运行：34", markdown)
         self.assertIn("legacy 不推断结论", markdown)
         self.assertIn("统一发布记录保持 pending", markdown)
+
+    def test_publication_analytics_reads_the_same_historical_evaluation(self) -> None:
+        self.seed_runs()
+        with Session(self.engine) as db:
+            plan = build_history_migration_plan(db, self.source)
+            apply_history_migration(db, plan)
+            db.commit()
+
+            publication_id = db.scalar(
+                select(ResearchPublication.id)
+                .join(
+                    FormalResearch,
+                    FormalResearch.id == ResearchPublication.formal_research_id,
+                )
+                .join(
+                    FrozenResearchPlan,
+                    FrozenResearchPlan.id == FormalResearch.plan_id,
+                )
+                .where(FrozenResearchPlan.strategy_id == "etf_trend_120d")
+            )
+            analytics = get_publication_analytics(db, str(publication_id))
+
+        self.assertIsNotNone(analytics)
+        self.assertEqual(analytics.data_status, "complete")
+        self.assertEqual(
+            analytics.primary_run_id,
+            "73c82e27-754f-4f6a-bc85-4fc43c4b5be3",
+        )
+        self.assertAlmostEqual(
+            analytics.metrics["totalReturn"],
+            0.006829920869796613,
+        )
+        self.assertAlmostEqual(
+            analytics.metrics["benchmarkTotalReturn"],
+            1.8509749999999991,
+        )
+        self.assertTrue(analytics.yearly)
+        self.assertTrue(analytics.regimes)
+        self.assertEqual(analytics.availability["metrics"]["status"], "complete")
+        self.assertEqual(analytics.availability["nav"]["status"], "not_available")
 
     def test_apply_keeps_mismatched_canonical_run_unpublished_and_records_gap(self) -> None:
         self.seed_runs(corrupt_first_fingerprint=True)
