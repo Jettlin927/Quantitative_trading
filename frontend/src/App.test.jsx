@@ -483,7 +483,7 @@ describe('研究驾驶舱', () => {
 
   it('ETF 目录按浏览器本地日期计算近一年窗口', async () => {
     vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-07-21T00:30:00+08:00'))
+    vi.setSystemTime(new Date(2026, 6, 21, 0, 30))
     render(<App />)
 
     await vi.runAllTimersAsync()
