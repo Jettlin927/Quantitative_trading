@@ -134,6 +134,50 @@ class UsBrokerLedgerTest(unittest.TestCase):
         self.assertEqual(["Z-BUY", "A-SELL"], [row["trade_id"] for row in merged])
         self.assertEqual([], calculate_holdings(merged))
 
+    def test_rebuilds_fifo_order_when_backfilled_rows_have_complete_timestamps(self):
+        base = {
+            "trade_date": "2020-01-02",
+            "status": "全部执行",
+            "ticker": "EXMPL",
+            "security_name": "EXAMPLE CORP",
+            "quantity": "1",
+            "currency": "USD",
+        }
+        merged = merge_executed_trades(
+            [
+                {
+                    **base,
+                    "email_ts_utc": "2020-01-02T15:00:00+00:00",
+                    "side": "买入",
+                    "trade_id": "EXAMPLE-LATE-BUY",
+                    "price": "100",
+                }
+            ],
+            [
+                {
+                    **base,
+                    "email_ts_utc": "2020-01-02T13:00:00+00:00",
+                    "side": "买入",
+                    "trade_id": "EXAMPLE-EARLY-BUY",
+                    "price": "10",
+                },
+                {
+                    **base,
+                    "email_ts_utc": "2020-01-02T14:00:00+00:00",
+                    "side": "沽出",
+                    "trade_id": "EXAMPLE-MIDDLE-SELL",
+                    "price": "20",
+                },
+            ],
+        )
+        holdings = calculate_holdings(merged)
+
+        self.assertEqual(
+            ["EXAMPLE-EARLY-BUY", "EXAMPLE-MIDDLE-SELL", "EXAMPLE-LATE-BUY"],
+            [row["trade_id"] for row in merged],
+        )
+        self.assertEqual("100.00", holdings[0]["cost_basis"])
+
     def test_removes_non_executed_rows_from_existing_ledger(self):
         merged = merge_executed_trades(
             [

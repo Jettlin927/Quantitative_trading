@@ -6,7 +6,7 @@
 
 用户希望把 `/Users/jettlin/code/投资分析` 中的美股研究、持仓账本和快照能力迁移到 Quantitative_trading。当前可用目标仓库是 `/Users/jettlin/code/Quantitative_trading`；本机未发现 `~/Document/Quantitative_trading` 或 `~/Documents/Quantitative_trading` 作为有效 Git 仓库。
 
-Quantitative_trading 的数据治理红线仍然有效：迁移 PR 不直接提交真实持仓、真实成交、Gmail 正文、券商导出或密钥。真实账本只能先落在本地 gitignore 私有目录，后续如需入库必须先确认新的数据治理方案。
+Quantitative_trading 的数据治理红线仍然有效：迁移 PR 不直接提交真实持仓、真实成交、Gmail 正文、券商导出或密钥。用户已于 2026-07-22 明确批准“本地 gitignore 私有 CSV”这一最小治理方案，用于从正文确认的成交计算个人持仓；该批准不覆盖 PostgreSQL、API、前端、共享服务器或 Git 提交。
 
 ## 迁移对象
 
@@ -38,7 +38,7 @@ Quantitative_trading 的数据治理红线仍然有效：迁移 PR 不直接提�
 
 - `.env.local`、`.env`、任何 API key、Gmail token、券商登录信息。
 - Gmail 原始正文、截图、浏览器缓存、临时 canvas 状态。
-- 真实 HSBC CSV 内容，除非先批准私有数据治理方案。
+- 真实 HSBC CSV 内容不得迁移或提交；已批准的本地私有文件只作为运行输入和输出。
 - 旧报告截图可按需保留为工件，不默认塞入 Git。
 
 ## 目标结构建议
@@ -72,7 +72,7 @@ Gmail connector 只负责搜索和读取邮件正文；脚本只接收已确认�
 1. 本 PR：建立私有 ledger 工具、迁移清单、gitignore 边界和单元测试；不提交真实交易数据。
 2. 后续 PR：把 `finnhub_snapshot.py` 的 holdings-only 快路径迁入 `my_quant/us_research`，并改为读取私有 holdings CSV。
 3. 后续 PR：迁移非敏感 watchlist / thesis ledger schema，并给前端只读展示入口。
-4. 人工批准后：设计真实持仓数据治理方案，再决定是否允许本地私有账本入库或仅保持文件模式。
+4. 当前只批准本地私有文件模式；若要把私人持仓写入 PostgreSQL、API、前端或共享服务器，必须重新设计并单独批准数据治理方案。
 
 ## 验证命令
 

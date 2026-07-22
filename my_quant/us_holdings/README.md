@@ -2,7 +2,7 @@
 
 本目录只提供本地 CSV 工具，用于把已经由 Gmail 正文确认的 HSBC `全部執行` / `全部执行` 成交整理成成交账本、FIFO/open-lot 持仓 CSV 和本地 HTML。
 
-它与 `my_quant/us_research/` 的 sample/实验行情数据严格分离；不连接券商、不下单、不生成交易指令，也不把私人持仓写入 PostgreSQL、API 或前端。
+它与 `my_quant/us_research/` 的 sample/实验行情数据严格分离；不连接券商、不下单、不生成交易指令，也不把私人持仓写入 PostgreSQL、API 或前端。用户于 2026-07-22 明确批准的治理边界仅限本地 Git 忽略文件。
 
 ## 使用
 

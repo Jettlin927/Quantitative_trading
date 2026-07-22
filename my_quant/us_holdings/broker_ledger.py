@@ -238,6 +238,49 @@ def infer_trade_date(email_ts: str) -> str:
     return timestamp.astimezone(dt.timezone(dt.timedelta(hours=8))).date().isoformat()
 
 
+def parse_order_timestamp(value: Any) -> dt.datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        timestamp = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=dt.timezone.utc)
+    return timestamp.astimezone(dt.timezone.utc)
+
+
+def order_trade_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not rows:
+        return rows
+    has_dates = [bool(str(row.get("trade_date", "")).strip()) for row in rows]
+    if not any(has_dates):
+        return rows
+    if not all(has_dates):
+        raise ValueError("cannot merge dated and undated trades safely")
+
+    ordered = sorted(rows, key=lambda row: str(row.get("trade_date", "")))
+    start = 0
+    while start < len(ordered):
+        trade_date = str(ordered[start].get("trade_date", ""))
+        end = start + 1
+        while end < len(ordered) and str(ordered[end].get("trade_date", "")) == trade_date:
+            end += 1
+        dated_rows = ordered[start:end]
+        timestamps = [parse_order_timestamp(row.get("email_ts_utc")) for row in dated_rows]
+        if all(timestamp is not None for timestamp in timestamps):
+            ordered[start:end] = [
+                row
+                for _, row in sorted(
+                    zip(timestamps, dated_rows),
+                    key=lambda item: item[0],
+                )
+            ]
+        start = end
+    return ordered
+
+
 def merge_executed_trades(existing_rows: list[dict[str, Any]], candidate_rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -247,7 +290,7 @@ def merge_executed_trades(existing_rows: list[dict[str, Any]], candidate_rows: I
             continue
         rows.append(trade)
         seen.add(trade["trade_id"])
-    return rows
+    return order_trade_rows(rows)
 
 
 def calculate_holdings(trade_rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
