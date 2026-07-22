@@ -332,6 +332,20 @@ describe('研究驾驶舱', () => {
     expect(fetchMock.mock.calls.filter(([path]) => path === `/api/research/publications/${PUBLICATION_ID}`).length).toBeGreaterThan(before.publication)
   })
 
+  it('全局刷新只读覆盖快照，不在页面请求中触发重型覆盖重算', async () => {
+    render(<App />)
+    await screen.findByRole('link', { name: /打开原始 HTML 证据/ })
+    const fetchMock = vi.mocked(globalThis.fetch)
+    fetchMock.mockClear()
+
+    fireEvent.click(screen.getByRole('button', { name: /全局刷新/ }))
+    await waitFor(() => expect(document.querySelector('.updated-at')).not.toHaveTextContent('尚未刷新'))
+
+    const requestedPaths = fetchMock.mock.calls.map(([path]) => path)
+    expect(requestedPaths).toContain('/api/db/overview')
+    expect(requestedPaths).not.toContain('/api/db/overview?refresh=true')
+  })
+
   it('发布投影刷新失败时保留一致旧事实且不伪造刷新时间', async () => {
     let failPublication = false
     installFetch({

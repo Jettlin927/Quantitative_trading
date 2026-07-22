@@ -87,7 +87,7 @@ export function App() {
       ['progress', '/api/tushare/sync-progress?include_coverage=false'],
       ['stockReadiness', '/api/research/readiness?scope=a_share_cross_section'],
       ['etfReadiness', '/api/research/readiness?scope=etf_time_series'],
-      ['overview', `/api/db/overview${refreshCoverage ? '?refresh=true' : ''}`],
+      ['overview', '/api/db/overview'],
       ['stocks', stockPageRequest.path],
       ['indices', '/api/indices?limit=1000'],
       ['funds', `/api/funds?limit=1000&daily_start_date=${catalogStartDate}&daily_end_date=${catalogEndDate}`],
