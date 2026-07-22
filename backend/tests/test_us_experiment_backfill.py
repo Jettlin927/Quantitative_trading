@@ -5,6 +5,7 @@ from argparse import Namespace
 import importlib.util
 from pathlib import Path
 import stat
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -39,6 +40,23 @@ class UsExperimentBackfillTest(unittest.TestCase):
         for private_symbol in ("HIDDEN1", "HIDDEN2"):
             self.assertNotIn(private_symbol, daily)
             self.assertNotIn(private_symbol, installer)
+
+    def test_cron_installer_rejects_shell_metacharacters_in_private_symbol_path(self):
+        installer = SCRIPT_PATH.parents[2] / "scripts/ops/install_us_experiment_cron.sh"
+        result = subprocess.run(
+            [str(installer)],
+            env={
+                "HOME": "/tmp",
+                "PATH": "/usr/bin:/bin",
+                "SOURCE_CODES_FILE": "/tmp/symbols;touch-pwned",
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("只能使用安全的绝对路径字符", result.stderr)
 
     def test_validation_sample_is_deterministic_and_date_rotated(self):
         codes = [f"105.TEST{index:03d}" for index in range(100)]

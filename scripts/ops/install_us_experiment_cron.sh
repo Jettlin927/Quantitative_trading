@@ -12,6 +12,10 @@ if [[ "$PROJECT_DIR" == *" "* || "$LOG_DIR" == *" "* || "$API_BASE" == *" "* || 
   echo "PROJECT_DIR, LOG_DIR, API_BASE and SOURCE_CODES_FILE must not contain spaces." >&2
   exit 2
 fi
+if [[ -n "$SOURCE_CODES_FILE" && ! "$SOURCE_CODES_FILE" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+  echo "SOURCE_CODES_FILE 只能使用安全的绝对路径字符：A-Z a-z 0-9 . _ / -" >&2
+  exit 2
+fi
 
 existing_cron="$(crontab -l 2>/dev/null || true)"
 kept_cron="$(printf '%s\n' "$existing_cron" | sed "/${MARKER_BEGIN}/,/${MARKER_END}/d")"
