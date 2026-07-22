@@ -12,6 +12,8 @@ from sqlalchemy.pool import StaticPool
 from backend.app import main, sync_worker
 from backend.app.database import Base
 from backend.app.models import (
+    DataOverviewSnapshot,
+    DataSyncJob,
     UsExperimentDailyBar,
     UsExperimentDailyCheck,
     UsExperimentInstrument,
@@ -208,6 +210,37 @@ class UsExperimentTest(unittest.TestCase):
         self.assertEqual(page["items"][0]["akshare"]["close"], 215.0)
         self.assertFalse(page["hasMore"])
 
+    def test_batch_provider_error_falls_back_to_single_symbol_isolation(self):
+        class BatchFragileYFinance:
+            def fetch(self, symbols, start_date, end_date):
+                if len(symbols) > 1:
+                    raise RuntimeError("batch failed")
+                if symbols == ["BABA"]:
+                    raise RuntimeError("ticker failed")
+                return FakeYFinance().fetch(symbols, start_date, end_date)
+
+        self.seed_universe()
+        request = SyncUsExperimentPricesRequest(
+            start_date=date(2026, 7, 20),
+            end_date=date(2026, 7, 21),
+            source_codes=["105.AAPL", "106.BABA"],
+        )
+        with self.Session() as db:
+            result = sync_daily_prices(
+                db,
+                request,
+                price_provider=BatchFragileYFinance(),
+                validation_provider=FakeAkshare(),
+                observed_at=NOW,
+            )
+            bars = list(db.scalars(select(UsExperimentDailyBar)))
+            checks = list(db.scalars(select(UsExperimentDailyCheck)))
+
+        self.assertEqual(result["successfulSourceCodes"], ["105.AAPL"])
+        self.assertEqual(result["failed"], [{"sourceCode": "106.BABA", "error": "RuntimeError: ticker failed"}])
+        self.assertEqual(len(bars), 2)
+        self.assertEqual([(row.source_code, row.status) for row in checks], [("106.BABA", "source_missing")])
+
     def test_overview_uses_explicit_persisted_coverage_snapshot(self):
         self.seed_universe()
         with self.Session() as db:
@@ -224,10 +257,12 @@ class UsExperimentTest(unittest.TestCase):
                 observed_at=NOW,
             )
             before_refresh = build_overview(db)
-            refreshed = build_overview(db, refresh=True)
+            refresh_result = main.execute_sync_job_action("us_experiment_overview_refresh", {}, db)
+            refreshed = build_overview(db)
             cached = build_overview(db)
 
         self.assertEqual(before_refresh["snapshotStatus"], "pending_refresh")
+        self.assertEqual(refresh_result["status"], "ok")
         self.assertEqual(before_refresh["coverage"]["dailyBars"], 0)
         self.assertEqual(refreshed["snapshotStatus"], "ready")
         self.assertEqual(refreshed["coverage"]["dailyBars"], 2)
@@ -235,6 +270,31 @@ class UsExperimentTest(unittest.TestCase):
         self.assertEqual(refreshed["validation"]["endDate"], "2026-07-21")
         self.assertEqual(cached["coverage"], refreshed["coverage"])
         self.assertIsNotNone(cached["snapshotAt"])
+
+    def test_overview_get_is_readonly_and_experiment_jobs_are_flagged_and_paginated(self):
+        self.seed_universe()
+        with self.Session.begin() as db:
+            db.add_all(
+                [
+                    DataSyncJob(id="experiment-1", action="us_experiment_prices", status="ok", payload={}, payload_hash="a"),
+                    DataSyncJob(id="experiment-2", action="us_experiment_universe", status="failed", payload={}, payload_hash="b"),
+                    DataSyncJob(id="other", action="daily_market", status="ok", payload={}, payload_hash="c"),
+                ]
+            )
+
+        with self.Session() as db:
+            overview = main.get_us_experiment_overview(db=db)
+            self.assertIsNone(db.get(DataOverviewSnapshot, "us_experiment"))
+            page = main.list_us_experiment_sync_jobs(limit=1, offset=0, db=db)
+
+        self.assertEqual(overview["snapshotStatus"], "pending_refresh")
+        self.assertTrue(page["isExperimental"])
+        self.assertFalse(page["researchEligible"])
+        self.assertEqual(page["total"], 2)
+        self.assertEqual(len(page["items"]), 1)
+        self.assertTrue(page["items"][0]["isExperimental"])
+        self.assertFalse(page["items"][0]["researchEligible"])
+        self.assertTrue(page["hasMore"])
 
     def test_overview_and_listing_keep_experimental_research_gate(self):
         self.seed_universe()
@@ -265,8 +325,10 @@ class UsExperimentTest(unittest.TestCase):
         self.assertEqual(normalized["source_codes"], ["105.AAPL"])
         self.assertIn("us_experiment_universe", sync_worker.SUPPORTED_SYNC_ACTIONS)
         self.assertIn("us_experiment_prices", sync_worker.SUPPORTED_SYNC_ACTIONS)
+        self.assertIn("us_experiment_overview_refresh", sync_worker.SUPPORTED_SYNC_ACTIONS)
         paths = {route.path for route in main.app.routes}
         self.assertIn("/api/us-experiment/overview", paths)
+        self.assertIn("/api/us-experiment/sync-jobs", paths)
         self.assertIn("/api/us-experiment/instruments", paths)
         self.assertIn("/api/us-experiment/daily-checks", paths)
         self.assertIn("/api/us-experiment/instruments/{source_code}/daily-bars", paths)

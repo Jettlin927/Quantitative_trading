@@ -172,7 +172,20 @@ def sync_daily_prices(
     instrument_by_code = {item.source_code: item for item in instruments}
     unknown_codes = [code for code in request.source_codes if code not in instrument_by_code]
     yahoo_symbols = sorted({item.yahoo_symbol for item in instruments})
-    fetched = (price_provider or YFinanceProvider()).fetch(yahoo_symbols, request.start_date, request.end_date)
+    provider = price_provider or YFinanceProvider()
+    fetch_errors: dict[str, str] = {}
+    try:
+        fetched = provider.fetch(yahoo_symbols, request.start_date, request.end_date)
+    except Exception as exc:  # noqa: BLE001
+        fetched = {}
+        if len(yahoo_symbols) == 1:
+            fetch_errors[yahoo_symbols[0]] = f"{type(exc).__name__}: {exc}"[:500]
+        else:
+            for yahoo_symbol in yahoo_symbols:
+                try:
+                    fetched.update(provider.fetch([yahoo_symbol], request.start_date, request.end_date))
+                except Exception as symbol_exc:  # noqa: BLE001
+                    fetch_errors[yahoo_symbol] = f"{type(symbol_exc).__name__}: {symbol_exc}"[:500]
 
     bar_rows: list[dict[str, Any]] = []
     rows_by_source: dict[str, list[dict[str, Any]]] = {}
@@ -186,7 +199,10 @@ def sync_daily_prices(
         instrument.last_sync_at = fetched_at
         if not normalized_rows:
             instrument.last_sync_status = "failed"
-            instrument.last_sync_error = "yfinance 在请求区间内未返回可用日线"
+            instrument.last_sync_error = fetch_errors.get(
+                instrument.yahoo_symbol,
+                "yfinance 在请求区间内未返回可用日线",
+            )
             failures.append({"sourceCode": instrument.source_code, "error": instrument.last_sync_error})
             continue
         successful_codes.append(instrument.source_code)
@@ -364,7 +380,7 @@ def refresh_overview_snapshot(db: Session) -> DataOverviewSnapshot:
     return snapshot
 
 
-def build_overview(db: Session, *, refresh: bool = False) -> dict[str, Any]:
+def build_overview(db: Session) -> dict[str, Any]:
     current_instruments = int(
         db.scalar(select(func.count()).select_from(UsExperimentInstrument).where(UsExperimentInstrument.is_current.is_(True)))
         or 0
@@ -377,7 +393,7 @@ def build_overview(db: Session, *, refresh: bool = False) -> dict[str, Any]:
             .group_by(UsExperimentInstrument.market_code)
         ).all()
     )
-    snapshot = refresh_overview_snapshot(db) if refresh else db.get(DataOverviewSnapshot, OVERVIEW_SNAPSHOT_KEY)
+    snapshot = db.get(DataOverviewSnapshot, OVERVIEW_SNAPSHOT_KEY)
     snapshot_payload = dict(snapshot.payload) if snapshot else {}
     coverage = dict(snapshot_payload.get("coverage") or {})
     validation = dict(snapshot_payload.get("validation") or {})

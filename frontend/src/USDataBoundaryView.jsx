@@ -38,7 +38,7 @@ export function USDataBoundaryView({ usDb, usExperiment }) {
           <h2>美股日线实验数据已隔离接入</h2>
           <p>yfinance 保存未自动复权 OHLCV、Adj Close 与公司行为；AKShare 只做独立同日对照，不覆盖主数据。当前目录、历史范围与校验事实可审计，但尚不具备 point-in-time 历史标的范围，因此不能进入正式研究。</p>
         </div>
-        <a href="https://github.com/Jettlin927/Quantitative_trading/issues/27" target="_blank" rel="noreferrer">查看工程合同 #27 <ChevronRight size={14} /></a>
+        <a href="https://github.com/Jettlin927/Quantitative_trading/issues/27" target="_blank" rel="noreferrer">查看工程：建设实验级美股日线数据模块 <ChevronRight size={14} /></a>
       </section>
 
       <section className="sample-ribbon experiment-ribbon">

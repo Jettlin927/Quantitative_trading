@@ -212,6 +212,7 @@ describe('研究驾驶舱', () => {
     expect(await screen.findByText('13,672')).toBeInTheDocument()
     expect(screen.getByText('每日 10:00', { exact: false })).toBeInTheDocument()
     expect(screen.getByText('实验可用 / 正式研究不可用')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '查看工程：建设实验级美股日线数据模块' })).toHaveAttribute('href', 'https://github.com/Jettlin927/Quantitative_trading/issues/27')
     expect(screen.getByText('同日价格或成交量超出容差')).toBeInTheDocument()
     expect(screen.getByText('近期同步任务')).toBeInTheDocument()
     expect(screen.getByText('同步实验日线')).toBeInTheDocument()

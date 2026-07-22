@@ -30,6 +30,7 @@ SUPPORTED_SYNC_ACTIONS = {
     "us_sample",
     "us_experiment_universe",
     "us_experiment_prices",
+    "us_experiment_overview_refresh",
 }
 
 

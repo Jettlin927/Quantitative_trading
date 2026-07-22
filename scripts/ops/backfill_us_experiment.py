@@ -167,7 +167,7 @@ def main() -> int:
     completed = set(checkpoint.get("completedSourceCodes") or [])
     failures = dict(checkpoint.get("failures") or {})
     validation_sample = deterministic_validation_sample(source_codes, args.end_date, args.validation_sample_size)
-    saw_validation_alert = False
+    saw_validation_alert = bool(checkpoint.get("validationAlertObserved"))
     batches = chunked(source_codes, args.batch_size)
 
     for batch_index, batch in enumerate(batches):
@@ -214,6 +214,7 @@ def main() -> int:
                     "contractSha256": frozen_hash,
                     "completedSourceCodes": sorted(completed),
                     "failures": failures,
+                    "validationAlertObserved": saw_validation_alert,
                     "lastJobId": job.get("id"),
                     "lastJobStatus": job.get("status"),
                     "updatedAtEpoch": int(time.time()),
@@ -233,8 +234,8 @@ def main() -> int:
 
     remaining = [code for code in source_codes if code not in completed]
     is_partial = bool(remaining) or saw_validation_alert
-    # 只在整轮结束后执行一次重型聚合；普通前端读取始终消费该持久化快照。
-    client.request("GET", "/api/us-experiment/overview?refresh=true")
+    # 只在整轮结束后排队一次重型聚合；普通前端读取始终消费该持久化快照。
+    client.submit_and_wait("us_experiment_overview_refresh", {})
     status = "partial" if is_partial else "ok"
     print(
         f"FINISH status={status} universe={len(source_codes)} completed={len(completed)} "

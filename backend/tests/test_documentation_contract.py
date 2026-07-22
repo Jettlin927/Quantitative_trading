@@ -133,6 +133,14 @@ class DocumentationContractTest(unittest.TestCase):
                 self.assertIn(f"| `{conclusion}` |", standard)
         self.assertNotIn("| `blocked` |", standard)
 
+    def test_global_stock_data_skill_preserves_repository_research_boundary(self) -> None:
+        skill = (REPO_ROOT / ".codex" / "skills" / "global-stock-data" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("researchEligible=false", skill)
+        self.assertIn("不得输出买入、卖出、持有、评级或实盘指令", skill)
+        self.assertIn("分析师评级与目标价只能作为带来源的市场观察", skill)
+
     def test_all_local_markdown_links_resolve(self) -> None:
         markdown_files = [
             REPO_ROOT / "README.md",

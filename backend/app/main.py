@@ -111,6 +111,7 @@ from .us_experiment import (
     list_daily_bars as list_us_experiment_daily_bars,
     list_daily_checks as list_us_experiment_daily_checks,
     list_instruments as list_us_experiment_instruments,
+    refresh_overview_snapshot as refresh_us_experiment_overview_snapshot,
     refresh_universe as refresh_us_experiment_universe,
     sync_daily_prices as sync_us_experiment_daily_prices,
 )
@@ -1300,11 +1301,41 @@ def get_us_research_db_overview(db: Session = Depends(get_db)) -> dict[str, Any]
 
 
 @app.get("/api/us-experiment/overview")
-def get_us_experiment_overview(
-    refresh: bool = False,
+def get_us_experiment_overview(db: Session = Depends(get_db)) -> dict[str, Any]:
+    return build_us_experiment_overview(db)
+
+
+@app.get("/api/us-experiment/sync-jobs")
+def list_us_experiment_sync_jobs(
+    limit: int = 20,
+    offset: int = 0,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    return build_us_experiment_overview(db, refresh=refresh)
+    actions = ("us_experiment_universe", "us_experiment_prices", "us_experiment_overview_refresh")
+    page_limit = min(max(limit, 1), 200)
+    page_offset = max(offset, 0)
+    total = int(
+        db.scalar(select(func.count()).select_from(DataSyncJob).where(DataSyncJob.action.in_(actions))) or 0
+    )
+    jobs = list(
+        db.scalars(
+            select(DataSyncJob)
+            .where(DataSyncJob.action.in_(actions))
+            .order_by(DataSyncJob.created_at.desc(), DataSyncJob.id)
+            .offset(page_offset)
+            .limit(page_limit)
+        )
+    )
+    return {
+        "isExperimental": True,
+        "researchEligible": False,
+        "executionEnabled": False,
+        "items": [sync_job_to_dict(job) for job in jobs],
+        "total": total,
+        "limit": page_limit,
+        "offset": page_offset,
+        "hasMore": page_offset + len(jobs) < total,
+    }
 
 
 @app.get("/api/us-experiment/instruments")
@@ -2166,7 +2197,7 @@ def chunked(rows: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]]
 
 def validate_sync_job_payload(action: str, payload: dict[str, Any]) -> dict[str, Any]:
     without_token = {key: value for key, value in payload.items() if key != "token"}
-    if action in {"us_sample", "us_experiment_universe"}:
+    if action in {"us_sample", "us_experiment_universe", "us_experiment_overview_refresh"}:
         return {}
     request_models = {
         "stock_listings": SyncStockListingsRequest,
@@ -2204,6 +2235,13 @@ def execute_sync_job_action(action: str, payload: dict[str, Any], db: Session) -
             db,
             SyncUsExperimentPricesRequest.model_validate(payload),
         )
+    if action == "us_experiment_overview_refresh":
+        snapshot = refresh_us_experiment_overview_snapshot(db)
+        return {
+            "status": "ok",
+            "rows_upserted": 1,
+            "snapshotAt": snapshot.updated_at.isoformat() if snapshot.updated_at else None,
+        }
     if action in {"market_bundle", "daily_market"}:
         return execute_market_sync_bundle(action, SyncMarketDataRequest.model_validate(payload), db)
     if action == "market_fundamentals":
@@ -2297,7 +2335,7 @@ def sync_result_rows(result: Any) -> int:
 
 
 def sync_job_to_dict(job: DataSyncJob) -> dict[str, Any]:
-    return {
+    payload = {
         "id": job.id,
         "action": job.action,
         "status": job.status,
@@ -2317,6 +2355,15 @@ def sync_job_to_dict(job: DataSyncJob) -> dict[str, Any]:
         "lastError": job.last_error,
         "updatedAt": job.updated_at.isoformat() if job.updated_at else None,
     }
+    if job.action.startswith("us_experiment_"):
+        payload.update(
+            {
+                "isExperimental": True,
+                "researchEligible": False,
+                "executionEnabled": False,
+            }
+        )
+    return payload
 
 
 def record_sync_run(
