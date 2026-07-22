@@ -11,7 +11,14 @@ SYNC_START_DATE="${SYNC_START_DATE:-$(python3 -c 'from datetime import date,time
 BATCH_SIZE="${BATCH_SIZE:-20}"
 BATCH_DELAY_SECONDS="${BATCH_DELAY_SECONDS:-5}"
 RETRY_BASE_DELAY_SECONDS="${RETRY_BASE_DELAY_SECONDS:-15}"
-VALIDATION_SAMPLE_SIZE="${VALIDATION_SAMPLE_SIZE:-30}"
+SOURCE_CODES_FILE="${SOURCE_CODES_FILE:-}"
+if [[ -n "$SOURCE_CODES_FILE" ]]; then
+  VALIDATION_SAMPLE_SIZE="${VALIDATION_SAMPLE_SIZE:-0}"
+  TARGET_UNIVERSE_ARGS=(--source-codes-file "$SOURCE_CODES_FILE")
+else
+  VALIDATION_SAMPLE_SIZE="${VALIDATION_SAMPLE_SIZE:-30}"
+  TARGET_UNIVERSE_ARGS=()
+fi
 JOB_TIMEOUT_SECONDS="${JOB_TIMEOUT_SECONDS:-7200}"
 LOCK_FILE="${LOCK_FILE:-/tmp/quantitative-trading-us-experiment-sync.lock}"
 CHECKPOINT="${CHECKPOINT:-${PROJECT_ROOT}/outputs/us-experiment-checkpoints/daily-${SYNC_END_DATE}.json}"
@@ -38,6 +45,7 @@ if python3 "${SCRIPT_DIR}/backfill_us_experiment.py" \
   --retry-base-delay-seconds "$RETRY_BASE_DELAY_SECONDS" \
   --validation-sample-size "$VALIDATION_SAMPLE_SIZE" \
   --job-timeout-seconds "$JOB_TIMEOUT_SECONDS" \
+  "${TARGET_UNIVERSE_ARGS[@]}" \
   --checkpoint "$CHECKPOINT"; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S %z')] finish status=ok US experimental daily sync"
 else

@@ -23,6 +23,7 @@ from backend.app.us_experiment import (
     build_overview,
     list_daily_checks,
     list_instruments,
+    register_targeted_universe,
     refresh_universe,
     sync_daily_prices,
     yfinance_frame_to_rows,
@@ -147,6 +148,24 @@ class UsExperimentTest(unittest.TestCase):
         self.assertEqual(apple.first_seen_at, original_first_seen)
         self.assertTrue(apple.is_current)
         self.assertFalse(baba.is_current)
+
+    def test_targeted_universe_uses_isolated_namespace_without_disclosing_account_source(self):
+        with self.Session() as db:
+            result = register_targeted_universe(
+                db,
+                symbols=["aapl", "META", "aapl"],
+                observed_at=NOW,
+            )
+            overview = build_overview(db)
+            instruments = list(db.scalars(select(UsExperimentInstrument).order_by(UsExperimentInstrument.source_code)))
+
+        self.assertEqual(result["source_codes"], ["TGT.AAPL", "TGT.META"])
+        self.assertEqual([item.source_code for item in instruments], ["TGT.AAPL", "TGT.META"])
+        self.assertEqual([item.market_name for item in instruments], ["TARGETED", "TARGETED"])
+        self.assertEqual(overview["universe"]["mode"], "targeted_explicit")
+        self.assertIn("显式目标名单", overview["universe"]["selection"])
+        self.assertNotIn("持仓", str(overview))
+        self.assertNotIn("成交", str(overview))
 
     def test_daily_sync_keeps_primary_rows_and_validation_separate(self):
         self.seed_universe()
@@ -278,6 +297,7 @@ class UsExperimentTest(unittest.TestCase):
                 [
                     DataSyncJob(id="experiment-1", action="us_experiment_prices", status="ok", payload={}, payload_hash="a"),
                     DataSyncJob(id="experiment-2", action="us_experiment_universe", status="failed", payload={}, payload_hash="b"),
+                    DataSyncJob(id="experiment-3", action="us_experiment_targeted_universe", status="ok", payload={}, payload_hash="d"),
                     DataSyncJob(id="other", action="daily_market", status="ok", payload={}, payload_hash="c"),
                 ]
             )
@@ -290,7 +310,7 @@ class UsExperimentTest(unittest.TestCase):
         self.assertEqual(overview["snapshotStatus"], "pending_refresh")
         self.assertTrue(page["isExperimental"])
         self.assertFalse(page["researchEligible"])
-        self.assertEqual(page["total"], 2)
+        self.assertEqual(page["total"], 3)
         self.assertEqual(len(page["items"]), 1)
         self.assertTrue(page["items"][0]["isExperimental"])
         self.assertFalse(page["items"][0]["researchEligible"])
@@ -324,6 +344,7 @@ class UsExperimentTest(unittest.TestCase):
         )
         self.assertEqual(normalized["source_codes"], ["105.AAPL"])
         self.assertIn("us_experiment_universe", sync_worker.SUPPORTED_SYNC_ACTIONS)
+        self.assertIn("us_experiment_targeted_universe", sync_worker.SUPPORTED_SYNC_ACTIONS)
         self.assertIn("us_experiment_prices", sync_worker.SUPPORTED_SYNC_ACTIONS)
         self.assertIn("us_experiment_overview_refresh", sync_worker.SUPPORTED_SYNC_ACTIONS)
         paths = {route.path for route in main.app.routes}
@@ -369,6 +390,20 @@ class UsExperimentTest(unittest.TestCase):
                 end_date=date(2026, 7, 21),
                 source_codes=["105.AAPL"],
                 validation_source_codes=["106.BABA"],
+            )
+
+        targeted = SyncUsExperimentPricesRequest(
+            start_date=date(2026, 7, 20),
+            end_date=date(2026, 7, 21),
+            source_codes=["tgt.aapl"],
+        )
+        self.assertEqual(targeted.source_codes, ["TGT.AAPL"])
+        with self.assertRaises(ValueError):
+            SyncUsExperimentPricesRequest(
+                start_date=date(2026, 7, 20),
+                end_date=date(2026, 7, 21),
+                source_codes=["TGT.AAPL"],
+                validation_source_codes=["TGT.AAPL"],
             )
 
 

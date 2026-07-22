@@ -6,6 +6,7 @@ from datetime import date
 from hashlib import sha256
 import json
 from pathlib import Path
+import re
 import time
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -31,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--job-timeout-seconds", type=int, default=7200)
     parser.add_argument("--checkpoint", type=Path)
     parser.add_argument("--skip-universe-refresh", action="store_true")
+    parser.add_argument("--source-codes-file", type=Path)
     return parser.parse_args()
 
 
@@ -98,6 +100,23 @@ def chunked(values: list[str], size: int) -> list[list[str]]:
     return [values[index : index + size] for index in range(0, len(values), size)]
 
 
+def read_target_symbols(path: Path) -> list[str]:
+    if not path.is_file():
+        raise ValueError(f"显式目标名单文件不存在：{path}")
+    symbols: list[str] = []
+    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        symbol = raw_line.strip().upper()
+        if not symbol or symbol.startswith("#"):
+            continue
+        if not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,31}", symbol):
+            raise ValueError(f"显式目标名单第 {line_number} 行不是有效美股 ticker：{symbol}")
+        if symbol not in symbols:
+            symbols.append(symbol)
+    if not symbols:
+        raise ValueError("显式目标名单不能为空")
+    return sorted(symbols)
+
+
 def default_checkpoint(start_date: date, end_date: date) -> Path:
     return Path("outputs/us-experiment-checkpoints") / f"{start_date.isoformat()}_{end_date.isoformat()}.json"
 
@@ -144,18 +163,28 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("batch-size 不能超过 API 合同上限 100")
     if args.validation_sample_size < 0 or args.max_symbols < 0:
         raise ValueError("validation-sample-size 和 max-symbols 不能为负数")
+    if getattr(args, "source_codes_file", None) and args.skip_universe_refresh:
+        raise ValueError("source-codes-file 与 skip-universe-refresh 不能同时使用")
 
 
 def main() -> int:
     args = parse_args()
     validate_args(args)
     client = ApiClient(args.api_base, args.poll_seconds, args.job_timeout_seconds)
-    if not args.skip_universe_refresh:
-        universe_job = client.submit_and_wait("us_experiment_universe", {})
+    source_codes_file = getattr(args, "source_codes_file", None)
+    targeted_mode = source_codes_file is not None
+    if targeted_mode:
+        symbols = read_target_symbols(source_codes_file)
+        universe_job = client.submit_and_wait("us_experiment_targeted_universe", {"symbols": symbols})
         if universe_job["status"] != "ok":
-            raise RuntimeError(f"美股目录刷新失败：{universe_job}")
-
-    source_codes = client.current_source_codes()
+            raise RuntimeError(f"显式目标名单注册失败：{universe_job}")
+        source_codes = list((universe_job.get("result") or {}).get("sourceCodes") or [])
+    else:
+        if not args.skip_universe_refresh:
+            universe_job = client.submit_and_wait("us_experiment_universe", {})
+            if universe_job["status"] != "ok":
+                raise RuntimeError(f"美股目录刷新失败：{universe_job}")
+        source_codes = client.current_source_codes()
     if args.max_symbols:
         source_codes = source_codes[: args.max_symbols]
     if not source_codes:
@@ -166,7 +195,11 @@ def main() -> int:
     checkpoint = load_checkpoint(checkpoint_path, frozen_hash)
     completed = set(checkpoint.get("completedSourceCodes") or [])
     failures = dict(checkpoint.get("failures") or {})
-    validation_sample = deterministic_validation_sample(source_codes, args.end_date, args.validation_sample_size)
+    validation_sample = (
+        set()
+        if targeted_mode
+        else deterministic_validation_sample(source_codes, args.end_date, args.validation_sample_size)
+    )
     saw_validation_alert = bool(checkpoint.get("validationAlertObserved"))
     batches = chunked(source_codes, args.batch_size)
 

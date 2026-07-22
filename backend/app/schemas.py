@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import re
 from typing import Any, Literal
 from uuid import UUID
 
@@ -177,15 +178,28 @@ class SyncUsExperimentPricesRequest(BaseModel):
     source_codes: list[str] = Field(min_length=1, max_length=100)
     validation_source_codes: list[str] = Field(default_factory=list, max_length=100)
 
-    @field_validator("source_codes", "validation_source_codes")
+    @field_validator("source_codes")
     @classmethod
     def normalize_us_source_codes(cls, values: list[str]) -> list[str]:
         normalized: list[str] = []
         for value in values:
             code = value.strip().upper()
             market, separator, symbol = code.partition(".")
+            if separator != "." or market not in {"105", "106", "107", "TGT"} or not symbol:
+                raise ValueError("美股实验代码必须使用 105/106/107/TGT 前缀，例如 105.AAPL")
+            if code not in normalized:
+                normalized.append(code)
+        return normalized
+
+    @field_validator("validation_source_codes")
+    @classmethod
+    def normalize_validation_source_codes(cls, values: list[str]) -> list[str]:
+        normalized: list[str] = []
+        for value in values:
+            code = value.strip().upper()
+            market, separator, symbol = code.partition(".")
             if separator != "." or market not in {"105", "106", "107"} or not symbol:
-                raise ValueError("美股实验代码必须使用 105/106/107 前缀，例如 105.AAPL")
+                raise ValueError("AKShare 校验只接受 105/106/107 目录代码")
             if code not in normalized:
                 normalized.append(code)
         return normalized
@@ -200,6 +214,22 @@ class SyncUsExperimentPricesRequest(BaseModel):
         return self
 
 
+class SyncUsExperimentTargetedUniverseRequest(BaseModel):
+    symbols: list[str] = Field(min_length=1, max_length=200)
+
+    @field_validator("symbols")
+    @classmethod
+    def normalize_symbols(cls, values: list[str]) -> list[str]:
+        normalized: list[str] = []
+        for value in values:
+            symbol = value.strip().upper()
+            if not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,31}", symbol):
+                raise ValueError("显式美股 ticker 必须以字母开头，且只能包含字母、数字、点或连字号")
+            if symbol not in normalized:
+                normalized.append(symbol)
+        return normalized
+
+
 class SyncJobCreate(BaseModel):
     action: Literal[
         "stock_listings",
@@ -209,6 +239,7 @@ class SyncJobCreate(BaseModel):
         "market_fundamentals",
         "us_sample",
         "us_experiment_universe",
+        "us_experiment_targeted_universe",
         "us_experiment_prices",
         "us_experiment_overview_refresh",
     ]

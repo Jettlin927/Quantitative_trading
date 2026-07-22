@@ -11,6 +11,8 @@
 - API 与前端固定返回 `isExperimental=true`、`researchEligible=false`、`executionEnabled=false`。
 - 当前目录不是历史 point-in-time universe，退市代码、历史成分、数据许可和长期可复现性仍是正式研究门禁。
 
+当全市场目录源不可用时，可切换为 Git 忽略的显式 ticker 名单。该模式使用 `TGT.SYMBOL` 隔离命名空间，只保存 ticker 和 yfinance 行情，不伪造 NASDAQ/NYSE 归属，不保存账户、持仓、成交或邮件来源。API 和前端必须显示“显式目标名单；非全市场目录”。之后全市场刷新成功时，`TGT` 标的会退出 current 目录，历史事实继续保留。
+
 ## 表与只读接口
 
 - `us_experiment_instruments`：当前目录、数据源代码、Yahoo 映射和逐标的同步状态。
@@ -30,6 +32,14 @@
 python3 scripts/ops/backfill_us_experiment.py --start-date 2010-01-01 --end-date 2026-07-21
 ```
 
+显式目标名单每行一个 Yahoo ticker，允许空行和 `#` 注释，不接受纯数字代码。名单文件不得提交到 Git：
+
+```bash
+python3 scripts/ops/backfill_us_experiment.py --source-codes-file /srv/quantitative-trading/private/us-market-symbols.txt --start-date 2010-01-01 --validation-sample-size 0
+```
+
+显式名单模式不调用 AKShare 逐票校验；yfinance 成功票继续落库，限流、无效或无历史的 ticker 会按票留下失败事实。
+
 回填默认每批 20 票、批间等待 5 秒，重试采用 15 秒起的指数退避；yfinance 内部线程关闭，避免批次外并发绕过限速。仍有失败标的或校验异常时脚本返回退出码 `2`，shell/cron 不会打印完整成功。
 
 checkpoint 位于被 Git 忽略的 `outputs/us-experiment-checkpoints/`，并保留尚未解除的校验异常事实。整轮结束后通过持久 Worker 的 `us_experiment_overview_refresh` 任务执行一次覆盖快照聚合；普通页面读取不会写库或扫描全量日线和校验表。每日任务使用最近 10 个日历日的短窗口，以覆盖周末、节假日和短暂停机：
@@ -37,6 +47,12 @@ checkpoint 位于被 Git 忽略的 `outputs/us-experiment-checkpoints/`，并保
 ```bash
 scripts/ops/sync_us_experiment_daily.sh
 scripts/ops/install_us_experiment_cron.sh
+```
+
+显式名单的每日同步通过环境变量传递私有文件路径，crontab 只保存路径，不嵌入 ticker：
+
+```bash
+SOURCE_CODES_FILE=/srv/quantitative-trading/private/us-market-symbols.txt scripts/ops/install_us_experiment_cron.sh
 ```
 
 cron 固定为 `CRON_TZ=Asia/Shanghai` 的每日 `10:00`。安装 cron、执行 migration、全量回填和部署生产是不同操作，不能因代码合入而自动发生。

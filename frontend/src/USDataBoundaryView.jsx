@@ -26,6 +26,7 @@ export function USDataBoundaryView({ usDb, usExperiment }) {
     'NASDAQ ' + formatInt(byMarket['105']),
     'NYSE ' + formatInt(byMarket['106']),
     '其他 ' + formatInt(byMarket['107']),
+    ...(byMarket.TGT == null ? [] : ['目标 ' + formatInt(byMarket.TGT)]),
   ].join(' · ')
   const validationTolerance = '价格容差 ' + (validation.priceTolerancePct ?? 0.5) + '% · 成交量容差 ' + (validation.volumeTolerancePct ?? 5) + '%'
 
@@ -44,7 +45,7 @@ export function USDataBoundaryView({ usDb, usExperiment }) {
       <section className="sample-ribbon experiment-ribbon">
         <Badge value="实验数据" />
         <span><Clock3 size={14} /> 每日 {schedule.dailyAt || '10:00'} · {schedule.timezone || 'Asia/Shanghai'}</span>
-        <strong>目标起点 {usExperiment?.targetStartDate || '2010-01-01'} · 当前目录全量、不设人工票数上限</strong>
+        <strong>目标起点 {usExperiment?.targetStartDate || '2010-01-01'} · {universe.selection || '当前目录全量、不设人工票数上限'}</strong>
       </section>
 
       <section className="summary-ribbon us-experiment-metrics">
@@ -135,6 +136,7 @@ export function USDataBoundaryView({ usDb, usExperiment }) {
 
 function jobActionLabel(action) {
   if (action === 'us_experiment_universe') return '刷新当前目录'
+  if (action === 'us_experiment_targeted_universe') return '注册目标名单'
   if (action === 'us_experiment_prices') return '同步实验日线'
   return action || '-'
 }
