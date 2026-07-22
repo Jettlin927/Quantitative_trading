@@ -22,7 +22,7 @@ from .schemas import SyncUsExperimentPricesRequest
 
 
 TARGET_START_DATE = date(2010, 1, 1)
-MARKET_NAMES = {"105": "NASDAQ", "106": "NYSE", "107": "US_OTHER"}
+MARKET_NAMES = {"105": "NASDAQ", "106": "NYSE", "107": "US_OTHER", "TGT": "TARGETED"}
 PRICE_RELATIVE_TOLERANCE = Decimal("0.005")
 VOLUME_RELATIVE_TOLERANCE = Decimal("0.05")
 OVERVIEW_SNAPSHOT_KEY = "us_experiment"
@@ -153,6 +153,51 @@ def refresh_universe(
     }
 
 
+def register_targeted_universe(
+    db: Session,
+    *,
+    symbols: list[str],
+    observed_at: datetime | None = None,
+) -> dict[str, Any]:
+    fetched_at = observed_at or datetime.now(timezone.utc)
+    normalized_symbols = sorted({symbol.strip().upper() for symbol in symbols if symbol.strip()})
+    if not normalized_symbols:
+        raise ValueError("显式目标名单不能为空")
+    rows = [
+        {
+            "source_code": f"TGT.{symbol}",
+            "symbol": symbol,
+            "yahoo_symbol": yahoo_symbol_for(symbol),
+            "name": None,
+            "market_code": "TGT",
+            "market_name": MARKET_NAMES["TGT"],
+            "is_current": True,
+            "last_seen_at": fetched_at,
+            "updated_at": fetched_at,
+        }
+        for symbol in normalized_symbols
+    ]
+    db.execute(update(UsExperimentInstrument).values(is_current=False, updated_at=fetched_at))
+    _upsert_universe_rows(db, rows, fetched_at)
+    db.add(
+        DataSyncRun(
+            source="explicit_target_list",
+            target="us_experiment_targeted_universe",
+            rows_upserted=len(rows),
+            status="ok",
+            message=f"targeted={len(rows)}",
+        )
+    )
+    db.commit()
+    return {
+        "status": "ok",
+        "rows_upserted": len(rows),
+        "sourceCodes": [row["source_code"] for row in rows],
+        "source_codes": [row["source_code"] for row in rows],
+        "observed_at": fetched_at.isoformat(),
+    }
+
+
 def sync_daily_prices(
     db: Session,
     request: SyncUsExperimentPricesRequest,
@@ -232,7 +277,11 @@ def sync_daily_prices(
     )
 
     requested_checks = set(request.validation_source_codes)
-    requested_checks.update(item["sourceCode"] for item in failures if item["sourceCode"] in instrument_by_code)
+    requested_checks.update(
+        item["sourceCode"]
+        for item in failures
+        if item["sourceCode"] in instrument_by_code and not item["sourceCode"].startswith("TGT.")
+    )
     check_rows: list[dict[str, Any]] = []
     validation_errors: list[dict[str, str]] = []
     checker = validation_provider or AkshareProvider()
@@ -393,6 +442,18 @@ def build_overview(db: Session) -> dict[str, Any]:
             .group_by(UsExperimentInstrument.market_code)
         ).all()
     )
+    latest_universe_run = db.scalar(
+        select(DataSyncRun)
+        .where(
+            DataSyncRun.target.in_(("us_experiment_universe", "us_experiment_targeted_universe")),
+            DataSyncRun.status == "ok",
+        )
+        .order_by(DataSyncRun.created_at.desc(), DataSyncRun.id.desc())
+        .limit(1)
+    )
+    targeted_mode = bool(
+        latest_universe_run and latest_universe_run.target == "us_experiment_targeted_universe"
+    )
     snapshot = db.get(DataOverviewSnapshot, OVERVIEW_SNAPSHOT_KEY)
     snapshot_payload = dict(snapshot.payload) if snapshot else {}
     coverage = dict(snapshot_payload.get("coverage") or {})
@@ -416,7 +477,11 @@ def build_overview(db: Session) -> dict[str, Any]:
     jobs = list(
         db.scalars(
             select(DataSyncJob)
-            .where(DataSyncJob.action.in_(("us_experiment_universe", "us_experiment_prices")))
+            .where(
+                DataSyncJob.action.in_(
+                    ("us_experiment_universe", "us_experiment_targeted_universe", "us_experiment_prices")
+                )
+            )
             .order_by(DataSyncJob.created_at.desc())
             .limit(8)
         )
@@ -442,7 +507,11 @@ def build_overview(db: Session) -> dict[str, Any]:
         "researchEligible": False,
         "executionEnabled": False,
         "sources": {
-            "universe": "AKShare stock_us_spot_em / Eastmoney current snapshot",
+            "universe": (
+                "operator-managed explicit ticker list"
+                if targeted_mode
+                else "AKShare stock_us_spot_em / Eastmoney current snapshot"
+            ),
             "primaryDaily": "yfinance 1d auto_adjust=false",
             "validationDaily": "AKShare stock_us_hist adjust=''",
         },
@@ -454,7 +523,12 @@ def build_overview(db: Session) -> dict[str, Any]:
             "total": total_instruments,
             "current": current_instruments,
             "byMarket": {key: int(value) for key, value in sorted(by_market.items())},
-            "selection": "m:105,m:106,m:107 全量当前目录；不设人工票数上限",
+            "mode": "targeted_explicit" if targeted_mode else "full_current_snapshot",
+            "selection": (
+                f"显式目标名单 {current_instruments} 只；非全市场目录"
+                if targeted_mode
+                else "m:105,m:106,m:107 全量当前目录；不设人工票数上限"
+            ),
             "historicalUniverse": False,
         },
         "coverage": coverage,
@@ -474,7 +548,11 @@ def build_overview(db: Session) -> dict[str, Any]:
             for job in jobs
         ],
         "limitations": [
-            "当前目录不是历史 point-in-time universe，退市与历史成分尚未补齐。",
+            (
+                "显式目标名单只用于定向行情跟踪，不是全市场或历史 point-in-time universe。"
+                if targeted_mode
+                else "当前目录不是历史 point-in-time universe，退市与历史成分尚未补齐。"
+            ),
             "免费源可能限流、缺失或调整历史；失败和对照差异会单独留痕。",
             "该数据仅供实验与工程验证，researchEligible=false，不可作为正式研究输入。",
         ],

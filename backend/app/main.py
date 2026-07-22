@@ -88,6 +88,7 @@ from .schemas import (
     SyncSuspendEventsRequest,
     SyncTradeCalendarRequest,
     SyncUsExperimentPricesRequest,
+    SyncUsExperimentTargetedUniverseRequest,
 )
 from .data_quality.contracts import QualityCheckContract
 from .data_quality.runner import list_quality_results, quality_run_to_dict, run_data_quality_check
@@ -112,6 +113,7 @@ from .us_experiment import (
     list_daily_checks as list_us_experiment_daily_checks,
     list_instruments as list_us_experiment_instruments,
     refresh_overview_snapshot as refresh_us_experiment_overview_snapshot,
+    register_targeted_universe as register_us_experiment_targeted_universe,
     refresh_universe as refresh_us_experiment_universe,
     sync_daily_prices as sync_us_experiment_daily_prices,
 )
@@ -1311,7 +1313,12 @@ def list_us_experiment_sync_jobs(
     offset: int = 0,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    actions = ("us_experiment_universe", "us_experiment_prices", "us_experiment_overview_refresh")
+    actions = (
+        "us_experiment_universe",
+        "us_experiment_targeted_universe",
+        "us_experiment_prices",
+        "us_experiment_overview_refresh",
+    )
     page_limit = min(max(limit, 1), 200)
     page_offset = max(offset, 0)
     total = int(
@@ -2205,6 +2212,7 @@ def validate_sync_job_payload(action: str, payload: dict[str, Any]) -> dict[str,
         "market_bundle": SyncMarketDataRequest,
         "daily_market": SyncMarketDataRequest,
         "market_fundamentals": SyncMarketFundamentalsRequest,
+        "us_experiment_targeted_universe": SyncUsExperimentTargetedUniverseRequest,
         "us_experiment_prices": SyncUsExperimentPricesRequest,
     }
     try:
@@ -2230,6 +2238,9 @@ def execute_sync_job_action(action: str, payload: dict[str, Any], db: Session) -
         return {**result, "rows_upserted": sum(int(value or 0) for value in result.get("summary", {}).values())}
     if action == "us_experiment_universe":
         return refresh_us_experiment_universe(db)
+    if action == "us_experiment_targeted_universe":
+        request = SyncUsExperimentTargetedUniverseRequest.model_validate(payload)
+        return register_us_experiment_targeted_universe(db, symbols=request.symbols)
     if action == "us_experiment_prices":
         return sync_us_experiment_daily_prices(
             db,

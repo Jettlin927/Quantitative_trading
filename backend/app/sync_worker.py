@@ -29,6 +29,7 @@ SUPPORTED_SYNC_ACTIONS = {
     "market_fundamentals",
     "us_sample",
     "us_experiment_universe",
+    "us_experiment_targeted_universe",
     "us_experiment_prices",
     "us_experiment_overview_refresh",
 }

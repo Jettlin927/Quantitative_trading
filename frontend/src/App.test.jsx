@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './main.jsx'
+import { USDataBoundaryView } from './USDataBoundaryView.jsx'
 
 vi.mock('lightweight-charts', () => ({
   CandlestickSeries: 'candlestick',
@@ -198,6 +199,29 @@ describe('研究驾驶舱', () => {
     cleanup()
     vi.useRealTimers()
     vi.restoreAllMocks()
+  })
+
+  it('显式目标名单不伪装成全市场目录', () => {
+    render(<USDataBoundaryView
+      usDb={{ counts: {}, assets: [] }}
+      usExperiment={{
+        targetStartDate: '2010-01-01',
+        sources: { primaryDaily: 'yfinance 1d auto_adjust=false' },
+        schedule: { timezone: 'Asia/Shanghai', dailyAt: '10:00' },
+        universe: {
+          current: 2,
+          byMarket: { TGT: 2 },
+          mode: 'targeted_explicit',
+          selection: '显式目标名单 2 只；非全市场目录',
+        },
+        coverage: {},
+        validation: {},
+      }}
+    />)
+
+    expect(screen.getAllByText('显式目标名单 2 只；非全市场目录').length).toBeGreaterThan(0)
+    expect(screen.getByText('目标 2', { exact: false })).toBeInTheDocument()
+    expect(screen.queryByText('当前目录全量、不设人工票数上限', { exact: false })).not.toBeInTheDocument()
   })
 
   it('提供四个一级区域并显式区分美股实验数据、研究门禁与 SAMPLE 边界', async () => {
