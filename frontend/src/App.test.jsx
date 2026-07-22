@@ -58,6 +58,34 @@ const coreResponses = {
     recentValidationAlerts: [{ sourceCode: '105.AAPL', tradeDate: '2026-07-20', status: 'mismatch', yfinance: { open: 210, high: 215, low: 209, close: 214, volume: 1000 }, akshare: { open: 211, high: 216, low: 208, close: 213, volume: 900 }, maxPriceRelativeDiff: 0.0047, volumeRelativeDiff: 0.1, message: '成交量差异超过容差' }],
     limitations: ['当前目录不是历史 point-in-time universe，退市与历史成分尚未补齐。'],
   },
+  '/api/us-experiment/instruments?current_only=true&limit=50&offset=0': {
+    isExperimental: true,
+    researchEligible: false,
+    items: [
+      { sourceCode: 'TGT.AAPL', symbol: 'AAPL', yahooSymbol: 'AAPL', name: 'Apple', marketCode: 'TGT', marketName: '目标名单', isCurrent: true, historyStartDate: '2010-01-04', historyEndDate: '2026-07-20', lastSyncStatus: 'ok' },
+      { sourceCode: 'TGT.NVDA', symbol: 'NVDA', yahooSymbol: 'NVDA', name: 'NVIDIA', marketCode: 'TGT', marketName: '目标名单', isCurrent: true, historyStartDate: '2010-01-04', historyEndDate: '2026-07-20', lastSyncStatus: 'ok' },
+    ],
+    total: 2,
+    limit: 50,
+    offset: 0,
+  },
+  '/api/us-experiment/instruments/TGT.AAPL/daily-bars': {
+    isExperimental: true,
+    researchEligible: false,
+    sourceCode: 'TGT.AAPL',
+    bars: [
+      { sourceCode: 'TGT.AAPL', tradeDate: '2026-07-17', open: 209, high: 212, low: 208, close: 210, adjClose: 209.8, volume: 1000, cashDividend: 0, splitRatio: 0, source: 'yfinance' },
+      { sourceCode: 'TGT.AAPL', tradeDate: '2026-07-20', open: 210, high: 215, low: 209, close: 214, adjClose: 213.8, volume: 1200, cashDividend: 0.25, splitRatio: 0, source: 'yfinance' },
+    ],
+  },
+  '/api/us-experiment/instruments/TGT.NVDA/daily-bars': {
+    isExperimental: true,
+    researchEligible: false,
+    sourceCode: 'TGT.NVDA',
+    bars: [
+      { sourceCode: 'TGT.NVDA', tradeDate: '2026-07-20', open: 180, high: 186, low: 179, close: 185, adjClose: 185, volume: 2200, cashDividend: 0, splitRatio: 0, source: 'yfinance' },
+    ],
+  },
 }
 
 const strategySummary = {
@@ -222,6 +250,46 @@ describe('研究驾驶舱', () => {
     expect(screen.getAllByText('显式目标名单 2 只；非全市场目录').length).toBeGreaterThan(0)
     expect(screen.getByText('目标 2', { exact: false })).toBeInTheDocument()
     expect(screen.queryByText('当前目录全量、不设人工票数上限', { exact: false })).not.toBeInTheDocument()
+    expect(screen.getByText('没有匹配的美股标的')).toBeInTheDocument()
+    expect(screen.getByText('暂无可绘制的日线数据')).toBeInTheDocument()
+  })
+
+  it('美股页优先展示标的行情、K 线和公司行动，再展示同步诊断', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /美股数据/ }))
+
+    expect(await screen.findByRole('heading', { name: '美股标的行情' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Apple' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /价格图。近 180 日：日 K 线共 2 个交易日/ })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /成交量图。近 180 日：日 K 线共 2 个交易日/ })).toBeInTheDocument()
+    expect(screen.getByText('Adj Close')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '公司行动' })).toBeInTheDocument()
+    expect(screen.getByText('0.25')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '近 1 年' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '全部历史' })).toBeInTheDocument()
+
+    const marketHeading = screen.getByRole('heading', { name: '美股标的行情' })
+    const diagnosticsHeading = screen.getByRole('heading', { name: '近期同步任务' })
+    expect(marketHeading.compareDocumentPosition(diagnosticsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText('researchEligible=false', { exact: false })).toBeInTheDocument()
+  })
+
+  it('支持按代码搜索美股标的并切换对应日线', async () => {
+    installFetch({
+      route: (path) => path === '/api/us-experiment/instruments?current_only=true&limit=50&offset=0&q=NVDA'
+        ? ok({ ...coreResponses['/api/us-experiment/instruments?current_only=true&limit=50&offset=0'], items: [coreResponses['/api/us-experiment/instruments?current_only=true&limit=50&offset=0'].items[1]], total: 1 })
+        : null,
+    })
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /美股数据/ }))
+    await screen.findByRole('heading', { name: 'Apple' })
+
+    fireEvent.change(screen.getByPlaceholderText('代码 / 名称'), { target: { value: 'NVDA' } })
+    fireEvent.click(screen.getByRole('button', { name: '查询' }))
+
+    expect(await screen.findByRole('heading', { name: 'NVIDIA' })).toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/us-experiment/instruments?current_only=true&limit=50&offset=0&q=NVDA', expect.any(Object))
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/us-experiment/instruments/TGT.NVDA/daily-bars', expect.any(Object))
   })
 
   it('提供四个一级区域并显式区分美股实验数据、研究门禁与 SAMPLE 边界', async () => {
