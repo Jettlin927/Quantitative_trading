@@ -1,16 +1,38 @@
-import { ChevronRight, Clock3, Database, FlaskConical, Globe2, ShieldAlert } from 'lucide-react'
+import { ChevronRight, Clock3, Database, FlaskConical, Globe2, RefreshCw, Search, ShieldAlert } from 'lucide-react'
+import { TechnicalChart } from './TechnicalChart.jsx'
 import {
   Badge,
+  DomainFailure,
   EmptyRow,
+  Fact,
+  FactGroup,
   Panel,
   SummaryMetric,
   formatDateTime,
   formatInt,
   formatNumber,
   formatPercent,
+  formatSignedPercent,
+  priceTone,
 } from './viewSupport.jsx'
 
-export function USDataBoundaryView({ usDb, usExperiment }) {
+export function USDataBoundaryView({
+  usDb,
+  usExperiment,
+  instruments = [],
+  instrumentPage = { items: [], total: 0, limit: 50, offset: 0 },
+  query = '',
+  setQuery = () => {},
+  onSearch = () => {},
+  onPage = () => {},
+  selectedCode = '',
+  setSelectedCode = () => {},
+  selectedInstrument = null,
+  bars = [],
+  detailLoading = false,
+  detailReady = true,
+  error = '',
+}) {
   const usAssets = usDb?.assets || []
   const sampleCounts = usDb?.counts || {}
   const universe = usExperiment?.universe || {}
@@ -32,6 +54,33 @@ export function USDataBoundaryView({ usDb, usExperiment }) {
 
   return (
     <div className="view-stack enter">
+      <section className="section-heading us-market-heading">
+        <div><span>yfinance 实验行情 · 只读</span><h2>美股标的行情</h2><p>先看标的、价格走势、成交量与公司行动；覆盖率、同步任务和数据源诊断放在行情工作台之后。</p></div>
+        <div className="data-boundary-badges"><Badge value="实验数据" /><Badge value="只读" /></div>
+      </section>
+
+      <section className="sample-ribbon experiment-ribbon">
+        <Badge value="实验数据" />
+        <span><Clock3 size={14} /> 每日 {schedule.dailyAt || '10:00'} · {schedule.timezone || 'Asia/Shanghai'}</span>
+        <strong>目标起点 {usExperiment?.targetStartDate || '2010-01-01'} · {universe.selection || '当前目录全量、不设人工票数上限'}</strong>
+      </section>
+
+      {error ? <DomainFailure title="美股行情读取失败" detail={error} /> : null}
+      <USMarketLab
+        instruments={instruments}
+        instrumentPage={instrumentPage}
+        query={query}
+        setQuery={setQuery}
+        onSearch={onSearch}
+        onPage={onPage}
+        selectedCode={selectedCode}
+        setSelectedCode={setSelectedCode}
+        selectedInstrument={selectedInstrument}
+        bars={bars}
+        detailLoading={detailLoading}
+        detailReady={detailReady}
+      />
+
       <section className="functional-debt-card us-experiment-boundary">
         <div className="debt-icon"><FlaskConical size={25} /></div>
         <div>
@@ -40,12 +89,6 @@ export function USDataBoundaryView({ usDb, usExperiment }) {
           <p>yfinance 保存未自动复权 OHLCV、Adj Close 与公司行为；AKShare 只做独立同日对照，不覆盖主数据。当前目录、历史范围与校验事实可审计，但尚不具备 point-in-time 历史标的范围，因此不能进入正式研究。</p>
         </div>
         <a href="https://github.com/Jettlin927/Quantitative_trading/issues/27" target="_blank" rel="noreferrer">查看工程：建设实验级美股日线数据模块 <ChevronRight size={14} /></a>
-      </section>
-
-      <section className="sample-ribbon experiment-ribbon">
-        <Badge value="实验数据" />
-        <span><Clock3 size={14} /> 每日 {schedule.dailyAt || '10:00'} · {schedule.timezone || 'Asia/Shanghai'}</span>
-        <strong>目标起点 {usExperiment?.targetStartDate || '2010-01-01'} · {universe.selection || '当前目录全量、不设人工票数上限'}</strong>
       </section>
 
       <section className="summary-ribbon us-experiment-metrics">
@@ -134,11 +177,96 @@ export function USDataBoundaryView({ usDb, usExperiment }) {
   )
 }
 
+function USMarketLab({ instruments, instrumentPage, query, setQuery, onSearch, onPage, selectedCode, setSelectedCode, selectedInstrument, bars, detailLoading, detailReady }) {
+  const sortedBars = [...bars].sort((left, right) => String(left.tradeDate).localeCompare(String(right.tradeDate)))
+  const chartBars = sortedBars.map((row) => ({ trade_date: row.tradeDate, open: row.open, high: row.high, low: row.low, close: row.close, vol: row.volume, amount: null }))
+  const latest = sortedBars[sortedBars.length - 1]
+  const previous = sortedBars[sortedBars.length - 2]
+  const changePercent = previous?.close ? ((Number(latest?.close) - Number(previous.close)) / Number(previous.close)) * 100 : null
+  const actions = [...sortedBars].reverse().filter((row) => Number(row.cashDividend) !== 0 || Number(row.splitRatio) !== 0)
+  const latestAction = actions[0]
+  const pageNumber = Math.floor(instrumentPage.offset / instrumentPage.limit) + 1
+  const pageCount = Math.max(1, Math.ceil(instrumentPage.total / instrumentPage.limit))
+  const historyStart = sortedBars[0]?.tradeDate || selectedInstrument?.historyStartDate
+  const historyEnd = latest?.tradeDate || selectedInstrument?.historyEndDate
+
+  return (
+    <div className="stock-lab us-stock-lab enter">
+      <aside className="security-browser">
+        <header><div><span>当前美股范围</span><h2>标的浏览</h2></div><b>{formatInt(instrumentPage.total)}</b></header>
+        <label className="security-search">
+          <Search size={15} />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && onSearch()} placeholder="代码 / 名称" />
+          <button onClick={onSearch}>查询</button>
+        </label>
+        <div className="security-list">
+          {instruments.map((instrument) => (
+            <button className={instrument.sourceCode === selectedCode ? 'active' : ''} key={instrument.sourceCode} onClick={() => setSelectedCode(instrument.sourceCode)}>
+              <span><b>{instrument.symbol || instrument.yahooSymbol || instrument.sourceCode}</b><small>{instrument.name || instrument.sourceCode}</small></span>
+              <span><b>{marketLabel(instrument.marketName || instrument.marketCode)}</b><small>{instrument.historyEndDate || '无行情'}</small></span>
+            </button>
+          ))}
+          {!instruments.length ? <div className="empty-state">没有匹配的美股标的</div> : null}
+        </div>
+        <div className="security-pagination" aria-label="美股标的分页">
+          <button disabled={instrumentPage.offset <= 0} onClick={() => onPage(Math.max(0, instrumentPage.offset - instrumentPage.limit))}>上一页</button>
+          <span>{pageNumber} / {pageCount}</span>
+          <button disabled={instrumentPage.offset + instrumentPage.limit >= instrumentPage.total} onClick={() => onPage(instrumentPage.offset + instrumentPage.limit)}>下一页</button>
+        </div>
+      </aside>
+
+      <section className="market-chart-panel">
+        <header className="security-title">
+          <div><span>{selectedInstrument?.symbol || selectedInstrument?.sourceCode || '未选择标的'}</span><h2>{selectedInstrument && !detailReady ? '正在读取行情…' : selectedInstrument?.name || selectedInstrument?.symbol || selectedInstrument?.yahooSymbol || '请选择美股标的'}</h2></div>
+          <div className="security-quote">
+            <strong className={priceTone(changePercent)}>{formatNumber(latest?.close)}</strong>
+            <span className={priceTone(changePercent)}>{formatSignedPercent(changePercent)}</span>
+          </div>
+          <div className="security-meta">
+            <span>市场 <b>{marketLabel(selectedInstrument?.marketName || selectedInstrument?.marketCode)}</b></span>
+            <span>代码 <b>{selectedInstrument?.yahooSymbol || selectedInstrument?.sourceCode || '-'}</b></span>
+            <span>交易日 <b>{detailLoading ? '加载中' : formatInt(sortedBars.length)}</b></span>
+            <span>完整区间 <b>{historyStart && historyEnd ? `${historyStart} → ${historyEnd}` : '-'}</b></span>
+          </div>
+        </header>
+        {detailLoading ? <div className="loading-state"><RefreshCw className="spin" size={18} />正在读取美股日线…</div> : <TechnicalChart bars={chartBars} />}
+      </section>
+
+      <aside className="facts-panel">
+        <header><span>价格与公司行为</span><h2>行情事实</h2></header>
+        <FactGroup title={latest?.tradeDate || '最新行情'}>
+          <Fact label="开 / 高" value={`${formatNumber(latest?.open)} / ${formatNumber(latest?.high)}`} />
+          <Fact label="低 / 收" value={`${formatNumber(latest?.low)} / ${formatNumber(latest?.close)}`} strong />
+          <Fact label="Adj Close" value={formatNumber(latest?.adjClose)} />
+          <Fact label="成交量" value={formatInt(latest?.volume)} />
+        </FactGroup>
+        <FactGroup title="公司行动">
+          <Fact label="最近日期" value={latestAction?.tradeDate || '无记录'} />
+          <Fact label="现金分红" value={latestAction ? formatNumber(latestAction.cashDividend) : '-'} strong />
+          <Fact label="拆股比例" value={latestAction ? formatNumber(latestAction.splitRatio) : '-'} />
+          <Fact label="历史事件" value={`${formatInt(actions.length)} 条`} />
+        </FactGroup>
+        <FactGroup title="数据状态">
+          <Fact label="主行情源" value={latest?.source || 'yfinance'} />
+          <Fact label="同步状态" value={selectedInstrument?.lastSyncStatus || '-'} strong />
+          <Fact label="最近同步" value={formatDateTime(selectedInstrument?.lastSyncAt)} />
+          <Fact label="研究资格" value="正式研究不可用" />
+        </FactGroup>
+      </aside>
+    </div>
+  )
+}
+
 function jobActionLabel(action) {
   if (action === 'us_experiment_universe') return '刷新当前目录'
   if (action === 'us_experiment_targeted_universe') return '注册目标名单'
   if (action === 'us_experiment_prices') return '同步实验日线'
   return action || '-'
+}
+
+function marketLabel(value) {
+  if (['TGT', 'TARGETED'].includes(String(value || '').toUpperCase())) return '目标名单'
+  return value || '-'
 }
 
 function ohlcvSummary(row) {

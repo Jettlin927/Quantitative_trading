@@ -22,6 +22,7 @@ import './styles.css'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const STOCK_PAGE_SIZE = 50
+const US_INSTRUMENT_PAGE_SIZE = 50
 
 const NAV_ITEMS = [
   { id: 'research', label: '研究驾驶舱', eyebrow: '结构化研究', icon: BookOpenCheck },
@@ -44,6 +45,14 @@ export function App() {
   const [catalogError, setCatalogError] = useState('')
   const [usDb, setUsDb] = useState(null)
   const [usExperiment, setUsExperiment] = useState(null)
+  const [usInstrumentPage, setUsInstrumentPage] = useState({ items: [], total: 0, limit: US_INSTRUMENT_PAGE_SIZE, offset: 0 })
+  const [usQuery, setUsQuery] = useState('')
+  const [selectedUsCode, setSelectedUsCode] = useState('')
+  const [usBars, setUsBars] = useState([])
+  const [usDataCode, setUsDataCode] = useState('')
+  const [usDetailLoading, setUsDetailLoading] = useState(false)
+  const [usListError, setUsListError] = useState('')
+  const [usDetailError, setUsDetailError] = useState('')
   const [strategies, setStrategies] = useState([])
   const [selectedStrategyId, setSelectedStrategyId] = useState('')
   const [strategyProfile, setStrategyProfile] = useState(null)
@@ -65,15 +74,19 @@ export function App() {
   const [stockDetailError, setStockDetailError] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
   const stockRequestId = useRef(0)
+  const usRequestId = useRef(0)
   const catalogRequestId = useRef(0)
   const strategyRequestId = useRef(0)
   const researchRequestId = useRef(0)
   const stockPageRequestRef = useRef({ id: 0, path: '' })
+  const usPageRequestRef = useRef({ id: 0, path: '' })
   const selectedCodeRef = useRef('')
+  const selectedUsCodeRef = useRef('')
   const selectedCatalogRef = useRef({ kind: '', code: '' })
   const selectedStrategyIdRef = useRef('')
   const selectedResearchIdRef = useRef('')
   const appliedStockQueryRef = useRef('')
+  const appliedUsQueryRef = useRef('')
 
   async function refreshAll(refreshCoverage = false) {
     setLoading(true)
@@ -82,6 +95,7 @@ export function App() {
     setResearchError('')
     const { startDate: catalogStartDate, endDate: catalogEndDate } = recentCatalogRange()
     const stockPageRequest = beginStockPageRequest(buildStockScreenPath(appliedStockQueryRef.current, 0))
+    const usPageRequest = beginUsPageRequest(buildUsInstrumentPath(appliedUsQueryRef.current, 0))
     const requests = [
       ['health', '/api/health?include_counts=false'],
       ['progress', '/api/tushare/sync-progress?include_coverage=false'],
@@ -94,19 +108,26 @@ export function App() {
       ['industries', '/api/industries?limit=1000'],
       ['usDb', '/api/us-research/db-overview'],
       ['usExperiment', '/api/us-experiment/overview'],
+      ['usInstruments', usPageRequest.path],
       ['strategies', '/api/research/strategies'],
     ]
     const results = await Promise.allSettled(requests.map(([, path]) => fetchJson(path)))
     const failures = []
     let stockPageRefreshed = true
+    let usPageRefreshed = true
     results.forEach((result, index) => {
       const key = requests[index][0]
       if (key === 'stocks' && !isCurrentStockPageRequest(stockPageRequest)) {
         stockPageRefreshed = false
         return
       }
+      if (key === 'usInstruments' && !isCurrentUsPageRequest(usPageRequest)) {
+        usPageRefreshed = false
+        return
+      }
       if (result.status === 'rejected') {
         if (key === 'stocks') setStockListError(errorMessage(result.reason))
+        if (key === 'usInstruments') setUsListError(errorMessage(result.reason))
         if (key === 'strategies') {
           setResearchError(errorMessage(result.reason))
           setResearchLoading(false)
@@ -143,6 +164,10 @@ export function App() {
       }
       if (key === 'usDb') setUsDb(value)
       if (key === 'usExperiment') setUsExperiment(value)
+      if (key === 'usInstruments') {
+        setUsListError('')
+        applyUsInstrumentPage(value)
+      }
       if (key === 'strategies') {
         setStrategies(value)
         const current = selectedStrategyIdRef.current
@@ -159,7 +184,9 @@ export function App() {
     })
     const detailResults = refreshCoverage ? await Promise.all([
       Promise.resolve(stockPageRefreshed),
+      Promise.resolve(usPageRefreshed),
       selectedCodeRef.current ? loadSelectedStockData(selectedCodeRef.current) : Promise.resolve(true),
+      selectedUsCodeRef.current ? loadSelectedUsData(selectedUsCodeRef.current) : Promise.resolve(true),
       selectedCatalogRef.current.code ? loadSelectedCatalogData(selectedCatalogRef.current) : Promise.resolve(true),
       refreshSelectedResearchData(selectedStrategyIdRef.current),
     ]) : [true]
@@ -189,6 +216,27 @@ export function App() {
     setStockDetail(null)
     setStockDetailError('')
     if (!tsCode) setDetailLoading(false)
+  }
+
+  function applyUsInstrumentPage(page) {
+    setUsInstrumentPage(page)
+    const current = selectedUsCodeRef.current
+    const nextCode = page.items.some((item) => item.sourceCode === current) ? current : page.items[0]?.sourceCode || ''
+    selectUsInstrument(nextCode)
+  }
+
+  function selectUsInstrument(sourceCode) {
+    if (sourceCode === selectedUsCodeRef.current) {
+      if (!sourceCode) setUsDetailLoading(false)
+      return
+    }
+    selectedUsCodeRef.current = sourceCode
+    usRequestId.current += 1
+    setSelectedUsCode(sourceCode)
+    setUsDataCode('')
+    setUsBars([])
+    setUsDetailError('')
+    if (!sourceCode) setUsDetailLoading(false)
   }
 
   function selectCatalog(kind, code) {
@@ -224,6 +272,27 @@ export function App() {
       return false
     } finally {
       if (requestId === stockRequestId.current) setDetailLoading(false)
+    }
+  }, [])
+
+  const loadSelectedUsData = useCallback(async (requestedCode) => {
+    const requestId = usRequestId.current + 1
+    usRequestId.current = requestId
+    setUsDetailLoading(true)
+    setUsDataCode('')
+    setUsBars([])
+    try {
+      const response = await fetchJson(`/api/us-experiment/instruments/${encodeURIComponent(requestedCode)}/daily-bars`)
+      if (requestId !== usRequestId.current || requestedCode !== selectedUsCodeRef.current) return false
+      setUsDataCode(requestedCode)
+      setUsBars(response.bars || [])
+      setUsDetailError('')
+      return true
+    } catch (err) {
+      if (requestId === usRequestId.current) setUsDetailError(errorMessage(err))
+      return false
+    } finally {
+      if (requestId === usRequestId.current) setUsDetailLoading(false)
     }
   }, [])
 
@@ -340,6 +409,10 @@ export function App() {
     await loadStocks(0, query.trim(), true)
   }
 
+  async function submitUsSearch() {
+    await loadUsInstruments(0, usQuery.trim(), true)
+  }
+
   async function loadStocks(offset = 0, requestedQuery = appliedStockQueryRef.current, applyQueryOnSuccess = false) {
     const request = beginStockPageRequest(buildStockScreenPath(requestedQuery, offset))
     setStockListError('')
@@ -362,6 +435,30 @@ export function App() {
 
   function isCurrentStockPageRequest(request) {
     return request.id === stockPageRequestRef.current.id && request.path === stockPageRequestRef.current.path
+  }
+
+  async function loadUsInstruments(offset = 0, requestedQuery = appliedUsQueryRef.current, applyQueryOnSuccess = false) {
+    const request = beginUsPageRequest(buildUsInstrumentPath(requestedQuery, offset))
+    setUsListError('')
+    try {
+      const page = await fetchJson(request.path)
+      if (isCurrentUsPageRequest(request)) {
+        if (applyQueryOnSuccess) appliedUsQueryRef.current = requestedQuery
+        applyUsInstrumentPage(page)
+      }
+    } catch (err) {
+      if (isCurrentUsPageRequest(request)) setUsListError(errorMessage(err))
+    }
+  }
+
+  function beginUsPageRequest(path) {
+    const request = { id: usPageRequestRef.current.id + 1, path }
+    usPageRequestRef.current = request
+    return request
+  }
+
+  function isCurrentUsPageRequest(request) {
+    return request.id === usPageRequestRef.current.id && request.path === usPageRequestRef.current.path
   }
 
   function selectStrategy(strategyId) {
@@ -405,6 +502,12 @@ export function App() {
   }, [loadSelectedStockData, selectedCode])
 
   useEffect(() => {
+    if (!selectedUsCode) return undefined
+    loadSelectedUsData(selectedUsCode)
+    return () => { usRequestId.current += 1 }
+  }, [loadSelectedUsData, selectedUsCode])
+
+  useEffect(() => {
     if (!selectedCatalog.code) return undefined
     loadSelectedCatalogData(selectedCatalog)
     return () => { catalogRequestId.current += 1 }
@@ -435,6 +538,9 @@ export function App() {
   const selectedStockBars = stockDataCode === selectedCode ? stockBars : []
   const selectedStockDetail = stockDataCode === selectedCode ? stockDetail : null
   const selectedLatestBar = selectedStockBars[selectedStockBars.length - 1] || selectedStock || null
+  const usInstruments = usInstrumentPage.items
+  const selectedUsInstrument = usInstruments.find((item) => item.sourceCode === selectedUsCode) || usInstruments[0] || null
+  const selectedUsBars = usDataCode === selectedUsCode ? usBars : []
 
   return (
     <div className="app-frame">
@@ -485,7 +591,25 @@ export function App() {
               error={[stockListError, stockDetailError].filter(Boolean).join('；')}
             />
           ) : null}
-          {activeView === 'us-data' ? <USDataBoundaryView usDb={usDb} usExperiment={usExperiment} /> : null}
+          {activeView === 'us-data' ? (
+            <USDataBoundaryView
+              usDb={usDb}
+              usExperiment={usExperiment}
+              instruments={usInstruments}
+              instrumentPage={usInstrumentPage}
+              query={usQuery}
+              setQuery={setUsQuery}
+              onSearch={submitUsSearch}
+              onPage={loadUsInstruments}
+              selectedCode={selectedUsCode}
+              setSelectedCode={selectUsInstrument}
+              selectedInstrument={selectedUsInstrument}
+              bars={selectedUsBars}
+              detailLoading={usDetailLoading}
+              detailReady={Boolean(selectedUsCode) && usDataCode === selectedUsCode}
+              error={[usListError, usDetailError].filter(Boolean).join('；')}
+            />
+          ) : null}
           {activeView === 'operations' ? <OperationsView health={health} readiness={readiness} coverageRows={coverageRows} syncRuns={syncRuns} /> : null}
         </main>
       </div>
@@ -585,6 +709,12 @@ function buildStockScreenPath(query, offset) {
   const params = new URLSearchParams({ limit: String(STOCK_PAGE_SIZE), offset: String(Math.max(0, offset)) })
   if (query.trim()) params.set('q', query.trim())
   return `/api/stocks/screen?${params.toString()}`
+}
+
+function buildUsInstrumentPath(query, offset) {
+  const params = new URLSearchParams({ current_only: 'true', limit: String(US_INSTRUMENT_PAGE_SIZE), offset: String(Math.max(0, offset)) })
+  if (query.trim()) params.set('q', query.trim())
+  return `/api/us-experiment/instruments?${params.toString()}`
 }
 
 function recentCatalogRange() {
