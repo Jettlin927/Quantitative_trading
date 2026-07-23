@@ -81,8 +81,8 @@ class QuantTrustContractDocumentationTest(unittest.TestCase):
 
         standard_relative_path = "docs/research/contracts/strategy-evaluation-standard.md"
         self.assertIn(standard_relative_path, agents)
-        self.assertIn("不得只凭累计收益、年化收益或 Sharpe", agents)
-        self.assertIn("内部编号代替名称", agents)
+        self.assertIn("不得只展示累计收益、年化收益或 Sharpe", standard)
+        self.assertIn("内部编号不能替代策略或变体名称", standard)
         self.assertIn("strategy-evaluation-standard.md", research_readme)
 
         required_sections = (
