@@ -26,6 +26,7 @@
 - [不可变验收证据](acceptance/)
 - [架构决策](adr/)
 - [Agent 规则](agents/)
+- [变更验证规则](agents/validation.md)
 - [历史归档](archive/)
 
 ## 活动路线图
@@ -33,4 +34,6 @@
 - [寻路地图：量化研究自动化、研究驾驶舱与新服务器迁移](https://github.com/Jettlin927/Quantitative_trading/issues/3)
 - [第一阶段实施总览：量化研究自动化、研究驾驶舱与新服务器](https://github.com/Jettlin927/Quantitative_trading/issues/17)
 
-`操作日志.md` 只追加阶段事实；已完成计划、旧 handoff、dated 快照和 sample 实施记录保留在归档中，不代表当前生产事实。
+活动任务只以 GitHub Issues 为准；代码与文档历史以 Git 提交和 Pull Request
+为准，批准、研究结论与重要运维事实记录在对应 Issue、自动化运行记录、数据库事实
+或冻结工件中。已归档资料不代表当前生产事实。
