@@ -79,7 +79,7 @@ class DocumentationContractTest(unittest.TestCase):
         self.assertIn("SSH 隧道是研究系统唯一的远程访问入口", decision)
         self.assertIn("不购买或申请域名", decision)
         self.assertIn("不开放公网 IP 端口", agents)
-        self.assertIn("除非用户明确提出变更", agents)
+        self.assertIn("除非用户明确变更决定", agents)
         self.assertNotIn("采用 **Cloudflare Tunnel + Cloudflare Access**", decision)
 
     def test_production_deployment_handoff_keeps_live_gates(self) -> None:
