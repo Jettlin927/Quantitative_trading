@@ -10,9 +10,9 @@ from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from backend.app import main, sync_worker
+from backend.app import main, market_data_ingestion, sync_worker
 from backend.app.database import Base
-from backend.app.models import DataSyncJob, SyncWorkerHeartbeat, TradeCalendar
+from backend.app.models import DataSyncJob, DataSyncRun, SyncWorkerHeartbeat, TradeCalendar
 
 
 @unittest.skipUnless(
@@ -155,6 +155,78 @@ class SyncWorkerPostgresTest(unittest.TestCase):
             )
         self.assertEqual(rows, 1)
         self.assertEqual(duplicate_groups, 0)
+
+    def test_trade_calendar_canonical_execution_survives_crash_replay(self) -> None:
+        class Frame:
+            @staticmethod
+            def to_dict(orient: str) -> list[dict]:
+                if orient != "records":
+                    raise AssertionError(orient)
+                return [
+                    {
+                        "exchange": "SSE",
+                        "cal_date": "20260711",
+                        "is_open": 1,
+                        "pretrade_date": "20260710",
+                    }
+                ]
+
+        class Provider:
+            @staticmethod
+            def trade_cal(**_kwargs):
+                return Frame()
+
+        self._enqueue("job-canonical-replay")
+        now = datetime(2026, 7, 11, 9, 0, tzinfo=timezone.utc)
+        first = sync_worker.claim_next_job(
+            "worker-before-action-crash",
+            session_factory=self.Session,
+            now=now,
+            lease_seconds=10,
+        )
+        with self.Session() as db:
+            first_result = market_data_ingestion.execute_command(
+                first.action,
+                first.payload,
+                db,
+                provider_factory=lambda _token: Provider(),
+            )
+
+        recovered = sync_worker.claim_next_job(
+            "worker-after-action-crash",
+            session_factory=self.Session,
+            now=now + timedelta(seconds=11),
+            lease_seconds=60,
+        )
+        with self.Session() as db:
+            replay_result = market_data_ingestion.execute_command(
+                recovered.action,
+                recovered.payload,
+                db,
+                provider_factory=lambda _token: Provider(),
+            )
+        sync_worker.complete_claimed_job(
+            recovered,
+            replay_result,
+            session_factory=self.Session,
+            now=now + timedelta(seconds=12),
+        )
+
+        with self.Session() as db:
+            job = db.get(DataSyncJob, "job-canonical-replay")
+            rows = db.scalar(select(func.count()).select_from(TradeCalendar))
+            runs = db.scalar(
+                select(func.count()).select_from(DataSyncRun).where(
+                    DataSyncRun.target == "trade_calendar"
+                )
+            )
+        self.assertEqual(first_result["rows_upserted"], 1)
+        self.assertEqual(replay_result["rows_upserted"], 1)
+        self.assertEqual(job.status, "ok")
+        self.assertEqual(job.attempt_count, 2)
+        self.assertEqual(job.rows_upserted, 1)
+        self.assertEqual(rows, 1)
+        self.assertEqual(runs, 2)
 
     def test_financial_revision_insert_reports_exact_postgres_count(self) -> None:
         row = main.financial_indicator_record_to_row(

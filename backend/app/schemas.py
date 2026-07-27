@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .ingestion_contracts import IngestionAction
+
 
 class StockOut(BaseModel):
     ts_code: str
@@ -231,18 +233,7 @@ class SyncUsExperimentTargetedUniverseRequest(BaseModel):
 
 
 class SyncJobCreate(BaseModel):
-    action: Literal[
-        "stock_listings",
-        "trade_calendar",
-        "market_bundle",
-        "daily_market",
-        "market_fundamentals",
-        "us_sample",
-        "us_experiment_universe",
-        "us_experiment_targeted_universe",
-        "us_experiment_prices",
-        "us_experiment_overview_refresh",
-    ]
+    action: IngestionAction
     payload: dict[str, Any] = Field(default_factory=dict)
 
 

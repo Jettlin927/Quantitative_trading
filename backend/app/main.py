@@ -23,6 +23,16 @@ from sqlalchemy.orm import Session
 
 from .database import Base, assert_schema_revision_at_head, engine, get_db
 from .json_safety import json_safe_value
+from .market_data_ingestion import (
+    UnknownIngestionActionError,
+    actions_with_metadata,
+    build_command as build_ingestion_command,
+    execute_command as execute_ingestion_command,
+    get_action_spec,
+    normalize_status as normalize_ingestion_status,
+    result_rows as ingestion_result_rows,
+    trade_calendar_record_to_row as canonical_trade_calendar_record_to_row,
+)
 from .models import (
     Asset,
     AssetDailyPrice,
@@ -150,7 +160,6 @@ FINA_INDICATOR_FIELDS = (
     "basic_eps_yoy,op_yoy,netprofit_yoy,tr_yoy,or_yoy,q_sales_yoy,q_profit_yoy,"
     "update_flag"
 )
-TRADE_CALENDAR_FIELDS = "exchange,cal_date,is_open,pretrade_date"
 ADJUST_FACTOR_FIELDS = "ts_code,trade_date,adj_factor"
 INDEX_BASIC_FIELDS = "ts_code,name,market,publisher,category,base_date,list_date"
 INDEX_DAILY_FIELDS = "ts_code,trade_date,open,high,low,close,pre_close,change,pct_chg,vol,amount"
@@ -734,13 +743,15 @@ def sync_market_fundamentals(payload: SyncMarketFundamentalsRequest, db: Session
 
 @app.post("/api/tushare/sync-trade-calendar")
 def sync_trade_calendar(payload: SyncTradeCalendarRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
-    pro = get_pro_api(payload.token)
-    exchange = payload.exchange or ""
-    df = pro.trade_cal(exchange=exchange, start_date=tushare_date(payload.start_date), end_date=tushare_date(payload.end_date), fields=TRADE_CALENDAR_FIELDS)
-    rows = [row for item in df.to_dict("records") if (row := trade_calendar_record_to_row(item, fallback_exchange=exchange or "SSE"))]
-    upserted = upsert_rows(db, TradeCalendar, dedupe_rows(rows, ("exchange", "cal_date")), ["exchange", "cal_date"])
-    record_sync_run(db, target="trade_calendar", start_date=payload.start_date, end_date=payload.end_date, rows_upserted=upserted)
-    return {"status": "ok", "rows_upserted": upserted}
+    """Compatibility HTTP adapter for the canonical trade_calendar action."""
+    request = SyncTradeCalendarRequest.model_validate(payload, from_attributes=True)
+    return execute_ingestion_command(
+        "trade_calendar",
+        request.model_dump(mode="json", exclude={"token"}),
+        db,
+        provider_factory=get_pro_api,
+        secrets={"token": request.token} if request.token else {},
+    )
 
 
 @app.post("/api/tushare/sync-adjust-factors")
@@ -902,8 +913,9 @@ def sync_industry_classifications(payload: SyncIndustryClassificationsRequest, d
 
 @app.post("/api/sync-jobs", status_code=202)
 def create_sync_job(payload: SyncJobCreate, db: Session = Depends(get_db)) -> dict[str, Any]:
-    normalized_payload = validate_sync_job_payload(payload.action, payload.payload)
-    payload_hash = sync_job_payload_hash(payload.action, normalized_payload)
+    action = payload.action.value
+    normalized_payload = validate_sync_job_payload(action, payload.payload)
+    payload_hash = sync_job_payload_hash(action, normalized_payload)
     existing = db.scalars(
         select(DataSyncJob).where(DataSyncJob.active_key == payload_hash).order_by(DataSyncJob.created_at.desc()).limit(1)
     ).first()
@@ -913,7 +925,7 @@ def create_sync_job(payload: SyncJobCreate, db: Session = Depends(get_db)) -> di
     queued_at = datetime.now(timezone.utc)
     job = DataSyncJob(
         id=str(uuid4()),
-        action=payload.action,
+        action=action,
         status="queued",
         payload=normalized_payload,
         payload_hash=payload_hash,
@@ -1313,12 +1325,7 @@ def list_us_experiment_sync_jobs(
     offset: int = 0,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    actions = (
-        "us_experiment_universe",
-        "us_experiment_targeted_universe",
-        "us_experiment_prices",
-        "us_experiment_overview_refresh",
-    )
+    actions = actions_with_metadata(is_experimental=True)
     page_limit = min(max(limit, 1), 200)
     page_offset = max(offset, 0)
     total = int(
@@ -2029,15 +2036,8 @@ def insert_financial_revision_rows(
 
 
 def trade_calendar_record_to_row(item: dict[str, Any], fallback_exchange: str = "SSE") -> dict[str, Any] | None:
-    cal_date = parse_tushare_date(item.get("cal_date"))
-    if not cal_date:
-        return None
-    return {
-        "exchange": str(item.get("exchange") or fallback_exchange),
-        "cal_date": cal_date,
-        "is_open": bool(int(item.get("is_open") or 0)),
-        "pretrade_date": parse_tushare_date(item.get("pretrade_date")),
-    }
+    """Compatibility adapter; the canonical mapper belongs to ingestion."""
+    return canonical_trade_calendar_record_to_row(item, fallback_exchange)
 
 
 def adjust_factor_record_to_row(item: dict[str, Any]) -> dict[str, Any] | None:
@@ -2203,36 +2203,24 @@ def chunked(rows: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]]
 
 
 def validate_sync_job_payload(action: str, payload: dict[str, Any]) -> dict[str, Any]:
-    without_token = {key: value for key, value in payload.items() if key != "token"}
-    if action in {"us_sample", "us_experiment_universe", "us_experiment_overview_refresh"}:
-        return {}
-    request_models = {
-        "stock_listings": SyncStockListingsRequest,
-        "trade_calendar": SyncTradeCalendarRequest,
-        "market_bundle": SyncMarketDataRequest,
-        "daily_market": SyncMarketDataRequest,
-        "market_fundamentals": SyncMarketFundamentalsRequest,
-        "us_experiment_targeted_universe": SyncUsExperimentTargetedUniverseRequest,
-        "us_experiment_prices": SyncUsExperimentPricesRequest,
-    }
     try:
-        request = request_models[action].model_validate(without_token)
-    except (KeyError, ValidationError) as exc:
-        detail = exc.errors(include_url=False) if isinstance(exc, ValidationError) else f"不支持的同步动作: {action}"
+        return build_ingestion_command(action, payload).payload
+    except (UnknownIngestionActionError, ValidationError) as exc:
+        detail = exc.errors(include_url=False) if isinstance(exc, ValidationError) else str(exc)
         raise HTTPException(status_code=422, detail=detail) from exc
-    return request.model_dump(mode="json", exclude={"token"})
 
 
 def sync_job_payload_hash(action: str, payload: dict[str, Any]) -> str:
-    canonical = json.dumps({"action": action, "payload": payload}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return sha256(canonical.encode("utf-8")).hexdigest()
+    return build_ingestion_command(action, payload).payload_hash
 
 
 def execute_sync_job_action(action: str, payload: dict[str, Any], db: Session) -> dict[str, Any]:
+    return execute_ingestion_command(action, payload, db)
+
+
+def execute_legacy_sync_job_action(action: str, payload: dict[str, Any], db: Session) -> dict[str, Any]:
     if action == "stock_listings":
         return sync_stock_listings(SyncStockListingsRequest.model_validate(payload), db)
-    if action == "trade_calendar":
-        return sync_trade_calendar(SyncTradeCalendarRequest.model_validate(payload), db)
     if action == "us_sample":
         result = import_us_research_sample_to_db(db)
         return {**result, "rows_upserted": sum(int(value or 0) for value in result.get("summary", {}).values())}
@@ -2327,22 +2315,11 @@ def execute_market_sync_bundle(action: str, payload: SyncMarketDataRequest, db: 
 
 
 def normalize_sync_job_status(status: Any) -> str:
-    if status is None:
-        return "ok"
-    if status in {"ok", "partial", "failed"}:
-        return str(status)
-    raise ValueError(f"未知同步任务状态：{status}")
+    return normalize_ingestion_status(status)
 
 
 def sync_result_rows(result: Any) -> int:
-    if not isinstance(result, dict):
-        return 0
-    if "rows_upserted" in result:
-        return int(result.get("rows_upserted") or 0)
-    summary = result.get("summary")
-    if isinstance(summary, dict):
-        return sum(int(value or 0) for value in summary.values())
-    return 0
+    return ingestion_result_rows(result)
 
 
 def sync_job_to_dict(job: DataSyncJob) -> dict[str, Any]:
@@ -2366,12 +2343,13 @@ def sync_job_to_dict(job: DataSyncJob) -> dict[str, Any]:
         "lastError": job.last_error,
         "updatedAt": job.updated_at.isoformat() if job.updated_at else None,
     }
-    if job.action.startswith("us_experiment_"):
+    metadata = get_action_spec(job.action).metadata
+    if metadata.is_experimental:
         payload.update(
             {
-                "isExperimental": True,
-                "researchEligible": False,
-                "executionEnabled": False,
+                "isExperimental": metadata.is_experimental,
+                "researchEligible": metadata.research_eligible,
+                "executionEnabled": metadata.execution_enabled,
             }
         )
     return payload
