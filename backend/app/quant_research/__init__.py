@@ -6,6 +6,14 @@ from .manifest import build_run_manifest
 from .metrics import summarize_performance
 from .portfolio import CostModel, SimulationResult, simulate_target_weights, simulate_target_weights_with_ledger
 from .readiness import evaluate_quality_run_readiness, evaluate_research_readiness
+from .research_evaluation import (
+    EVALUATION_SCHEMA_VERSION,
+    EVIDENCE_SCHEMA_VERSION,
+    EvaluationContractError,
+    EvaluationResult,
+    StrategyEvidenceBundle,
+    evaluate_research,
+)
 from .repository import load_index_benchmark, load_stock_research_panel
 from .universe import (
     build_explicit_universe,
@@ -32,8 +40,13 @@ from .validation import WalkForwardWindow, build_walk_forward_windows
 
 __all__ = [
     "CostModel",
+    "EVALUATION_SCHEMA_VERSION",
+    "EVIDENCE_SCHEMA_VERSION",
+    "EvaluationContractError",
+    "EvaluationResult",
     "OpenTradeCalendar",
     "SimulationResult",
+    "StrategyEvidenceBundle",
     "WalkForwardWindow",
     "active_members_as_of",
     "attach_fundamentals_asof",
@@ -54,6 +67,7 @@ __all__ = [
     "build_industry_membership_universe",
     "build_run_manifest",
     "build_walk_forward_windows",
+    "evaluate_research",
     "evaluate_research_readiness",
     "evaluate_universe_provenance",
     "evaluate_quality_run_readiness",

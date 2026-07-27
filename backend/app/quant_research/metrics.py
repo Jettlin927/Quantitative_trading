@@ -86,6 +86,66 @@ def summarize_performance(
     return result
 
 
+def summarize_trading_observations(observations: pd.DataFrame) -> dict[str, Any]:
+    """Summarize canonical daily trading evidence for every evaluation caller."""
+
+    required = {
+        "trade_date",
+        "request_count",
+        "execution_count",
+        "blocked_count",
+        "fully_blocked_count",
+        "one_way_turnover",
+        "transaction_cost_rate",
+    }
+    missing = sorted(required - set(observations.columns))
+    if missing:
+        raise ValueError("交易观察缺少字段：" + ", ".join(missing))
+    frame = observations.loc[:, sorted(required)].copy()
+    frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="raise")
+    if frame.empty or frame["trade_date"].duplicated().any():
+        raise ValueError("交易观察日期不能为空或重复")
+    for field in (
+        "request_count",
+        "execution_count",
+        "blocked_count",
+        "fully_blocked_count",
+    ):
+        values = frame[field]
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or value < 0
+            for value in values
+        ):
+            raise ValueError(f"交易观察.{field} 必须是非负整数")
+    if (
+        (frame["execution_count"] > frame["request_count"])
+        | (frame["blocked_count"] > frame["request_count"])
+        | (frame["fully_blocked_count"] > frame["blocked_count"])
+    ).any():
+        raise ValueError("交易观察请求、成交与阻塞计数不闭合")
+    _numeric_columns(
+        frame,
+        ("one_way_turnover", "transaction_cost_rate"),
+        "交易观察",
+    )
+    if (frame[["one_way_turnover", "transaction_cost_rate"]] < 0).any().any():
+        raise ValueError("交易观察换手与成本不能为负")
+    request_count = int(frame["request_count"].sum())
+    blocked_count = int(frame["blocked_count"].sum())
+    fully_blocked_count = int(frame["fully_blocked_count"].sum())
+    return {
+        "observations": int(len(frame)),
+        "requestCount": request_count,
+        "executionCount": int(frame["execution_count"].sum()),
+        "blockedCount": blocked_count,
+        "blockedRequestRate": fully_blocked_count / request_count if request_count else 0.0,
+        "averageOneWayTurnover": float(frame["one_way_turnover"].mean()),
+        "cumulativeTransactionCostRate": float(frame["transaction_cost_rate"].sum()),
+    }
+
+
 def summarize_execution_metrics(
     nav: pd.DataFrame,
     requests: pd.DataFrame,
@@ -231,20 +291,43 @@ def summarize_execution_metrics(
     total_requests = len(execution_frame)
     executed = execution_frame["executed_change"].gt(1e-10)
     blocked = execution_frame["blocked_change"].gt(1e-10)
+    grouped = execution_frame.assign(_executed=executed, _blocked=blocked).groupby(
+        "execution_date"
+    )
+    daily_trading = nav_frame[[
+        "trade_date", "one_way_turnover", "transaction_cost_rate"
+    ]].copy()
+    daily_trading["request_count"] = daily_trading["trade_date"].map(
+        grouped.size()
+    ).fillna(0).astype(int)
+    daily_trading["execution_count"] = daily_trading["trade_date"].map(
+        grouped["_executed"].sum()
+    ).fillna(0).astype(int)
+    daily_trading["blocked_count"] = daily_trading["trade_date"].map(
+        grouped["_blocked"].sum()
+    ).fillna(0).astype(int)
+    fully_blocked = execution_frame["status"].eq("blocked")
+    daily_trading["fully_blocked_count"] = daily_trading["trade_date"].map(
+        fully_blocked.groupby(execution_frame["execution_date"]).sum()
+    ).fillna(0).astype(int)
+    trading_summary = summarize_trading_observations(daily_trading)
     return {
         "openTradingDays": int(len(nav_frame)),
         "rebalanceCount": int(request_frame["execution_date"].nunique()),
-        "requestCount": int(total_requests),
-        "executionCount": int(executed.sum()),
-        "blockedCount": int(blocked.sum()),
+        **{key: trading_summary[key] for key in (
+            "requestCount",
+            "executionCount",
+            "blockedCount",
+            "averageOneWayTurnover",
+            "cumulativeTransactionCostRate",
+            "blockedRequestRate",
+        )},
         "independentTradeCount": int(
             execution_frame.loc[executed, ["execution_date", "ts_code"]]
             .drop_duplicates()
             .shape[0]
         ),
-        "averageOneWayTurnover": float(nav_frame["one_way_turnover"].mean()),
         "maxOneWayTurnover": float(nav_frame["one_way_turnover"].max()),
-        "cumulativeTransactionCostRate": float(nav_frame["transaction_cost_rate"].sum()),
         "averageHoldingCount": float(pd.Series(counts).mean()),
         "maxHoldingCount": int(max(counts, default=0)),
         "maxSingleWeight": float(position_frame["close_weight"].max()) if not position_frame.empty else 0.0,
@@ -255,9 +338,6 @@ def summarize_execution_metrics(
         "endingGrossExposure": float(gross_values[-1]) if gross_values else 0.0,
         "averageNetExposure": float(pd.Series(net_values).mean()),
         "endingNetExposure": float(net_values[-1]) if net_values else 0.0,
-        "blockedRequestRate": (
-            float(execution_frame["status"].eq("blocked").mean()) if total_requests else 0.0
-        ),
         "partialRequestRate": (
             float(execution_frame["status"].eq("partial").mean()) if total_requests else 0.0
         ),
