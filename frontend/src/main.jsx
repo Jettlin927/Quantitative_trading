@@ -17,12 +17,10 @@ import { AShareDataView } from './AShareDataView.jsx'
 import { OperationsView } from './OperationsView.jsx'
 import { ResearchCockpitView } from './ResearchCockpitView.jsx'
 import { USDataBoundaryView } from './USDataBoundaryView.jsx'
+import { browserReadAdapter, systemClock } from './readAdapter.js'
+import { useStockResearch } from './stockResearch.js'
 import { Notice, isInventoryAvailable, translateStatus } from './viewSupport.jsx'
 import './styles.css'
-
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
-const STOCK_PAGE_SIZE = 50
-const US_INSTRUMENT_PAGE_SIZE = 50
 
 const NAV_ITEMS = [
   { id: 'research', label: '研究驾驶舱', eyebrow: '结构化研究', icon: BookOpenCheck },
@@ -31,13 +29,13 @@ const NAV_ITEMS = [
   { id: 'operations', label: '系统运维', eyebrow: '只读运行事实', icon: Server },
 ]
 
-export function App() {
+export function App({ readAdapter = browserReadAdapter, clock = systemClock, chartAdapter = undefined } = {}) {
   const [activeView, setActiveView] = useState('research')
+  const stockResearch = useStockResearch(readAdapter)
   const [health, setHealth] = useState(null)
   const [overview, setOverview] = useState(null)
   const [syncProgress, setSyncProgress] = useState(null)
   const [readiness, setReadiness] = useState({ stocks: null, etf: null })
-  const [stockPage, setStockPage] = useState({ items: [], total: 0, limit: STOCK_PAGE_SIZE, offset: 0 })
   const [catalogs, setCatalogs] = useState({ indices: [], funds: [], industries: [] })
   const [selectedCatalog, setSelectedCatalog] = useState({ kind: '', code: '' })
   const [catalogDetail, setCatalogDetail] = useState({ kind: '', code: '', bars: [], adjustments: [], members: [] })
@@ -45,14 +43,6 @@ export function App() {
   const [catalogError, setCatalogError] = useState('')
   const [usDb, setUsDb] = useState(null)
   const [usExperiment, setUsExperiment] = useState(null)
-  const [usInstrumentPage, setUsInstrumentPage] = useState({ items: [], total: 0, limit: US_INSTRUMENT_PAGE_SIZE, offset: 0 })
-  const [usQuery, setUsQuery] = useState('')
-  const [selectedUsCode, setSelectedUsCode] = useState('')
-  const [usBars, setUsBars] = useState([])
-  const [usDataCode, setUsDataCode] = useState('')
-  const [usDetailLoading, setUsDetailLoading] = useState(false)
-  const [usListError, setUsListError] = useState('')
-  const [usDetailError, setUsDetailError] = useState('')
   const [strategies, setStrategies] = useState([])
   const [selectedStrategyId, setSelectedStrategyId] = useState('')
   const [strategyProfile, setStrategyProfile] = useState(null)
@@ -60,74 +50,50 @@ export function App() {
   const [researchDetail, setResearchDetail] = useState(null)
   const [publication, setPublication] = useState(null)
   const [publicationAnalytics, setPublicationAnalytics] = useState(null)
-  const [query, setQuery] = useState('')
-  const [selectedCode, setSelectedCode] = useState('')
-  const [stockBars, setStockBars] = useState([])
-  const [stockDetail, setStockDetail] = useState(null)
-  const [stockDataCode, setStockDataCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [researchLoading, setResearchLoading] = useState(false)
-  const [detailLoading, setDetailLoading] = useState(false)
   const [globalError, setGlobalError] = useState('')
   const [researchError, setResearchError] = useState('')
-  const [stockListError, setStockListError] = useState('')
-  const [stockDetailError, setStockDetailError] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
-  const stockRequestId = useRef(0)
-  const usRequestId = useRef(0)
   const catalogRequestId = useRef(0)
   const strategyRequestId = useRef(0)
   const researchRequestId = useRef(0)
-  const stockPageRequestRef = useRef({ id: 0, path: '' })
-  const usPageRequestRef = useRef({ id: 0, path: '' })
-  const selectedCodeRef = useRef('')
-  const selectedUsCodeRef = useRef('')
   const selectedCatalogRef = useRef({ kind: '', code: '' })
   const selectedStrategyIdRef = useRef('')
   const selectedResearchIdRef = useRef('')
-  const appliedStockQueryRef = useRef('')
-  const appliedUsQueryRef = useRef('')
 
   async function refreshAll(refreshCoverage = false) {
     setLoading(true)
     setResearchLoading(true)
     setGlobalError('')
     setResearchError('')
-    const { startDate: catalogStartDate, endDate: catalogEndDate } = recentCatalogRange()
-    const stockPageRequest = beginStockPageRequest(buildStockScreenPath(appliedStockQueryRef.current, 0))
-    const usPageRequest = beginUsPageRequest(buildUsInstrumentPath(appliedUsQueryRef.current, 0))
+    const { startDate: catalogStartDate, endDate: catalogEndDate } = recentCatalogRange(clock.now())
     const requests = [
       ['health', '/api/health?include_counts=false'],
       ['progress', '/api/tushare/sync-progress?include_coverage=false'],
       ['stockReadiness', '/api/research/readiness?scope=a_share_cross_section'],
       ['etfReadiness', '/api/research/readiness?scope=etf_time_series'],
       ['overview', `/api/db/overview${refreshCoverage ? '?refresh=true' : ''}`],
-      ['stocks', stockPageRequest.path],
+      ['stocks', null],
       ['indices', '/api/indices?limit=1000'],
       ['funds', `/api/funds?limit=1000&daily_start_date=${catalogStartDate}&daily_end_date=${catalogEndDate}`],
       ['industries', '/api/industries?limit=1000'],
       ['usDb', '/api/us-research/db-overview'],
       ['usExperiment', '/api/us-experiment/overview'],
-      ['usInstruments', usPageRequest.path],
+      ['usInstruments', null],
       ['strategies', '/api/research/strategies'],
     ]
-    const results = await Promise.allSettled(requests.map(([, path]) => fetchJson(path)))
+    const results = await Promise.allSettled(requests.map(([key, path]) => {
+      if (key === 'stocks') return stockResearch.aShare.refreshList()
+      if (key === 'usInstruments') return stockResearch.us.refreshList()
+      return readAdapter({ path })
+    }))
     const failures = []
     let stockPageRefreshed = true
     let usPageRefreshed = true
     results.forEach((result, index) => {
       const key = requests[index][0]
-      if (key === 'stocks' && !isCurrentStockPageRequest(stockPageRequest)) {
-        stockPageRefreshed = false
-        return
-      }
-      if (key === 'usInstruments' && !isCurrentUsPageRequest(usPageRequest)) {
-        usPageRefreshed = false
-        return
-      }
       if (result.status === 'rejected') {
-        if (key === 'stocks') setStockListError(errorMessage(result.reason))
-        if (key === 'usInstruments') setUsListError(errorMessage(result.reason))
         if (key === 'strategies') {
           setResearchError(errorMessage(result.reason))
           setResearchLoading(false)
@@ -136,15 +102,19 @@ export function App() {
         return
       }
       const value = result.value
+      if (key === 'stocks' || key === 'usInstruments') {
+        if (!value) {
+          if (key === 'stocks') stockPageRefreshed = false
+          if (key === 'usInstruments') usPageRefreshed = false
+          failures.push(`${key}: 当前请求未应用`)
+        }
+        return
+      }
       if (key === 'health') setHealth(value)
       if (key === 'progress') setSyncProgress(value)
       if (key === 'stockReadiness') setReadiness((current) => ({ ...current, stocks: value }))
       if (key === 'etfReadiness') setReadiness((current) => ({ ...current, etf: value }))
       if (key === 'overview') setOverview(value)
-      if (key === 'stocks') {
-        setStockListError('')
-        applyStockPage(value)
-      }
       if (key === 'indices') {
         setCatalogs((current) => ({ ...current, indices: value }))
         if (!selectedCatalogRef.current.code && value.length) selectCatalog('index', value[0].tsCode)
@@ -164,10 +134,6 @@ export function App() {
       }
       if (key === 'usDb') setUsDb(value)
       if (key === 'usExperiment') setUsExperiment(value)
-      if (key === 'usInstruments') {
-        setUsListError('')
-        applyUsInstrumentPage(value)
-      }
       if (key === 'strategies') {
         setStrategies(value)
         const current = selectedStrategyIdRef.current
@@ -185,58 +151,15 @@ export function App() {
     const detailResults = refreshCoverage ? await Promise.all([
       Promise.resolve(stockPageRefreshed),
       Promise.resolve(usPageRefreshed),
-      selectedCodeRef.current ? loadSelectedStockData(selectedCodeRef.current) : Promise.resolve(true),
-      selectedUsCodeRef.current ? loadSelectedUsData(selectedUsCodeRef.current) : Promise.resolve(true),
+      stockResearch.aShare.refreshSelected(),
+      stockResearch.us.refreshSelected(),
       selectedCatalogRef.current.code ? loadSelectedCatalogData(selectedCatalogRef.current) : Promise.resolve(true),
       refreshSelectedResearchData(selectedStrategyIdRef.current),
     ]) : [true]
     if (failures.length) setGlobalError(`部分只读数据读取失败：${failures.join('；')}`)
-    if (refreshCoverage && !failures.length && detailResults.every(Boolean)) setLastUpdated(new Date())
+    if (refreshCoverage && !failures.length && detailResults.every(Boolean)) setLastUpdated(clock.now())
     setResearchLoading(false)
     setLoading(false)
-  }
-
-  function applyStockPage(page) {
-    setStockPage(page)
-    const current = selectedCodeRef.current
-    const nextCode = page.items.some((item) => item.ts_code === current) ? current : page.items[0]?.ts_code || ''
-    selectStock(nextCode)
-  }
-
-  function selectStock(tsCode) {
-    if (tsCode === selectedCodeRef.current) {
-      if (!tsCode) setDetailLoading(false)
-      return
-    }
-    selectedCodeRef.current = tsCode
-    stockRequestId.current += 1
-    setSelectedCode(tsCode)
-    setStockDataCode('')
-    setStockBars([])
-    setStockDetail(null)
-    setStockDetailError('')
-    if (!tsCode) setDetailLoading(false)
-  }
-
-  function applyUsInstrumentPage(page) {
-    setUsInstrumentPage(page)
-    const current = selectedUsCodeRef.current
-    const nextCode = page.items.some((item) => item.sourceCode === current) ? current : page.items[0]?.sourceCode || ''
-    selectUsInstrument(nextCode)
-  }
-
-  function selectUsInstrument(sourceCode) {
-    if (sourceCode === selectedUsCodeRef.current) {
-      if (!sourceCode) setUsDetailLoading(false)
-      return
-    }
-    selectedUsCodeRef.current = sourceCode
-    usRequestId.current += 1
-    setSelectedUsCode(sourceCode)
-    setUsDataCode('')
-    setUsBars([])
-    setUsDetailError('')
-    if (!sourceCode) setUsDetailLoading(false)
   }
 
   function selectCatalog(kind, code) {
@@ -249,53 +172,6 @@ export function App() {
     setCatalogError('')
   }
 
-  const loadSelectedStockData = useCallback(async (requestedCode) => {
-    const requestId = stockRequestId.current + 1
-    stockRequestId.current = requestId
-    setDetailLoading(true)
-    setStockDataCode('')
-    setStockBars([])
-    setStockDetail(null)
-    try {
-      const [barsRes, detailRes] = await Promise.all([
-        fetchJson(`/api/daily-bars?ts_code=${encodeURIComponent(requestedCode)}`),
-        fetchJson(`/api/stocks/${encodeURIComponent(requestedCode)}/detail`),
-      ])
-      if (requestId !== stockRequestId.current || requestedCode !== selectedCodeRef.current) return false
-      setStockDataCode(requestedCode)
-      setStockBars(barsRes)
-      setStockDetail(detailRes)
-      setStockDetailError('')
-      return true
-    } catch (err) {
-      if (requestId === stockRequestId.current) setStockDetailError(errorMessage(err))
-      return false
-    } finally {
-      if (requestId === stockRequestId.current) setDetailLoading(false)
-    }
-  }, [])
-
-  const loadSelectedUsData = useCallback(async (requestedCode) => {
-    const requestId = usRequestId.current + 1
-    usRequestId.current = requestId
-    setUsDetailLoading(true)
-    setUsDataCode('')
-    setUsBars([])
-    try {
-      const response = await fetchJson(`/api/us-experiment/instruments/${encodeURIComponent(requestedCode)}/daily-bars`)
-      if (requestId !== usRequestId.current || requestedCode !== selectedUsCodeRef.current) return false
-      setUsDataCode(requestedCode)
-      setUsBars(response.bars || [])
-      setUsDetailError('')
-      return true
-    } catch (err) {
-      if (requestId === usRequestId.current) setUsDetailError(errorMessage(err))
-      return false
-    } finally {
-      if (requestId === usRequestId.current) setUsDetailLoading(false)
-    }
-  }, [])
-
   const loadSelectedCatalogData = useCallback(async (requested) => {
     const requestId = catalogRequestId.current + 1
     catalogRequestId.current = requestId
@@ -303,19 +179,19 @@ export function App() {
     setCatalogError('')
     setCatalogDetail({ ...requested, bars: [], adjustments: [], members: [] })
     try {
-      const { startDate, endDate } = recentCatalogRange()
+      const { startDate, endDate } = recentCatalogRange(clock.now())
       let detail
       if (requested.kind === 'index') {
-        const bars = await fetchJson(`/api/indices/${encodeURIComponent(requested.code)}/daily-bars?start_date=${startDate}&end_date=${endDate}`)
+        const bars = await readAdapter({ path: `/api/indices/${encodeURIComponent(requested.code)}/daily-bars?start_date=${startDate}&end_date=${endDate}` })
         detail = { ...requested, bars, adjustments: [], members: [] }
       } else if (requested.kind === 'fund') {
         const [bars, adjustments] = await Promise.all([
-          fetchJson(`/api/funds/${encodeURIComponent(requested.code)}/daily-bars?start_date=${startDate}&end_date=${endDate}`),
-          fetchJson(`/api/funds/${encodeURIComponent(requested.code)}/adjust-factors?start_date=${startDate}&end_date=${endDate}`),
+          readAdapter({ path: `/api/funds/${encodeURIComponent(requested.code)}/daily-bars?start_date=${startDate}&end_date=${endDate}` }),
+          readAdapter({ path: `/api/funds/${encodeURIComponent(requested.code)}/adjust-factors?start_date=${startDate}&end_date=${endDate}` }),
         ])
         detail = { ...requested, bars, adjustments, members: [] }
       } else {
-        const members = await fetchJson(`/api/industries/${encodeURIComponent(requested.code)}/members?trade_date=${endDate}`)
+        const members = await readAdapter({ path: `/api/industries/${encodeURIComponent(requested.code)}/members?trade_date=${endDate}` })
         detail = { ...requested, bars: [], adjustments: [], members }
       }
       const isCurrent = requestId === catalogRequestId.current
@@ -329,13 +205,13 @@ export function App() {
     } finally {
       if (requestId === catalogRequestId.current) setCatalogLoading(false)
     }
-  }, [])
+  }, [clock, readAdapter])
 
   const loadStrategyProfileData = useCallback(async (strategyId) => {
     const requestId = strategyRequestId.current + 1
     strategyRequestId.current = requestId
     try {
-      const profile = await fetchJson(`/api/research/strategies/${encodeURIComponent(strategyId)}`)
+      const profile = await readAdapter({ path: `/api/research/strategies/${encodeURIComponent(strategyId)}` })
       if (requestId !== strategyRequestId.current || strategyId !== selectedStrategyIdRef.current) return { ok: false, researchId: '' }
       setResearchError('')
       setStrategyProfile(profile)
@@ -363,23 +239,23 @@ export function App() {
     } finally {
       if (requestId === strategyRequestId.current) setResearchLoading(false)
     }
-  }, [])
+  }, [readAdapter])
 
   const loadResearchDetailData = useCallback(async (researchId) => {
     const requestId = researchRequestId.current + 1
     researchRequestId.current = requestId
     try {
-      const detail = await fetchJson(`/api/research/formal-researches/${encodeURIComponent(researchId)}`)
+      const detail = await readAdapter({ path: `/api/research/formal-researches/${encodeURIComponent(researchId)}` })
       if (requestId !== researchRequestId.current || researchId !== selectedResearchIdRef.current) return false
       const latest = [...detail.publications]
         .filter((item) => item.status === 'published')
         .sort((left, right) => right.version - left.version)[0]
-      const projection = latest ? await fetchJson(`/api/research/publications/${encodeURIComponent(latest.id)}`) : null
+      const projection = latest ? await readAdapter({ path: `/api/research/publications/${encodeURIComponent(latest.id)}` }) : null
       let analytics = null
       let analyticsError = ''
       if (projection?.analytics_url) {
         try {
-          analytics = await fetchJson(projection.analytics_url)
+          analytics = await readAdapter({ path: projection.analytics_url })
         } catch (err) {
           analyticsError = errorMessage(err)
         }
@@ -396,69 +272,13 @@ export function App() {
     } finally {
       if (requestId === researchRequestId.current) setResearchLoading(false)
     }
-  }, [])
+  }, [readAdapter])
 
   async function refreshSelectedResearchData(strategyId) {
     if (!strategyId) return true
     const profileResult = await loadStrategyProfileData(strategyId)
     if (!profileResult.ok || !profileResult.researchId) return profileResult.ok
     return loadResearchDetailData(profileResult.researchId)
-  }
-
-  async function submitStockSearch() {
-    await loadStocks(0, query.trim(), true)
-  }
-
-  async function submitUsSearch() {
-    await loadUsInstruments(0, usQuery.trim(), true)
-  }
-
-  async function loadStocks(offset = 0, requestedQuery = appliedStockQueryRef.current, applyQueryOnSuccess = false) {
-    const request = beginStockPageRequest(buildStockScreenPath(requestedQuery, offset))
-    setStockListError('')
-    try {
-      const page = await fetchJson(request.path)
-      if (isCurrentStockPageRequest(request)) {
-        if (applyQueryOnSuccess) appliedStockQueryRef.current = requestedQuery
-        applyStockPage(page)
-      }
-    } catch (err) {
-      if (isCurrentStockPageRequest(request)) setStockListError(errorMessage(err))
-    }
-  }
-
-  function beginStockPageRequest(path) {
-    const request = { id: stockPageRequestRef.current.id + 1, path }
-    stockPageRequestRef.current = request
-    return request
-  }
-
-  function isCurrentStockPageRequest(request) {
-    return request.id === stockPageRequestRef.current.id && request.path === stockPageRequestRef.current.path
-  }
-
-  async function loadUsInstruments(offset = 0, requestedQuery = appliedUsQueryRef.current, applyQueryOnSuccess = false) {
-    const request = beginUsPageRequest(buildUsInstrumentPath(requestedQuery, offset))
-    setUsListError('')
-    try {
-      const page = await fetchJson(request.path)
-      if (isCurrentUsPageRequest(request)) {
-        if (applyQueryOnSuccess) appliedUsQueryRef.current = requestedQuery
-        applyUsInstrumentPage(page)
-      }
-    } catch (err) {
-      if (isCurrentUsPageRequest(request)) setUsListError(errorMessage(err))
-    }
-  }
-
-  function beginUsPageRequest(path) {
-    const request = { id: usPageRequestRef.current.id + 1, path }
-    usPageRequestRef.current = request
-    return request
-  }
-
-  function isCurrentUsPageRequest(request) {
-    return request.id === usPageRequestRef.current.id && request.path === usPageRequestRef.current.path
   }
 
   function selectStrategy(strategyId) {
@@ -496,18 +316,6 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    if (!selectedCode) return undefined
-    loadSelectedStockData(selectedCode)
-    return () => { stockRequestId.current += 1 }
-  }, [loadSelectedStockData, selectedCode])
-
-  useEffect(() => {
-    if (!selectedUsCode) return undefined
-    loadSelectedUsData(selectedUsCode)
-    return () => { usRequestId.current += 1 }
-  }, [loadSelectedUsData, selectedUsCode])
-
-  useEffect(() => {
     if (!selectedCatalog.code) return undefined
     loadSelectedCatalogData(selectedCatalog)
     return () => { catalogRequestId.current += 1 }
@@ -531,16 +339,12 @@ export function App() {
     }
   }, [loadResearchDetailData, selectedResearchId])
 
-  const stocks = stockPage.items
+  const aShareResearch = stockResearch.aShare
+  const usResearch = stockResearch.us
+  const stocks = aShareResearch.page.items
   const coverageRows = useMemo(() => buildCoverageRows(overview), [overview])
   const syncRuns = useMemo(() => syncProgress?.runs || [], [syncProgress])
-  const selectedStock = stocks.find((stock) => stock.ts_code === selectedCode) || stocks[0] || null
-  const selectedStockBars = stockDataCode === selectedCode ? stockBars : []
-  const selectedStockDetail = stockDataCode === selectedCode ? stockDetail : null
-  const selectedLatestBar = selectedStockBars[selectedStockBars.length - 1] || selectedStock || null
-  const usInstruments = usInstrumentPage.items
-  const selectedUsInstrument = usInstruments.find((item) => item.sourceCode === selectedUsCode) || usInstruments[0] || null
-  const selectedUsBars = usDataCode === selectedUsCode ? usBars : []
+  const selectedLatestBar = aShareResearch.bars[aShareResearch.bars.length - 1] || aShareResearch.selected || null
 
   return (
     <div className="app-frame">
@@ -569,17 +373,18 @@ export function App() {
               coverageRows={coverageRows}
               readiness={readiness}
               stocks={stocks}
-              stockPage={stockPage}
-              query={query}
-              setQuery={setQuery}
-              onSearch={submitStockSearch}
-              onPage={loadStocks}
-              selectedCode={selectedCode}
-              setSelectedCode={selectStock}
-              selectedStock={selectedStock}
+              stockPage={aShareResearch.page}
+              query={aShareResearch.query}
+              setQuery={aShareResearch.setQuery}
+              onSearch={aShareResearch.submitSearch}
+              onPage={aShareResearch.loadPage}
+              selectedCode={aShareResearch.selectedCode}
+              setSelectedCode={aShareResearch.select}
+              selectedStock={aShareResearch.selected}
               selectedLatestBar={selectedLatestBar}
-              stockBars={selectedStockBars}
-              stockDetail={selectedStockDetail}
+              stockBars={aShareResearch.bars}
+              stockDetail={aShareResearch.detail}
+              chartAdapter={chartAdapter}
               catalogs={catalogs}
               selectedCatalog={selectedCatalog}
               setSelectedCatalog={selectCatalog}
@@ -587,27 +392,29 @@ export function App() {
               catalogLoading={catalogLoading}
               catalogError={catalogError}
               syncRuns={syncRuns}
-              detailLoading={detailLoading}
-              error={[stockListError, stockDetailError].filter(Boolean).join('；')}
+              detailLoading={aShareResearch.loading}
+              error={aShareResearch.error}
             />
           ) : null}
           {activeView === 'us-data' ? (
             <USDataBoundaryView
               usDb={usDb}
               usExperiment={usExperiment}
-              instruments={usInstruments}
-              instrumentPage={usInstrumentPage}
-              query={usQuery}
-              setQuery={setUsQuery}
-              onSearch={submitUsSearch}
-              onPage={loadUsInstruments}
-              selectedCode={selectedUsCode}
-              setSelectedCode={selectUsInstrument}
-              selectedInstrument={selectedUsInstrument}
-              bars={selectedUsBars}
-              detailLoading={usDetailLoading}
-              detailReady={Boolean(selectedUsCode) && usDataCode === selectedUsCode}
-              error={[usListError, usDetailError].filter(Boolean).join('；')}
+              instruments={usResearch.page.items}
+              instrumentPage={usResearch.page}
+              query={usResearch.query}
+              setQuery={usResearch.setQuery}
+              onSearch={usResearch.submitSearch}
+              onPage={usResearch.loadPage}
+              selectedCode={usResearch.selectedCode}
+              setSelectedCode={usResearch.select}
+              selectedInstrument={usResearch.selected}
+              bars={usResearch.bars}
+              marketBars={usResearch.marketBars}
+              detailLoading={usResearch.loading}
+              detailReady={usResearch.ready}
+              error={usResearch.error}
+              chartAdapter={chartAdapter}
             />
           ) : null}
           {activeView === 'operations' ? <OperationsView health={health} readiness={readiness} coverageRows={coverageRows} syncRuns={syncRuns} /> : null}
@@ -664,18 +471,6 @@ function SystemState({ label, value, healthy, icon: Icon }) {
   return <span className="system-state"><Icon size={14} /><b>{label}</b><i className={healthy ? 'good' : 'bad'} />{String(value)}</span>
 }
 
-async function fetchJson(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options,
-  })
-  if (!response.ok) {
-    const body = await response.json().catch(() => null)
-    throw new Error(body?.detail || `${path} 返回 ${response.status}`)
-  }
-  return response.json()
-}
-
 function buildCoverageRows(overview) {
   if (!overview) return []
   const a = overview?.aShare || {}
@@ -705,20 +500,8 @@ function dateRange(value) {
   return `${value.minDate || '?'} → ${value.maxDate || '?'}`
 }
 
-function buildStockScreenPath(query, offset) {
-  const params = new URLSearchParams({ limit: String(STOCK_PAGE_SIZE), offset: String(Math.max(0, offset)) })
-  if (query.trim()) params.set('q', query.trim())
-  return `/api/stocks/screen?${params.toString()}`
-}
-
-function buildUsInstrumentPath(query, offset) {
-  const params = new URLSearchParams({ current_only: 'true', limit: String(US_INSTRUMENT_PAGE_SIZE), offset: String(Math.max(0, offset)) })
-  if (query.trim()) params.set('q', query.trim())
-  return `/api/us-experiment/instruments?${params.toString()}`
-}
-
-function recentCatalogRange() {
-  const end = new Date()
+function recentCatalogRange(now) {
+  const end = new Date(now)
   const start = new Date(end)
   start.setFullYear(start.getFullYear() - 1)
   const formatLocalDate = (value) => [value.getFullYear(), String(value.getMonth() + 1).padStart(2, '0'), String(value.getDate()).padStart(2, '0')].join('-')
