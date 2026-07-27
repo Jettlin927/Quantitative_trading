@@ -28,8 +28,8 @@ from .market_data_ingestion import (
     actions_with_metadata,
     build_command as build_ingestion_command,
     execute_command as execute_ingestion_command,
-    get_action_spec,
     normalize_status as normalize_ingestion_status,
+    projection_metadata,
     result_rows as ingestion_result_rows,
     trade_calendar_record_to_row as canonical_trade_calendar_record_to_row,
 )
@@ -2343,8 +2343,8 @@ def sync_job_to_dict(job: DataSyncJob) -> dict[str, Any]:
         "lastError": job.last_error,
         "updatedAt": job.updated_at.isoformat() if job.updated_at else None,
     }
-    metadata = get_action_spec(job.action).metadata
-    if metadata.is_experimental:
+    metadata = projection_metadata(job.action)
+    if metadata and metadata.is_experimental:
         payload.update(
             {
                 "isExperimental": metadata.is_experimental,

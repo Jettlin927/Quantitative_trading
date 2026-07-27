@@ -118,6 +118,21 @@ class MarketDataIngestionTest(unittest.TestCase):
         self.assertEqual(pro.trade_cal.call_count, 2)
         self.assertEqual(pro.trade_cal.call_args_list[0].kwargs["start_date"], "20260711")
 
+    def test_legacy_unknown_job_remains_readable_without_projection_guessing(self) -> None:
+        job = DataSyncJob(
+            id="legacy-job",
+            action="legacy_unknown",
+            status="failed",
+            payload={},
+            payload_hash="legacy-hash",
+            rows_upserted=0,
+            attempt_count=1,
+            max_attempts=1,
+        )
+        projection = main.sync_job_to_dict(job)
+        self.assertEqual(projection["action"], "legacy_unknown")
+        self.assertNotIn("isExperimental", projection)
+
     def test_worker_does_not_reverse_import_application_entry(self) -> None:
         source = Path(sync_worker.__file__).read_text(encoding="utf-8")
         self.assertNotIn("from .main import", source)

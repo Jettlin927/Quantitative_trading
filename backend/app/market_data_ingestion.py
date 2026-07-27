@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import date
 from hashlib import sha256
 import json
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Literal, Mapping, NotRequired, Required, TypedDict
 
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -37,6 +37,14 @@ class InvalidIngestionResultError(ValueError):
     """An executor returned a result outside the stable ingestion contract."""
 
 
+class IngestionResult(TypedDict, total=False):
+    status: Required[Literal["ok", "partial", "failed"]]
+    rows_upserted: Required[int]
+    message: NotRequired[str]
+    details: NotRequired[dict[str, Any]]
+    retryable: NotRequired[bool]
+
+
 @dataclass(frozen=True)
 class ActionMetadata:
     is_experimental: bool = False
@@ -52,7 +60,7 @@ class IngestionCommand:
 
 
 ProviderFactory = Callable[[str | None], Any]
-Executor = Callable[[IngestionCommand, Session, ProviderFactory, Mapping[str, Any]], dict[str, Any]]
+Executor = Callable[[IngestionCommand, Session, ProviderFactory, Mapping[str, Any]], Mapping[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -84,7 +92,7 @@ def _trade_calendar_executor(
     db: Session,
     provider_factory: ProviderFactory,
     secrets: Mapping[str, Any],
-) -> dict[str, Any]:
+) -> IngestionResult:
     payload = SyncTradeCalendarRequest.model_validate(command.payload)
     pro = provider_factory(_secret_value(secrets, "token"))
     exchange = payload.exchange or ""
@@ -139,6 +147,14 @@ def get_action_spec(action: str | IngestionAction) -> ActionSpec:
         return ACTION_REGISTRY[identity]
     except (ValueError, KeyError) as exc:
         raise UnknownIngestionActionError(f"不支持的同步动作: {action}") from exc
+
+
+def projection_metadata(action: str | IngestionAction) -> ActionMetadata | None:
+    """Return registry-owned projection metadata without breaking legacy job reads."""
+    try:
+        return get_action_spec(action).metadata
+    except UnknownIngestionActionError:
+        return None
 
 
 def actions_with_metadata(*, is_experimental: bool) -> tuple[str, ...]:
