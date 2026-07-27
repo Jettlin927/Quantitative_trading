@@ -16,11 +16,16 @@ if str(REPO_ROOT) not in sys.path:
 
 from backend.app.database import DATABASE_URL
 from backend.app.models import DataQualityRun
-from backend.app.quant_research.runner import (
-    mark_stale_research_runs,
-    resume_quant_research,
-    run_quant_research,
+from backend.app.quant_research.execution import (
+    ExecutionRuntime,
+    InterruptedRun,
+    RequestRejected,
+    ResumeRun,
+    RunFailed,
+    StartRun,
+    execute,
 )
+from backend.app.quant_research.runner import mark_stale_research_runs
 from backend.app.quant_research.strategy_registry import list_strategy_definitions
 
 
@@ -96,27 +101,35 @@ def main(argv: list[str] | None = None) -> int:
                     args.output_root,
                     stale_after_seconds=args.stale_after_seconds,
                 )
+                runtime = ExecutionRuntime(
+                    registry_db=db,
+                    output_root=args.output_root,
+                    test_mode=args.test_mode,
+                )
                 if args.resume:
-                    result = resume_quant_research(
-                        db,
-                        args.resume,
-                        args.output_root,
-                        test_mode=args.test_mode,
-                    )
+                    request = ResumeRun(run_id=args.resume)
                 else:
                     config = json.loads(args.config.read_text(encoding="utf-8"))
                     quality_run = db.get(DataQualityRun, args.quality_run_id)
                     if quality_run is None:
                         raise ValueError("quality-run-id 不存在")
                     config["qualityRunId"] = quality_run.id
-                    result = run_quant_research(
-                        db,
-                        config,
-                        args.output_root,
-                        test_mode=args.test_mode,
-                    )
+                    request = StartRun(config=config)
+                result = execute(runtime, request)
+                if isinstance(result, InterruptedRun):
+                    raise RuntimeError(result.reason)
         finally:
             engine.dispose()
+    except (RequestRejected, RunFailed) as exc:
+        cause = exc.cause
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(cause).__name__}: {cause}"},
+                ensure_ascii=False,
+            )
+        )
+        return 3
+
     except Exception as exc:  # noqa: BLE001
         print(json.dumps({"status": "failed", "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False))
         return 3

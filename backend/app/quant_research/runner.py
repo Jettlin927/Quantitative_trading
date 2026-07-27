@@ -172,6 +172,92 @@ def run_quant_research(
     orchestration_attempt_id: str | None = None,
     should_stop: Callable[[], bool] | None = None,
 ) -> ResearchRunResult:
+    """兼容入口；新调用方应构造 StartRun 并调用 execute。"""
+
+    from .execution import ExecutionRuntime, StartRun
+
+    outcome = _execute_compatibility(
+        ExecutionRuntime(
+            registry_db=registry_db,
+            output_root=Path(output_root),
+            code_commit=code_commit,
+            schema_revision=schema_revision,
+            test_mode=test_mode,
+            capacity_policy=capacity_policy,
+            interrupt_after_stage=interrupt_after_stage,
+        ),
+        StartRun(
+            config=config,
+            formal_research_id=formal_research_id,
+            orchestration_attempt_id=orchestration_attempt_id,
+        ),
+        should_stop,
+    )
+    return ResearchRunResult(outcome.run_id, outcome.path, outcome.manifest)
+
+
+def resume_quant_research(
+    registry_db: Session,
+    run_id: str,
+    output_root: Path,
+    *,
+    code_commit: str | None = None,
+    schema_revision: str | None = None,
+    test_mode: bool = False,
+    capacity_policy: SnapshotCapacityPolicy | None = None,
+    interrupt_after_stage: str | None = None,
+    should_stop: Callable[[], bool] | None = None,
+) -> ResearchRunResult:
+    """兼容入口；恢复身份只能通过 ResumeRun(run_id) 传入。"""
+
+    from .execution import ExecutionRuntime, ResumeRun
+
+    outcome = _execute_compatibility(
+        ExecutionRuntime(
+            registry_db=registry_db,
+            output_root=Path(output_root),
+            code_commit=code_commit,
+            schema_revision=schema_revision,
+            test_mode=test_mode,
+            capacity_policy=capacity_policy,
+            interrupt_after_stage=interrupt_after_stage,
+        ),
+        ResumeRun(run_id=run_id),
+        should_stop,
+    )
+    return ResearchRunResult(outcome.run_id, outcome.path, outcome.manifest)
+
+
+def _execute_compatibility(
+    runtime: Any,
+    request: Any,
+    should_stop: Callable[[], bool] | None,
+) -> Any:
+    from .execution import InterruptedRun, RequestRejected, RunFailed, execute
+
+    try:
+        outcome = execute(runtime, request, should_stop)
+    except (RequestRejected, RunFailed) as exc:
+        raise exc.cause
+    if isinstance(outcome, InterruptedRun):
+        raise ResearchStopRequested(outcome.reason)
+    return outcome
+
+
+def _start_quant_research_pipeline(
+    registry_db: Session,
+    config: dict[str, Any],
+    output_root: Path,
+    *,
+    code_commit: str | None = None,
+    schema_revision: str | None = None,
+    test_mode: bool = False,
+    capacity_policy: SnapshotCapacityPolicy | None = None,
+    interrupt_after_stage: str | None = None,
+    formal_research_id: str | None = None,
+    orchestration_attempt_id: str | None = None,
+    should_stop: Callable[[], bool] | None = None,
+) -> ResearchRunResult:
     _validate_interrupt_stage(interrupt_after_stage)
     normalized = validate_run_config(config)
     strategy = resolve_strategy_definition(normalized)
@@ -240,7 +326,7 @@ def run_quant_research(
         raise
 
 
-def resume_quant_research(
+def _resume_quant_research_pipeline(
     registry_db: Session,
     run_id: str,
     output_root: Path,
