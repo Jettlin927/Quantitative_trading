@@ -14,7 +14,7 @@ from ..quant_research.universe import (
     resolve_industry_membership,
 )
 from .contracts import QualityCheckContract, QualityRuleResult, result_reference, summarize_quality_status
-from .rules import evaluate_quality_rules
+from .families import evaluate_registered_quality_families
 
 
 def configure_quality_read_transaction(db: Session, statement_timeout_ms: int) -> None:
@@ -34,7 +34,10 @@ def run_data_quality_check(
     contract: QualityCheckContract,
     *,
     code_commit: str | None = None,
-    evaluator: Callable[[Session, QualityCheckContract], list[QualityRuleResult]] = evaluate_quality_rules,
+    evaluator: Callable[
+        [Session, QualityCheckContract],
+        list[QualityRuleResult],
+    ] = evaluate_registered_quality_families,
 ) -> dict[str, Any]:
     run = DataQualityRun(
         id=str(uuid4()),

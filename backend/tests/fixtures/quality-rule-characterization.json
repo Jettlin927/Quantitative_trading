@@ -1,0 +1,618 @@
+{
+  "a_share_cross_section": [
+    {
+      "ruleId": "schema.contract",
+      "tableName": "index_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 15,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "indices",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 9,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "industry_members",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 10,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "stock_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 7,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "stock_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 15,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "stock_limit_prices",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 9,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "stock_listings",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 13,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "stock_suspend_events",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 8,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "trade_calendars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 8,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "index_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "indices",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "industry_members",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 0,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "stock_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "stock_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "stock_limit_prices",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "stock_listings",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "stock_suspend_events",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 0,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "trade_calendars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 3,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "domain.unlisted_codes",
+      "tableName": "stock_limit_prices",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "referential.universe",
+      "tableName": "stock_listings",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "calendar.daily_bar_coverage",
+      "tableName": "stock_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "calendar.closed_day_rows",
+      "tableName": "stock_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "calendar.outside_listing",
+      "tableName": "stock_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "calendar.adjust_factor_coverage",
+      "tableName": "stock_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "calendar.limit_price_coverage",
+      "tableName": "stock_limit_prices",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "value.ohlcv_sanity",
+      "tableName": "stock_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "value.volume_amount_missing",
+      "tableName": "stock_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "value.ohlcv_sanity",
+      "tableName": "index_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "value.volume_amount_missing",
+      "tableName": "index_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "value.limit_price_sanity",
+      "tableName": "stock_limit_prices",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "adjustment.factor_positive",
+      "tableName": "stock_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "adjustment.factor_jump",
+      "tableName": "stock_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "freshness.coverage",
+      "tableName": "stock_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "freshness.coverage",
+      "tableName": "stock_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "freshness.coverage",
+      "tableName": "stock_limit_prices",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "freshness.coverage",
+      "tableName": "index_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "benchmark.overlap",
+      "tableName": "index_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "universe.provenance",
+      "tableName": "stock_listings",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    }
+  ],
+  "etf_time_series": [
+    {
+      "ruleId": "schema.contract",
+      "tableName": "fund_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 7,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "fund_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 15,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "funds",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 9,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "index_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 15,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "indices",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 9,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "schema.contract",
+      "tableName": "trade_calendars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 8,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "fund_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "fund_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "funds",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "index_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "indices",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "uniqueness.natural_key",
+      "tableName": "trade_calendars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 3,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "domain.unlisted_codes",
+      "tableName": "fund_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "domain.unlisted_codes",
+      "tableName": "fund_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "referential.universe",
+      "tableName": "funds",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "calendar.daily_bar_coverage",
+      "tableName": "fund_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "calendar.closed_day_rows",
+      "tableName": "fund_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "calendar.outside_listing",
+      "tableName": "fund_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "calendar.adjust_factor_coverage",
+      "tableName": "fund_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "value.ohlcv_sanity",
+      "tableName": "fund_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "value.volume_amount_missing",
+      "tableName": "fund_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "value.ohlcv_sanity",
+      "tableName": "index_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "value.volume_amount_missing",
+      "tableName": "index_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "adjustment.factor_positive",
+      "tableName": "fund_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "adjustment.factor_jump",
+      "tableName": "fund_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "freshness.coverage",
+      "tableName": "fund_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "freshness.coverage",
+      "tableName": "fund_adjust_factors",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "freshness.coverage",
+      "tableName": "index_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "benchmark.overlap",
+      "tableName": "index_daily_bars",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 2,
+      "failedRows": 0,
+      "sampleIssues": []
+    },
+    {
+      "ruleId": "universe.provenance",
+      "tableName": "funds",
+      "severity": "info",
+      "status": "passed",
+      "checkedRows": 1,
+      "failedRows": 0,
+      "sampleIssues": []
+    }
+  ]
+}

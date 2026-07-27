@@ -134,11 +134,19 @@ class DataQualityRulesTest(unittest.TestCase):
         with Session(self.engine) as db:
             return evaluate_quality_rules(db, contract or self.contract())
 
+    @staticmethod
+    def characterized_results(scope: str) -> list[dict[str, object]]:
+        fixture = Path("backend/tests/fixtures/quality-rule-characterization.json")
+        return json.loads(fixture.read_text(encoding="utf-8"))[scope]
+
     def test_complete_research_slice_is_ready(self):
         results = self.evaluate()
 
         self.assertEqual(summarize_quality_status(results), "ready")
-        self.assertTrue(results)
+        self.assertEqual(
+            [result.to_dict() for result in results],
+            self.characterized_results("a_share_cross_section"),
+        )
         self.assertTrue(all(result.status == "passed" for result in results))
         self.assertTrue(
             {
@@ -181,6 +189,10 @@ class DataQualityRulesTest(unittest.TestCase):
         results = self.evaluate(contract)
 
         self.assertEqual(summarize_quality_status(results), "ready")
+        self.assertEqual(
+            [result.to_dict() for result in results],
+            self.characterized_results("etf_time_series"),
+        )
         self.assertTrue(all(result.status == "passed" for result in results))
 
     def test_unlisted_limit_prices_are_warning_and_samples_are_capped(self):
