@@ -9,6 +9,7 @@
   "maxDrawdown": -0.004854368932038833,
   "observations": 15,
   "positiveDayRate": 0.5,
+  "relativeWealth": 0.03299856527977041,
   "sharpe": 10.070872884169093,
   "startDate": "2026-01-05",
   "totalReturn": 0.0588235294117645,

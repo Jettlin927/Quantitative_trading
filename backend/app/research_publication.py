@@ -2223,6 +2223,12 @@ def _validate_research_pass_market_regimes(
                 and observations == 1
             ):
                 continue
+            if (
+                field == "blockedRequestRate"
+                and metric is None
+                and cell["requestCount"] == 0
+            ):
+                continue
             if isinstance(metric, bool) or not isinstance(metric, (int, float)):
                 raise PublicationConflictError(
                     f"研究通过报告的市场环境指标无效：{name}/{field}"

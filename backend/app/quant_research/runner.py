@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 from uuid import uuid4
 
 import pandas as pd
@@ -1124,6 +1124,9 @@ def validate_research_archive(run_path: Path) -> tuple[dict[str, Any], dict[str,
             )
         except ValueError as exc:
             raise SnapshotIntegrityError("归档模拟账本无法对账") from exc
+        recalculated_execution_metrics = _normalize_archived_zero_request_rate(
+            persisted_metrics, recalculated_execution_metrics
+        )
         if any(persisted_metrics.get(key) != value for key, value in recalculated_execution_metrics.items()):
             raise SnapshotIntegrityError("归档执行指标与模拟账本不一致")
         if walk_forward_enabled:
@@ -1246,6 +1249,10 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
             metrics_simulation,
             table_artifacts,
         )
+        if artifact_schema_version >= 2:
+            metrics = _normalize_archived_zero_request_rate(
+                _read_json(run_path / "metrics.json", "metrics.json"), metrics
+            )
         if _walk_forward_enabled(config):
             windows, window_metrics, walk_forward_summary = _evaluate_walk_forward(
                 run_path / "inputs",
@@ -1377,6 +1384,20 @@ def reproduce_quant_research(run_path: Path) -> dict[str, Any]:
         "expectedResultFingerprint": manifest["resultFingerprint"],
         "actualResultFingerprint": actual_fingerprint,
     }
+
+
+def _normalize_archived_zero_request_rate(
+    persisted_metrics: Mapping[str, Any], recalculated_metrics: Mapping[str, Any]
+) -> dict[str, Any]:
+    normalized = dict(recalculated_metrics)
+    if (
+        persisted_metrics.get("requestCount") == 0
+        and persisted_metrics.get("blockedRequestRate") == 0.0
+        and normalized.get("requestCount") == 0
+        and normalized.get("blockedRequestRate") is None
+    ):
+        normalized["blockedRequestRate"] = 0.0
+    return normalized
 
 
 def _build_strategy_targets(strategy: StrategyDefinition, *args: Any, **kwargs: Any) -> Any:
