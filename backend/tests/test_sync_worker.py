@@ -326,6 +326,19 @@ class SyncWorkerTest(unittest.TestCase):
         )
         self.assertEqual(unknown_status, "queued")
 
+        missing_status_job_id = self.enqueue("stock_listings")
+        missing_status_claim = sync_worker.claim_next_job(
+            "worker-missing-status", session_factory=self.Session, now=self.now
+        )
+        missing_status = sync_worker.run_claimed_job(
+            missing_status_claim,
+            executor=lambda _action, _payload, _db: {"rows_upserted": 1},
+            session_factory=self.Session,
+            heartbeat_interval_seconds=0,
+            now=self.now,
+        )
+        self.assertEqual(missing_status, "queued")
+
         list_job_id = self.enqueue("stock_listings")
         list_claim = sync_worker.claim_next_job("worker-list", session_factory=self.Session, now=self.now)
         list_status = sync_worker.run_claimed_job(
@@ -338,8 +351,10 @@ class SyncWorkerTest(unittest.TestCase):
         self.assertEqual(list_status, "queued")
         with self.Session() as db:
             self.assertNotEqual(db.get(DataSyncJob, unknown_job_id).status, "ok")
+            self.assertNotEqual(db.get(DataSyncJob, missing_status_job_id).status, "ok")
             self.assertNotEqual(db.get(DataSyncJob, list_job_id).status, "ok")
-        self.assertEqual(sync_worker.normalize_sync_job_status(None), "ok")
+        with self.assertRaisesRegex(ValueError, "未知同步任务状态"):
+            sync_worker.normalize_sync_job_status(None)
         with self.assertRaisesRegex(ValueError, "未知同步任务状态"):
             sync_worker.normalize_sync_job_status("mystery")
         with self.assertRaisesRegex(ValueError, "未知同步任务状态"):

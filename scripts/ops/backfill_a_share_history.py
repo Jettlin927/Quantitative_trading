@@ -273,8 +273,12 @@ def sync_stock_listings(pro: Any, args: argparse.Namespace, limiter: RateLimiter
 
 
 def sync_trade_calendar(pro: Any, args: argparse.Namespace, limiter: RateLimiter) -> tuple[int, list[str]]:
-    from backend.app.main import TRADE_CALENDAR_FIELDS, dedupe_rows, trade_calendar_record_to_row
-    from backend.app.models import TradeCalendar
+    from backend.app.market_data_ingestion import (
+        TRADE_CALENDAR_FIELDS,
+        dedupe_rows,
+        trade_calendar_record_to_row,
+        upsert_trade_calendar_rows,
+    )
     from backend.app.tushare_client import tushare_date
 
     written = 0
@@ -309,7 +313,12 @@ def sync_trade_calendar(pro: Any, args: argparse.Namespace, limiter: RateLimiter
             rows = [row for item in frame.to_dict("records") if (row := trade_calendar_record_to_row(item, "SSE"))]
             if not rows:
                 raise RuntimeError("Tushare returned no trade-calendar rows")
-            item_written = upsert(TradeCalendar, dedupe_rows(rows, ("exchange", "cal_date")), ["exchange", "cal_date"])
+            from backend.app.database import SessionLocal
+
+            with SessionLocal() as db:
+                item_written = upsert_trade_calendar_rows(
+                    db, dedupe_rows(rows, ("exchange", "cal_date"))
+                )
             written += item_written
             record_checkpoint("trade_calendar", item_start, item_end, item_written, "ok", f"source_rows={len(rows)}")
         except Exception as exc:  # noqa: BLE001

@@ -16,23 +16,18 @@ from sqlalchemy.orm import Session
 
 from .database import SessionLocal, assert_schema_revision_at_head, engine
 from .json_safety import json_safe_value
+from .market_data_ingestion import (
+    ACTION_REGISTRY,
+    execute_command as execute_ingestion_command,
+    normalize_status as normalize_ingestion_status,
+    result_rows as ingestion_result_rows,
+)
 from .models import DataSyncJob, ResearchWorkItem, SyncWorkerHeartbeat
 from .work_coordination import try_acquire_heavy_work_claim_lock
 
 
 UTC = timezone.utc
-SUPPORTED_SYNC_ACTIONS = {
-    "stock_listings",
-    "trade_calendar",
-    "market_bundle",
-    "daily_market",
-    "market_fundamentals",
-    "us_sample",
-    "us_experiment_universe",
-    "us_experiment_targeted_universe",
-    "us_experiment_prices",
-    "us_experiment_overview_refresh",
-}
+SUPPORTED_SYNC_ACTIONS = set(ACTION_REGISTRY)
 
 
 class PermanentSyncError(RuntimeError):
@@ -282,9 +277,7 @@ def run_claimed_job(
 
 
 def execute_sync_job_action(action: str, payload: dict[str, Any], db: Session) -> dict[str, Any]:
-    from .main import execute_sync_job_action as execute
-
-    return execute(action, payload, db)
+    return execute_ingestion_command(action, payload, db)
 
 
 def run_forever() -> None:
@@ -436,22 +429,11 @@ def is_explicit_terminal_result(result: Any) -> bool:
 
 
 def normalize_sync_job_status(status: Any) -> str:
-    if status is None:
-        return "ok"
-    if status in {"ok", "partial", "failed"}:
-        return str(status)
-    raise ValueError(f"未知同步任务状态：{status}")
+    return normalize_ingestion_status(status)
 
 
 def sync_result_rows(result: Any) -> int:
-    if not isinstance(result, dict):
-        return 0
-    if "rows_upserted" in result:
-        return int(result.get("rows_upserted") or 0)
-    summary = result.get("summary")
-    if isinstance(summary, dict):
-        return sum(int(value or 0) for value in summary.values())
-    return 0
+    return ingestion_result_rows(result)
 
 
 def sync_result_message(action: str, status: str, result: Any) -> str:
