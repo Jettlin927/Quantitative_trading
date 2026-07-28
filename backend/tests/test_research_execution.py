@@ -130,6 +130,76 @@ class ResearchExecutionTest(unittest.TestCase):
         self.assertIsNone(outcome.last_stage)
         self.assertTrue(outcome.checkpoint_ref.is_file())
 
+    def test_concurrent_starts_return_their_own_interrupted_identity(self) -> None:
+        second_outcome: InterruptedRun | None = None
+
+        def stop_first_after_second_run_stops() -> bool:
+            nonlocal second_outcome
+            with Session(self.engine) as second_db:
+                outcome = execute(
+                    self._runtime(second_db),
+                    StartRun(config=self.config),
+                    stop_signal=lambda: True,
+                )
+            self.assertIsInstance(outcome, InterruptedRun)
+            second_outcome = outcome
+            return True
+
+        with Session(self.engine) as first_db:
+            first_outcome = execute(
+                self._runtime(first_db),
+                StartRun(config=self.config),
+                stop_signal=stop_first_after_second_run_stops,
+            )
+
+        self.assertIsInstance(first_outcome, InterruptedRun)
+        if second_outcome is None:
+            self.fail("第二个并发运行未返回中断结果")
+        self.assertNotEqual(first_outcome.run_id, second_outcome.run_id)
+        self.assertEqual(
+            first_outcome.checkpoint_ref.parents[1].name,
+            f".{first_outcome.run_id}.tmp",
+        )
+        self.assertEqual(
+            second_outcome.checkpoint_ref.parents[1].name,
+            f".{second_outcome.run_id}.tmp",
+        )
+
+    def test_resume_stop_reads_checkpoint_from_promoted_directory(self) -> None:
+        with Session(self.engine) as db:
+            with self.assertRaises(InjectedResearchInterruption):
+                execute(
+                    self._runtime(db, interrupt_after_stage="finalize"),
+                    StartRun(config=self.config),
+                )
+            run = db.scalar(select(ResearchRun).where(ResearchRun.status == "running"))
+            run_id = run.run_id
+            temporary = self.output_root / "runs" / f".{run_id}.tmp"
+            promoted = self.output_root / "runs" / run_id
+            temporary.replace(promoted)
+            now = datetime.now(timezone.utc)
+            run.heartbeat_at = now - timedelta(minutes=10)
+            db.commit()
+            self.assertEqual(
+                mark_stale_research_runs(
+                    db,
+                    self.output_root,
+                    stale_after_seconds=60,
+                    now=now,
+                ),
+                [run_id],
+            )
+            outcome = execute(
+                self._runtime(db),
+                ResumeRun(run_id=run_id),
+                stop_signal=lambda: True,
+            )
+
+        self.assertIsInstance(outcome, InterruptedRun)
+        self.assertEqual(outcome.run_id, run_id)
+        self.assertEqual(outcome.checkpoint_ref, promoted / "checkpoints" / "recovery.json")
+        self.assertTrue(outcome.checkpoint_ref.is_file())
+
     def test_invalid_start_request_is_rejected_before_creating_a_run(self) -> None:
         with Session(self.engine) as db:
             with self.assertRaises(RequestRejected) as raised:
@@ -139,6 +209,22 @@ class ResearchExecutionTest(unittest.TestCase):
                 )
             self.assertEqual(raised.exception.category, "request")
             self.assertIsNone(db.scalar(select(ResearchRun)))
+
+    def _runtime(
+        self,
+        db: Session,
+        *,
+        interrupt_after_stage: str | None = None,
+    ) -> ExecutionRuntime:
+        return ExecutionRuntime(
+            registry_db=db,
+            output_root=self.output_root,
+            code_commit="golden-test-commit",
+            schema_revision="test-schema",
+            test_mode=True,
+            capacity_policy=SnapshotCapacityPolicy(min_remaining_bytes=0),
+            interrupt_after_stage=interrupt_after_stage,
+        )
 
 
 if __name__ == "__main__":

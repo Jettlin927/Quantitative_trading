@@ -13,7 +13,6 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
-from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -145,7 +144,7 @@ def execute(
     except ResumeIntegrityError as exc:
         raise RunFailed("integrity", exc, retryable=False) from exc
     except ResearchStopRequested as exc:
-        return _interrupted_outcome(runtime, request, str(exc))
+        return _interrupted_outcome(runtime, exc)
     except Exception as exc:
         retryable = isinstance(
             exc,
@@ -168,27 +167,33 @@ def _succeeded(result: ResearchRunResult) -> SucceededRun:
 
 def _interrupted_outcome(
     runtime: ExecutionRuntime,
-    request: ExecutionRequest,
-    reason: str,
+    interruption: ResearchStopRequested,
 ) -> InterruptedRun:
     from ..models import ResearchRun
 
-    if isinstance(request, ResumeRun):
-        run = runtime.registry_db.get(ResearchRun, request.run_id)
-    else:
-        query = select(ResearchRun).where(ResearchRun.status == "interrupted")
-        if request.orchestration_attempt_id is not None:
-            query = query.where(
-                ResearchRun.orchestration_attempt_id == request.orchestration_attempt_id
-            )
-        run = runtime.registry_db.scalar(query.order_by(ResearchRun.started_at.desc()))
-    if run is None:
+    run_id = interruption.run_id
+    working = interruption.checkpoint_root
+    if run_id is None or working is None:
         raise RunFailed(
             "integrity",
-            RuntimeError("停止后无法读回 interrupted 研究运行"),
+            RuntimeError("停止异常缺少本次研究运行身份或 checkpoint 目录"),
             retryable=False,
         )
-    working = Path(runtime.output_root) / "runs" / f".{run.run_id}.tmp"
+    run = runtime.registry_db.get(ResearchRun, run_id)
+    if run is None or run.status != "interrupted":
+        raise RunFailed(
+            "integrity",
+            RuntimeError("停止后无法按本次身份读回 interrupted 研究运行"),
+            retryable=False,
+        )
+    runs_root = Path(runtime.output_root) / "runs"
+    allowed_roots = {runs_root / f".{run_id}.tmp", runs_root / run_id}
+    if working not in allowed_roots:
+        raise RunFailed(
+            "integrity",
+            RuntimeError("停止异常中的 checkpoint 目录不属于本次研究运行"),
+            retryable=False,
+        )
     index_path = working / "checkpoints" / "index.json"
     recovery_path = working / "checkpoints" / "recovery.json"
     try:
@@ -196,8 +201,8 @@ def _interrupted_outcome(
     except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
         raise RunFailed("integrity", exc, retryable=False) from exc
     return InterruptedRun(
-        run_id=run.run_id,
+        run_id=run_id,
         last_stage=completed[-1] if completed else None,
         checkpoint_ref=recovery_path,
-        reason=reason,
+        reason=str(interruption),
     )

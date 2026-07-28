@@ -150,6 +150,17 @@ class InjectedResearchInterruption(BaseException):
 class ResearchStopRequested(RuntimeError):
     """编排器在阶段安全点请求停止，保留 checkpoint 供审计或同身份恢复。"""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        run_id: str | None = None,
+        checkpoint_root: Path | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.run_id = run_id
+        self.checkpoint_root = checkpoint_root
+
 
 @dataclass(frozen=True)
 class ResearchRunResult:
@@ -319,8 +330,13 @@ def _start_quant_research_pipeline(
             should_stop=should_stop,
         )
     except ResearchStopRequested as exc:
-        _mark_run_interrupted(registry_db, run_id, temporary, exc)
-        raise
+        interrupted = ResearchStopRequested(
+            str(exc),
+            run_id=run_id,
+            checkpoint_root=temporary,
+        )
+        _mark_run_interrupted(registry_db, run_id, temporary, interrupted)
+        raise interrupted from exc
     except Exception as exc:
         _mark_run_failed(registry_db, run_id, temporary, runs_root, exc)
         raise
@@ -407,8 +423,13 @@ def _resume_quant_research_pipeline(
             should_stop=should_stop,
         )
     except ResearchStopRequested as exc:
-        _mark_run_interrupted(registry_db, run_id, working, exc)
-        raise
+        interrupted = ResearchStopRequested(
+            str(exc),
+            run_id=run_id,
+            checkpoint_root=working,
+        )
+        _mark_run_interrupted(registry_db, run_id, working, interrupted)
+        raise interrupted from exc
     except Exception as exc:
         _mark_run_failed(registry_db, run_id, working, runs_root, exc)
         raise
