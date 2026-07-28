@@ -59,6 +59,18 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
         errors = self._verify_with_change(move_audit)
         self.assertTrue(any("预期入口路径不匹配" in error for error in errors), errors)
 
+    def test_verifier_rejects_misclassified_expected_entry(self) -> None:
+        def misclassify_registry(inventory: dict[str, Any]) -> None:
+            entry = next(
+                entry
+                for entry in inventory["entries"]
+                if entry["id"] == "active.strategy_registry"
+            )
+            entry["classification"] = "historical_evidence"
+
+        errors = self._verify_with_change(misclassify_registry)
+        self.assertTrue(any("预期入口分类不匹配" in error for error in errors), errors)
+
     def test_managed_discovery_rejects_unregistered_executable(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -81,6 +93,37 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
             )
         self.assertEqual(
             ["发现未登记的受管 executable：scripts/research/unregistered.py"],
+            errors,
+        )
+
+    def test_managed_discovery_recursively_rejects_nested_unregistered_executable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scripts = root / "scripts" / "research"
+            executable_source = 'if __name__ == "__main__":\n    raise SystemExit(0)\n'
+            nested_paths = (
+                scripts / "z_reports" / "run.py",
+                scripts / "a_reports" / "run.py",
+            )
+            for nested in nested_paths:
+                nested.parent.mkdir(parents=True)
+                nested.write_text(executable_source, encoding="utf-8")
+            excluded_paths = (
+                scripts / "__pycache__" / "cached.py",
+                scripts / "vendor" / "tool.py",
+            )
+            for excluded in excluded_paths:
+                excluded.parent.mkdir(parents=True, exist_ok=True)
+                excluded.write_text(executable_source, encoding="utf-8")
+            (scripts / "not_a_file.py").mkdir()
+
+            errors = _verify_managed_executables(set(), root, ("scripts/research",))
+
+        self.assertEqual(
+            [
+                "发现未登记的受管 executable：scripts/research/a_reports/run.py",
+                "发现未登记的受管 executable：scripts/research/z_reports/run.py",
+            ],
             errors,
         )
 

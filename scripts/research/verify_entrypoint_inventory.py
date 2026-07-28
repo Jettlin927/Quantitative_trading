@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -44,6 +45,27 @@ REQUIRED_ENTRY_FIELDS = {
     "retirement_conditions",
 }
 ID_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
+EXPECTED_ENTRY_CLASSIFICATIONS = {
+    "active.strategy_registry": "active_architecture",
+    "active.research_cli": "active_architecture",
+    "active.data_quality_cli": "active_architecture",
+    "active.reproduction_cli": "active_architecture",
+    "active.publication_cli": "active_architecture",
+    "compat.history_issue_mapping_cli": "compatibility_entry",
+    "candidate.audit_cli": "legacy_executable_candidate",
+    "compat.render_etf_volatility_managed": "compatibility_entry",
+    "compat.render_etf_trend_120d": "compatibility_entry",
+    "compat.render_a_share_b1": "compatibility_entry",
+    "compat.history_migration_cli": "compatibility_entry",
+    "candidate.ma_executable": "legacy_executable_candidate",
+    "candidate.value_sector_executable": "legacy_executable_candidate",
+    "active.inventory_verifier": "active_architecture",
+    "active.sample_snapshot": "active_architecture",
+    "compat.strategy_results_projection": "compatibility_entry",
+    "historical.published_reports": "historical_evidence",
+    "active.a_share_b1_long_history_config": "active_architecture",
+    "historical.us_trade_migration_inventory": "historical_evidence",
+}
 EXPECTED_ENTRY_PATHS = {
     "active.strategy_registry": "backend/app/quant_research/strategy_registry.py",
     "active.research_cli": "scripts/research/run_quant_research.py",
@@ -69,6 +91,17 @@ MANAGED_EXECUTABLE_ROOTS = (
     "scripts/research",
     "my_quant/us_research/scripts",
 )
+EXCLUDED_DISCOVERY_DIRECTORIES = {
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+    "vendor",
+    "vendors",
+    "venv",
+}
 
 
 def _non_empty_strings(value: Any) -> bool:
@@ -117,13 +150,29 @@ def _verify_managed_executables(
     managed_roots: tuple[str, ...] = MANAGED_EXECUTABLE_ROOTS,
 ) -> list[str]:
     discovered: set[str] = set()
+    resolved_repo_root = repo_root.resolve()
     for raw_root in managed_roots:
         root = _resolve_repo_path(repo_root, raw_root)
         if root is None or not root.is_dir():
             continue
-        for path in root.glob("*.py"):
-            if _is_python_executable(path):
-                discovered.add(path.relative_to(repo_root.resolve()).as_posix())
+        for current_root, directory_names, file_names in os.walk(
+            root, topdown=True, followlinks=False
+        ):
+            current_path = Path(current_root)
+            directory_names[:] = sorted(
+                name
+                for name in directory_names
+                if name not in EXCLUDED_DISCOVERY_DIRECTORIES
+                and not (current_path / name).is_symlink()
+            )
+            for file_name in sorted(file_names):
+                if not file_name.endswith(".py"):
+                    continue
+                path = current_path / file_name
+                if path.is_symlink() or not path.is_file():
+                    continue
+                if _is_python_executable(path):
+                    discovered.add(path.relative_to(resolved_repo_root).as_posix())
     return [
         f"发现未登记的受管 executable：{path}"
         for path in sorted(discovered - registered_paths)
@@ -185,6 +234,19 @@ def verify_inventory(inventory_path: Path, repo_root: Path = REPO_ROOT) -> list[
             errors.append(f"{prefix} 的分类无效：{classification!r}")
         else:
             seen_classifications.add(classification)
+        expected_classification = (
+            EXPECTED_ENTRY_CLASSIFICATIONS.get(entry_id)
+            if isinstance(entry_id, str)
+            else None
+        )
+        if (
+            expected_classification is not None
+            and classification != expected_classification
+        ):
+            errors.append(
+                "预期入口分类不匹配："
+                f"{entry_id} 应为 {expected_classification}，实际为 {classification}"
+            )
 
         raw_path = entry.get("path")
         if not isinstance(raw_path, str) or not raw_path.strip():
