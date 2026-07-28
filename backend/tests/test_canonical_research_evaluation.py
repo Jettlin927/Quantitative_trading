@@ -255,6 +255,63 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
             ):
                 StrategyEvidenceBundle.from_dict(payload)
 
+    def test_run_identity_is_closed_to_strategy_research_and_plan(self) -> None:
+        for target, field, value in (
+            ("bundle", "formalResearchId", "formal-other"),
+            ("run", "strategyId", "other_strategy"),
+            ("run", "planSha256", "9" * 64),
+        ):
+            payload = _complete_bundle()
+            if target == "bundle":
+                payload[field] = value
+            else:
+                payload["runIdentities"][0][field] = value
+            with self.subTest(target=target, field=field), self.assertRaisesRegex(
+                EvaluationContractError, "正式研究及冻结计划身份不闭合"
+            ):
+                StrategyEvidenceBundle.from_dict(payload)
+
+    def test_multiple_trials_require_registered_dsr_and_pbo(self) -> None:
+        missing = _complete_bundle()
+        missing["strategyFacts"]["validationDesign"]["trialCount"] = 2
+        missing["robustnessEvidence"]["multipleTesting"]["value"]["trialCount"] = 2
+        with self.assertRaisesRegex(EvaluationContractError, "multipleTesting.dsr.status 无效"):
+            StrategyEvidenceBundle.from_dict(missing)
+
+        below_threshold = _complete_bundle()
+        below_threshold["strategyFacts"]["validationDesign"]["trialCount"] = 2
+        _gate(below_threshold, "trial_history")["passed"] = False
+        below_threshold["robustnessEvidence"]["parameterNeighborhood"]["value"][
+            "passed"
+        ] = False
+        below_threshold["robustnessEvidence"]["multipleTesting"]["value"] = {
+            "passed": False,
+            "trialCount": 2,
+            "dsr": {
+                "status": "complete",
+                "value": {"probability": 0.80, "trialCount": 2, "observations": 24},
+            },
+            "pbo": {
+                "status": "complete",
+                "value": {
+                    "probability": 0.40,
+                    "monthlyObservations": 24,
+                    "combinations": 2,
+                    "trainingWinnerCounts": {"candidate-a": 1, "candidate-b": 1},
+                },
+            },
+        }
+        self.assertEqual(
+            evaluate_research(StrategyEvidenceBundle.from_dict(below_threshold)).conclusion,
+            "不通过",
+        )
+
+    def test_limitations_are_required_for_every_evaluation(self) -> None:
+        payload = _complete_bundle()
+        payload["limitations"] = []
+        with self.assertRaisesRegex(EvaluationContractError, "limitations 必须是非空"):
+            StrategyEvidenceBundle.from_dict(payload)
+
     def test_run_identity_formats_and_reproducibility_derivation_are_verified(self) -> None:
         for field, value in (
             ("codeCommit", "commit"),
@@ -295,6 +352,10 @@ def _complete_bundle() -> dict:
     run = {
         "runId": "run-golden",
         "status": "succeeded",
+        "strategyId": "golden_strategy",
+        "strategyVersion": "1.0.0",
+        "formalResearchId": "formal-golden",
+        "planSha256": "a" * 64,
         "codeCommit": "b" * 40,
         "dataSnapshotId": "c" * 64,
         "configSha256": "d" * 64,
@@ -352,6 +413,21 @@ def _complete_bundle() -> dict:
             {"passed": True, "expectedCapital": 10_000_000, "advParticipationP95": 0.03},
             ["ledger", "statistics"],
         ),
+        "multipleTesting": _robustness(
+            {
+                "passed": True,
+                "trialCount": 1,
+                "dsr": {
+                    "status": "not_applicable",
+                    "reason": "冻结试验次数为 1，无多重筛选",
+                },
+                "pbo": {
+                    "status": "not_applicable",
+                    "reason": "冻结试验次数为 1，无多重筛选",
+                },
+            },
+            ["parameters", "statistics"],
+        ),
     }
     return {
         "schemaVersion": EVIDENCE_SCHEMA_VERSION,
@@ -400,7 +476,7 @@ def _complete_bundle() -> dict:
             "reason": "冻结计划未定义有条件候选自动规则",
         },
         "strategyFacts": _strategy_facts(),
-        "limitations": [],
+        "limitations": ["合成黄金夹具不代表实际市场研究结论"],
     }
 
 
@@ -422,7 +498,12 @@ def _strategy_facts() -> dict:
         "execution": {"signalTiming": "收盘", "executionTiming": "下一开盘"},
         "costs": {"returnBasis": "净收益", "stressMultipliers": [1.0, 2.0]},
         "riskControls": {"positionLimit": 0.1, "score": 1.0},
-        "validationDesign": {"sampleSplit": "IS/OOS", "trialCount": 1},
+        "validationDesign": {
+            "sampleSplit": "IS/OOS",
+            "trialCount": 1,
+            "minimumDsrProbability": 0.95,
+            "maximumPboProbability": 0.20,
+        },
         "capacityAssumptions": ["预期资金一千万元"],
         "failureMechanisms": ["流动性枯竭", "交易拥挤"],
         "evidenceRefIds": ["code", "parameters", "statistics"],

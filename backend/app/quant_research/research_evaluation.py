@@ -92,6 +92,7 @@ _ROBUSTNESS_FIELDS = (
     "costStress",
     "marketRegimes",
     "capacity",
+    "multipleTesting",
 )
 _ROBUSTNESS_GATE_IDS = {
     "walkForward": "test_oos",
@@ -99,6 +100,7 @@ _ROBUSTNESS_GATE_IDS = {
     "costStress": "net_cost_and_liquidity",
     "marketRegimes": "market_regime",
     "capacity": "capacity",
+    "multipleTesting": "trial_history",
 }
 _ROBUSTNESS_VALUE_FIELDS = {
     "walkForward": {"passed", "testWindowCount"},
@@ -112,6 +114,7 @@ _ROBUSTNESS_VALUE_FIELDS = {
         "stressPeriodCount",
     },
     "capacity": {"passed", "expectedCapital", "advParticipationP95"},
+    "multipleTesting": {"passed", "trialCount", "dsr", "pbo"},
 }
 _STRATEGY_FACT_FIELDS = {
     "strategyName",
@@ -312,7 +315,15 @@ def _validate_bundle(value: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(payload[field], str) or not payload[field].strip():
             raise EvaluationContractError(f"{field} 必须是非空字符串")
     _require_sha256(payload["planSha256"], "planSha256")
-    payload["runIdentities"] = _validate_run_identities(payload["runIdentities"])
+    payload["runIdentities"] = _validate_run_identities(
+        payload["runIdentities"],
+        {
+            "strategyId": payload["strategyId"],
+            "strategyVersion": payload["strategyVersion"],
+            "formalResearchId": payload["formalResearchId"],
+            "planSha256": payload["planSha256"],
+        },
+    )
     payload["evidenceRefs"] = _validate_evidence_refs(
         payload["evidenceRefs"], payload["runIdentities"]
     )
@@ -332,6 +343,9 @@ def _validate_bundle(value: Mapping[str, Any]) -> dict[str, Any]:
         != [item["tradeDate"] for item in payload["tradingEvidence"]["observations"]]
     ):
         raise EvaluationContractError("NAV 与交易证据必须覆盖相同交易日")
+    payload["strategyFacts"] = _validate_strategy_facts(
+        payload["strategyFacts"], reference_by_id
+    )
     payload["hardGates"] = _validate_gates(payload["hardGates"], reference_by_id)
     gates_by_id = {item["gateId"]: item for item in payload["hardGates"]}
     robustness = payload["robustnessEvidence"]
@@ -339,25 +353,39 @@ def _validate_bundle(value: Mapping[str, Any]) -> dict[str, Any]:
         raise EvaluationContractError("robustnessEvidence 必须包含固定五类稳健性证据")
     payload["robustnessEvidence"] = {
         name: _validate_robustness_evidence(
-            name, robustness[name], gates_by_id, reference_by_id
+            name,
+            robustness[name],
+            gates_by_id,
+            reference_by_id,
+            payload["strategyFacts"]["validationDesign"],
         )
         for name in _ROBUSTNESS_FIELDS
     }
     payload["conditionalCandidateRule"] = _validate_conditional_rule(
         payload["conditionalCandidateRule"], payload["hardGates"]
     )
-    payload["strategyFacts"] = _validate_strategy_facts(
-        payload["strategyFacts"], reference_by_id
-    )
-    if not isinstance(payload["limitations"], list) or any(
-        not isinstance(item, str) or not item.strip() for item in payload["limitations"]
+    if (
+        not isinstance(payload["limitations"], list)
+        or not payload["limitations"]
+        or any(
+            not isinstance(item, str) or not item.strip()
+            for item in payload["limitations"]
+        )
     ):
         raise EvaluationContractError("limitations 必须是非空字符串数组")
     canonical_json_bytes(payload)
     return json.loads(canonical_json_bytes(payload))
 
 
-def _validate_run_identities(value: Any) -> list[dict[str, Any]]:
+def _validate_run_identities(
+    value: Any, expected_research_identity: Mapping[str, str]
+) -> list[dict[str, Any]]:
+    research_identity_fields = {
+        "strategyId",
+        "strategyVersion",
+        "formalResearchId",
+        "planSha256",
+    }
     fields = {
         "runId",
         "status",
@@ -368,6 +396,7 @@ def _validate_run_identities(value: Any) -> list[dict[str, Any]]:
         "randomSeed",
         "reproducibilityKey",
         "resultFingerprint",
+        *research_identity_fields,
     }
     if not isinstance(value, list) or not value:
         raise EvaluationContractError("runIdentities 必须包含全部终态运行")
@@ -378,6 +407,11 @@ def _validate_run_identities(value: Any) -> list[dict[str, Any]]:
         run = dict(item)
         if run["status"] not in {"succeeded", "failed", "interrupted", "stopped"}:
             raise EvaluationContractError("runIdentity.status 必须是终态")
+        if any(
+            run[field] != expected_research_identity[field]
+            for field in research_identity_fields
+        ):
+            raise EvaluationContractError("runIdentity 与策略、正式研究及冻结计划身份不闭合")
         if not isinstance(run["runId"], str) or not run["runId"].strip():
             raise EvaluationContractError("runIdentity.runId 必须是非空字符串")
         _require_hex(run["codeCommit"], "runIdentity.codeCommit", 40, 64)
@@ -622,6 +656,7 @@ def _validate_robustness_evidence(
     value: Any,
     gates: Mapping[str, Mapping[str, Any]],
     references: Mapping[str, Mapping[str, Any]],
+    validation_design: Mapping[str, Any],
 ) -> dict[str, Any]:
     status = _validate_status(
         value,
@@ -641,6 +676,8 @@ def _validate_robustness_evidence(
         "passed",
         "expectedCapital",
         "advParticipationP95",
+        "dsr",
+        "pbo",
     }
     for field in count_fields:
         minimum = 2 if name in {"parameterNeighborhood", "costStress"} else 1
@@ -666,6 +703,8 @@ def _validate_robustness_evidence(
         )
         if details["advParticipationP95"] < 0:
             raise EvaluationContractError("robustnessEvidence.capacity.advParticipationP95 不能为负")
+    if name == "multipleTesting":
+        details = _validate_multiple_testing_evidence(details, validation_design)
     gate = gates[_ROBUSTNESS_GATE_IDS[name]]
     if gate["status"] != "complete" or gate["passed"] is not details["passed"]:
         raise EvaluationContractError(f"robustnessEvidence.{name} 与对应冻结门禁不一致")
@@ -679,6 +718,109 @@ def _validate_robustness_evidence(
         raise EvaluationContractError(f"robustnessEvidence.{name} 未绑定对应门禁证据")
     status["value"] = details
     return status
+
+
+def _validate_multiple_testing_evidence(
+    details: dict[str, Any], validation_design: Mapping[str, Any]
+) -> dict[str, Any]:
+    trial_count = validation_design["trialCount"]
+    if details["trialCount"] != trial_count:
+        raise EvaluationContractError("multipleTesting.trialCount 与冻结试验登记不一致")
+    dsr = details["dsr"]
+    pbo = details["pbo"]
+    if trial_count == 1:
+        for field, value in (("dsr", dsr), ("pbo", pbo)):
+            if (
+                not isinstance(value, Mapping)
+                or set(value) != {"status", "reason"}
+                or value.get("status") != "not_applicable"
+                or not isinstance(value.get("reason"), str)
+                or not value["reason"].strip()
+            ):
+                raise EvaluationContractError(
+                    f"multipleTesting.{field} 单次冻结试验必须为 not_applicable"
+                )
+        computed_passed = True
+    else:
+        dsr_status = _validate_status(
+            dsr,
+            "multipleTesting.dsr",
+            complete_fields={"value"},
+            allowed_statuses={"complete"},
+        )
+        pbo_status = _validate_status(
+            pbo,
+            "multipleTesting.pbo",
+            complete_fields={"value"},
+            allowed_statuses={"complete"},
+        )
+        dsr_value = dsr_status["value"]
+        pbo_value = pbo_status["value"]
+        if not isinstance(dsr_value, Mapping) or set(dsr_value) != {
+            "probability",
+            "trialCount",
+            "observations",
+        }:
+            raise EvaluationContractError("multipleTesting.dsr 领域字段无效")
+        if not isinstance(pbo_value, Mapping) or set(pbo_value) != {
+            "probability",
+            "monthlyObservations",
+            "combinations",
+            "trainingWinnerCounts",
+        }:
+            raise EvaluationContractError("multipleTesting.pbo 领域字段无效")
+        dsr_value = dict(dsr_value)
+        pbo_value = dict(pbo_value)
+        for field, value in (
+            ("dsr.probability", dsr_value["probability"]),
+            ("pbo.probability", pbo_value["probability"]),
+        ):
+            probability = _finite_number(value, f"multipleTesting.{field}")
+            if not 0 <= probability <= 1:
+                raise EvaluationContractError(f"multipleTesting.{field} 必须位于 [0,1]")
+            if field.startswith("dsr"):
+                dsr_value["probability"] = probability
+            else:
+                pbo_value["probability"] = probability
+        if (
+            dsr_value["trialCount"] != trial_count
+            or isinstance(dsr_value["observations"], bool)
+            or not isinstance(dsr_value["observations"], int)
+            or dsr_value["observations"] < 2
+        ):
+            raise EvaluationContractError("multipleTesting.dsr 与冻结试验登记不闭合")
+        winner_counts = pbo_value["trainingWinnerCounts"]
+        if (
+            isinstance(pbo_value["monthlyObservations"], bool)
+            or not isinstance(pbo_value["monthlyObservations"], int)
+            or pbo_value["monthlyObservations"] < 2
+            or isinstance(pbo_value["combinations"], bool)
+            or not isinstance(pbo_value["combinations"], int)
+            or pbo_value["combinations"] < 1
+            or not isinstance(winner_counts, Mapping)
+            or len(winner_counts) != trial_count
+            or any(
+                not isinstance(candidate, str)
+                or not candidate.strip()
+                or isinstance(count, bool)
+                or not isinstance(count, int)
+                or count < 0
+                for candidate, count in winner_counts.items()
+            )
+            or sum(winner_counts.values()) != pbo_value["combinations"]
+        ):
+            raise EvaluationContractError("multipleTesting.pbo 与冻结试验登记不闭合")
+        dsr_status["value"] = dsr_value
+        pbo_status["value"] = {**pbo_value, "trainingWinnerCounts": dict(winner_counts)}
+        details["dsr"] = dsr_status
+        details["pbo"] = pbo_status
+        computed_passed = (
+            dsr_value["probability"] >= validation_design["minimumDsrProbability"]
+            and pbo_value["probability"] <= validation_design["maximumPboProbability"]
+        )
+    if details["passed"] is not computed_passed:
+        raise EvaluationContractError("multipleTesting.passed 与冻结 DSR/PBO 门槛不一致")
+    return details
 
 
 def _validate_conditional_rule(value: Any, gates: list[dict[str, Any]]) -> dict[str, Any]:
@@ -739,6 +881,32 @@ def _validate_strategy_facts(
             raise EvaluationContractError(f"strategyFacts.{field} 必须是非空领域对象")
         _require_nonempty_tree(section, f"strategyFacts.{field}")
         facts[field] = dict(section)
+    validation_design = facts["validationDesign"]
+    if set(validation_design) != {
+        "sampleSplit",
+        "trialCount",
+        "minimumDsrProbability",
+        "maximumPboProbability",
+    }:
+        raise EvaluationContractError("strategyFacts.validationDesign 试验登记字段无效")
+    if (
+        not isinstance(validation_design["sampleSplit"], str)
+        or not validation_design["sampleSplit"].strip()
+        or isinstance(validation_design["trialCount"], bool)
+        or not isinstance(validation_design["trialCount"], int)
+        or validation_design["trialCount"] < 1
+    ):
+        raise EvaluationContractError("strategyFacts.validationDesign 试验登记无效")
+    for field in ("minimumDsrProbability", "maximumPboProbability"):
+        probability = _finite_number(
+            validation_design[field], f"strategyFacts.validationDesign.{field}"
+        )
+        if not 0 <= probability <= 1:
+            raise EvaluationContractError(
+                f"strategyFacts.validationDesign.{field} 必须位于 [0,1]"
+            )
+        validation_design[field] = probability
+    facts["validationDesign"] = validation_design
     facts["economicHypothesis"] = dict(hypothesis)
     facts["evidenceRefIds"] = _validate_reference_ids(
         facts["evidenceRefIds"],
