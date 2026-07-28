@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -14,6 +16,7 @@ from backend.app.quant_research.execution import (
     InterruptedRun,
     RequestRejected,
     ResumeRun,
+    RunFailed,
     StartRun,
     SucceededRun,
     execute,
@@ -24,6 +27,10 @@ from backend.app.quant_research.runner import (
 )
 from backend.app.quant_research.snapshot import SnapshotCapacityPolicy
 from backend.tests.research_test_support import create_golden_database, golden_run_config
+
+
+class UnsupportedConfigValue:
+    pass
 
 
 class ResearchExecutionTest(unittest.TestCase):
@@ -209,6 +216,47 @@ class ResearchExecutionTest(unittest.TestCase):
                 )
             self.assertEqual(raised.exception.category, "request")
             self.assertIsNone(db.scalar(select(ResearchRun)))
+
+    def test_unsupported_nested_config_values_are_request_rejections(self) -> None:
+        unsupported_values = (
+            {"unexpected"},
+            Path("relative/path"),
+            UnsupportedConfigValue(),
+        )
+        with Session(self.engine) as db:
+            for value in unsupported_values:
+                with self.subTest(value_type=type(value).__name__):
+                    config = deepcopy(self.config)
+                    config["featureParameters"]["unsupported"] = value
+                    with self.assertRaises(RequestRejected) as raised:
+                        execute(
+                            ExecutionRuntime(
+                                registry_db=db,
+                                output_root=self.output_root,
+                            ),
+                            StartRun(config=config),
+                        )
+                    self.assertEqual(raised.exception.category, "request")
+                    self.assertIsInstance(raised.exception.__cause__, TypeError)
+            self.assertIsNone(db.scalar(select(ResearchRun)))
+
+    def test_pipeline_type_error_remains_an_execution_failure(self) -> None:
+        programming_error = TypeError("pipeline programming error")
+        with Session(self.engine) as db:
+            with patch(
+                "backend.app.quant_research.execution._start_quant_research_pipeline",
+                side_effect=programming_error,
+            ):
+                with self.assertRaises(RunFailed) as raised:
+                    execute(
+                        ExecutionRuntime(
+                            registry_db=db,
+                            output_root=self.output_root,
+                        ),
+                        StartRun(config=self.config),
+                    )
+            self.assertEqual(raised.exception.category, "execution")
+            self.assertIs(raised.exception.__cause__, programming_error)
 
     def _runtime(
         self,

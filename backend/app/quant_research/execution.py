@@ -106,6 +106,9 @@ def execute(
     if isinstance(request, StartRun):
         try:
             normalized = validate_run_config(request.config)
+        except (TypeError, ValueError) as exc:
+            raise RequestRejected("request", exc) from exc
+        try:
             resolve_strategy_definition(normalized)
         except ValueError as exc:
             raise RequestRejected("request", exc) from exc
