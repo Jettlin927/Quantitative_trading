@@ -143,6 +143,8 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
             "artifacts://run-other/manifest.json",
             "artifacts://run-golden",
             "artifacts://run-golden/manifest.json?version=other",
+            "artifacts://run-golden/../run-other/metrics.json",
+            "artifacts://run-golden/other\\metrics.json",
         ):
             payload = _complete_bundle()
             payload["evidenceRefs"][0]["uri"] = uri
@@ -150,6 +152,13 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
                 EvaluationContractError, "authority 绑定 runId.*工件路径"
             ):
                 StrategyEvidenceBundle.from_dict(payload)
+
+        duplicate_uri = _complete_bundle()
+        duplicate_uri["evidenceRefs"][1]["uri"] = duplicate_uri["evidenceRefs"][0][
+            "uri"
+        ]
+        with self.assertRaisesRegex(EvaluationContractError, "uri 不能重复声明"):
+            StrategyEvidenceBundle.from_dict(duplicate_uri)
 
     def test_only_frozen_market_capacity_and_soft_threshold_gates_can_be_conditional(self) -> None:
         forbidden = _complete_bundle()
@@ -198,6 +207,17 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
             evaluate_research(StrategyEvidenceBundle.from_dict(mixed)).conclusion,
             "受阻",
         )
+
+    def test_trading_counts_cannot_mark_one_request_executed_and_fully_blocked(self) -> None:
+        payload = _complete_bundle()
+        payload["tradingEvidence"]["observations"][0].update(
+            requestCount=1,
+            executionCount=1,
+            blockedCount=1,
+            blockedRequestCount=1,
+        )
+        with self.assertRaisesRegex(EvaluationContractError, "计数不闭合"):
+            StrategyEvidenceBundle.from_dict(payload)
 
     def test_false_robustness_cannot_be_relabelled_as_research_passed(self) -> None:
         payload = _complete_bundle()
@@ -385,10 +405,10 @@ def _complete_bundle() -> dict:
         random_seed=run["randomSeed"],
     )
     evidence_refs = [
-        _ref("input", "input_snapshot", "manifest.json", "1"),
-        _ref("code", "code", "manifest.json", "2"),
-        _ref("environment", "environment", "manifest.json", "3"),
-        _ref("parameters", "parameters", "manifest.json", "4"),
+        _ref("input", "input_snapshot", "input-manifest.json", "1"),
+        _ref("code", "code", "code-manifest.json", "2"),
+        _ref("environment", "environment", "environment.json", "3"),
+        _ref("parameters", "parameters", "config.json", "4"),
         _ref("ledger", "ledger", "rebalance_executions.csv.gz", "5"),
         _ref("statistics", "statistics", "metrics.json", "6"),
     ]

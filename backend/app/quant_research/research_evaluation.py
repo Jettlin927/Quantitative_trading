@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import math
+from pathlib import PurePosixPath
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
@@ -468,22 +469,29 @@ def _validate_evidence_refs(
         if ref["runId"] not in run_ids:
             raise EvaluationContractError("evidenceRef.runId 未绑定评价运行")
         parsed_uri = urlparse(ref["uri"])
+        relative_text = parsed_uri.path.removeprefix("/")
+        relative_path = PurePosixPath(relative_text)
         if (
             parsed_uri.scheme != "artifacts"
             or parsed_uri.netloc != ref["runId"]
-            or not parsed_uri.path.startswith("/")
-            or parsed_uri.path == "/"
+            or not relative_text
+            or parsed_uri.path != f"/{relative_path.as_posix()}"
+            or relative_path.is_absolute()
+            or ".." in relative_path.parts
+            or "\\" in relative_text
             or parsed_uri.params
             or parsed_uri.query
             or parsed_uri.fragment
         ):
             raise EvaluationContractError(
-                "evidenceRef.uri 必须是 authority 绑定 runId 且含工件路径的 canonical artifacts URI"
+                "evidenceRef.uri 必须是 authority 绑定 runId 且不越界的 canonical 工件路径"
             )
         _require_sha256(ref["sha256"], "evidenceRef.sha256")
         result.append(ref)
     if len({item["artifactName"] for item in result}) != len(result):
         raise EvaluationContractError("evidenceRef.artifactName 不能重复")
+    if len({(item["runId"], item["uri"]) for item in result}) != len(result):
+        raise EvaluationContractError("同一运行的 evidenceRef.uri 不能重复声明")
     return sorted(result, key=lambda item: item["artifactName"])
 
 
@@ -589,6 +597,8 @@ def _validate_trading_evidence(
             row["executionCount"] > row["requestCount"]
             or row["blockedCount"] > row["requestCount"]
             or row["blockedRequestCount"] > row["blockedCount"]
+            or row["executionCount"] + row["blockedRequestCount"]
+            > row["requestCount"]
         ):
             raise EvaluationContractError("交易请求、成交与阻塞计数不闭合")
         for field in ("oneWayTurnover", "transactionCostRate"):
