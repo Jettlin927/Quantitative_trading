@@ -190,6 +190,11 @@ def summarize_execution_metrics(
         frame["ts_code"] = frame["ts_code"].astype(str).str.upper()
     position_frame["trade_date"] = pd.to_datetime(position_frame["trade_date"])
     position_frame["ts_code"] = position_frame["ts_code"].astype(str).str.upper()
+    nav_dates = set(nav_frame["trade_date"])
+    if not set(request_frame["execution_date"]).issubset(nav_dates) or not set(
+        execution_frame["execution_date"]
+    ).issubset(nav_dates):
+        raise ValueError("调仓请求或模拟执行日期不属于 NAV 交易日")
 
     _numeric_columns(nav_frame, ("cash_weight", "one_way_turnover", "transaction_cost_rate"), "NAV")
     _numeric_columns(request_frame, ("requested_change",), "调仓请求")

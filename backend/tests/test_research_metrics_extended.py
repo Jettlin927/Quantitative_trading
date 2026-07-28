@@ -98,6 +98,16 @@ class ResearchMetricsExtendedTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "status、reason"):
             summarize_execution_metrics(nav, requests, broken_status, positions)
 
+        outside_requests = requests.copy()
+        outside_executions = executions.copy()
+        outside_date = dates[-1] + pd.offsets.BDay(1)
+        outside_requests.loc[1, "execution_date"] = outside_date
+        outside_executions.loc[1, "execution_date"] = outside_date
+        with self.assertRaisesRegex(ValueError, "日期不属于 NAV 交易日"):
+            summarize_execution_metrics(
+                nav, outside_requests, outside_executions, positions
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

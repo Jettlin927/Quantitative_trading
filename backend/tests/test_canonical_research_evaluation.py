@@ -49,6 +49,18 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
         )
         self.assertEqual(result["strategyFacts"]["strategyName"], "黄金策略")
 
+    def test_nav_evidence_is_closed_to_frozen_test_oos_boundary(self) -> None:
+        for mutate in (
+            lambda payload: payload["navEvidence"].update(sampleRole="train"),
+            lambda payload: payload["navEvidence"]["observations"][0].update(
+                tradeDate="2025-01-01"
+            ),
+        ):
+            payload = _complete_bundle()
+            mutate(payload)
+            with self.assertRaisesRegex(EvaluationContractError, "test/OOS"):
+                StrategyEvidenceBundle.from_dict(payload)
+
     def test_structured_missing_states_never_become_numeric_placeholders(self) -> None:
         payload = _complete_bundle()
         payload["navEvidence"] = {
@@ -213,6 +225,8 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
         for gate_id in (
             "identity_and_hypothesis",
             "point_in_time_universe",
+            "execution_semantics",
+            "matched_benchmark",
             "reproducibility",
         ):
             payload = _complete_bundle()
@@ -439,6 +453,9 @@ def _complete_bundle() -> dict:
         "evidenceRefs": evidence_refs,
         "navEvidence": {
             "status": "complete",
+            "sampleRole": "test_oos",
+            "startDate": "2025-01-02",
+            "endDate": "2025-01-08",
             "initialNav": 1.0,
             "initialBenchmarkNav": 1.0,
             "evidenceRefIds": ["statistics"],
@@ -500,6 +517,9 @@ def _strategy_facts() -> dict:
         "riskControls": {"positionLimit": 0.1, "score": 1.0},
         "validationDesign": {
             "sampleSplit": "IS/OOS",
+            "sampleRole": "test_oos",
+            "testOosStartDate": "2025-01-02",
+            "testOosEndDate": "2025-01-08",
             "trialCount": 1,
             "minimumDsrProbability": 0.95,
             "maximumPboProbability": 0.20,

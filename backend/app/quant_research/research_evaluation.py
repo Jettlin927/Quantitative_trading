@@ -65,7 +65,13 @@ _MISSING_BLOCKING_GATE_IDS = frozenset(
     }
 )
 _FAILED_BLOCKING_GATE_IDS = frozenset(
-    {"identity_and_hypothesis", "point_in_time_universe", "reproducibility"}
+    {
+        "identity_and_hypothesis",
+        "point_in_time_universe",
+        "execution_semantics",
+        "matched_benchmark",
+        "reproducibility",
+    }
 )
 _GATE_EVIDENCE_KINDS = {
     "identity_and_hypothesis": frozenset({"code", "parameters"}),
@@ -330,8 +336,13 @@ def _validate_bundle(value: Mapping[str, Any]) -> dict[str, Any]:
     reference_by_id = {
         item["artifactName"]: item for item in payload["evidenceRefs"]
     }
+    payload["strategyFacts"] = _validate_strategy_facts(
+        payload["strategyFacts"], reference_by_id
+    )
     payload["navEvidence"] = _validate_nav_evidence(
-        payload["navEvidence"], reference_by_id
+        payload["navEvidence"],
+        reference_by_id,
+        payload["strategyFacts"]["validationDesign"],
     )
     payload["tradingEvidence"] = _validate_trading_evidence(
         payload["tradingEvidence"], reference_by_id
@@ -343,9 +354,6 @@ def _validate_bundle(value: Mapping[str, Any]) -> dict[str, Any]:
         != [item["tradeDate"] for item in payload["tradingEvidence"]["observations"]]
     ):
         raise EvaluationContractError("NAV 与交易证据必须覆盖相同交易日")
-    payload["strategyFacts"] = _validate_strategy_facts(
-        payload["strategyFacts"], reference_by_id
-    )
     payload["hardGates"] = _validate_gates(payload["hardGates"], reference_by_id)
     gates_by_id = {item["gateId"]: item for item in payload["hardGates"]}
     robustness = payload["robustnessEvidence"]
@@ -480,12 +488,17 @@ def _validate_evidence_refs(
 
 
 def _validate_nav_evidence(
-    value: Any, references: Mapping[str, Mapping[str, Any]]
+    value: Any,
+    references: Mapping[str, Mapping[str, Any]],
+    validation_design: Mapping[str, Any],
 ) -> dict[str, Any]:
     status = _validate_status(
         value,
         "navEvidence",
         complete_fields={
+            "sampleRole",
+            "startDate",
+            "endDate",
             "initialNav",
             "initialBenchmarkNav",
             "observations",
@@ -498,6 +511,15 @@ def _validate_nav_evidence(
     status["evidenceRefIds"] = _validate_reference_ids(
         status["evidenceRefIds"], "navEvidence", references, {"statistics"}
     )
+    status["startDate"] = _iso_date(status["startDate"], "navEvidence.startDate")
+    status["endDate"] = _iso_date(status["endDate"], "navEvidence.endDate")
+    if (
+        status["sampleRole"] != "test_oos"
+        or status["sampleRole"] != validation_design["sampleRole"]
+        or status["startDate"] != validation_design["testOosStartDate"]
+        or status["endDate"] != validation_design["testOosEndDate"]
+    ):
+        raise EvaluationContractError("navEvidence 必须绑定冻结 test/OOS 角色与区间")
     for field in ("initialNav", "initialBenchmarkNav"):
         status[field] = _finite_number(status[field], f"navEvidence.{field}", positive=True)
     observations = status["observations"]
@@ -518,6 +540,8 @@ def _validate_nav_evidence(
     dates = [item["tradeDate"] for item in normalized]
     if dates != sorted(dates) or len(set(dates)) != len(dates):
         raise EvaluationContractError("navEvidence 日期必须严格升序且唯一")
+    if dates[0] != status["startDate"] or dates[-1] != status["endDate"]:
+        raise EvaluationContractError("navEvidence 观察日期与冻结 test/OOS 区间不闭合")
     status["observations"] = normalized
     return status
 
@@ -884,6 +908,9 @@ def _validate_strategy_facts(
     validation_design = facts["validationDesign"]
     if set(validation_design) != {
         "sampleSplit",
+        "sampleRole",
+        "testOosStartDate",
+        "testOosEndDate",
         "trialCount",
         "minimumDsrProbability",
         "maximumPboProbability",
@@ -892,11 +919,22 @@ def _validate_strategy_facts(
     if (
         not isinstance(validation_design["sampleSplit"], str)
         or not validation_design["sampleSplit"].strip()
+        or validation_design["sampleRole"] != "test_oos"
         or isinstance(validation_design["trialCount"], bool)
         or not isinstance(validation_design["trialCount"], int)
         or validation_design["trialCount"] < 1
     ):
         raise EvaluationContractError("strategyFacts.validationDesign 试验登记无效")
+    validation_design["testOosStartDate"] = _iso_date(
+        validation_design["testOosStartDate"],
+        "strategyFacts.validationDesign.testOosStartDate",
+    )
+    validation_design["testOosEndDate"] = _iso_date(
+        validation_design["testOosEndDate"],
+        "strategyFacts.validationDesign.testOosEndDate",
+    )
+    if validation_design["testOosStartDate"] > validation_design["testOosEndDate"]:
+        raise EvaluationContractError("strategyFacts.validationDesign test/OOS 日期倒置")
     for field in ("minimumDsrProbability", "maximumPboProbability"):
         probability = _finite_number(
             validation_design[field], f"strategyFacts.validationDesign.{field}"
