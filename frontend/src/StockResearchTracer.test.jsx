@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './main.jsx'
@@ -103,6 +104,119 @@ describe('股票研究 tracer', () => {
     await waitFor(() => expect(setData).toHaveBeenCalledWith(expect.objectContaining({
       bars: [expect.objectContaining({ provenance: { kind: 'experimental', label: '实验数据', source: 'yfinance', researchEligible: false, sample: false } })],
     })))
+  })
+
+  it('StrictMode setup→cleanup→setup 后仍会提交当前股票明细', async () => {
+    const readAdapter = vi.fn(({ path }) => {
+      if (path === '/api/stocks/screen?limit=50&offset=0') return Promise.resolve(stockPage([{ ts_code: '000001.SZ', symbol: '000001', name: '甲公司' }]))
+      if (path === '/api/daily-bars?ts_code=000001.SZ') return Promise.resolve([])
+      if (path === '/api/stocks/000001.SZ/detail') return Promise.resolve({ listing: { listStatus: 'StrictMode 当前状态' }, valuation_history: [], financial_history: [] })
+      if (path === '/api/us-experiment/instruments?current_only=true&limit=50&offset=0') return Promise.resolve(instrumentPage([]))
+      return Promise.resolve(fallback(path))
+    })
+
+    render(<StrictMode><App readAdapter={readAdapter} /></StrictMode>)
+    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
+
+    expect(await screen.findByText('StrictMode 当前状态')).toBeInTheDocument()
+  })
+
+  it('快速搜索会取消旧列表请求，adapter 忽略 abort 时不提交 stale，也不显示全局失败', async () => {
+    const oldList = deferred()
+    /** @type {AbortSignal[]} */
+    const oldSignals = []
+    const readAdapter = vi.fn(({ path, signal }) => {
+      if (path === '/api/stocks/screen?limit=50&offset=0') { oldSignals.push(signal); return oldList.promise }
+      if (path === '/api/stocks/screen?limit=50&offset=0&q=%E4%B9%99') return Promise.resolve(stockPage([{ ts_code: '000002.SZ', symbol: '000002', name: '乙公司' }]))
+      if (path === '/api/daily-bars?ts_code=000002.SZ') return Promise.resolve([])
+      if (path === '/api/stocks/000002.SZ/detail') return Promise.resolve({ listing: { listStatus: '乙股当前状态' }, valuation_history: [], financial_history: [] })
+      if (path === '/api/us-experiment/instruments?current_only=true&limit=50&offset=0') return Promise.resolve(instrumentPage([]))
+      return Promise.resolve(fallback(path))
+    })
+
+    render(<App readAdapter={readAdapter} />)
+    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
+    await waitFor(() => expect(oldSignals).toHaveLength(1))
+    fireEvent.change(screen.getByPlaceholderText('代码 / 名称 / 拼音'), { target: { value: '乙' } })
+    fireEvent.click(screen.getByRole('button', { name: '查询' }))
+    expect(await screen.findByRole('button', { name: /000002.*乙公司/ })).toBeInTheDocument()
+    expect(oldSignals[0].aborted).toBe(true)
+
+    oldList.resolve(stockPage([{ ts_code: '000001.SZ', symbol: '000001', name: '甲公司' }]))
+    await waitFor(() => expect(screen.getByRole('button', { name: /全局刷新/ })).not.toBeDisabled())
+    expect(screen.queryByText(/部分只读数据读取失败/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /000001.*甲公司/ })).not.toBeInTheDocument()
+  })
+
+  it('当前列表真实失败仍显示局部错误和全局失败，不与 cancelled/stale/skipped 混淆', async () => {
+    const readAdapter = vi.fn(({ path }) => {
+      if (path === '/api/stocks/screen?limit=50&offset=0') return Promise.reject(new Error('股票目录不可用'))
+      if (path === '/api/us-experiment/instruments?current_only=true&limit=50&offset=0') return Promise.resolve(instrumentPage([]))
+      return Promise.resolve(fallback(path))
+    })
+
+    render(<App readAdapter={readAdapter} />)
+    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
+
+    expect(await screen.findByText('股票目录不可用')).toBeInTheDocument()
+    expect(screen.getByText(/部分只读数据读取失败.*stocks: 股票目录不可用/)).toBeInTheDocument()
+  })
+
+  it('全局刷新更换选中项时复用同一明细请求，不因 effect 并发 abort 产生虚假失败', async () => {
+    let listCalls = 0
+    let nextDetailCalls = 0
+    const nextDetail = deferred()
+    const readAdapter = vi.fn(({ path }) => {
+      if (path.startsWith('/api/stocks/screen?')) {
+        listCalls += 1
+        return Promise.resolve(stockPage([listCalls === 1
+          ? { ts_code: '000001.SZ', symbol: '000001', name: '甲公司' }
+          : { ts_code: '000002.SZ', symbol: '000002', name: '乙公司' }]))
+      }
+      if (path === '/api/daily-bars?ts_code=000001.SZ') return Promise.resolve([])
+      if (path === '/api/stocks/000001.SZ/detail') return Promise.resolve({ listing: { listStatus: '甲股当前状态' }, valuation_history: [], financial_history: [] })
+      if (path === '/api/daily-bars?ts_code=000002.SZ') return Promise.resolve([])
+      if (path === '/api/stocks/000002.SZ/detail') {
+        nextDetailCalls += 1
+        return nextDetailCalls === 1
+          ? nextDetail.promise
+          : Promise.reject(new Error('不应出现的重复明细请求'))
+      }
+      if (path === '/api/us-experiment/instruments?current_only=true&limit=50&offset=0') return Promise.resolve(instrumentPage([]))
+      return Promise.resolve(fallback(path))
+    })
+
+    render(<App readAdapter={readAdapter} />)
+    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
+    expect(await screen.findByText('甲股当前状态')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /全局刷新/ }))
+    await waitFor(() => expect(nextDetailCalls).toBe(1))
+    nextDetail.resolve({ listing: { listStatus: '乙股刷新状态' }, valuation_history: [], financial_history: [] })
+
+    expect(await screen.findByText('乙股刷新状态')).toBeInTheDocument()
+    expect(nextDetailCalls).toBe(1)
+    expect(screen.queryByText('不应出现的重复明细请求')).not.toBeInTheDocument()
+  })
+
+  it('列表请求在 unmount 时 abort，一级导航与既有文案保持兼容', async () => {
+    const pendingList = deferred()
+    /** @type {AbortSignal[]} */
+    const signals = []
+    const readAdapter = vi.fn(({ path, signal }) => {
+      if (path === '/api/stocks/screen?limit=50&offset=0') { signals.push(signal); return pendingList.promise }
+      if (path === '/api/us-experiment/instruments?current_only=true&limit=50&offset=0') return Promise.resolve(instrumentPage([]))
+      return Promise.resolve(fallback(path))
+    })
+
+    const view = render(<App readAdapter={readAdapter} />)
+    expect(screen.getByRole('button', { name: /研究驾驶舱/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /A 股数据/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /美股数据/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /系统运维/ })).toBeInTheDocument()
+    await waitFor(() => expect(signals).toHaveLength(1))
+
+    view.unmount()
+    expect(signals[0].aborted).toBe(true)
   })
 
   it('美股新选择与 unmount 会 abort，generation 和 selection 阻止过期实验行情提交', async () => {

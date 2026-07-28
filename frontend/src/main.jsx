@@ -18,7 +18,7 @@ import { OperationsView } from './OperationsView.jsx'
 import { ResearchCockpitView } from './ResearchCockpitView.jsx'
 import { USDataBoundaryView } from './USDataBoundaryView.jsx'
 import { browserReadAdapter, systemClock } from './readAdapter.js'
-import { useStockResearch } from './stockResearch.js'
+import { isReadComplete, isReadFailure, useStockResearch } from './stockResearch.js'
 import { Notice, isInventoryAvailable, translateStatus } from './viewSupport.jsx'
 import './styles.css'
 
@@ -89,8 +89,8 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
       return readAdapter({ path })
     }))
     const failures = []
-    let stockPageRefreshed = true
-    let usPageRefreshed = true
+    let stockListOutcome = null
+    let usListOutcome = null
     results.forEach((result, index) => {
       const key = requests[index][0]
       if (result.status === 'rejected') {
@@ -103,11 +103,9 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
       }
       const value = result.value
       if (key === 'stocks' || key === 'usInstruments') {
-        if (!value) {
-          if (key === 'stocks') stockPageRefreshed = false
-          if (key === 'usInstruments') usPageRefreshed = false
-          failures.push(`${key}: 当前请求未应用`)
-        }
+        if (key === 'stocks') stockListOutcome = value
+        if (key === 'usInstruments') usListOutcome = value
+        if (isReadFailure(value)) failures.push(`${key}: ${value.error}`)
         return
       }
       if (key === 'health') setHealth(value)
@@ -149,15 +147,16 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
       }
     })
     const detailResults = refreshCoverage ? await Promise.all([
-      Promise.resolve(stockPageRefreshed),
-      Promise.resolve(usPageRefreshed),
+      Promise.resolve(stockListOutcome),
+      Promise.resolve(usListOutcome),
       stockResearch.aShare.refreshSelected(),
       stockResearch.us.refreshSelected(),
       selectedCatalogRef.current.code ? loadSelectedCatalogData(selectedCatalogRef.current) : Promise.resolve(true),
       refreshSelectedResearchData(selectedStrategyIdRef.current),
     ]) : [true]
     if (failures.length) setGlobalError(`部分只读数据读取失败：${failures.join('；')}`)
-    if (refreshCoverage && !failures.length && detailResults.every(Boolean)) setLastUpdated(clock.now())
+    const detailComplete = detailResults.every((result) => typeof result === 'boolean' ? result : isReadComplete(result))
+    if (refreshCoverage && !failures.length && detailComplete) setLastUpdated(clock.now())
     setResearchLoading(false)
     setLoading(false)
   }

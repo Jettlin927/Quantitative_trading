@@ -5,6 +5,25 @@ const PAGE_SIZE = 50
 const emptyStockPage = { items: [], total: 0, limit: PAGE_SIZE, offset: 0 }
 const emptyUsPage = { items: [], total: 0, limit: PAGE_SIZE, offset: 0 }
 
+export const READ_OUTCOME = Object.freeze({
+  APPLIED: 'applied',
+  CANCELLED: 'cancelled',
+  STALE: 'stale',
+  SKIPPED: 'skipped',
+  FAILED: 'failed',
+})
+
+const applied = { status: READ_OUTCOME.APPLIED }
+const skipped = { status: READ_OUTCOME.SKIPPED }
+
+export function isReadFailure(result) {
+  return result?.status === READ_OUTCOME.FAILED
+}
+
+export function isReadComplete(result) {
+  return result?.status === READ_OUTCOME.APPLIED || result?.status === READ_OUTCOME.SKIPPED
+}
+
 /**
  * 股票研究 module interface. It owns A/美股 list-selection-detail consistency,
  * cancellation and stale-response rules. Callers know only user actions and the
@@ -37,6 +56,11 @@ export function useStockResearch(readAdapter) {
   const appliedUsQuery = useRef('')
   const generations = useRef({ aList: 0, aDetail: 0, usList: 0, usDetail: 0 })
   const controllers = useRef({ aList: null, aDetail: null, usList: null, usDetail: null })
+  const pendingDetails = useRef({ aDetail: null, usDetail: null })
+  const requestedDetails = useRef({
+    aDetail: { selection: '', generation: 0 },
+    usDetail: { selection: '', generation: 0 },
+  })
 
   const begin = useCallback((kind) => {
     controllers.current[kind]?.abort()
@@ -92,13 +116,16 @@ export function useStockResearch(readAdapter) {
     setStockListError('')
     try {
       const page = await readAdapter({ path: stockScreenPath(requestedQuery, offset), signal: request.controller.signal })
-      if (!isCurrent('aList', request)) return false
+      if (!isCurrent('aList', request)) return { status: READ_OUTCOME.STALE }
       if (applyQuery) appliedAQuery.current = requestedQuery
       applyStockPage(page)
-      return true
+      return applied
     } catch (error) {
-      if (isCurrent('aList', request)) setStockListError(errorMessage(error))
-      return false
+      if (request.controller.signal.aborted) return { status: READ_OUTCOME.CANCELLED }
+      if (!isCurrent('aList', request)) return { status: READ_OUTCOME.STALE }
+      const message = errorMessage(error)
+      setStockListError(message)
+      return { status: READ_OUTCOME.FAILED, error: message }
     }
   }, [applyStockPage, begin, isCurrent, readAdapter])
 
@@ -107,62 +134,99 @@ export function useStockResearch(readAdapter) {
     setUsListError('')
     try {
       const page = await readAdapter({ path: usInstrumentPath(requestedQuery, offset), signal: request.controller.signal })
-      if (!isCurrent('usList', request)) return false
+      if (!isCurrent('usList', request)) return { status: READ_OUTCOME.STALE }
       if (applyQuery) appliedUsQuery.current = requestedQuery
       applyUsPage(page)
-      return true
+      return applied
     } catch (error) {
-      if (isCurrent('usList', request)) setUsListError(errorMessage(error))
-      return false
+      if (request.controller.signal.aborted) return { status: READ_OUTCOME.CANCELLED }
+      if (!isCurrent('usList', request)) return { status: READ_OUTCOME.STALE }
+      const message = errorMessage(error)
+      setUsListError(message)
+      return { status: READ_OUTCOME.FAILED, error: message }
     }
   }, [applyUsPage, begin, isCurrent, readAdapter])
 
-  const loadSelectedStock = useCallback(async (code) => {
-    if (!code) return true
+  const loadSelectedStock = useCallback((code, force = false) => {
+    if (!code) return Promise.resolve(skipped)
+    const pending = pendingDetails.current.aDetail
+    if (pending?.selection === code) return pending.promise
+    const requested = requestedDetails.current.aDetail
+    if (!force && requested.selection === code && requested.generation === generations.current.aDetail) {
+      return Promise.resolve(skipped)
+    }
+
     const request = begin('aDetail')
+    requestedDetails.current.aDetail = { selection: code, generation: request.generation }
+    const entry = { selection: code, promise: null }
     setStockDetailLoading(true)
     setStockBars([])
     setStockDetail(null)
-    try {
-      const [bars, detail] = await Promise.all([
-        readAdapter({ path: `/api/daily-bars?ts_code=${encodeURIComponent(code)}`, signal: request.controller.signal }),
-        readAdapter({ path: `/api/stocks/${encodeURIComponent(code)}/detail`, signal: request.controller.signal }),
-      ])
-      if (!isCurrent('aDetail', request, code)) return false
-      setStockBars(toAShareMarketBars(bars))
-      setStockDetail(detail)
-      setStockDetailError('')
-      return true
-    } catch (error) {
-      if (isCurrent('aDetail', request, code)) setStockDetailError(errorMessage(error))
-      return false
-    } finally {
-      if (isCurrent('aDetail', request, code)) setStockDetailLoading(false)
-    }
+    entry.promise = (async () => {
+      try {
+        const [bars, detail] = await Promise.all([
+          readAdapter({ path: `/api/daily-bars?ts_code=${encodeURIComponent(code)}`, signal: request.controller.signal }),
+          readAdapter({ path: `/api/stocks/${encodeURIComponent(code)}/detail`, signal: request.controller.signal }),
+        ])
+        if (!isCurrent('aDetail', request, code)) return { status: READ_OUTCOME.STALE }
+        setStockBars(toAShareMarketBars(bars))
+        setStockDetail(detail)
+        setStockDetailError('')
+        return applied
+      } catch (error) {
+        if (request.controller.signal.aborted) return { status: READ_OUTCOME.CANCELLED }
+        if (!isCurrent('aDetail', request, code)) return { status: READ_OUTCOME.STALE }
+        const message = errorMessage(error)
+        setStockDetailError(message)
+        return { status: READ_OUTCOME.FAILED, error: message }
+      } finally {
+        if (pendingDetails.current.aDetail === entry) pendingDetails.current.aDetail = null
+        if (isCurrent('aDetail', request, code)) setStockDetailLoading(false)
+      }
+    })()
+    pendingDetails.current.aDetail = entry
+    return entry.promise
   }, [begin, isCurrent, readAdapter])
 
-  const loadSelectedUs = useCallback(async (code) => {
-    if (!code) return true
+  const loadSelectedUs = useCallback((code, force = false) => {
+    if (!code) return Promise.resolve(skipped)
+    const pending = pendingDetails.current.usDetail
+    if (pending?.selection === code) return pending.promise
+    const requested = requestedDetails.current.usDetail
+    if (!force && requested.selection === code && requested.generation === generations.current.usDetail) {
+      return Promise.resolve(skipped)
+    }
+
     const request = begin('usDetail')
+    requestedDetails.current.usDetail = { selection: code, generation: request.generation }
+    const entry = { selection: code, promise: null }
     setUsDetailLoading(true)
     setLoadedUsCode('')
     setUsBars([])
     setUsMarketBars([])
-    try {
-      const response = await readAdapter({ path: `/api/us-experiment/instruments/${encodeURIComponent(code)}/daily-bars`, signal: request.controller.signal })
-      if (!isCurrent('usDetail', request, code)) return false
-      const bars = response.bars || []
-      setUsBars(bars)
-      setUsMarketBars(toUsMarketBars(bars))
-      setLoadedUsCode(code)
-      setUsDetailError('')
-      return true
-    } catch (error) {
-      if (isCurrent('usDetail', request, code)) setUsDetailError(errorMessage(error))
-      return false
-    } finally {
-      if (isCurrent('usDetail', request, code)) setUsDetailLoading(false)
-    }
+    entry.promise = (async () => {
+      try {
+        const response = await readAdapter({ path: `/api/us-experiment/instruments/${encodeURIComponent(code)}/daily-bars`, signal: request.controller.signal })
+        if (!isCurrent('usDetail', request, code)) return { status: READ_OUTCOME.STALE }
+        const bars = response.bars || []
+        setUsBars(bars)
+        setUsMarketBars(toUsMarketBars(bars))
+        setLoadedUsCode(code)
+        setUsDetailError('')
+        return applied
+      } catch (error) {
+        if (request.controller.signal.aborted) return { status: READ_OUTCOME.CANCELLED }
+        if (!isCurrent('usDetail', request, code)) return { status: READ_OUTCOME.STALE }
+        const message = errorMessage(error)
+        setUsDetailError(message)
+        return { status: READ_OUTCOME.FAILED, error: message }
+      } finally {
+        if (pendingDetails.current.usDetail === entry) pendingDetails.current.usDetail = null
+        if (isCurrent('usDetail', request, code)) setUsDetailLoading(false)
+      }
+    })()
+    pendingDetails.current.usDetail = entry
+    return entry.promise
   }, [begin, isCurrent, readAdapter])
 
   useEffect(() => {
@@ -177,10 +241,16 @@ export function useStockResearch(readAdapter) {
     return () => window.clearTimeout(timer)
   }, [loadSelectedUs, selectedUsCode])
 
-  useEffect(() => () => {
-    mounted.current = false
-    Object.values(controllers.current).forEach((controller) => controller?.abort())
-    Object.keys(generations.current).forEach((kind) => { generations.current[kind] += 1 })
+  useEffect(() => {
+    const activeControllers = controllers.current
+    const activeGenerations = generations.current
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      Object.values(activeControllers).forEach((controller) => controller?.abort())
+      Object.keys(activeGenerations).forEach((kind) => { activeGenerations[kind] += 1 })
+      pendingDetails.current = { aDetail: null, usDetail: null }
+    }
   }, [])
 
   const selectedStock = stockPage.items.find((item) => item.ts_code === selectedStockCode) || stockPage.items[0] || null
@@ -201,7 +271,7 @@ export function useStockResearch(readAdapter) {
       loading: stockDetailLoading,
       error: [stockListError, stockDetailError].filter(Boolean).join('；'),
       refreshList: () => loadStocks(0),
-      refreshSelected: () => loadSelectedStock(aSelection.current),
+      refreshSelected: () => loadSelectedStock(aSelection.current, true),
     },
     us: {
       page: usPage,
@@ -218,7 +288,7 @@ export function useStockResearch(readAdapter) {
       ready: Boolean(selectedUsCode) && loadedUsCode === selectedUsCode,
       error: [usListError, usDetailError].filter(Boolean).join('；'),
       refreshList: () => loadUsInstruments(0),
-      refreshSelected: () => loadSelectedUs(usSelection.current),
+      refreshSelected: () => loadSelectedUs(usSelection.current, true),
     },
   }
 }
