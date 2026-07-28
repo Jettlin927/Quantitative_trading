@@ -29,7 +29,10 @@ export function isReadComplete(result) {
  * cancellation and stale-response rules. Callers know only user actions and the
  * current view model; endpoint and generation knowledge stays inside.
  */
-export function useStockResearch(readAdapter) {
+export function useStockResearch(
+  readAdapter,
+  { aShareDetailEnabled = true, usDetailEnabled = true } = {},
+) {
   const [stockPage, setStockPage] = useState(emptyStockPage)
   const [stockQuery, setStockQuery] = useState('')
   const [selectedStockCode, setSelectedStockCode] = useState('')
@@ -244,16 +247,16 @@ export function useStockResearch(readAdapter) {
   }, [begin, isCurrent, readAdapter])
 
   useEffect(() => {
-    if (!selectedStockCode) return undefined
+    if (!aShareDetailEnabled || !selectedStockCode) return undefined
     const timer = window.setTimeout(() => loadSelectedStock(selectedStockCode), 0)
     return () => window.clearTimeout(timer)
-  }, [loadSelectedStock, selectedStockCode])
+  }, [aShareDetailEnabled, loadSelectedStock, selectedStockCode])
 
   useEffect(() => {
-    if (!selectedUsCode) return undefined
+    if (!usDetailEnabled || !selectedUsCode) return undefined
     const timer = window.setTimeout(() => loadSelectedUs(selectedUsCode), 0)
     return () => window.clearTimeout(timer)
-  }, [loadSelectedUs, selectedUsCode])
+  }, [loadSelectedUs, selectedUsCode, usDetailEnabled])
 
   useEffect(() => {
     const activeControllers = controllers.current

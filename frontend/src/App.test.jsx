@@ -37,7 +37,7 @@ const coreResponses = {
   '/api/tushare/sync-progress?include_coverage=false': { runs: [] },
   '/api/research/readiness?scope=a_share_cross_section': { level: 'inventory', status: 'inventory_available', blockers: [] },
   '/api/research/readiness?scope=etf_time_series': { level: 'inventory', status: 'inventory_available', blockers: [] },
-  '/api/db/overview': { aShare: {} },
+  '/api/db/overview': { aShare: {}, snapshotAt: '2026-07-21T02:16:00Z' },
   '/api/stocks/screen?limit=50&offset=0': { items: [], total: 0, limit: 50, offset: 0 },
   '/api/indices?limit=1000': [],
   '/api/funds?limit=1000': [],
@@ -407,11 +407,12 @@ describe('研究驾驶舱', () => {
     expect(screen.getAllByText('研究通过').length).toBeGreaterThan(0)
   })
 
-  it('全局刷新会重读策略、研究与发布投影，并在全部成功后更新时间', async () => {
+  it('全局刷新复用库存投影并重读策略、研究与发布，不在 API 请求内扫描整库', async () => {
     render(<App />)
     await screen.findByRole('link', { name: /打开原始 HTML 证据/ })
     const fetchMock = vi.mocked(globalThis.fetch)
     const before = {
+      overview: fetchMock.mock.calls.filter(([path]) => path === '/api/db/overview').length,
       profile: fetchMock.mock.calls.filter(([path]) => path === '/api/research/strategies/momentum-v1').length,
       detail: fetchMock.mock.calls.filter(([path]) => path === `/api/research/formal-researches/${RESEARCH_ID}`).length,
       publication: fetchMock.mock.calls.filter(([path]) => path === `/api/research/publications/${PUBLICATION_ID}`).length,
@@ -419,9 +420,15 @@ describe('研究驾驶舱', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /全局刷新/ }))
     await waitFor(() => expect(document.querySelector('.updated-at')).not.toHaveTextContent('尚未刷新'))
+    expect(fetchMock.mock.calls.some(([path]) => path === '/api/db/overview?refresh=true')).toBe(false)
+    expect(fetchMock.mock.calls.filter(([path]) => path === '/api/db/overview').length).toBeGreaterThan(before.overview)
     expect(fetchMock.mock.calls.filter(([path]) => path === '/api/research/strategies/momentum-v1').length).toBeGreaterThan(before.profile)
     expect(fetchMock.mock.calls.filter(([path]) => path === `/api/research/formal-researches/${RESEARCH_ID}`).length).toBeGreaterThan(before.detail)
     expect(fetchMock.mock.calls.filter(([path]) => path === `/api/research/publications/${PUBLICATION_ID}`).length).toBeGreaterThan(before.publication)
+    expect(document.querySelector('.updated-at')).toHaveTextContent('界面刷新')
+
+    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
+    expect(screen.getByText(/覆盖快照.*07.*21/)).toBeInTheDocument()
   })
 
   it('发布投影刷新失败时保留一致旧事实且不伪造刷新时间', async () => {

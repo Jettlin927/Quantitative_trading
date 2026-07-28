@@ -1,7 +1,7 @@
 import { Activity, Database, FileText, ListChecks, Server, ShieldCheck } from 'lucide-react'
-import { Badge, CoverageMatrix, Panel, RunTable, inventoryLabel, isInventoryAvailable, translateStatus } from './viewSupport.jsx'
+import { Badge, CoverageMatrix, Panel, RunTable, formatDateTime, inventoryLabel, isInventoryAvailable, translateStatus } from './viewSupport.jsx'
 
-export function OperationsView({ health, readiness, coverageRows, syncRuns }) {
+export function OperationsView({ health, readiness, coverageRows, overviewSnapshotAt, syncRuns }) {
   return (
     <div className="view-stack enter">
       <section className="section-heading"><div><span>只读系统事实</span><h2>系统运维</h2><p>仅展示 API、数据库、同步 Worker、同步队列、数据覆盖与同步历史；研究编排和发布健康在专用投影接入前明确标为功能债。</p></div><Badge value="无写入控制" /></section>
@@ -16,7 +16,7 @@ export function OperationsView({ health, readiness, coverageRows, syncRuns }) {
         <OperationCard icon={ShieldCheck} title="备份" value="人工核验门禁：跟踪议题 #28" healthy={false} />
       </section>
       <section className="data-detail-grid">
-        <Panel title="PostgreSQL 数据覆盖" eyebrow="数据库实时计数" className="full-coverage"><CoverageMatrix rows={coverageRows} detailed /></Panel>
+        <Panel title="PostgreSQL 数据覆盖" eyebrow={`库存快照 ${formatDateTime(overviewSnapshotAt)} · 非现场扫描`} className="full-coverage"><CoverageMatrix rows={coverageRows} detailed /></Panel>
         <Panel title="最近同步事实" eyebrow="最近数据写入" className="full-runs"><RunTable runs={syncRuns} /></Panel>
       </section>
     </div>

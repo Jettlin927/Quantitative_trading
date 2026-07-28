@@ -31,7 +31,10 @@ const NAV_ITEMS = [
 
 export function App({ readAdapter = browserReadAdapter, clock = systemClock, chartAdapter = undefined } = {}) {
   const [activeView, setActiveView] = useState('research')
-  const stockResearch = useStockResearch(readAdapter)
+  const stockResearch = useStockResearch(readAdapter, {
+    aShareDetailEnabled: activeView === 'a-share',
+    usDetailEnabled: activeView === 'us-data',
+  })
   const [health, setHealth] = useState(null)
   const [overview, setOverview] = useState(null)
   const [syncProgress, setSyncProgress] = useState(null)
@@ -62,7 +65,7 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
   const selectedStrategyIdRef = useRef('')
   const selectedResearchIdRef = useRef('')
 
-  async function refreshAll(refreshCoverage = false) {
+  async function refreshAll(refreshSelected = false) {
     setLoading(true)
     setResearchLoading(true)
     setGlobalError('')
@@ -73,7 +76,7 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
       ['progress', '/api/tushare/sync-progress?include_coverage=false'],
       ['stockReadiness', '/api/research/readiness?scope=a_share_cross_section'],
       ['etfReadiness', '/api/research/readiness?scope=etf_time_series'],
-      ['overview', `/api/db/overview${refreshCoverage ? '?refresh=true' : ''}`],
+      ['overview', '/api/db/overview'],
       ['stocks', null],
       ['indices', '/api/indices?limit=1000'],
       ['funds', `/api/funds?limit=1000&daily_start_date=${catalogStartDate}&daily_end_date=${catalogEndDate}`],
@@ -146,17 +149,19 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
         }
       }
     })
-    const detailResults = refreshCoverage ? await Promise.all([
-      Promise.resolve(stockListOutcome),
-      Promise.resolve(usListOutcome),
-      stockResearch.aShare.refreshSelected(),
-      stockResearch.us.refreshSelected(),
-      selectedCatalogRef.current.code ? loadSelectedCatalogData(selectedCatalogRef.current) : Promise.resolve(true),
-      refreshSelectedResearchData(selectedStrategyIdRef.current),
-    ]) : [true]
+    const detailRequests = [Promise.resolve(stockListOutcome), Promise.resolve(usListOutcome)]
+    if (refreshSelected && activeView === 'a-share') {
+      detailRequests.push(stockResearch.aShare.refreshSelected())
+      if (selectedCatalogRef.current.code) detailRequests.push(loadSelectedCatalogData(selectedCatalogRef.current))
+    }
+    if (refreshSelected && activeView === 'us-data') detailRequests.push(stockResearch.us.refreshSelected())
+    if (refreshSelected && activeView === 'research') {
+      detailRequests.push(refreshSelectedResearchData(selectedStrategyIdRef.current))
+    }
+    const detailResults = refreshSelected ? await Promise.all(detailRequests) : [true]
     if (failures.length) setGlobalError(`部分只读数据读取失败：${failures.join('；')}`)
     const detailComplete = detailResults.every((result) => typeof result === 'boolean' ? result : isReadComplete(result))
-    if (refreshCoverage && !failures.length && detailComplete) setLastUpdated(clock.now())
+    if (refreshSelected && !failures.length && detailComplete) setLastUpdated(clock.now())
     setResearchLoading(false)
     setLoading(false)
   }
@@ -371,6 +376,7 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
             <AShareDataView
               coverageRows={coverageRows}
               readiness={readiness}
+              overviewSnapshotAt={overview?.snapshotAt}
               stocks={stocks}
               stockPage={aShareResearch.page}
               query={aShareResearch.query}
@@ -416,7 +422,7 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
               chartAdapter={chartAdapter}
             />
           ) : null}
-          {activeView === 'operations' ? <OperationsView health={health} readiness={readiness} coverageRows={coverageRows} syncRuns={syncRuns} /> : null}
+          {activeView === 'operations' ? <OperationsView health={health} readiness={readiness} coverageRows={coverageRows} overviewSnapshotAt={overview?.snapshotAt} syncRuns={syncRuns} /> : null}
         </main>
       </div>
     </div>
@@ -459,7 +465,7 @@ function Topbar({ activeView, health, loading, lastUpdated, onRefresh }) {
         <SystemState label="PostgreSQL" value={translateStatus(health?.database)} healthy={['connected', 'ok'].includes(health?.database)} icon={Database} />
         <SystemState label="同步 Worker" value={health?.worker ? `${translateStatus(health.worker.status)} · ${health.worker.ageSeconds ?? '-'} 秒` : '未知'} healthy={health?.worker?.status === 'ok' && !health.worker.stale} icon={Activity} />
         <SystemState label="同步队列" value={health?.queue ? `${health.queue.active} 个运行中` : '未知'} healthy={Boolean(health?.queue) && health.queue.status !== 'stalled'} icon={ListChecks} />
-        <span className="updated-at"><Clock3 size={14} /> {lastUpdated ? lastUpdated.toLocaleTimeString() : '尚未刷新'}</span>
+        <span className="updated-at"><Clock3 size={14} /> {lastUpdated ? `界面刷新 ${lastUpdated.toLocaleTimeString()}` : '尚未刷新'}</span>
         <button className="primary-action" onClick={onRefresh} disabled={loading}><RefreshCw size={15} className={loading ? 'spin' : ''} />全局刷新</button>
       </div>
     </header>

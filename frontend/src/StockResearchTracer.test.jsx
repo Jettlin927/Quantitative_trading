@@ -176,6 +176,41 @@ describe('股票研究 tracer', () => {
     expect(screen.getByText(/部分只读数据读取失败.*stocks: 股票目录不可用/)).toBeInTheDocument()
   })
 
+  it('研究驾驶舱刷新不等待隐藏的 A 股明细请求', async () => {
+    let barsCalls = 0
+    let detailCalls = 0
+    const readAdapter = vi.fn(({ path }) => {
+      if (path.startsWith('/api/stocks/screen?')) {
+        return Promise.resolve(stockPage([{ ts_code: '000001.SZ', symbol: '000001', name: '甲公司' }]))
+      }
+      if (path === '/api/daily-bars?ts_code=000001.SZ') {
+        barsCalls += 1
+        return Promise.resolve([])
+      }
+      if (path === '/api/stocks/000001.SZ/detail') {
+        detailCalls += 1
+        return Promise.resolve({ listing: { listStatus: '甲股当前状态' }, valuation_history: [], financial_history: [] })
+      }
+      if (path === '/api/us-experiment/instruments?current_only=true&limit=50&offset=0') return Promise.resolve(instrumentPage([]))
+      return Promise.resolve(fallback(path))
+    })
+
+    render(<App readAdapter={readAdapter} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /全局刷新/ })).not.toBeDisabled())
+    expect(barsCalls).toBe(0)
+    expect(detailCalls).toBe(0)
+
+    fireEvent.click(screen.getByRole('button', { name: /全局刷新/ }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /全局刷新/ })).not.toBeDisabled())
+
+    expect(barsCalls).toBe(0)
+    expect(detailCalls).toBe(0)
+
+    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
+    await waitFor(() => expect(detailCalls).toBe(1))
+    expect(barsCalls).toBe(1)
+  })
+
   it('全局刷新更换选中项时复用同一明细请求，不因 effect 并发 abort 产生虚假失败', async () => {
     let listCalls = 0
     let nextDetailCalls = 0
