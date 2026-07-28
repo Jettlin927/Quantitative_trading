@@ -68,6 +68,9 @@ def summarize_performance(
         result.update(
             {
                 "benchmarkTotalReturn": float(benchmark_total),
+                "relativeWealth": float(
+                    (1.0 + aligned_strategy_total) / (1.0 + benchmark_total) - 1.0
+                ),
                 "excessTotalReturn": float(aligned_strategy_total - benchmark_total),
                 "trackingError": tracking_error,
                 "informationRatio": _ratio(active_returns.mean() * periods_per_year, tracking_error),
@@ -140,7 +143,7 @@ def summarize_trading_observations(observations: pd.DataFrame) -> dict[str, Any]
         "requestCount": request_count,
         "executionCount": int(frame["execution_count"].sum()),
         "blockedCount": blocked_count,
-        "blockedRequestRate": fully_blocked_count / request_count if request_count else 0.0,
+        "blockedRequestRate": fully_blocked_count / request_count if request_count else None,
         "averageOneWayTurnover": float(frame["one_way_turnover"].mean()),
         "cumulativeTransactionCostRate": float(frame["transaction_cost_rate"].sum()),
     }
