@@ -37,7 +37,7 @@ const coreResponses = {
   '/api/tushare/sync-progress?include_coverage=false': { runs: [] },
   '/api/research/readiness?scope=a_share_cross_section': { level: 'inventory', status: 'inventory_available', blockers: [] },
   '/api/research/readiness?scope=etf_time_series': { level: 'inventory', status: 'inventory_available', blockers: [] },
-  '/api/db/overview': { aShare: {} },
+  '/api/db/overview': { aShare: {}, snapshotAt: '2026-07-21T02:16:00Z' },
   '/api/stocks/screen?limit=50&offset=0': { items: [], total: 0, limit: 50, offset: 0 },
   '/api/indices?limit=1000': [],
   '/api/funds?limit=1000': [],
@@ -425,6 +425,10 @@ describe('研究驾驶舱', () => {
     expect(fetchMock.mock.calls.filter(([path]) => path === '/api/research/strategies/momentum-v1').length).toBeGreaterThan(before.profile)
     expect(fetchMock.mock.calls.filter(([path]) => path === `/api/research/formal-researches/${RESEARCH_ID}`).length).toBeGreaterThan(before.detail)
     expect(fetchMock.mock.calls.filter(([path]) => path === `/api/research/publications/${PUBLICATION_ID}`).length).toBeGreaterThan(before.publication)
+    expect(document.querySelector('.updated-at')).toHaveTextContent('界面刷新')
+
+    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
+    expect(screen.getByText(/覆盖快照.*07.*21/)).toBeInTheDocument()
   })
 
   it('发布投影刷新失败时保留一致旧事实且不伪造刷新时间', async () => {

@@ -27,6 +27,7 @@ export function AShareDataView(props) {
   const {
     readiness,
     coverageRows,
+    overviewSnapshotAt,
     catalogs,
     stockDetail,
     selectedCatalog,
@@ -62,7 +63,7 @@ export function AShareDataView(props) {
       {catalogError ? <DomainFailure title="目录明细读取失败" detail={catalogError} /> : null}
       <CatalogDetailPanel selection={selectedCatalog} detail={catalogDetail} loading={catalogLoading} />
       <DataQualityDetails readiness={readiness} coverageRows={coverageRows} syncRuns={syncRuns} />
-      <Panel title="实际数据覆盖与研究用途" eyebrow="覆盖与质量"><CoverageMatrix rows={coverageRows} detailed /></Panel>
+      <Panel title="实际数据覆盖与研究用途" eyebrow={`覆盖快照 ${formatDateTime(overviewSnapshotAt)}`}><CoverageMatrix rows={coverageRows} detailed /></Panel>
     </div>
   )
 }

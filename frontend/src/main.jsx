@@ -376,6 +376,7 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
             <AShareDataView
               coverageRows={coverageRows}
               readiness={readiness}
+              overviewSnapshotAt={overview?.snapshotAt}
               stocks={stocks}
               stockPage={aShareResearch.page}
               query={aShareResearch.query}
@@ -421,7 +422,7 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
               chartAdapter={chartAdapter}
             />
           ) : null}
-          {activeView === 'operations' ? <OperationsView health={health} readiness={readiness} coverageRows={coverageRows} syncRuns={syncRuns} /> : null}
+          {activeView === 'operations' ? <OperationsView health={health} readiness={readiness} coverageRows={coverageRows} overviewSnapshotAt={overview?.snapshotAt} syncRuns={syncRuns} /> : null}
         </main>
       </div>
     </div>
@@ -464,7 +465,7 @@ function Topbar({ activeView, health, loading, lastUpdated, onRefresh }) {
         <SystemState label="PostgreSQL" value={translateStatus(health?.database)} healthy={['connected', 'ok'].includes(health?.database)} icon={Database} />
         <SystemState label="同步 Worker" value={health?.worker ? `${translateStatus(health.worker.status)} · ${health.worker.ageSeconds ?? '-'} 秒` : '未知'} healthy={health?.worker?.status === 'ok' && !health.worker.stale} icon={Activity} />
         <SystemState label="同步队列" value={health?.queue ? `${health.queue.active} 个运行中` : '未知'} healthy={Boolean(health?.queue) && health.queue.status !== 'stalled'} icon={ListChecks} />
-        <span className="updated-at"><Clock3 size={14} /> {lastUpdated ? lastUpdated.toLocaleTimeString() : '尚未刷新'}</span>
+        <span className="updated-at"><Clock3 size={14} /> {lastUpdated ? `界面刷新 ${lastUpdated.toLocaleTimeString()}` : '尚未刷新'}</span>
         <button className="primary-action" onClick={onRefresh} disabled={loading}><RefreshCw size={15} className={loading ? 'spin' : ''} />全局刷新</button>
       </div>
     </header>
