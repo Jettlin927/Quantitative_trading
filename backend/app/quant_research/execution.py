@@ -110,7 +110,7 @@ def execute(
             raise RequestRejected("request", exc) from exc
         try:
             resolve_strategy_definition(normalized)
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             raise RequestRejected("request", exc) from exc
 
     try:
