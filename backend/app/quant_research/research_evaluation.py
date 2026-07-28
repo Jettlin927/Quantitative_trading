@@ -113,13 +113,7 @@ _ROBUSTNESS_VALUE_FIELDS = {
     "walkForward": {"passed", "testWindowCount"},
     "parameterNeighborhood": {"passed", "parameterSetCount"},
     "costStress": {"passed", "scenarioCount"},
-    "marketRegimes": {
-        "passed",
-        "directionRegimeCount",
-        "volatilityRegimeCount",
-        "calendarYearCount",
-        "stressPeriodCount",
-    },
+    "marketRegimes": {"passed", "cells"},
     "capacity": {"passed", "expectedCapital", "advParticipationP95"},
     "multipleTesting": {"passed", "trialCount", "dsr", "pbo"},
 }
@@ -367,9 +361,16 @@ def _validate_bundle(value: Mapping[str, Any]) -> dict[str, Any]:
             gates_by_id,
             reference_by_id,
             payload["strategyFacts"]["validationDesign"],
+            [
+                item["tradeDate"]
+                for item in payload["navEvidence"].get("observations", [])
+            ],
         )
         for name in _ROBUSTNESS_FIELDS
     }
+    _validate_trial_history_aggregate(
+        payload["robustnessEvidence"], gates_by_id["trial_history"]
+    )
     payload["conditionalCandidateRule"] = _validate_conditional_rule(
         payload["conditionalCandidateRule"], payload["hardGates"]
     )
@@ -691,6 +692,7 @@ def _validate_robustness_evidence(
     gates: Mapping[str, Mapping[str, Any]],
     references: Mapping[str, Mapping[str, Any]],
     validation_design: Mapping[str, Any],
+    oos_observation_dates: list[str],
 ) -> dict[str, Any]:
     status = _validate_status(
         value,
@@ -706,28 +708,28 @@ def _validate_robustness_evidence(
     details = dict(details)
     if not isinstance(details["passed"], bool):
         raise EvaluationContractError(f"robustnessEvidence.{name}.passed 必须是布尔值")
-    count_fields = _ROBUSTNESS_VALUE_FIELDS[name] - {
-        "passed",
-        "expectedCapital",
-        "advParticipationP95",
-        "dsr",
-        "pbo",
-    }
-    for field in count_fields:
-        minimum = 2 if name in {"parameterNeighborhood", "costStress"} else 1
-        if name == "marketRegimes" and field in {
-            "directionRegimeCount",
-            "volatilityRegimeCount",
-        }:
-            minimum = 2
-        if (
-            isinstance(details[field], bool)
-            or not isinstance(details[field], int)
-            or details[field] < minimum
-        ):
-            raise EvaluationContractError(
-                f"robustnessEvidence.{name}.{field} 必须至少为 {minimum}"
-            )
+    if name == "marketRegimes":
+        details = _validate_market_regime_cells(
+            details, oos_observation_dates, validation_design
+        )
+    else:
+        count_fields = _ROBUSTNESS_VALUE_FIELDS[name] - {
+            "passed",
+            "expectedCapital",
+            "advParticipationP95",
+            "dsr",
+            "pbo",
+        }
+        for field in count_fields:
+            minimum = 2 if name in {"parameterNeighborhood", "costStress"} else 1
+            if (
+                isinstance(details[field], bool)
+                or not isinstance(details[field], int)
+                or details[field] < minimum
+            ):
+                raise EvaluationContractError(
+                    f"robustnessEvidence.{name}.{field} 必须至少为 {minimum}"
+                )
     if name == "capacity":
         details["expectedCapital"] = _finite_number(
             details["expectedCapital"], "robustnessEvidence.capacity.expectedCapital", positive=True
@@ -740,7 +742,9 @@ def _validate_robustness_evidence(
     if name == "multipleTesting":
         details = _validate_multiple_testing_evidence(details, validation_design)
     gate = gates[_ROBUSTNESS_GATE_IDS[name]]
-    if gate["status"] != "complete" or gate["passed"] is not details["passed"]:
+    if name not in {"parameterNeighborhood", "multipleTesting"} and (
+        gate["status"] != "complete" or gate["passed"] is not details["passed"]
+    ):
         raise EvaluationContractError(f"robustnessEvidence.{name} 与对应冻结门禁不一致")
     status["evidenceRefIds"] = _validate_reference_ids(
         status["evidenceRefIds"],
@@ -752,6 +756,102 @@ def _validate_robustness_evidence(
         raise EvaluationContractError(f"robustnessEvidence.{name} 未绑定对应门禁证据")
     status["value"] = details
     return status
+
+
+def _validate_market_regime_cells(
+    details: dict[str, Any],
+    oos_observation_dates: list[str],
+    validation_design: Mapping[str, Any],
+) -> dict[str, Any]:
+    cells = details["cells"]
+    cell_fields = {
+        "direction",
+        "volatility",
+        "stressPeriods",
+        "observationDates",
+        "observationCount",
+    }
+    if not isinstance(cells, list) or not cells:
+        raise EvaluationContractError("robustnessEvidence.marketRegimes.cells 不能为空")
+    normalized_cells = []
+    covered_dates: list[str] = []
+    for item in cells:
+        if not isinstance(item, Mapping) or set(item) != cell_fields:
+            raise EvaluationContractError("市场环境单元字段无效")
+        cell = dict(item)
+        for field in ("direction", "volatility"):
+            if not isinstance(cell[field], str) or not cell[field].strip():
+                raise EvaluationContractError(f"市场环境单元.{field} 必须是非空字符串")
+        stress_periods = cell["stressPeriods"]
+        if not isinstance(stress_periods, list) or any(
+            not isinstance(period, str) or not period.strip()
+            for period in stress_periods
+        ):
+            raise EvaluationContractError("市场环境单元.stressPeriods 必须是字符串数组")
+        observation_dates = cell["observationDates"]
+        if not isinstance(observation_dates, list) or not observation_dates:
+            raise EvaluationContractError("市场环境单元.observationDates 不能为空")
+        normalized_dates = [
+            _iso_date(date, "市场环境单元.observationDates")
+            for date in observation_dates
+        ]
+        if normalized_dates != sorted(normalized_dates) or len(set(normalized_dates)) != len(
+            normalized_dates
+        ):
+            raise EvaluationContractError("市场环境单元日期必须严格升序且唯一")
+        if (
+            isinstance(cell["observationCount"], bool)
+            or not isinstance(cell["observationCount"], int)
+            or cell["observationCount"] != len(normalized_dates)
+        ):
+            raise EvaluationContractError("市场环境单元 observationCount 必须由日期样本派生")
+        cell["stressPeriods"] = sorted(stress_periods)
+        cell["observationDates"] = normalized_dates
+        normalized_cells.append(cell)
+        covered_dates.extend(normalized_dates)
+    dates_are_duplicated = len(set(covered_dates)) != len(covered_dates)
+    if oos_observation_dates:
+        dates_are_not_closed = sorted(covered_dates) != sorted(oos_observation_dates)
+    else:
+        dates_are_not_closed = (
+            min(covered_dates) != validation_design["testOosStartDate"]
+            or max(covered_dates) != validation_design["testOosEndDate"]
+        )
+    if dates_are_duplicated or dates_are_not_closed:
+        raise EvaluationContractError("市场环境单元日期与冻结 test/OOS 样本不闭合")
+    directions = {cell["direction"] for cell in normalized_cells}
+    volatilities = {cell["volatility"] for cell in normalized_cells}
+    if len(directions) < 2:
+        raise EvaluationContractError("robustnessEvidence.marketRegimes.directionRegimeCount 必须至少为 2")
+    if len(volatilities) < 2:
+        raise EvaluationContractError("robustnessEvidence.marketRegimes.volatilityRegimeCount 必须至少为 2")
+    stress_periods = {
+        period for cell in normalized_cells for period in cell["stressPeriods"]
+    }
+    if not stress_periods:
+        raise EvaluationContractError("robustnessEvidence.marketRegimes.stressPeriodCount 必须至少为 1")
+    return {
+        "passed": details["passed"],
+        "cells": normalized_cells,
+        "directionRegimeCount": len(directions),
+        "volatilityRegimeCount": len(volatilities),
+        "calendarYearCount": len({date[:4] for date in covered_dates}),
+        "stressPeriodCount": len(stress_periods),
+    }
+
+
+def _validate_trial_history_aggregate(
+    robustness: Mapping[str, Mapping[str, Any]], gate: Mapping[str, Any]
+) -> None:
+    applicable = [
+        robustness[name]["value"]["passed"]
+        for name in ("parameterNeighborhood", "multipleTesting")
+        if robustness[name]["status"] == "complete"
+    ]
+    if gate["status"] != "complete" or gate["passed"] is not all(applicable):
+        raise EvaluationContractError(
+            "trial_history 门禁必须由适用的参数邻域与多重试验结果聚合"
+        )
 
 
 def _validate_multiple_testing_evidence(

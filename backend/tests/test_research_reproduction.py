@@ -207,6 +207,22 @@ class ResearchReproductionTest(unittest.TestCase):
         result = reproduce_quant_research(run.path)
         self.assertTrue(result["matches"])
 
+    def test_v2_plus_zero_request_archive_keeps_legacy_rate_on_reproduction(self):
+        config = dict(self.config)
+        config["targetWeightParameters"] = {
+            **config["targetWeightParameters"],
+            "targetWeight": "0.000000000000001",
+        }
+        run = self._run(config)
+        metrics_path = run.path / "metrics.json"
+        metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        self.assertEqual(metrics["requestCount"], 0)
+        self.assertIsNone(metrics["blockedRequestRate"])
+        metrics["blockedRequestRate"] = 0.0
+        self._resign_metrics_artifact(run.path, metrics)
+
+        self.assertTrue(reproduce_quant_research(run.path)["matches"])
+
     def test_formal_run_rejects_missing_deployment_commit(self):
         environment = dict(os.environ)
         environment.pop("APP_GIT_COMMIT", None)
@@ -375,6 +391,48 @@ class ResearchReproductionTest(unittest.TestCase):
             elif stage == "finalize":
                 checkpoint["inputs"] = {"manifest": manifest_artifact}
                 checkpoint["outputs"] = {"resultFingerprint": manifest["resultFingerprint"]}
+            checkpoint_artifact = atomic_write_json(checkpoint_path, checkpoint)
+            previous_hash = checkpoint_artifact["fileSha256"]
+            entry["contentSha256"] = previous_hash
+        atomic_write_json(index_path, index)
+
+    def _resign_metrics_artifact(
+        self,
+        run_path: Path,
+        metrics: dict[str, object],
+    ) -> None:
+        manifest_path = run_path / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        metrics_artifact = atomic_write_json(run_path / "metrics.json", metrics)
+        manifest["artifactHashes"]["metrics.json"] = metrics_artifact
+        manifest["resultFingerprint"] = build_result_fingerprint(manifest["artifactHashes"])
+        manifest_artifact = atomic_write_json(manifest_path, manifest)
+
+        checkpoint_root = run_path / "checkpoints"
+        index_path = checkpoint_root / "index.json"
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+        previous_hash = None
+        for entry in index["completed"]:
+            stage = entry["stage"]
+            checkpoint_path = checkpoint_root / f"{stage}.json"
+            checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+            checkpoint["previousCheckpointSha256"] = previous_hash
+            if stage == "metrics":
+                checkpoint["outputs"]["metrics"] = metrics_artifact
+            elif stage == "manifest":
+                checkpoint["inputs"]["artifactContentSha256"] = {
+                    key: value["contentSha256"]
+                    for key, value in sorted(manifest["artifactHashes"].items())
+                }
+                checkpoint["outputs"] = {
+                    "manifest": manifest_artifact,
+                    "resultFingerprint": manifest["resultFingerprint"],
+                }
+            elif stage == "finalize":
+                checkpoint["inputs"] = {"manifest": manifest_artifact}
+                checkpoint["outputs"] = {
+                    "resultFingerprint": manifest["resultFingerprint"]
+                }
             checkpoint_artifact = atomic_write_json(checkpoint_path, checkpoint)
             previous_hash = checkpoint_artifact["fileSha256"]
             entry["contentSha256"] = previous_hash

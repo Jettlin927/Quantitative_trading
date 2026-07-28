@@ -269,10 +269,10 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
             StrategyEvidenceBundle.from_dict(missing_failure)
 
         weak_regimes = _complete_bundle()
-        del weak_regimes["robustnessEvidence"]["marketRegimes"]["value"][
-            "stressPeriodCount"
+        del weak_regimes["robustnessEvidence"]["marketRegimes"]["value"]["cells"][0][
+            "observationCount"
         ]
-        with self.assertRaisesRegex(EvaluationContractError, "领域字段无效"):
+        with self.assertRaisesRegex(EvaluationContractError, "环境单元字段无效"):
             StrategyEvidenceBundle.from_dict(weak_regimes)
 
         weak_capacity = _complete_bundle()
@@ -280,14 +280,22 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
         with self.assertRaisesRegex(EvaluationContractError, "领域字段无效"):
             StrategyEvidenceBundle.from_dict(weak_capacity)
 
-    def test_single_direction_or_volatility_regime_cannot_pass_research(self) -> None:
-        for field in ("directionRegimeCount", "volatilityRegimeCount"):
-            payload = _complete_bundle()
-            payload["robustnessEvidence"]["marketRegimes"]["value"][field] = 1
-            with self.subTest(field=field), self.assertRaisesRegex(
-                EvaluationContractError, rf"marketRegimes.{field} 必须至少为 2"
-            ):
-                StrategyEvidenceBundle.from_dict(payload)
+    def test_market_regime_counts_are_derived_from_oos_closed_cells(self) -> None:
+        result = evaluate_research(
+            StrategyEvidenceBundle.from_dict(_complete_bundle())
+        ).to_dict()
+        regimes = result["robustness"]["marketRegimes"]["value"]
+        self.assertEqual(regimes["directionRegimeCount"], 3)
+        self.assertEqual(regimes["volatilityRegimeCount"], 2)
+        self.assertEqual(regimes["calendarYearCount"], 1)
+        self.assertEqual(regimes["stressPeriodCount"], 1)
+
+        impossible = _complete_bundle()
+        impossible["robustnessEvidence"]["marketRegimes"]["value"]["cells"][0][
+            "observationDates"
+        ][0] = "2024-12-31"
+        with self.assertRaisesRegex(EvaluationContractError, "test/OOS.*闭合"):
+            StrategyEvidenceBundle.from_dict(impossible)
 
     def test_run_identity_is_closed_to_strategy_research_and_plan(self) -> None:
         for target, field, value in (
@@ -335,10 +343,24 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
                 },
             },
         }
-        self.assertEqual(
-            evaluate_research(StrategyEvidenceBundle.from_dict(below_threshold)).conclusion,
-            "不通过",
+        result = evaluate_research(
+            StrategyEvidenceBundle.from_dict(below_threshold)
+        ).to_dict()
+        self.assertEqual(result["conclusion"], "不通过")
+        self.assertFalse(result["robustness"]["multipleTesting"]["value"]["passed"])
+
+        mixed_results = deepcopy(below_threshold)
+        mixed_results["robustnessEvidence"]["parameterNeighborhood"]["value"][
+            "passed"
+        ] = True
+        mixed = evaluate_research(
+            StrategyEvidenceBundle.from_dict(mixed_results)
+        ).to_dict()
+        self.assertEqual(mixed["conclusion"], "不通过")
+        self.assertTrue(
+            mixed["robustness"]["parameterNeighborhood"]["value"]["passed"]
         )
+        self.assertFalse(mixed["robustness"]["multipleTesting"]["value"]["passed"])
 
     def test_limitations_are_required_for_every_evaluation(self) -> None:
         payload = _complete_bundle()
@@ -436,10 +458,24 @@ def _complete_bundle() -> dict:
         "marketRegimes": _robustness(
             {
                 "passed": True,
-                "directionRegimeCount": 3,
-                "volatilityRegimeCount": 2,
-                "calendarYearCount": 3,
-                "stressPeriodCount": 1,
+                "cells": [
+                    _regime_cell(
+                        "上涨",
+                        "低波",
+                        ["2025-01-02", "2025-01-03"],
+                    ),
+                    _regime_cell(
+                        "下跌",
+                        "高波",
+                        ["2025-01-06"],
+                        stress_periods=["预设压力期"],
+                    ),
+                    _regime_cell(
+                        "震荡",
+                        "低波",
+                        ["2025-01-07", "2025-01-08"],
+                    ),
+                ],
             },
             ["statistics"],
         ),
@@ -566,6 +602,22 @@ def _robustness(value: dict, refs: list[str]) -> dict:
 
 def _gate(payload: dict, gate_id: str) -> dict:
     return next(item for item in payload["hardGates"] if item["gateId"] == gate_id)
+
+
+def _regime_cell(
+    direction: str,
+    volatility: str,
+    observation_dates: list[str],
+    *,
+    stress_periods: list[str] | None = None,
+) -> dict:
+    return {
+        "direction": direction,
+        "volatility": volatility,
+        "stressPeriods": stress_periods or [],
+        "observationDates": observation_dates,
+        "observationCount": len(observation_dates),
+    }
 
 
 def _trade(
