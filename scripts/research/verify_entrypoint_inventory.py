@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 from pathlib import Path
 import re
 import sys
-from typing import Any
+from typing import Any, cast
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -43,6 +44,31 @@ REQUIRED_ENTRY_FIELDS = {
     "retirement_conditions",
 }
 ID_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
+EXPECTED_ENTRY_PATHS = {
+    "active.strategy_registry": "backend/app/quant_research/strategy_registry.py",
+    "active.research_cli": "scripts/research/run_quant_research.py",
+    "active.data_quality_cli": "scripts/research/check_data_quality.py",
+    "active.reproduction_cli": "scripts/research/reproduce_quant_research.py",
+    "active.publication_cli": "scripts/research/publish_research_evaluation.py",
+    "compat.history_issue_mapping_cli": "scripts/research/register_historical_issue_mapping.py",
+    "candidate.audit_cli": "scripts/research/audit_quant_research.py",
+    "compat.render_etf_volatility_managed": "scripts/research/render_etf_volatility_managed_report.py",
+    "compat.render_etf_trend_120d": "scripts/research/render_etf_trend_120d_report.py",
+    "compat.render_a_share_b1": "scripts/research/render_a_share_b1_report.py",
+    "compat.history_migration_cli": "scripts/research/migrate_research_history.py",
+    "candidate.ma_executable": "scripts/research/run_ma_strategy_stats.py",
+    "candidate.value_sector_executable": "scripts/research/run_value_sector_strategy.py",
+    "active.inventory_verifier": "scripts/research/verify_entrypoint_inventory.py",
+    "active.sample_snapshot": "my_quant/us_research/scripts/refresh_us_snapshot.py",
+    "compat.strategy_results_projection": "backend/app/strategy_results.py",
+    "historical.published_reports": "docs/research/strategy-results",
+    "active.a_share_b1_long_history_config": "configs/research/a_share_b1_long_history.json",
+    "historical.us_trade_migration_inventory": "docs/research/us-trade-migration-inventory-2026-07-22.md",
+}
+MANAGED_EXECUTABLE_ROOTS = (
+    "scripts/research",
+    "my_quant/us_research/scripts",
+)
 
 
 def _non_empty_strings(value: Any) -> bool:
@@ -61,6 +87,55 @@ def _resolve_repo_path(repo_root: Path, raw_path: str) -> Path | None:
     except ValueError:
         return None
     return resolved
+
+
+def _is_python_executable(path: Path) -> bool:
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except (OSError, SyntaxError, UnicodeError):
+        return False
+    for node in tree.body:
+        if not isinstance(node, ast.If) or not isinstance(node.test, ast.Compare):
+            continue
+        comparison = node.test
+        if (
+            isinstance(comparison.left, ast.Name)
+            and comparison.left.id == "__name__"
+            and len(comparison.ops) == 1
+            and isinstance(comparison.ops[0], ast.Eq)
+            and len(comparison.comparators) == 1
+            and isinstance(comparison.comparators[0], ast.Constant)
+            and comparison.comparators[0].value == "__main__"
+        ):
+            return True
+    return False
+
+
+def _verify_managed_executables(
+    registered_paths: set[str],
+    repo_root: Path,
+    managed_roots: tuple[str, ...] = MANAGED_EXECUTABLE_ROOTS,
+) -> list[str]:
+    discovered: set[str] = set()
+    for raw_root in managed_roots:
+        root = _resolve_repo_path(repo_root, raw_root)
+        if root is None or not root.is_dir():
+            continue
+        for path in root.glob("*.py"):
+            if _is_python_executable(path):
+                discovered.add(path.relative_to(repo_root.resolve()).as_posix())
+    return [
+        f"发现未登记的受管 executable：{path}"
+        for path in sorted(discovered - registered_paths)
+    ]
+
+
+def _display_path(path: Path, repo_root: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(repo_root.resolve()).as_posix()
+    except ValueError:
+        return str(resolved)
 
 
 def verify_inventory(inventory_path: Path, repo_root: Path = REPO_ROOT) -> list[str]:
@@ -83,6 +158,7 @@ def verify_inventory(inventory_path: Path, repo_root: Path = REPO_ROOT) -> list[
         return errors
 
     seen_ids: set[str] = set()
+    seen_paths: set[str] = set()
     seen_classifications: set[str] = set()
     seen_coverage: set[str] = set()
 
@@ -117,15 +193,29 @@ def verify_inventory(inventory_path: Path, repo_root: Path = REPO_ROOT) -> list[
             resolved_path = _resolve_repo_path(repo_root, raw_path)
             if resolved_path is None or not resolved_path.exists():
                 errors.append(f"{prefix} 入口路径不存在：{raw_path}")
+            if raw_path in seen_paths:
+                errors.append(f"入口路径重复：{raw_path}")
+            else:
+                seen_paths.add(raw_path)
+            expected_path = (
+                EXPECTED_ENTRY_PATHS.get(entry_id)
+                if isinstance(entry_id, str)
+                else None
+            )
+            if expected_path is not None and raw_path != expected_path:
+                errors.append(
+                    f"预期入口路径不匹配：{entry_id} 应为 {expected_path}，实际为 {raw_path}"
+                )
 
         coverage = entry.get("coverage")
         if not _non_empty_strings(coverage):
             errors.append(f"{prefix} 的 coverage 必须是非空字符串数组")
         else:
-            unknown = sorted(set(coverage) - REQUIRED_COVERAGE)
+            coverage_values = set(cast(list[str], coverage))
+            unknown = sorted(coverage_values - REQUIRED_COVERAGE)
             if unknown:
                 errors.append(f"{prefix} 包含未知 coverage：{', '.join(unknown)}")
-            seen_coverage.update(set(coverage) & REQUIRED_COVERAGE)
+            seen_coverage.update(coverage_values & REQUIRED_COVERAGE)
 
         for field in ("callers", "artifact_identity", "test_seams", "stable_references"):
             if not _non_empty_strings(entry.get(field)):
@@ -154,12 +244,16 @@ def verify_inventory(inventory_path: Path, repo_root: Path = REPO_ROOT) -> list[
                 if resolved_reference is None or not resolved_reference.exists():
                     errors.append(f"{prefix} {label}不存在：{reference}")
 
+    missing_entry_ids = sorted(set(EXPECTED_ENTRY_PATHS) - seen_ids)
+    if missing_entry_ids:
+        errors.append("缺少预期入口 ID：" + ", ".join(missing_entry_ids))
     missing_classifications = sorted(CLASSIFICATIONS - seen_classifications)
     if missing_classifications:
         errors.append("分类不完整，缺少：" + ", ".join(missing_classifications))
     missing_coverage = sorted(REQUIRED_COVERAGE - seen_coverage)
     if missing_coverage:
         errors.append("入口覆盖不完整，缺少：" + ", ".join(missing_coverage))
+    errors.extend(_verify_managed_executables(seen_paths, repo_root))
     return errors
 
 
@@ -172,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         for error in errors:
             print(f"错误：{error}", file=sys.stderr)
         return 1
-    print(f"入口清单校验通过：{args.inventory.relative_to(REPO_ROOT)}")
+    print(f"入口清单校验通过：{_display_path(args.inventory, REPO_ROOT)}")
     return 0
 
 

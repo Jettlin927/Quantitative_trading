@@ -20,36 +20,108 @@
       "path": "scripts/research/run_quant_research.py",
       "classification": "active_architecture",
       "coverage": ["cli"],
-      "callers": ["研究操作人员与自动化 adapter"],
+      "callers": ["研究操作人员、自动化 adapter 与归档研究操作说明"],
       "stable_behavior": "保留 run、resume、list 的 CLI 参数、稳定错误与非零退出合同，核心计算继续委托领域 module。",
       "artifact_identity": ["run ID、checkpoint、archive 与 result fingerprint 由 canonical runner 生成"],
       "test_seams": ["backend/tests/test_research_cli.py", "backend/tests/test_research_resume.py"],
-      "stable_references": ["scripts/research/check_data_quality.py", "scripts/research/reproduce_quant_research.py", "scripts/research/publish_research_evaluation.py"],
+      "stable_references": ["docs/archive/research/research-overview-2026-07-19.md", "docs/archive/handoffs/agent-handoff-2026-07-19.md"],
       "retirement_conditions": ["所有受支持调用方迁移到等价 adapter，并完成 CLI、archive 与离线复现读回。"]
+    },
+    {
+      "id": "active.data_quality_cli",
+      "path": "scripts/research/check_data_quality.py",
+      "classification": "active_architecture",
+      "coverage": ["cli"],
+      "callers": ["研究操作人员、正式研究质量检查流程与归档研究操作说明"],
+      "stable_behavior": "按显式研究切片执行 canonical 数据质量检查，并保持 ready、ready_with_warnings、blocked、failed 的退出码语义。",
+      "artifact_identity": ["quality scope、quality run 与持久化规则明细"],
+      "test_seams": ["backend/tests/test_data_quality_postgres.py", "backend/tests/test_data_quality_rules.py"],
+      "stable_references": ["docs/archive/research/research-overview-2026-07-19.md", "docs/research/contracts/quant-foundation-trust-contract.md"],
+      "retirement_conditions": ["所有正式质量检查调用方迁移到等价 adapter，且 CLI 退出码与持久化结果合同完成读回。"]
+    },
+    {
+      "id": "active.reproduction_cli",
+      "path": "scripts/research/reproduce_quant_research.py",
+      "classification": "active_architecture",
+      "coverage": ["cli"],
+      "callers": ["离线复现操作人员与归档研究操作说明"],
+      "stable_behavior": "只读取冻结输入复现已有运行，不访问在线行情库，并按 result fingerprint 是否匹配返回稳定退出码。",
+      "artifact_identity": ["冻结输入、manifest、checkpoint 链、reproducibility key 与 result fingerprint"],
+      "test_seams": ["backend/tests/test_research_reproduction.py", "backend/tests/test_research_resume.py"],
+      "stable_references": ["docs/archive/research/research-overview-2026-07-19.md", "docs/archive/handoffs/agent-handoff-2026-07-19.md"],
+      "retirement_conditions": ["等价离线复现 adapter 覆盖全部 archive schema，并完成断网、篡改和黄金指纹读回。"]
+    },
+    {
+      "id": "active.publication_cli",
+      "path": "scripts/research/publish_research_evaluation.py",
+      "classification": "active_architecture",
+      "coverage": ["cli", "report"],
+      "callers": ["经批准的研究发布操作人员"],
+      "stable_behavior": "提交并冻结评价合同；一致发布仍由 research-worker 独占，CLI 成功不等于研究通过。",
+      "artifact_identity": ["formal research、evaluation、publication 与 evaluation SHA-256"],
+      "test_seams": ["backend/tests/test_research_publication.py"],
+      "stable_references": ["docs/operations/research-publication.md", "docs/adr/0004-published-research-is-immutable.md"],
+      "retirement_conditions": ["所有受控提交方迁移到等价 adapter，且不可变评价与发布身份完成 PostgreSQL、GitHub、API 读回。"]
+    },
+    {
+      "id": "compat.history_issue_mapping_cli",
+      "path": "scripts/research/register_historical_issue_mapping.py",
+      "classification": "compatibility_entry",
+      "coverage": ["migration", "cli"],
+      "callers": ["经精确人工授权的历史发布 Issue 映射操作人员"],
+      "stable_behavior": "只登记冻结清单允许的一对一历史 Issue 映射，拒绝覆盖或把 provenance 提升为批准。",
+      "artifact_identity": ["历史正式研究与独立 GitHub Issue 的不可变映射"],
+      "test_seams": ["backend/tests/test_research_history_migration.py", "backend/tests/test_research_publication.py"],
+      "stable_references": ["docs/operations/research-publication.md", "configs/research/historical_publication_issues_v1.json"],
+      "retirement_conditions": ["历史映射全部收敛且灾难恢复不再依赖该命令；冻结映射身份继续保留。"]
     },
     {
       "id": "candidate.audit_cli",
       "path": "scripts/research/audit_quant_research.py",
       "classification": "legacy_executable_candidate",
       "coverage": ["cli"],
-      "callers": ["当前仓库内仅脚本自身；仓库外人工 runbook 尚待维护者确认"],
+      "callers": ["归档 handoff 与研究总览仍显式提供运行命令；仓库外人工 runbook 尚待维护者确认"],
       "stable_behavior": "聚合运行既有研究合同测试，不提供新的研究计算。",
       "artifact_identity": ["不生成 canonical 研究工件"],
       "test_seams": ["backend/tests/test_quant_trust_contract.py"],
-      "stable_references": [".github/workflows/ci.yml"],
-      "retirement_conditions": ["确认仓库外人工调用为零。", "脚本选择的测试继续由 CI 直接收集并通过。"]
+      "stable_references": ["docs/archive/handoffs/agent-handoff-2026-07-19.md", "docs/archive/research/research-overview-2026-07-19.md", "docs/archive/code-maps/agent-code-map-2026-07-19.md"],
+      "retirement_conditions": ["替换或明确归档仓库内仍存在的运行命令。", "确认仓库外人工调用为零。", "脚本选择的测试继续由 CI 直接收集并通过。"]
     },
     {
-      "id": "compat.report_renderers",
+      "id": "compat.render_etf_volatility_managed",
       "path": "scripts/research/render_etf_volatility_managed_report.py",
       "classification": "compatibility_entry",
       "coverage": ["renderer", "report"],
-      "callers": ["三组历史报告合同测试与可能的人工重发流程"],
-      "stable_behavior": "只组装 canonical 工件的报告投影，不得复制成交、成本或绩效公式。",
-      "artifact_identity": ["三份 current-trustworthy HTML、summary 与复现证据的路径和哈希保持不变"],
-      "test_seams": ["backend/tests/test_etf_volatility_managed_report.py", "backend/tests/test_etf_trend_report.py", "backend/tests/test_a_share_b1_report.py", "backend/tests/test_report_evidence.py"],
-      "stable_references": ["scripts/research/render_etf_trend_120d_report.py", "scripts/research/render_a_share_b1_report.py", "scripts/research/report_evidence.py", "docs/research/strategy-results/manifest.json"],
-      "retirement_conditions": ["确认不再承担人工重发或审计职责。", "动态发布覆盖未来报告，且旧报告 URL、身份和哈希仍可只读校验。"]
+      "callers": ["ETF 波动率管理报告合同测试与可能的人工重发流程"],
+      "stable_behavior": "只接受预登记波动率与成本场景，从 canonical 工件组装报告，不复制 runner 成交、成本或绩效公式。",
+      "artifact_identity": ["ETF 波动率管理 current-trustworthy HTML、summary 与复现证据"],
+      "test_seams": ["backend/tests/test_etf_volatility_managed_report.py", "backend/tests/test_report_evidence.py"],
+      "stable_references": ["scripts/research/report_evidence.py", "docs/research/strategy-results/manifest.json", "docs/archive/code-maps/agent-code-map-2026-07-19.md"],
+      "retirement_conditions": ["确认不再承担 ETF 波动率管理报告人工重发或审计职责。", "替代发布投影保持该报告 URL、身份和哈希只读可验。"]
+    },
+    {
+      "id": "compat.render_etf_trend_120d",
+      "path": "scripts/research/render_etf_trend_120d_report.py",
+      "classification": "compatibility_entry",
+      "coverage": ["renderer", "report"],
+      "callers": ["ETF 120 日趋势报告合同测试与可能的人工重发流程"],
+      "stable_behavior": "只接受固定趋势与成本场景，从 canonical 工件组装长历史报告，不复制 runner 成交、成本或绩效公式。",
+      "artifact_identity": ["ETF 120 日趋势 current-trustworthy HTML、summary 与复现证据"],
+      "test_seams": ["backend/tests/test_etf_trend_report.py", "backend/tests/test_report_evidence.py"],
+      "stable_references": ["scripts/research/report_evidence.py", "docs/research/strategy-results/manifest.json", "docs/archive/code-maps/agent-code-map-2026-07-19.md"],
+      "retirement_conditions": ["确认不再承担 ETF 120 日趋势报告人工重发或审计职责。", "替代发布投影保持该报告 URL、身份和哈希只读可验。"]
+    },
+    {
+      "id": "compat.render_a_share_b1",
+      "path": "scripts/research/render_a_share_b1_report.py",
+      "classification": "compatibility_entry",
+      "coverage": ["renderer", "report"],
+      "callers": ["A 股 B1 报告合同测试与可能的人工重发流程"],
+      "stable_behavior": "只接受五个预登记 B1 场景，从 canonical 工件组装报告，不复制 runner 成交、成本或绩效公式。",
+      "artifact_identity": ["A 股 B1 current-trustworthy HTML、summary 与复现证据"],
+      "test_seams": ["backend/tests/test_a_share_b1_report.py", "backend/tests/test_report_evidence.py"],
+      "stable_references": ["scripts/research/report_evidence.py", "docs/research/strategy-results/manifest.json", "docs/archive/code-maps/agent-code-map-2026-07-19.md"],
+      "retirement_conditions": ["确认不再承担 A 股 B1 报告人工重发或审计职责。", "替代发布投影保持该报告 URL、身份和哈希只读可验。"]
     },
     {
       "id": "compat.history_migration_cli",
@@ -60,7 +132,7 @@
       "stable_behavior": "preview、rollback、apply 与历史 Issue 映射保持受控、幂等且不把来源记录提升为批准。",
       "artifact_identity": ["冻结迁移合同、四项 Issue 映射、既有运行与评价版本"],
       "test_seams": ["backend/tests/test_research_history_migration.py", "backend/tests/test_research_publication.py"],
-      "stable_references": ["scripts/research/register_historical_issue_mapping.py", "configs/research-history-migration-v1.json", "configs/research/historical_publication_issues_v1.json", "docs/research/guides/history-migration.md", "docs/adr/0006-history-import-is-provenance-not-approval.md"],
+      "stable_references": ["configs/research-history-migration-v1.json", "configs/research/historical_publication_issues_v1.json", "docs/research/guides/history-migration.md", "docs/adr/0006-history-import-is-provenance-not-approval.md"],
       "retirement_conditions": ["经单独授权现场证明迁移与映射已收敛。", "确认灾难恢复与幂等重放不再依赖 CLI；冻结 JSON 身份继续保留。"]
     },
     {
@@ -86,6 +158,18 @@
       "test_seams": ["backend/tests/test_value_sector_strategy.py", "backend/tests/test_strategy_results.py"],
       "stable_references": ["backend/app/value_sector_strategy.py", "docs/research/strategy-results/value-sector-stopfall-20260629/summary.json", "docs/research/a-share-value-quality-industry-strength-feasibility-2026-07-21.md"],
       "retirement_conditions": ["活动生产与仓库外调用方均证明为零。", "历史文档改为稳定指向冻结报告或精确提交。", "维护者逐项确认可执行代码退役范围。"]
+    },
+    {
+      "id": "active.inventory_verifier",
+      "path": "scripts/research/verify_entrypoint_inventory.py",
+      "classification": "active_architecture",
+      "coverage": ["config", "cli"],
+      "callers": ["repository gates 与 verifier 单元测试"],
+      "stable_behavior": "仅在 CI/开发验证中读取版本化清单并扫描固定受管目录；不得被运行时研究分发导入。",
+      "artifact_identity": ["固定 schema version、预期入口 ID/路径与受管 executable 发现规则"],
+      "test_seams": ["backend/tests/test_research_entrypoint_inventory.py"],
+      "stable_references": [".github/workflows/ci.yml", "configs/research-entrypoints-v1.json"],
+      "retirement_conditions": ["仅在 repository gates 具备等价逐入口与未登记 executable 失败能力时替代。"]
     },
     {
       "id": "active.sample_snapshot",
@@ -124,16 +208,16 @@
       "retirement_conditions": ["永久保留 canonical 历史证据；代码入口退役不得隐含删除、覆盖或重生成这些字节。"]
     },
     {
-      "id": "historical.research_configs",
+      "id": "active.a_share_b1_long_history_config",
       "path": "configs/research/a_share_b1_long_history.json",
-      "classification": "historical_evidence",
+      "classification": "active_architecture",
       "coverage": ["config"],
-      "callers": ["冻结报告身份、复现证据与历史审计"],
-      "stable_behavior": "冻结配置、universe 路径和配置哈希不得因 executable 退役而改写。",
+      "callers": ["活动 strategy registry 的 example_config、研究 runner、A 股 B1 renderer/合同测试、冻结报告身份与历史审计"],
+      "stable_behavior": "既是活动 a_share_b1_trend_pullback@1 的示例运行配置，也是已发布报告引用的冻结身份；活动消费不得改写既有配置字节。",
       "artifact_identity": ["策略 ID、版本、配置哈希、universe、run ID 与代码提交"],
-      "test_seams": ["backend/tests/test_research_reproduction.py", "backend/tests/test_research_history_migration.py"],
-      "stable_references": ["configs/research/etf_trend_120d_long_history.json", "configs/research/etf_volatility_managed_baseline.json", "docs/research/strategy-results/reproduction-evidence-20260719.json"],
-      "retirement_conditions": ["永久保留已发布研究所引用的冻结身份；只能以明确替代版本前向修正。"]
+      "test_seams": ["backend/tests/test_research_strategy_dispatch.py", "backend/tests/test_a_share_b1_trend_pullback.py", "backend/tests/test_a_share_b1_report.py", "backend/tests/test_research_reproduction.py"],
+      "stable_references": ["backend/app/quant_research/strategy_registry.py", "scripts/research/render_a_share_b1_report.py", "docs/research/strategy-results/reproduction-evidence-20260719.json"],
+      "retirement_conditions": ["活动 registry 与 runner 先迁移到明确替代配置；已发布研究引用的冻结身份仍永久保留。"]
     },
     {
       "id": "historical.us_trade_migration_inventory",
