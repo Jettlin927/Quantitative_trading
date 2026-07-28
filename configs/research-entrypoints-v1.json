@@ -64,6 +64,30 @@
       "retirement_conditions": ["所有受控提交方迁移到等价 adapter，且不可变评价与发布身份完成 PostgreSQL、GitHub、API 读回。"]
     },
     {
+      "id": "active.research_plan_cli",
+      "path": "backend/app/research_plan.py",
+      "classification": "active_architecture",
+      "coverage": ["cli", "config"],
+      "callers": ["研究提案校验人员、GitHub 研究编排与正式研究计划冻结流程"],
+      "stable_behavior": "只读解析 GitHub 研究 Issue 的机器计划，按服务器资源上限规范化合同并输出 plan_sha256、批准评论与停止评论；不据此启动正式研究。",
+      "artifact_identity": ["规范化冻结研究计划、plan_sha256 与精确批准/停止评论"],
+      "test_seams": ["backend/tests/test_research_orchestration.py"],
+      "stable_references": ["docs/operations/research-orchestrator.md", "docs/agents/issue-tracker.md"],
+      "retirement_conditions": ["所有研究计划调用方迁移到等价只读校验入口，且规范化 JSON、哈希与批准语法保持字节级兼容。"]
+    },
+    {
+      "id": "active.research_worker",
+      "path": "backend/app/research_worker.py",
+      "classification": "active_architecture",
+      "coverage": ["cli", "report"],
+      "callers": ["research-automation Compose profile；仅在代码、CI、migration、凭据和人工上线门禁分别满足后显式启用"],
+      "stable_behavior": "独占轮询已批准正式研究、租约执行 work item 并一致发布冻结评价；运行成功不推断研究结论，普通 compose up 不启动。",
+      "artifact_identity": ["正式研究 work item、运行、租约、冻结评价、发布版本与 canonical 工件"],
+      "test_seams": ["backend/tests/test_research_orchestration.py", "backend/tests/test_research_publication.py"],
+      "stable_references": ["docker-compose.yml", "docs/operations/research-orchestrator.md", "docs/operations/research-publication.md"],
+      "retirement_conditions": ["正式研究编排与一致发布迁移到等价独占 Worker，且租约、停止、重试、GitHub 与工件/API 读回合同全部保持。"]
+    },
+    {
       "id": "compat.history_issue_mapping_cli",
       "path": "scripts/research/register_historical_issue_mapping.py",
       "classification": "compatibility_entry",

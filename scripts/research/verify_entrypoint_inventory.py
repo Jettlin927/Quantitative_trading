@@ -55,6 +55,8 @@ EXPECTED_ENTRY_CLASSIFICATIONS = {
     "active.data_quality_cli": "active_architecture",
     "active.reproduction_cli": "active_architecture",
     "active.publication_cli": "active_architecture",
+    "active.research_plan_cli": "active_architecture",
+    "active.research_worker": "active_architecture",
     "compat.history_issue_mapping_cli": "compatibility_entry",
     "candidate.audit_cli": "legacy_executable_candidate",
     "compat.render_etf_volatility_managed": "compatibility_entry",
@@ -76,6 +78,8 @@ EXPECTED_ENTRY_PATHS = {
     "active.data_quality_cli": "scripts/research/check_data_quality.py",
     "active.reproduction_cli": "scripts/research/reproduce_quant_research.py",
     "active.publication_cli": "scripts/research/publish_research_evaluation.py",
+    "active.research_plan_cli": "backend/app/research_plan.py",
+    "active.research_worker": "backend/app/research_worker.py",
     "compat.history_issue_mapping_cli": "scripts/research/register_historical_issue_mapping.py",
     "candidate.audit_cli": "scripts/research/audit_quant_research.py",
     "compat.render_etf_volatility_managed": "scripts/research/render_etf_volatility_managed_report.py",
@@ -94,7 +98,12 @@ EXPECTED_ENTRY_PATHS = {
 MANAGED_EXECUTABLE_ROOTS = (
     "scripts/research",
     "my_quant/us_research/scripts",
+    "backend/app",
 )
+OUT_OF_SCOPE_DATA_EXECUTABLE_PATHS = {
+    "backend/app/database.py",
+    "backend/app/sync_worker.py",
+}
 EXCLUDED_DISCOVERY_DIRECTORIES = {
     ".mypy_cache",
     ".pytest_cache",
@@ -185,8 +194,11 @@ def _verify_managed_executables(
                 path = current_path / file_name
                 if path.is_symlink() or not path.is_file():
                     continue
+                relative_path = path.relative_to(resolved_repo_root).as_posix()
+                if relative_path in OUT_OF_SCOPE_DATA_EXECUTABLE_PATHS:
+                    continue
                 if _is_python_executable(path):
-                    discovered.add(path.relative_to(resolved_repo_root).as_posix())
+                    discovered.add(relative_path)
     return [
         f"发现未登记的受管 executable：{path}"
         for path in sorted(discovered - registered_paths)
@@ -213,8 +225,9 @@ def verify_inventory(inventory_path: Path, repo_root: Path = REPO_ROOT) -> list[
         return ["入口清单根节点必须是对象"]
 
     errors: list[str] = []
-    if inventory.get("schema_version") != 1:
-        errors.append("schema_version 必须为 1")
+    schema_version = inventory.get("schema_version")
+    if type(schema_version) is not int or schema_version != 1:
+        errors.append("schema_version 必须为整数 1")
     if inventory.get("inventory_id") != EXPECTED_INVENTORY_ID:
         errors.append(f"inventory_id 必须为 {EXPECTED_INVENTORY_ID}")
     if inventory.get("purpose") != EXPECTED_PURPOSE:

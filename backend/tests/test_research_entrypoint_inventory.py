@@ -31,6 +31,14 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
         missing_purpose = self._verify_with_change(lambda inventory: inventory.pop("purpose"))
         self.assertTrue(any("purpose" in error for error in missing_purpose), missing_purpose)
 
+    def test_verifier_requires_integer_schema_version(self) -> None:
+        for invalid_version in (True, 1.0):
+            with self.subTest(schema_version=invalid_version):
+                errors = self._verify_with_change(
+                    lambda inventory: inventory.update(schema_version=invalid_version)
+                )
+                self.assertTrue(any("schema_version" in error for error in errors), errors)
+
     def test_verifier_reports_missing_entry_path(self) -> None:
         errors = self._verify_with_change(
             lambda inventory: inventory["entries"][0].update(path="missing/entry.py")
@@ -109,6 +117,22 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
             )
         self.assertEqual(
             ["发现未登记的受管 executable：scripts/research/unregistered.py"],
+            errors,
+        )
+
+    def test_default_managed_discovery_includes_backend_research_entrypoints(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worker = root / "backend" / "app" / "research_worker.py"
+            worker.parent.mkdir(parents=True)
+            worker.write_text(
+                'if __name__ == "__main__":\n    raise SystemExit(0)\n',
+                encoding="utf-8",
+            )
+            errors = _verify_managed_executables(set(), root)
+
+        self.assertEqual(
+            ["发现未登记的受管 executable：backend/app/research_worker.py"],
             errors,
         )
 
