@@ -15,6 +15,10 @@ from typing import Any, cast
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INVENTORY = REPO_ROOT / "configs" / "research-entrypoints-v1.json"
+EXPECTED_INVENTORY_ID = "research-entrypoints-v1"
+EXPECTED_PURPOSE = (
+    "CI-only research entrypoint inventory; never import this file for runtime dispatch."
+)
 CLASSIFICATIONS = {
     "active_architecture",
     "compatibility_entry",
@@ -131,15 +135,25 @@ def _is_python_executable(path: Path) -> bool:
         if not isinstance(node, ast.If) or not isinstance(node.test, ast.Compare):
             continue
         comparison = node.test
-        if (
-            isinstance(comparison.left, ast.Name)
-            and comparison.left.id == "__name__"
-            and len(comparison.ops) == 1
-            and isinstance(comparison.ops[0], ast.Eq)
-            and len(comparison.comparators) == 1
-            and isinstance(comparison.comparators[0], ast.Constant)
-            and comparison.comparators[0].value == "__main__"
-        ):
+        if len(comparison.ops) != 1 or not isinstance(comparison.ops[0], ast.Eq):
+            continue
+        if len(comparison.comparators) != 1:
+            continue
+        left = comparison.left
+        right = comparison.comparators[0]
+        name_on_left = (
+            isinstance(left, ast.Name)
+            and left.id == "__name__"
+            and isinstance(right, ast.Constant)
+            and right.value == "__main__"
+        )
+        name_on_right = (
+            isinstance(right, ast.Name)
+            and right.id == "__name__"
+            and isinstance(left, ast.Constant)
+            and left.value == "__main__"
+        )
+        if name_on_left or name_on_right:
             return True
     return False
 
@@ -201,6 +215,10 @@ def verify_inventory(inventory_path: Path, repo_root: Path = REPO_ROOT) -> list[
     errors: list[str] = []
     if inventory.get("schema_version") != 1:
         errors.append("schema_version 必须为 1")
+    if inventory.get("inventory_id") != EXPECTED_INVENTORY_ID:
+        errors.append(f"inventory_id 必须为 {EXPECTED_INVENTORY_ID}")
+    if inventory.get("purpose") != EXPECTED_PURPOSE:
+        errors.append(f"purpose 必须为固定 CI-only 声明：{EXPECTED_PURPOSE}")
     entries = inventory.get("entries")
     if not isinstance(entries, list) or not entries:
         errors.append("entries 必须是非空数组")

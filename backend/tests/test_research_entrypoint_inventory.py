@@ -22,6 +22,15 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
     def test_versioned_inventory_is_complete_and_valid(self) -> None:
         self.assertEqual([], verify_inventory(INVENTORY_PATH, REPO_ROOT))
 
+    def test_verifier_requires_versioned_root_identity_and_purpose(self) -> None:
+        wrong_identity = self._verify_with_change(
+            lambda inventory: inventory.update(inventory_id="research-entrypoints-v2")
+        )
+        self.assertTrue(any("inventory_id" in error for error in wrong_identity), wrong_identity)
+
+        missing_purpose = self._verify_with_change(lambda inventory: inventory.pop("purpose"))
+        self.assertTrue(any("purpose" in error for error in missing_purpose), missing_purpose)
+
     def test_verifier_reports_missing_entry_path(self) -> None:
         errors = self._verify_with_change(
             lambda inventory: inventory["entries"][0].update(path="missing/entry.py")
@@ -100,6 +109,22 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
             )
         self.assertEqual(
             ["发现未登记的受管 executable：scripts/research/unregistered.py"],
+            errors,
+        )
+
+    def test_managed_discovery_rejects_reversed_main_guard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            script = root / "scripts" / "research" / "reversed.py"
+            script.parent.mkdir(parents=True)
+            script.write_text(
+                'if "__main__" == __name__:\n    raise SystemExit(0)\n',
+                encoding="utf-8",
+            )
+            errors = _verify_managed_executables(set(), root, ("scripts/research",))
+
+        self.assertEqual(
+            ["发现未登记的受管 executable：scripts/research/reversed.py"],
             errors,
         )
 
