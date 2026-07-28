@@ -5,9 +5,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from .ingestion_contracts import IngestionAction
-
-
 class StockOut(BaseModel):
     ts_code: str
     symbol: str | None = None
@@ -233,7 +230,7 @@ class SyncUsExperimentTargetedUniverseRequest(BaseModel):
 
 
 class SyncJobCreate(BaseModel):
-    action: IngestionAction
+    action: str
     payload: dict[str, Any] = Field(default_factory=dict)
 
 

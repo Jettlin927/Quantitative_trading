@@ -27,7 +27,7 @@ from .work_coordination import try_acquire_heavy_work_claim_lock
 
 
 UTC = timezone.utc
-SUPPORTED_SYNC_ACTIONS = {action.value for action in ACTION_REGISTRY}
+SUPPORTED_SYNC_ACTIONS = set(ACTION_REGISTRY)
 
 
 class PermanentSyncError(RuntimeError):
