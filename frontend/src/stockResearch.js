@@ -150,7 +150,9 @@ export function useStockResearch(readAdapter) {
   const loadSelectedStock = useCallback((code, force = false) => {
     if (!code) return Promise.resolve(skipped)
     const pending = pendingDetails.current.aDetail
-    if (pending?.selection === code) return pending.promise
+    if (pending?.selection === code
+      && pending.generation === generations.current.aDetail
+      && !pending.controller.signal.aborted) return pending.promise
     const requested = requestedDetails.current.aDetail
     if (!force && requested.selection === code && requested.generation === generations.current.aDetail) {
       return Promise.resolve(skipped)
@@ -158,7 +160,12 @@ export function useStockResearch(readAdapter) {
 
     const request = begin('aDetail')
     requestedDetails.current.aDetail = { selection: code, generation: request.generation }
-    const entry = { selection: code, promise: null }
+    const entry = {
+      selection: code,
+      generation: request.generation,
+      controller: request.controller,
+      promise: null,
+    }
     setStockDetailLoading(true)
     setStockBars([])
     setStockDetail(null)
@@ -191,7 +198,9 @@ export function useStockResearch(readAdapter) {
   const loadSelectedUs = useCallback((code, force = false) => {
     if (!code) return Promise.resolve(skipped)
     const pending = pendingDetails.current.usDetail
-    if (pending?.selection === code) return pending.promise
+    if (pending?.selection === code
+      && pending.generation === generations.current.usDetail
+      && !pending.controller.signal.aborted) return pending.promise
     const requested = requestedDetails.current.usDetail
     if (!force && requested.selection === code && requested.generation === generations.current.usDetail) {
       return Promise.resolve(skipped)
@@ -199,7 +208,12 @@ export function useStockResearch(readAdapter) {
 
     const request = begin('usDetail')
     requestedDetails.current.usDetail = { selection: code, generation: request.generation }
-    const entry = { selection: code, promise: null }
+    const entry = {
+      selection: code,
+      generation: request.generation,
+      controller: request.controller,
+      promise: null,
+    }
     setUsDetailLoading(true)
     setLoadedUsCode('')
     setUsBars([])

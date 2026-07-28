@@ -47,9 +47,11 @@ afterEach(() => {
 })
 
 describe('股票研究 tracer', () => {
-  it('A 股新选择会取消旧请求，且 ReadAdapter 忽略 abort 时旧响应仍不能覆盖当前选择', async () => {
+  it('A→B→A 快速选择只复用同 generation 请求，ReadAdapter 忽略 abort 时旧响应不能覆盖', async () => {
     const oldBars = deferred()
     const oldDetail = deferred()
+    let aBarCalls = 0
+    let aDetailCalls = 0
     /** @type {AbortSignal[]} */
     const oldSignals = []
     const readAdapter = vi.fn(({ path, signal }) => {
@@ -57,8 +59,16 @@ describe('股票研究 tracer', () => {
         { ts_code: '000001.SZ', symbol: '000001', name: '甲公司' },
         { ts_code: '000002.SZ', symbol: '000002', name: '乙公司' },
       ]))
-      if (path === '/api/daily-bars?ts_code=000001.SZ') { oldSignals.push(signal); return oldBars.promise }
-      if (path === '/api/stocks/000001.SZ/detail') { oldSignals.push(signal); return oldDetail.promise }
+      if (path === '/api/daily-bars?ts_code=000001.SZ') {
+        aBarCalls += 1
+        if (aBarCalls === 1) { oldSignals.push(signal); return oldBars.promise }
+        return Promise.resolve([])
+      }
+      if (path === '/api/stocks/000001.SZ/detail') {
+        aDetailCalls += 1
+        if (aDetailCalls === 1) { oldSignals.push(signal); return oldDetail.promise }
+        return Promise.resolve({ listing: { listStatus: '甲股重新选中状态' }, valuation_history: [], financial_history: [] })
+      }
       if (path === '/api/daily-bars?ts_code=000002.SZ') return Promise.resolve([])
       if (path === '/api/stocks/000002.SZ/detail') return Promise.resolve({ listing: { listStatus: '乙股当前状态' }, valuation_history: [], financial_history: [] })
       if (path === '/api/us-experiment/instruments?current_only=true&limit=50&offset=0') return Promise.resolve(instrumentPage([]))
@@ -70,12 +80,16 @@ describe('股票研究 tracer', () => {
     await waitFor(() => expect(oldSignals).toHaveLength(2))
 
     fireEvent.click(screen.getByRole('button', { name: /000002.*乙公司/ }))
-    expect(await screen.findByText('乙股当前状态')).toBeInTheDocument()
     expect(oldSignals.every((signal) => signal.aborted)).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: /000001.*甲公司/ }))
+    expect(await screen.findByText('甲股重新选中状态')).toBeInTheDocument()
+    expect(aBarCalls).toBe(2)
+    expect(aDetailCalls).toBe(2)
 
     oldBars.resolve([{ trade_date: '2026-01-01', open: 1, high: 2, low: 1, close: 2, vol: 3, amount: 4 }])
     oldDetail.resolve({ listing: { listStatus: '甲股过期状态' }, valuation_history: [], financial_history: [] })
     await waitFor(() => expect(screen.queryByText('甲股过期状态')).not.toBeInTheDocument())
+    expect(screen.getByText('甲股重新选中状态')).toBeInTheDocument()
 
     view.unmount()
   })
