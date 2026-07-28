@@ -306,7 +306,16 @@ def verify_inventory(inventory_path: Path, repo_root: Path = REPO_ROOT) -> list[
                 if resolved_reference is None or not resolved_reference.exists():
                     errors.append(f"{prefix} {label}不存在：{reference}")
 
-    missing_entry_ids = sorted(set(EXPECTED_ENTRY_PATHS) - seen_ids)
+    expected_entry_ids = set(EXPECTED_ENTRY_PATHS)
+    contract_table_drift = sorted(
+        expected_entry_ids.symmetric_difference(EXPECTED_ENTRY_CLASSIFICATIONS)
+    )
+    if contract_table_drift:
+        errors.append("版本化入口合同表不一致：" + ", ".join(contract_table_drift))
+    unexpected_entry_ids = sorted(seen_ids - expected_entry_ids)
+    if unexpected_entry_ids:
+        errors.append("入口 ID 未列入版本化入口合同：" + ", ".join(unexpected_entry_ids))
+    missing_entry_ids = sorted(expected_entry_ids - seen_ids)
     if missing_entry_ids:
         errors.append("缺少预期入口 ID：" + ", ".join(missing_entry_ids))
     missing_classifications = sorted(CLASSIFICATIONS - seen_classifications)

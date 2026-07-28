@@ -71,6 +71,13 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
         errors = self._verify_with_change(misclassify_registry)
         self.assertTrue(any("预期入口分类不匹配" in error for error in errors), errors)
 
+    def test_verifier_rejects_entry_id_outside_versioned_contract(self) -> None:
+        def replace_registry_id(inventory: dict[str, Any]) -> None:
+            inventory["entries"][0]["id"] = "active.unversioned_cli"
+
+        errors = self._verify_with_change(replace_registry_id)
+        self.assertTrue(any("未列入版本化入口合同" in error for error in errors), errors)
+
     def test_managed_discovery_rejects_unregistered_executable(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -178,6 +185,15 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
         self.assertIn("renderer", callers)
         self.assertIn("backend/app/quant_research/strategy_registry.py", entry["stable_references"])
         self.assertIn("scripts/research/render_a_share_b1_report.py", entry["stable_references"])
+
+    def test_b1_renderer_records_existing_compatibility_metrics(self) -> None:
+        entry = next(
+            entry
+            for entry in self._load_inventory()["entries"]
+            if entry["id"] == "compat.render_a_share_b1"
+        )
+        self.assertIn("绩效统计兼容口径", entry["stable_behavior"])
+        self.assertNotIn("不复制 runner 成交、成本或绩效公式", entry["stable_behavior"])
 
     def test_audit_cli_records_archived_command_callers_instead_of_ci_claim(self) -> None:
         entry = next(

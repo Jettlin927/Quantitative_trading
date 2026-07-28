@@ -117,11 +117,11 @@
       "classification": "compatibility_entry",
       "coverage": ["renderer", "report"],
       "callers": ["A 股 B1 报告合同测试与可能的人工重发流程"],
-      "stable_behavior": "只接受五个预登记 B1 场景，从 canonical 工件组装报告，不复制 runner 成交、成本或绩效公式。",
+      "stable_behavior": "只接受五个预登记 B1 场景并从 canonical 工件组装报告；保留 renderer 内既有绩效统计兼容口径，尚未收敛到 canonical summarize_performance。",
       "artifact_identity": ["A 股 B1 current-trustworthy HTML、summary 与复现证据"],
       "test_seams": ["backend/tests/test_a_share_b1_report.py", "backend/tests/test_report_evidence.py"],
-      "stable_references": ["scripts/research/report_evidence.py", "docs/research/strategy-results/manifest.json", "docs/archive/code-maps/agent-code-map-2026-07-19.md"],
-      "retirement_conditions": ["确认不再承担 A 股 B1 报告人工重发或审计职责。", "替代发布投影保持该报告 URL、身份和哈希只读可验。"]
+      "stable_references": ["backend/app/quant_research/metrics.py", "scripts/research/report_evidence.py", "docs/research/strategy-results/manifest.json", "docs/archive/code-maps/agent-code-map-2026-07-19.md"],
+      "retirement_conditions": ["确认不再承担 A 股 B1 报告人工重发或审计职责。", "替代发布投影保持该报告 URL、身份和哈希只读可验。", "替代或退役前将 renderer 内绩效统计兼容口径收敛到 canonical metrics。"]
     },
     {
       "id": "compat.history_migration_cli",
