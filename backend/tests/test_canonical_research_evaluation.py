@@ -126,6 +126,19 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
         with self.assertRaisesRegex(EvaluationContractError, "未绑定评价运行"):
             StrategyEvidenceBundle.from_dict(unbound_run)
 
+    def test_artifact_uri_authority_and_path_are_bound_to_declared_run(self) -> None:
+        for uri in (
+            "artifacts://run-other/manifest.json",
+            "artifacts://run-golden",
+            "artifacts://run-golden/manifest.json?version=other",
+        ):
+            payload = _complete_bundle()
+            payload["evidenceRefs"][0]["uri"] = uri
+            with self.subTest(uri=uri), self.assertRaisesRegex(
+                EvaluationContractError, "authority 绑定 runId.*工件路径"
+            ):
+                StrategyEvidenceBundle.from_dict(payload)
+
     def test_only_frozen_market_capacity_and_soft_threshold_gates_can_be_conditional(self) -> None:
         forbidden = _complete_bundle()
         _gate(forbidden, "test_oos")["passed"] = False
@@ -168,6 +181,7 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
         failed_run["status"] = "failed"
         mixed["runIdentities"].append(failed_run)
         mixed["evidenceRefs"][0]["runId"] = "run-failed"
+        mixed["evidenceRefs"][0]["uri"] = "artifacts://run-failed/manifest.json"
         self.assertEqual(
             evaluate_research(StrategyEvidenceBundle.from_dict(mixed)).conclusion,
             "受阻",
@@ -187,7 +201,7 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
         with self.assertRaisesRegex(EvaluationContractError, "对应冻结门禁不一致"):
             StrategyEvidenceBundle.from_dict(inconsistent)
 
-    def test_missing_oos_is_insufficient_and_identity_or_reproduction_is_blocked(self) -> None:
+    def test_missing_oos_is_insufficient_and_untrusted_protocol_is_blocked(self) -> None:
         oos = _complete_bundle()
         _gate(oos, "test_oos")["passed"] = False
         oos["robustnessEvidence"]["walkForward"]["value"]["passed"] = False
@@ -196,7 +210,11 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
             "证据不足",
         )
 
-        for gate_id in ("identity_and_hypothesis", "reproducibility"):
+        for gate_id in (
+            "identity_and_hypothesis",
+            "point_in_time_universe",
+            "reproducibility",
+        ):
             payload = _complete_bundle()
             _gate(payload, gate_id)["passed"] = False
             with self.subTest(gate_id=gate_id):
@@ -227,6 +245,15 @@ class CanonicalResearchEvaluationTests(unittest.TestCase):
         weak_capacity["robustnessEvidence"]["capacity"]["value"] = {"passed": True}
         with self.assertRaisesRegex(EvaluationContractError, "领域字段无效"):
             StrategyEvidenceBundle.from_dict(weak_capacity)
+
+    def test_single_direction_or_volatility_regime_cannot_pass_research(self) -> None:
+        for field in ("directionRegimeCount", "volatilityRegimeCount"):
+            payload = _complete_bundle()
+            payload["robustnessEvidence"]["marketRegimes"]["value"][field] = 1
+            with self.subTest(field=field), self.assertRaisesRegex(
+                EvaluationContractError, rf"marketRegimes.{field} 必须至少为 2"
+            ):
+                StrategyEvidenceBundle.from_dict(payload)
 
     def test_run_identity_formats_and_reproducibility_derivation_are_verified(self) -> None:
         for field, value in (

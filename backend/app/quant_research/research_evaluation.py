@@ -65,7 +65,7 @@ _MISSING_BLOCKING_GATE_IDS = frozenset(
     }
 )
 _FAILED_BLOCKING_GATE_IDS = frozenset(
-    {"identity_and_hypothesis", "reproducibility"}
+    {"identity_and_hypothesis", "point_in_time_universe", "reproducibility"}
 )
 _GATE_EVIDENCE_KINDS = {
     "identity_and_hypothesis": frozenset({"code", "parameters"}),
@@ -425,8 +425,19 @@ def _validate_evidence_refs(
             raise EvaluationContractError("evidenceRef.kind 不属于冻结证据类型")
         if ref["runId"] not in run_ids:
             raise EvaluationContractError("evidenceRef.runId 未绑定评价运行")
-        if urlparse(ref["uri"]).scheme != "artifacts":
-            raise EvaluationContractError("evidenceRef.uri 必须是 canonical artifacts URI")
+        parsed_uri = urlparse(ref["uri"])
+        if (
+            parsed_uri.scheme != "artifacts"
+            or parsed_uri.netloc != ref["runId"]
+            or not parsed_uri.path.startswith("/")
+            or parsed_uri.path == "/"
+            or parsed_uri.params
+            or parsed_uri.query
+            or parsed_uri.fragment
+        ):
+            raise EvaluationContractError(
+                "evidenceRef.uri 必须是 authority 绑定 runId 且含工件路径的 canonical artifacts URI"
+            )
         _require_sha256(ref["sha256"], "evidenceRef.sha256")
         result.append(ref)
     if len({item["artifactName"] for item in result}) != len(result):
@@ -633,7 +644,16 @@ def _validate_robustness_evidence(
     }
     for field in count_fields:
         minimum = 2 if name in {"parameterNeighborhood", "costStress"} else 1
-        if isinstance(details[field], bool) or not isinstance(details[field], int) or details[field] < minimum:
+        if name == "marketRegimes" and field in {
+            "directionRegimeCount",
+            "volatilityRegimeCount",
+        }:
+            minimum = 2
+        if (
+            isinstance(details[field], bool)
+            or not isinstance(details[field], int)
+            or details[field] < minimum
+        ):
             raise EvaluationContractError(
                 f"robustnessEvidence.{name}.{field} 必须至少为 {minimum}"
             )
@@ -753,10 +773,10 @@ def _nav_metrics(evidence: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
         status = dict(evidence)
         return {"returns": status, "risk": status, "benchmark": status}
     frame = pd.DataFrame(evidence["observations"])
-    strategy = frame[["tradeDate", "nav"]].rename(columns={"tradeDate": "trade_date"})
-    benchmark = frame[["tradeDate", "benchmarkNav"]].rename(
-        columns={"tradeDate": "trade_date", "benchmarkNav": "nav"}
-    )
+    strategy = pd.DataFrame(frame[["tradeDate", "nav"]])
+    strategy.columns = ["trade_date", "nav"]
+    benchmark = pd.DataFrame(frame[["tradeDate", "benchmarkNav"]])
+    benchmark.columns = ["trade_date", "nav"]
     summary = summarize_performance(
         strategy,
         benchmark,
@@ -768,7 +788,7 @@ def _nav_metrics(evidence: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
         [pd.Series([float(evidence["initialNav"])]), frame["nav"].astype(float)],
         ignore_index=True,
     )
-    returns = path.pct_change(fill_method=None).dropna()
+    returns = pd.Series(path.pct_change(fill_method=None).dropna())
     tails = {key: _finite_or_none(value) for key, value in tail_metrics(returns).items()}
     return {
         "returns": {
@@ -986,7 +1006,7 @@ def _iso_date(value: Any, field: str) -> str:
         raise EvaluationContractError(f"{field} 必须是 ISO 日期")
     try:
         timestamp = pd.Timestamp(value)
-        if pd.isna(timestamp):
+        if not isinstance(timestamp, pd.Timestamp):
             raise ValueError("日期不能为空")
         normalized = timestamp.date().isoformat()
     except (AttributeError, TypeError, ValueError) as exc:
