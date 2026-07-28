@@ -30,12 +30,17 @@ from .models import (
     ResearchRun,
     ResearchWorkItem,
 )
-from .quant_research.runner import (
-    ResearchRunResult,
-    ResearchStopRequested,
-    resume_quant_research,
-    run_quant_research,
+from .quant_research.execution import (
+    ExecutionRuntime,
+    InterruptedRun,
+    RequestRejected,
+    ResumeRun,
+    RunFailed,
+    StartRun,
+    SucceededRun,
+    execute,
 )
+from .quant_research.runner import ResearchRunResult, ResearchStopRequested
 from .research_orchestration import append_research_event, transition_orchestration
 from .research_plan import ResearchServerLimits
 from .research_publication import publish_next_pending_research_evaluation
@@ -335,6 +340,20 @@ def execute_claimed_research_work(
     except ResearchBudgetExceeded as exc:
         fail_research_work(claim, exc, transient=False, session_factory=factory)
         return "blocked"
+    except (RequestRejected, RunFailed) as exc:
+        if lease_lost.is_set():
+            return "lease_lost"
+        if heartbeat_failure.is_set():
+            failure_exc, transient = _classify_heartbeat_failure(heartbeat_errors)
+        else:
+            failure_exc = exc.cause
+            transient = exc.retryable if isinstance(exc, RunFailed) else False
+        return fail_research_work(
+            claim,
+            failure_exc,
+            transient=transient,
+            session_factory=factory,
+        )
     except Exception as runner_exc:
         if lease_lost.is_set():
             return "lease_lost"
@@ -562,25 +581,24 @@ def _execute_with_runner(
     claim: ClaimedResearchWork,
     factory: SessionFactory,
     should_stop: Callable[[], bool],
-) -> ResearchRunResult:
+) -> SucceededRun:
     with factory() as db:
         plan = db.get(FrozenResearchPlan, claim.plan_id)
         output_root = Path(os.getenv("RESEARCH_ARTIFACT_ROOT", "outputs/research-runs"))
-        if claim.resume_run_id:
-            return resume_quant_research(
-                db,
-                claim.resume_run_id,
-                output_root,
-                should_stop=should_stop,
+        runtime = ExecutionRuntime(registry_db=db, output_root=output_root)
+        request = (
+            ResumeRun(run_id=claim.resume_run_id)
+            if claim.resume_run_id
+            else StartRun(
+                config=dict(plan.plan_json["runConfig"]),
+                formal_research_id=claim.formal_research_id,
+                orchestration_attempt_id=claim.attempt_id,
             )
-        return run_quant_research(
-            db,
-            dict(plan.plan_json["runConfig"]),
-            output_root,
-            formal_research_id=claim.formal_research_id,
-            orchestration_attempt_id=claim.attempt_id,
-            should_stop=should_stop,
         )
+        outcome = execute(runtime, request, should_stop)
+        if isinstance(outcome, InterruptedRun):
+            raise ResearchStopRequested(outcome.reason)
+        return outcome
 
 
 def _heartbeat_loop(
