@@ -1,5 +1,5 @@
 import { ChevronRight, Clock3, Database, FlaskConical, Globe2, RefreshCw, Search, ShieldAlert } from 'lucide-react'
-import { TechnicalChart } from './TechnicalChart.jsx'
+import { MarketChart } from './MarketChart.jsx'
 import {
   Badge,
   DomainFailure,
@@ -29,9 +29,11 @@ export function USDataBoundaryView({
   setSelectedCode = () => {},
   selectedInstrument = null,
   bars = [],
+  marketBars = [],
   detailLoading = false,
   detailReady = true,
   error = '',
+  chartAdapter = undefined,
 }) {
   const usAssets = usDb?.assets || []
   const sampleCounts = usDb?.counts || {}
@@ -77,8 +79,10 @@ export function USDataBoundaryView({
         setSelectedCode={setSelectedCode}
         selectedInstrument={selectedInstrument}
         bars={bars}
+        marketBars={marketBars}
         detailLoading={detailLoading}
         detailReady={detailReady}
+        chartAdapter={chartAdapter}
       />
 
       <section className="functional-debt-card us-experiment-boundary">
@@ -177,9 +181,8 @@ export function USDataBoundaryView({
   )
 }
 
-function USMarketLab({ instruments, instrumentPage, query, setQuery, onSearch, onPage, selectedCode, setSelectedCode, selectedInstrument, bars, detailLoading, detailReady }) {
+function USMarketLab({ instruments, instrumentPage, query, setQuery, onSearch, onPage, selectedCode, setSelectedCode, selectedInstrument, bars, marketBars, detailLoading, detailReady, chartAdapter }) {
   const sortedBars = [...bars].sort((left, right) => String(left.tradeDate).localeCompare(String(right.tradeDate)))
-  const chartBars = sortedBars.map((row) => ({ trade_date: row.tradeDate, open: row.open, high: row.high, low: row.low, close: row.close, vol: row.volume, amount: null }))
   const latest = sortedBars[sortedBars.length - 1]
   const previous = sortedBars[sortedBars.length - 2]
   const changePercent = previous?.close ? ((Number(latest?.close) - Number(previous.close)) / Number(previous.close)) * 100 : null
@@ -229,7 +232,7 @@ function USMarketLab({ instruments, instrumentPage, query, setQuery, onSearch, o
             <span>完整区间 <b>{historyStart && historyEnd ? `${historyStart} → ${historyEnd}` : '-'}</b></span>
           </div>
         </header>
-        {detailLoading ? <div className="loading-state"><RefreshCw className="spin" size={18} />正在读取美股日线…</div> : <TechnicalChart bars={chartBars} />}
+        {detailLoading ? <div className="loading-state"><RefreshCw className="spin" size={18} />正在读取美股日线…</div> : <MarketChart bars={marketBars} chartAdapter={chartAdapter} />}
       </section>
 
       <aside className="facts-panel">

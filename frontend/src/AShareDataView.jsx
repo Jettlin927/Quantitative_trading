@@ -1,5 +1,5 @@
 import { RefreshCw, Search } from 'lucide-react'
-import { TechnicalChart } from './TechnicalChart.jsx'
+import { MarketChart } from './MarketChart.jsx'
 import {
   Badge,
   CoverageMatrix,
@@ -170,9 +170,10 @@ function StockLabView({
   stockBars,
   stockDetail,
   detailLoading,
+  chartAdapter,
 }) {
-  const historyStart = stockBars[0]?.trade_date
-  const historyEnd = stockBars[stockBars.length - 1]?.trade_date
+  const historyStart = stockBars[0]?.time
+  const historyEnd = stockBars[stockBars.length - 1]?.time
   const pageNumber = Math.floor(stockPage.offset / stockPage.limit) + 1
   const pageCount = Math.max(1, Math.ceil(stockPage.total / stockPage.limit))
   return (
@@ -213,8 +214,8 @@ function StockLabView({
         <header className="security-title">
           <div><span>{selectedStock?.ts_code || '未选择股票'}</span><h2>{selectedStock?.name || '请选择股票'}</h2></div>
           <div className="security-quote">
-            <strong className={priceTone(selectedLatestBar?.pct_chg)}>{formatNumber(selectedLatestBar?.close)}</strong>
-            <span className={priceTone(selectedLatestBar?.pct_chg)}>{formatSignedPercent(selectedLatestBar?.pct_chg)}</span>
+            <strong className={priceTone(selectedLatestBar?.changePercent ?? selectedLatestBar?.pct_chg)}>{formatNumber(selectedLatestBar?.close)}</strong>
+            <span className={priceTone(selectedLatestBar?.changePercent ?? selectedLatestBar?.pct_chg)}>{formatSignedPercent(selectedLatestBar?.changePercent ?? selectedLatestBar?.pct_chg)}</span>
           </div>
           <div className="security-meta">
             <span>行业 <b>{selectedStock?.industry || '-'}</b></span>
@@ -223,12 +224,12 @@ function StockLabView({
             <span>完整区间 <b>{historyStart && historyEnd ? `${historyStart} → ${historyEnd}` : '-'}</b></span>
           </div>
         </header>
-        <TechnicalChart bars={stockBars} />
+        <MarketChart bars={stockBars} chartAdapter={chartAdapter} />
       </section>
 
       <aside className="facts-panel">
         <header><span>时点可见事实</span><h2>估值与财务</h2></header>
-        <FactGroup title={selectedLatestBar?.trade_date || selectedStock?.latest_date || '最新行情'}>
+        <FactGroup title={selectedLatestBar?.time || selectedStock?.latest_date || '最新行情'}>
           <Fact label="开 / 高" value={`${formatNumber(selectedLatestBar?.open)} / ${formatNumber(selectedLatestBar?.high)}`} />
           <Fact label="低 / 收" value={`${formatNumber(selectedLatestBar?.low)} / ${formatNumber(selectedLatestBar?.close)}`} strong />
           <Fact label="成交额" value={formatDailyAmount(selectedLatestBar?.amount)} />
