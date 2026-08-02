@@ -6,5 +6,7 @@ pydantic==2.12.5
 tushare==1.4.24
 pandas==2.3.3
 alembic==1.18.5
+cryptography==50.0.0
+httpx==0.28.1
 yfinance==1.5.1
 akshare==1.18.70

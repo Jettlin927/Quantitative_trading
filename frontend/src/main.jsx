@@ -4,10 +4,13 @@ import {
   Activity,
   BarChart3,
   BookOpenCheck,
+  BriefcaseBusiness,
   ChevronRight,
   Clock3,
   Database,
+  FileClock,
   Globe2,
+  LayoutDashboard,
   ListChecks,
   RefreshCw,
   Server,
@@ -15,25 +18,37 @@ import {
 } from 'lucide-react'
 import { AShareDataView } from './AShareDataView.jsx'
 import { OperationsView } from './OperationsView.jsx'
+import { PersonalPlaceholder, PersonalTodayView } from './PersonalTodayView.jsx'
 import { ResearchCockpitView } from './ResearchCockpitView.jsx'
 import { USDataBoundaryView } from './USDataBoundaryView.jsx'
+import { browserPersonalJourneyClient } from './personalJourneyClient.js'
 import { browserReadAdapter, systemClock } from './readAdapter.js'
 import { isReadComplete, isReadFailure, useStockResearch } from './stockResearch.js'
 import { Notice, isInventoryAvailable, translateStatus } from './viewSupport.jsx'
 import './styles.css'
 
 const NAV_ITEMS = [
-  { id: 'research', label: '研究驾驶舱', eyebrow: '结构化研究', icon: BookOpenCheck },
-  { id: 'a-share', label: 'A 股数据', eyebrow: '实际市场数据', icon: BarChart3 },
-  { id: 'us-data', label: '美股数据', eyebrow: '数据边界', icon: Globe2 },
-  { id: 'operations', label: '系统运维', eyebrow: '只读运行事实', icon: Server },
+  { id: 'today', path: '/today', label: '今日工作台', eyebrow: '持仓事项优先', icon: LayoutDashboard },
+  { id: 'portfolio', path: '/portfolio', label: '我的持仓', eyebrow: '私有手工账本', icon: BriefcaseBusiness },
+  { id: 'markets', path: '/markets/us/SYNTH-001', label: '市场与标的', eyebrow: '标的与证据', icon: Globe2 },
+  { id: 'rules', path: '/rules', label: '规则与策略', eyebrow: '确定性四态', icon: ListChecks },
+  { id: 'research', path: '/research', label: '研究驾驶舱', eyebrow: '正式研究隔离', icon: BookOpenCheck },
+  { id: 'records', path: '/records', label: '研究记录', eyebrow: '不可变版本', icon: FileClock },
+  { id: 'system', path: '/system', label: '数据与系统', eyebrow: '授权与健康', icon: Server },
 ]
 
-export function App({ readAdapter = browserReadAdapter, clock = systemClock, chartAdapter = undefined } = {}) {
-  const [activeView, setActiveView] = useState('research')
+/** @param {any} [appProps] */
+export function App(appProps = {}) {
+  const { initialPath = '/today', ...props } = appProps
+  return <WorkspaceApp {...props} initialPath={initialPath} />
+}
+
+function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = browserPersonalJourneyClient, clock = systemClock, chartAdapter = undefined, initialPath = null, browserHistory = false } = {}) {
+  const { pathname, navigate } = useWorkspaceRoute({ initialPath, browserHistory })
+  const activeView = routeView(pathname)
   const stockResearch = useStockResearch(readAdapter, {
-    aShareDetailEnabled: activeView === 'a-share',
-    usDetailEnabled: activeView === 'us-data',
+    aShareDetailEnabled: activeView === 'markets' && pathname.startsWith('/markets/a-share'),
+    usDetailEnabled: activeView === 'legacy-us-data',
   })
   const [health, setHealth] = useState(null)
   const [overview, setOverview] = useState(null)
@@ -150,11 +165,11 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
       }
     })
     const detailRequests = [Promise.resolve(stockListOutcome), Promise.resolve(usListOutcome)]
-    if (refreshSelected && activeView === 'a-share') {
+    if (refreshSelected && activeView === 'markets' && pathname.startsWith('/markets/a-share')) {
       detailRequests.push(stockResearch.aShare.refreshSelected())
       if (selectedCatalogRef.current.code) detailRequests.push(loadSelectedCatalogData(selectedCatalogRef.current))
     }
-    if (refreshSelected && activeView === 'us-data') detailRequests.push(stockResearch.us.refreshSelected())
+    if (refreshSelected && activeView === 'legacy-us-data') detailRequests.push(stockResearch.us.refreshSelected())
     if (refreshSelected && activeView === 'research') {
       detailRequests.push(refreshSelectedResearchData(selectedStrategyIdRef.current))
     }
@@ -352,11 +367,16 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
 
   return (
     <div className="app-frame">
-      <Sidebar activeView={activeView} onNavigate={setActiveView} readiness={readiness} />
+      <Sidebar activeView={activeView} onNavigate={navigate} readiness={readiness} />
       <div className="workspace">
         <Topbar activeView={activeView} health={health} loading={loading} lastUpdated={lastUpdated} onRefresh={() => refreshAll(true)} />
         <main className="workspace-main">
           {globalError ? <Notice tone="warning" title="部分数据暂不可用" text={globalError} /> : null}
+          {activeView === 'today' ? <PersonalTodayView client={personalClient} chartAdapter={chartAdapter} /> : null}
+          {activeView === 'portfolio' ? <PersonalPlaceholder title="我的持仓" description="手工真实持仓将在 T1 受控启用；本阶段不写入任何真实持仓。" /> : null}
+          {activeView === 'rules' ? <PersonalPlaceholder title="观察规则" description="T0 只展示 synthetic 四态；规则模板与历史将在 T2 交付。" /> : null}
+          {activeView === 'records' ? <PersonalPlaceholder title="研究记录" description="当前只能由今日工作台显式保存 synthetic record。" /> : null}
+          {activeView === 'markets' && !pathname.startsWith('/markets/a-share') ? <PersonalTodayView client={personalClient} chartAdapter={chartAdapter} /> : null}
           {activeView === 'research' ? (
             <ResearchCockpitView
               strategies={strategies}
@@ -372,7 +392,7 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
               error={researchError}
             />
           ) : null}
-          {activeView === 'a-share' ? (
+          {activeView === 'markets' && pathname.startsWith('/markets/a-share') ? (
             <AShareDataView
               coverageRows={coverageRows}
               readiness={readiness}
@@ -401,7 +421,7 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
               error={aShareResearch.error}
             />
           ) : null}
-          {activeView === 'us-data' ? (
+          {activeView === 'legacy-us-data' ? (
             <USDataBoundaryView
               usDb={usDb}
               usExperiment={usExperiment}
@@ -422,7 +442,7 @@ export function App({ readAdapter = browserReadAdapter, clock = systemClock, cha
               chartAdapter={chartAdapter}
             />
           ) : null}
-          {activeView === 'operations' ? <OperationsView health={health} readiness={readiness} coverageRows={coverageRows} overviewSnapshotAt={overview?.snapshotAt} syncRuns={syncRuns} /> : null}
+          {activeView === 'system' ? <OperationsView health={health} readiness={readiness} coverageRows={coverageRows} overviewSnapshotAt={overview?.snapshotAt} syncRuns={syncRuns} /> : null}
         </main>
       </div>
     </div>
@@ -438,11 +458,15 @@ function Sidebar({ activeView, onNavigate, readiness }) {
         <div><b>量化研究</b><small>量化研究工作台</small></div>
       </div>
       <nav className="side-nav" aria-label="主导航">
-        {NAV_ITEMS.map(({ id, label, eyebrow, icon: Icon }) => (
-          <button className={activeView === id ? 'active' : ''} key={id} onClick={() => onNavigate(id)} aria-current={activeView === id ? 'page' : undefined}>
+        {NAV_ITEMS.map(({ id, path, label, eyebrow, icon: Icon }) => (
+          <button className={activeView === id ? 'active' : ''} key={id} onClick={() => onNavigate(path)} aria-current={activeView === id ? 'page' : undefined}>
             <Icon size={18} /><span><small>{eyebrow}</small>{label}</span><ChevronRight size={14} />
           </button>
         ))}
+        <div className="market-subnav" aria-label="市场次级导航">
+          <button onClick={() => onNavigate('/markets/a-share/overview')}><BarChart3 size={14} /><span>A 股数据</span></button>
+          <button onClick={() => onNavigate('/legacy/us-data')}><Globe2 size={14} /><span>美股数据</span></button>
+        </div>
       </nav>
       <div className="sidebar-foot">
         <div className="sidebar-readiness">
@@ -456,7 +480,9 @@ function Sidebar({ activeView, onNavigate, readiness }) {
 }
 
 function Topbar({ activeView, health, loading, lastUpdated, onRefresh }) {
-  const current = NAV_ITEMS.find((item) => item.id === activeView) || NAV_ITEMS[0]
+  const current = activeView === 'legacy-us-data'
+    ? { eyebrow: '市场次级 · 实验边界', label: '美股数据' }
+    : NAV_ITEMS.find((item) => item.id === activeView) || NAV_ITEMS[0]
   return (
     <header className="topbar">
       <div className="page-identity"><span>{current.eyebrow}</span><h1>{current.label}</h1></div>
@@ -470,6 +496,39 @@ function Topbar({ activeView, health, loading, lastUpdated, onRefresh }) {
       </div>
     </header>
   )
+}
+
+function routeView(pathname) {
+  if (pathname === '/') return 'today'
+  if (pathname.startsWith('/today')) return 'today'
+  if (pathname.startsWith('/portfolio')) return 'portfolio'
+  if (pathname.startsWith('/markets/')) return 'markets'
+  if (pathname.startsWith('/rules')) return 'rules'
+  if (pathname.startsWith('/research') || pathname.startsWith('/strategies')) return 'research'
+  if (pathname.startsWith('/records')) return 'records'
+  if (pathname.startsWith('/system')) return 'system'
+  if (pathname.startsWith('/legacy/us-data')) return 'legacy-us-data'
+  return 'today'
+}
+
+function useWorkspaceRoute({ initialPath, browserHistory }) {
+  const requestedPath = initialPath || window.location.pathname
+  const [pathname, setPathname] = useState(requestedPath === '/' ? '/today' : requestedPath)
+
+  useEffect(() => {
+    if (!browserHistory) return undefined
+    if (window.location.pathname === '/') window.history.replaceState(null, '', '/today')
+    const handlePopState = () => setPathname(window.location.pathname)
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [browserHistory])
+
+  const navigate = useCallback((path) => {
+    if (browserHistory && window.location.pathname !== path) window.history.pushState(null, '', path)
+    setPathname(path)
+  }, [browserHistory])
+
+  return { pathname, navigate }
 }
 
 function SystemState({ label, value, healthy, icon: Icon }) {
@@ -521,5 +580,5 @@ const rootElement = document.getElementById('root')
 if (rootElement) {
   const appRoot = Reflect.get(window, '__quantResearchRoot') || createRoot(rootElement)
   Reflect.set(window, '__quantResearchRoot', appRoot)
-  appRoot.render(<App />)
+  appRoot.render(<WorkspaceApp browserHistory />)
 }

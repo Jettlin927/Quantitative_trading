@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index as SqlIndex,
     JSON,
+    LargeBinary,
     Numeric,
     String,
     Uuid,
@@ -20,7 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
-from .database import Base
+from .database import Base, PrivateBase
 
 
 RESEARCH_RUN_STATUS_VALUES = {
@@ -224,6 +225,108 @@ class StockSuspendEvent(Base):
     suspend_timing: Mapped[str] = mapped_column(String(40), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class PersonalWorkspace(PrivateBase):
+    __tablename__ = "personal_workspaces"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    actor_identity_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    revision: Mapped[int] = mapped_column(default=1, nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PersonalHolding(PrivateBase):
+    __tablename__ = "personal_holdings"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "symbol_hmac", name="uq_personal_holding_workspace_symbol"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    state: Mapped[str] = mapped_column(String(24), nullable=False)
+    symbol_hmac: Mapped[str] = mapped_column(String(64), nullable=False)
+    revision: Mapped[int] = mapped_column(default=1, nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PersonalRuleEvaluation(PrivateBase):
+    __tablename__ = "personal_rule_evaluations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    result_summary: Mapped[str] = mapped_column(String(64), nullable=False)
+    synthetic: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PersonalAnalysisDraft(PrivateBase):
+    __tablename__ = "personal_analysis_drafts"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "idempotency_hash", name="uq_personal_analysis_idempotency"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    preview_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    idempotency_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    synthetic: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PersonalResearchRecord(PrivateBase):
+    __tablename__ = "personal_research_records"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "idempotency_hash", name="uq_personal_record_idempotency"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    analysis_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_analysis_drafts.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    version: Mapped[int] = mapped_column(nullable=False)
+    state: Mapped[str] = mapped_column(String(24), nullable=False)
+    idempotency_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    synthetic: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class TradeCalendar(Base):

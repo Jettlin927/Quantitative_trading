@@ -28,6 +28,7 @@ class SyncWorkerPostgresTest(unittest.TestCase):
             raise AssertionError("worker 集成测试只允许本机 quant_worker_test 隔离库")
         cls.engine = create_engine(database_url, pool_pre_ping=True)
         with cls.engine.begin() as connection:
+            connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
             connection.execute(text("DROP SCHEMA public CASCADE"))
             connection.execute(text("CREATE SCHEMA public"))
         Base.metadata.create_all(cls.engine)
@@ -36,6 +37,7 @@ class SyncWorkerPostgresTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         with cls.engine.begin() as connection:
+            connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
             connection.execute(text("DROP SCHEMA public CASCADE"))
             connection.execute(text("CREATE SCHEMA public"))
         cls.engine.dispose()

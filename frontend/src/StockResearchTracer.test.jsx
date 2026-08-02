@@ -261,7 +261,7 @@ describe('股票研究 tracer', () => {
     expect(screen.getByRole('button', { name: /研究驾驶舱/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /A 股数据/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /美股数据/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /系统运维/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /数据与系统/ })).toBeInTheDocument()
     await waitFor(() => expect(signals).toHaveLength(1))
 
     view.unmount()

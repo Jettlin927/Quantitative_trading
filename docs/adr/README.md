@@ -8,3 +8,4 @@
 - [已发布研究不可覆盖](0004-published-research-is-immutable.md)
 - [新服务器通过并行验收接替生产](0005-new-server-replaces-production-safely.md)
 - [历史研究导入是来源记录，不是研究批准](0006-history-import-is-provenance-not-approval.md)
+- [个人工作台使用私有存储并与正式研究隔离](0007-personal-workbench-is-private-and-separated-from-formal-research.md)

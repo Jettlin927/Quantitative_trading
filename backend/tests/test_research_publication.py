@@ -3948,6 +3948,7 @@ class ResearchPublicationPostgresTest(ResearchPublicationTest):
             raise AssertionError("一致发布集成测试只允许本机 quant_worker_test 隔离库")
         cls.engine = create_engine(database_url, pool_pre_ping=True)
         with cls.engine.begin() as connection:
+            connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
             connection.execute(text("DROP SCHEMA public CASCADE"))
             connection.execute(text("CREATE SCHEMA public"))
         with cls.engine.connect() as connection:
@@ -3957,6 +3958,7 @@ class ResearchPublicationPostgresTest(ResearchPublicationTest):
     @classmethod
     def tearDownClass(cls) -> None:
         with cls.engine.begin() as connection:
+            connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
             connection.execute(text("DROP SCHEMA public CASCADE"))
             connection.execute(text("CREATE SCHEMA public"))
         cls.engine.dispose()

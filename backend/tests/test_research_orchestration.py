@@ -2220,6 +2220,7 @@ class ResearchWorkerPostgresTest(unittest.TestCase):
             )
         cls.engine = create_engine(database_url, pool_pre_ping=True)
         with cls.engine.begin() as connection:
+            connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
             connection.execute(text("DROP SCHEMA public CASCADE"))
             connection.execute(text("CREATE SCHEMA public"))
         with cls.engine.connect() as connection:
@@ -2229,6 +2230,7 @@ class ResearchWorkerPostgresTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         with cls.engine.begin() as connection:
+            connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
             connection.execute(text("DROP SCHEMA public CASCADE"))
             connection.execute(text("CREATE SCHEMA public"))
         cls.engine.dispose()

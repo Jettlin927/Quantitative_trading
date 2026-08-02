@@ -297,7 +297,7 @@ describe('研究驾驶舱', () => {
     expect(screen.getByRole('button', { name: /研究驾驶舱/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /A 股数据/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /美股数据/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /系统运维/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /数据与系统/ })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /美股数据/ }))
     expect(screen.getByRole('heading', { name: '美股日线实验数据已隔离接入' })).toBeInTheDocument()
@@ -315,7 +315,7 @@ describe('研究驾驶舱', () => {
   })
 
   it('分别展示运行成功事实、五态研究结论与原始 HTML 证据入口', async () => {
-    render(<App />)
+    render(<App initialPath="/research" />)
     await screen.findByRole('heading', { name: '横截面动量' })
     await screen.findByText('执行成功')
 
@@ -333,7 +333,7 @@ describe('研究驾驶舱', () => {
   })
 
   it('用同一发布分析投影展示规范指标、净值、回撤、成本和市场环境', async () => {
-    render(<App />)
+    render(<App initialPath="/research" />)
 
     expect(await screen.findByText('累计净收益')).toBeInTheDocument()
     expect(screen.getAllByText('-12.34%').length).toBeGreaterThan(0)
@@ -384,7 +384,7 @@ describe('研究驾驶舱', () => {
         return null
       },
     })
-    render(<App />)
+    render(<App initialPath="/research" />)
 
     expect(await screen.findByText('仅追溯，未按当前标准评价')).toBeInTheDocument()
     expect(screen.getByText(/缺失指标不会显示为 0/)).toBeInTheDocument()
@@ -400,7 +400,7 @@ describe('研究驾驶舱', () => {
       supporting_evidence: [{ statement: '待发布 v2 证据，不应展示' }],
     }
     installFetch({ detail: { ...researchDetail, evaluations: [...researchDetail.evaluations, nextEvaluation] } })
-    render(<App />)
+    render(<App initialPath="/research" />)
 
     await screen.findByText('OOS 净收益通过')
     expect(screen.queryByText('待发布 v2 证据，不应展示')).not.toBeInTheDocument()
@@ -408,7 +408,7 @@ describe('研究驾驶舱', () => {
   })
 
   it('全局刷新复用库存投影并重读策略、研究与发布，不在 API 请求内扫描整库', async () => {
-    render(<App />)
+    render(<App initialPath="/research" />)
     await screen.findByRole('link', { name: /打开原始 HTML 证据/ })
     const fetchMock = vi.mocked(globalThis.fetch)
     const before = {
@@ -441,7 +441,7 @@ describe('研究驾驶舱', () => {
         return null
       },
     })
-    render(<App />)
+    render(<App initialPath="/research" />)
     await screen.findByRole('link', { name: /打开原始 HTML 证据/ })
     failPublication = true
 
@@ -453,11 +453,11 @@ describe('研究驾驶舱', () => {
 
   it('研究 API 失败时保留其他只读区域可访问', async () => {
     installFetch({ failStrategies: true })
-    render(<App />)
+    render(<App initialPath="/research" />)
     await screen.findByText('研究表尚不可用')
     expect(screen.getByText('其他只读区域仍可继续浏览。')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /系统运维/ }))
+    fireEvent.click(screen.getByRole('button', { name: /数据与系统/ }))
     await waitFor(() => expect(screen.getByRole('heading', { name: '系统运维', level: 2 })).toBeInTheDocument())
     expect(screen.getByText('无写入控制')).toBeInTheDocument()
   })
