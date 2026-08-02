@@ -72,18 +72,34 @@ def traceable_context() -> EvidenceFetchContext:
         qualification=EvidenceQualification.TRACEABLE_HISTORY,
         authorization=SourceAuthorization(
             snapshot_id="auth-sec-fixture-v1",
+            source="official_primary",
+            dataset="synthetic_official_fixture",
+            plan="frozen_scripted_adapter",
             display=True,
             internal_analysis=True,
             ai_context=True,
             persist=True,
+            backfill=True,
+            redistribute=False,
             formal_research=False,
             terms_url="https://www.sec.gov/privacy.htm",
             checked_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+            retention_policy="按来源条款保留",
+            evidence_sha256="a" * 64,
         ),
     )
 
 
 class OfficialEvidenceAdaptersTest(unittest.TestCase):
+    def test_authorization_snapshot_requires_auditable_time_and_evidence_hash(self) -> None:
+        authorization = traceable_context().authorization
+        with self.assertRaisesRegex(ValueError, "checked_at_requires_timezone"):
+            replace(authorization, checked_at=datetime(2026, 8, 1))
+        with self.assertRaisesRegex(
+            ValueError, "authorization_evidence_sha256_invalid"
+        ):
+            replace(authorization, evidence_sha256="not-a-digest")
+
     def test_issuer_ir_preserves_independent_release_metadata(self) -> None:
         body = (FIXTURES / "issuer_ir_malicious.html").read_bytes()
         url = "https://investor.synthetic.example/releases/q2-2026.html"
@@ -157,6 +173,9 @@ class OfficialEvidenceAdaptersTest(unittest.TestCase):
         self.assertEqual(document.revision, "0000000123-26-000001")
         self.assertFalse(document.authorization.formal_research)
         self.assertTrue(document.authorization.ai_context)
+        self.assertFalse(document.authorization.redistribute)
+        self.assertEqual(document.authorization.source, "official_primary")
+        self.assertEqual(len(document.authorization.evidence_sha256), 64)
         self.assertEqual(document.qualification, EvidenceQualification.TRACEABLE_HISTORY)
         self.assertEqual(document.health, SourceHealth.FRESH)
         self.assertEqual(batch.events[0].document_identity, document.identity)

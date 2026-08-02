@@ -27,13 +27,29 @@ class EvidenceQualification(str, Enum):
 @dataclass(frozen=True)
 class SourceAuthorization:
     snapshot_id: str
+    source: str
+    dataset: str
+    plan: str
     display: bool
     internal_analysis: bool
     ai_context: bool
     persist: bool
+    backfill: bool
+    redistribute: bool
     formal_research: bool
     terms_url: str
     checked_at: datetime
+    retention_policy: str
+    evidence_sha256: str
+
+    def __post_init__(self) -> None:
+        if self.checked_at.tzinfo is None:
+            raise ValueError("checked_at_requires_timezone")
+        if len(self.evidence_sha256) != 64 or any(
+            character not in "0123456789abcdef"
+            for character in self.evidence_sha256
+        ):
+            raise ValueError("authorization_evidence_sha256_invalid")
 
 
 @dataclass(frozen=True)
