@@ -74,6 +74,21 @@ _BLS_QUERY_FIELDS = frozenset(
         "authorization_snapshot_id",
     }
 )
+_FROZEN_QUERY_FIELDS = frozenset(
+    {
+        "query_id",
+        "subject_id",
+        "kind",
+        "source",
+        "dataset",
+        "evidence_id",
+        "field",
+        "excerpt",
+        "content_sha256",
+        "as_of",
+        "authorization_snapshot_id",
+    }
+)
 _RELEASE_FIELDS = frozenset(
     {
         "published_at",
@@ -123,6 +138,20 @@ class _BlsRuntimeQuery:
     start_year: int
     end_year: int
     release: ReleaseMetadata
+    authorization: SourceAuthorization
+
+
+@dataclass(frozen=True)
+class _FrozenOfficialRuntimeQuery:
+    query_id: str
+    subject_id: str
+    source: str
+    dataset: str
+    evidence_id: str
+    field: str
+    excerpt: str
+    content_sha256: str
+    as_of: datetime
     authorization: SourceAuthorization
 
 
@@ -188,7 +217,12 @@ class OfficialAnalysisEvidenceReader:
         self,
         *,
         config_revision: str,
-        queries: tuple[_SecCompanyFactsRuntimeQuery | _BlsRuntimeQuery, ...],
+        queries: tuple[
+            _SecCompanyFactsRuntimeQuery
+            | _BlsRuntimeQuery
+            | _FrozenOfficialRuntimeQuery,
+            ...,
+        ],
         sec_user_agent: str,
         transport: OfficialEvidenceTransport,
         clock: Callable[[], datetime],
@@ -231,9 +265,29 @@ class OfficialAnalysisEvidenceReader:
         )
 
     def _read_one(
-        self, query: _SecCompanyFactsRuntimeQuery | _BlsRuntimeQuery
+        self,
+        query: _SecCompanyFactsRuntimeQuery
+        | _BlsRuntimeQuery
+        | _FrozenOfficialRuntimeQuery,
     ) -> EvidenceCandidate | None:
         now = self._clock()
+        if isinstance(query, _FrozenOfficialRuntimeQuery):
+            if query.as_of > now:
+                return None
+            return EvidenceCandidate(
+                evidence_id=query.evidence_id,
+                kind=(
+                    "official_company_fact"
+                    if query.field == "official_facts"
+                    else "official_macro_fact"
+                ),
+                source=query.source,
+                field=query.field,
+                excerpt=query.excerpt,
+                content_sha256=query.content_sha256,
+                authorized_for_ai=True,
+                as_of=query.as_of,
+            )
         context = EvidenceFetchContext(
             fetched_at=now,
             health=SourceHealth.FRESH,
@@ -405,7 +459,10 @@ def _parse_queries(
     payload: Mapping[str, Any],
     *,
     authorizations: Mapping[str, SourceAuthorization],
-) -> tuple[_SecCompanyFactsRuntimeQuery | _BlsRuntimeQuery, ...]:
+) -> tuple[
+    _SecCompanyFactsRuntimeQuery | _BlsRuntimeQuery | _FrozenOfficialRuntimeQuery,
+    ...,
+]:
     raw_queries = payload.get("queries")
     if not isinstance(raw_queries, list):
         raise _ConfigError("official_evidence_config_unavailable")
@@ -470,6 +527,35 @@ def _parse_queries(
                         vintage=_clean_text(release, "vintage"),
                         revision=_clean_text(release, "revision"),
                     ),
+                    authorization=authorization,
+                )
+            )
+        elif kind == "frozen_official_fact":
+            if set(raw) != _FROZEN_QUERY_FIELDS:
+                raise _ConfigError("official_evidence_config_unavailable")
+            source = _clean_text(raw, "source")
+            dataset = _clean_text(raw, "dataset")
+            excerpt = _clean_text(raw, "excerpt")
+            content_sha256 = _clean_text(raw, "content_sha256")
+            field = _clean_text(raw, "field")
+            if (
+                source != authorization.source
+                or dataset != authorization.dataset
+                or field not in {"official_facts", "macro_facts"}
+                or sha256(excerpt.encode("utf-8")).hexdigest() != content_sha256
+            ):
+                raise _ConfigError("official_evidence_config_unavailable")
+            parsed.append(
+                _FrozenOfficialRuntimeQuery(
+                    query_id=query_id,
+                    subject_id=subject_id,
+                    source=source,
+                    dataset=dataset,
+                    evidence_id=_clean_text(raw, "evidence_id"),
+                    field=field,
+                    excerpt=excerpt,
+                    content_sha256=content_sha256,
+                    as_of=_parse_time(_clean_text(raw, "as_of")),
                     authorization=authorization,
                 )
             )
