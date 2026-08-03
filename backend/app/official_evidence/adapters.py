@@ -173,6 +173,8 @@ class SecCompanyFactsAdapter:
             accession = str(item["accn"])
             published_at = availability_by_accession.get(accession)
             if published_at is None:
+                if query.only_mapped_accessions:
+                    continue
                 raise EvidenceAdapterError(
                     "accession_availability_missing",
                     "SEC company fact 缺少 accession 的精确可得时间",

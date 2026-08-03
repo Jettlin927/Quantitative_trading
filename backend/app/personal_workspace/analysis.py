@@ -105,6 +105,12 @@ class EvidenceCandidate:
 
 
 @dataclass(frozen=True)
+class EvidenceReadResult:
+    candidates: tuple[EvidenceCandidate, ...]
+    gaps: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class FrozenEvidence:
     evidence_id: str
     kind: str
@@ -112,6 +118,14 @@ class FrozenEvidence:
     field: str
     excerpt: str
     content_sha256: str
+    as_of: datetime
+
+
+@dataclass(frozen=True)
+class EvidencePreview:
+    evidence_id: str
+    source: str
+    field: str
     as_of: datetime
 
 
@@ -134,6 +148,7 @@ class AnalysisDraftReceipt:
     expires_at: datetime
     consumed_at: datetime | None
     evidence_ids: tuple[str, ...]
+    evidence: tuple[EvidencePreview, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1086,7 +1101,10 @@ class AnalysisWorkspace:
         self,
         *,
         store: AnalysisStore,
-        evidence_reader: Callable[[PersonalActor, AnalysisIntent], tuple[EvidenceCandidate, ...]],
+        evidence_reader: Callable[
+            [PersonalActor, AnalysisIntent],
+            tuple[EvidenceCandidate, ...] | EvidenceReadResult,
+        ],
         provider: ResponsesAdapter,
         clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
         model: str = DEEPSEEK_MODEL,
@@ -1118,7 +1136,13 @@ class AnalysisWorkspace:
         question = intent.question.strip()
         if not question or not intent.subject_ids:
             raise ValueError("invalid_command")
-        candidates = self._evidence_reader(actor, intent)
+        evidence_result = self._evidence_reader(actor, intent)
+        if isinstance(evidence_result, EvidenceReadResult):
+            candidates = evidence_result.candidates
+            reader_gaps = evidence_result.gaps
+        else:
+            candidates = evidence_result
+            reader_gaps = ()
         allowed: list[FrozenEvidence] = []
         excluded: list[ExcludedAnalysisField] = []
         included_fields = ["user_question"]
@@ -1150,7 +1174,9 @@ class AnalysisWorkspace:
             )
             if item.field not in included_fields:
                 included_fields.append(item.field)
-        gaps = () if allowed else ("no_authorized_evidence",)
+        gaps = tuple(dict.fromkeys(reader_gaps))
+        if not allowed and not gaps:
+            gaps = ("no_authorized_evidence",)
         now = self._clock()
         draft_id = str(uuid4())
         provider_request = _responses_request(
@@ -1169,6 +1195,8 @@ class AnalysisWorkspace:
             "evidence": [
                 {
                     "evidence_id": item.evidence_id,
+                    "source": item.source,
+                    "field": item.field,
                     "content_sha256": item.content_sha256,
                     "as_of": item.as_of.isoformat(),
                 }
@@ -1195,6 +1223,15 @@ class AnalysisWorkspace:
             expires_at=now + self._preview_ttl,
             consumed_at=None,
             evidence_ids=tuple(item.evidence_id for item in allowed),
+            evidence=tuple(
+                EvidencePreview(
+                    evidence_id=item.evidence_id,
+                    source=item.source,
+                    field=item.field,
+                    as_of=item.as_of,
+                )
+                for item in allowed
+            ),
         )
         stored = self._store.save_draft(
             StoredAnalysisDraft(
@@ -1215,11 +1252,13 @@ class AnalysisWorkspace:
         preview_sha256: str,
         idempotency_key: str,
     ) -> AnalysisRunView:
-        if not self._provider.available:
-            raise ValueError("provider_unavailable")
         draft = self._store.get_draft(actor.actor_id, draft_id)
         if draft is None:
             raise ValueError("private_object_not_found")
+        if draft.receipt.gaps or not draft.evidence:
+            raise ValueError("evidence_insufficient")
+        if not self._provider.available:
+            raise ValueError("provider_unavailable")
         projected_cost = self._monthly_spend_reader(actor, self._clock()) + Decimal(
             draft.receipt.estimated_cost_usd
         )
@@ -1487,6 +1526,13 @@ def _append_event(
 
 def _stored_draft_payload(draft: StoredAnalysisDraft) -> dict[str, Any]:
     receipt = asdict(draft.receipt)
+    receipt["evidence"] = [
+        {
+            **item,
+            "as_of": item["as_of"].isoformat(),
+        }
+        for item in receipt["evidence"]
+    ]
     receipt["expires_at"] = draft.receipt.expires_at.isoformat()
     receipt["consumed_at"] = (
         draft.receipt.consumed_at.isoformat()
@@ -1541,6 +1587,15 @@ def _stored_draft_from_payload(
             else None
         ),
         evidence_ids=tuple(receipt_payload["evidence_ids"]),
+        evidence=tuple(
+            EvidencePreview(
+                evidence_id=item["evidence_id"],
+                source=item["source"],
+                field=item["field"],
+                as_of=datetime.fromisoformat(item["as_of"]),
+            )
+            for item in receipt_payload.get("evidence", ())
+        ),
     )
     intent_payload = payload["intent"]
     return StoredAnalysisDraft(

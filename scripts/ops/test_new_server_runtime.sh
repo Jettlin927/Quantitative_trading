@@ -51,7 +51,9 @@ touch \
   "$TEST_ROOT/personal-keyring.json" \
   "$TEST_ROOT/deepseek-credentials.json" \
   "$TEST_ROOT/alpaca-credentials.json" \
-  "$TEST_ROOT/alpaca-authorization.json"
+  "$TEST_ROOT/alpaca-authorization.json" \
+  "$TEST_ROOT/official-analysis-queries.json" \
+  "$TEST_ROOT/official-analysis-authorization.json"
 
 POSTGRES_PASSWORD=compose-config-only \
 POSTGRES_DATA_DIR="$TEST_ROOT/postgres" \
@@ -140,6 +142,9 @@ PERSONAL_DATA_KEYRING_HOST_FILE="$TEST_ROOT/personal-keyring.json" \
 PERSONAL_ALLOWED_ORIGINS='http://127.0.0.1:25173' \
 ALPACA_CREDENTIALS_HOST_FILE="$TEST_ROOT/alpaca-credentials.json" \
 ALPACA_AUTHORIZATION_HOST_FILE="$TEST_ROOT/alpaca-authorization.json" \
+OFFICIAL_ANALYSIS_QUERY_HOST_FILE="$TEST_ROOT/official-analysis-queries.json" \
+OFFICIAL_ANALYSIS_AUTHORIZATION_HOST_FILE="$TEST_ROOT/official-analysis-authorization.json" \
+SEC_USER_AGENT='QuantitativeTrading compose@example.invalid' \
 docker compose \
   --env-file /dev/null \
   --file "$REPO_ROOT/docker-compose.yml" \
@@ -160,6 +165,9 @@ PERSONAL_ANALYSIS_PROVIDER='deepseek' \
 PERSONAL_ALLOWED_ORIGINS='http://127.0.0.1:25173' \
 ALPACA_CREDENTIALS_HOST_FILE="$TEST_ROOT/alpaca-credentials.json" \
 ALPACA_AUTHORIZATION_HOST_FILE="$TEST_ROOT/alpaca-authorization.json" \
+OFFICIAL_ANALYSIS_QUERY_HOST_FILE="$TEST_ROOT/official-analysis-queries.json" \
+OFFICIAL_ANALYSIS_AUTHORIZATION_HOST_FILE="$TEST_ROOT/official-analysis-authorization.json" \
+SEC_USER_AGENT='QuantitativeTrading compose@example.invalid' \
 docker compose \
   --profile research-automation \
   --profile personal-ai \
@@ -190,6 +198,13 @@ assert api["environment"]["PERSONAL_DATA_KEYRING_FILE"] == "/run/secrets/persona
 assert api["environment"]["PERSONAL_ALLOWED_ORIGINS"] == "http://127.0.0.1:25173"
 assert api["environment"]["ALPACA_CREDENTIALS_FILE"] == "/run/secrets/alpaca-credentials.json"
 assert api["environment"]["ALPACA_AUTHORIZATION_FILE"] == "/run/config/alpaca-authorization.json"
+assert api["environment"]["OFFICIAL_ANALYSIS_QUERY_FILE"] == (
+    "/run/config/official-analysis-queries.json"
+)
+assert api["environment"]["OFFICIAL_ANALYSIS_AUTHORIZATION_FILE"] == (
+    "/run/config/official-analysis-authorization.json"
+)
+assert api["environment"]["SEC_USER_AGENT"] == "QuantitativeTrading compose@example.invalid"
 assert api["environment"]["PERSONAL_ANALYSIS_PROVIDER"] == "deepseek"
 assert api["environment"]["DEEPSEEK_MONTHLY_SOFT_BUDGET_USD"] == "5"
 
@@ -199,6 +214,8 @@ expected_secrets = {
     "/run/secrets/personal-keyring.json": test_root / "personal-keyring.json",
     "/run/secrets/alpaca-credentials.json": test_root / "alpaca-credentials.json",
     "/run/config/alpaca-authorization.json": test_root / "alpaca-authorization.json",
+    "/run/config/official-analysis-queries.json": test_root / "official-analysis-queries.json",
+    "/run/config/official-analysis-authorization.json": test_root / "official-analysis-authorization.json",
 }
 for target, source in expected_secrets.items():
     mount = mounts[target]
@@ -212,6 +229,15 @@ alpaca_targets = {
     "/run/secrets/alpaca-credentials.json",
     "/run/config/alpaca-authorization.json",
 }
+official_environment = {
+    "OFFICIAL_ANALYSIS_QUERY_FILE",
+    "OFFICIAL_ANALYSIS_AUTHORIZATION_FILE",
+    "SEC_USER_AGENT",
+}
+official_targets = {
+    "/run/config/official-analysis-queries.json",
+    "/run/config/official-analysis-authorization.json",
+}
 for service_name, service in services.items():
     if service_name == "api":
         continue
@@ -219,6 +245,8 @@ for service_name, service in services.items():
     assert alpaca_environment.isdisjoint(environment), service_name
     targets = {mount["target"] for mount in service.get("volumes", [])}
     assert targets.isdisjoint(alpaca_targets), (service_name, targets)
+    assert official_environment.isdisjoint(environment), service_name
+    assert targets.isdisjoint(official_targets), (service_name, targets)
 
 for service_name in ("worker", "research-worker"):
     service = services[service_name]

@@ -149,9 +149,13 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) 
           <div><h3>强制排除字段</h3><ul>{preview.excluded_fields.map((item) => <li key={item.field}><Ban size={14} /><span>{item.field}<small>{item.reason_code}</small></span></li>)}</ul></div>
           <div><h3>仍缺证据</h3><ul>{preview.gaps.length ? preview.gaps.map((gap) => <li key={gap}><AlertTriangle size={14} />{gap}</li>) : <li><Check size={14} />未识别缺口</li>}</ul></div>
         </div>
+        <div className="analysis-preview-evidence">
+          <h3>冻结官方证据</h3>
+          <ul>{(preview.evidence || []).length ? preview.evidence.map((item) => <li key={item.evidence_id}><Check size={14} />{item.evidence_id} · {item.source} · {item.field} · as-of {new Date(item.as_of).toLocaleString('zh-CN')}</li>) : <li><AlertTriangle size={14} />没有可外发的合格官方证据</li>}</ul>
+        </div>
         <div className="analysis-confirm-row">
           <label><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />确认 preview {preview.preview_sha256.slice(0, 8)} 的 provider、字段、排除项、保留政策与费用</label>
-          <button className="primary-action" disabled={!confirmed || busy || Boolean(run)} onClick={start}><Play size={15} />确认外发并开始分析</button>
+          <button className="primary-action" disabled={!confirmed || busy || Boolean(run) || preview.gaps.length > 0 || !(preview.evidence || []).length} onClick={start}><Play size={15} />确认外发并开始分析</button>
         </div>
       </section> : null}
 

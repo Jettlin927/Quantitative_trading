@@ -95,6 +95,7 @@ class SecCompanyFactsQuery:
     tag: str
     unit: str
     accession_availability: tuple[SecAccessionAvailability, ...]
+    only_mapped_accessions: bool = False
 
 
 @dataclass(frozen=True)

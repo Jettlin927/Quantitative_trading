@@ -495,6 +495,7 @@ def _raise_domain_error(error: ValueError) -> None:
         "purge_challenge_invalid",
         "purge_challenge_expired",
         "analysis_not_saveable",
+        "evidence_insufficient",
     }:
         status_code = 409
     elif code in {"budget_blocked", "provider_rate_limited"}:

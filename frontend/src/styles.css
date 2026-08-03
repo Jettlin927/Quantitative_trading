@@ -3875,6 +3875,10 @@ button:disabled {
 .analysis-preview-meta span:last-child { border-right: 0; }
 .analysis-preview .preview-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .analysis-preview .preview-columns > div { min-height: 150px; }
+.analysis-preview-evidence { border-top: 1px solid var(--line-soft); padding: 11px 14px; background: #f8fbfc; }
+.analysis-preview-evidence h3 { margin: 0 0 7px; color: var(--ink-soft); font-size: 10px; letter-spacing: .08em; }
+.analysis-preview-evidence ul { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.analysis-preview-evidence li { display: flex; align-items: center; gap: 7px; overflow-wrap: anywhere; color: #355968; font: 600 9px/1.5 Consolas, monospace; }
 .analysis-confirm-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid var(--line); padding: 12px 15px; }
 .analysis-confirm-row label { display: flex; align-items: flex-start; gap: 8px; color: #435f6b; font-size: 9px; line-height: 1.5; }
 .analysis-confirm-row input { width: 15px; height: 15px; accent-color: var(--cyan); }
