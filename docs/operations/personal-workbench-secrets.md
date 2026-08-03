@@ -49,10 +49,18 @@ API 只接收非 secret 的 `PERSONAL_ANALYSIS_PROVIDER` 状态；缺省或其�
 
 ## 官方证据查询与用途授权
 
-API 只支持两类固定、无凭据的首期查询：SEC `companyfacts` 与 BLS series。查询清单按
-`subject_id` 选择公司事实，`subject_id="*"` 选择所有问题共享的宏观事实；不得配置任意
-URL、任意请求方法或自定义 header。SEC 查询先读取固定 submissions endpoint 取得
-accession 的精确可得时间，再读取固定 companyfacts endpoint；BLS 只读取固定公开 API。
+API 的在线读取只支持两类固定、无凭据的首期查询：SEC `companyfacts` 与 BLS series。
+查询清单按 `subject_id` 选择公司事实，`subject_id="*"` 选择所有问题共享的宏观事实；
+不得配置任意 URL、任意请求方法或自定义 header。SEC 查询先读取固定 submissions
+endpoint 取得 accession 的精确可得时间，再读取固定 companyfacts endpoint；BLS 只
+读取固定公开 API。
+
+当生产服务器无法直接访问上述官方端点时，查询清单也允许
+`kind="frozen_official_fact"`。该类型只能保存从官方来源取得的最小事实摘录，并必须同时
+固定 `source`、`dataset`、`evidence_id`、`field`、`excerpt`、`content_sha256`、`as_of`
+和用途授权快照；`field` 只允许 `official_facts` 或 `macro_facts`。内容哈希、来源与授权
+不一致，或 `as_of` 晚于当前时间时必须 fail-closed。冻结事实不包含 URL、请求头、凭据、
+持仓或 provider payload，也不授权把非官方数据改名为官方证据。
 
 查询文件与授权文件都是 schema version 1 的 JSON 对象，顶层必须包含 `checked_at`、
 `expires_at` 和 `content_sha256`。哈希口径为：移除顶层 `content_sha256` 后，对剩余对象按
