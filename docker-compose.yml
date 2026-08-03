@@ -33,7 +33,8 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-quant}:${POSTGRES_PASSWORD:-quant_password}@db:5432/${POSTGRES_DB:-quant_trading}
+      DATABASE_URL: ${API_DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-quant}:${POSTGRES_PASSWORD:-quant_password}@db:5432/${POSTGRES_DB:-quant_trading}}
+      PRIVATE_DATABASE_URL: ${PRIVATE_DATABASE_URL:-}
       TUSHARE_TOKEN: ${TUSHARE_TOKEN:-}
       DEEPSEEK_TOKEN: ${DEEPSEEK_TOKEN:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
@@ -67,7 +68,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-quant}:${POSTGRES_PASSWORD:-quant_password}@db:5432/${POSTGRES_DB:-quant_trading}
+      DATABASE_URL: ${SYNC_WORKER_DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-quant}:${POSTGRES_PASSWORD:-quant_password}@db:5432/${POSTGRES_DB:-quant_trading}}
       TUSHARE_TOKEN: ${TUSHARE_TOKEN:-}
       DEEPSEEK_TOKEN: ${DEEPSEEK_TOKEN:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
@@ -102,7 +103,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-quant}:${POSTGRES_PASSWORD:-quant_password}@db:5432/${POSTGRES_DB:-quant_trading}
+      DATABASE_URL: ${RESEARCH_WORKER_DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-quant}:${POSTGRES_PASSWORD:-quant_password}@db:5432/${POSTGRES_DB:-quant_trading}}
       APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
       APP_GIT_REF: ${APP_GIT_REF:-unknown}
       GITHUB_REPOSITORY: ${GITHUB_REPOSITORY:-Jettlin927/Quantitative_trading}
