@@ -5,6 +5,8 @@ services:
       PERSONAL_GATEWAY_TOKEN_FILE: /run/secrets/personal-gateway-token
       PERSONAL_DATA_KEYRING_FILE: /run/secrets/personal-keyring.json
       PERSONAL_ALLOWED_ORIGINS: ${PERSONAL_ALLOWED_ORIGINS:?启用个人工作台前必须配置 PERSONAL_ALLOWED_ORIGINS}
+      ALPACA_CREDENTIALS_FILE: /run/secrets/alpaca-credentials.json
+      ALPACA_AUTHORIZATION_FILE: /run/config/alpaca-authorization.json
     volumes:
       - type: bind
         source: ${PERSONAL_GATEWAY_TOKEN_HOST_FILE:?启用个人工作台前必须配置 PERSONAL_GATEWAY_TOKEN_HOST_FILE}
@@ -15,6 +17,18 @@ services:
       - type: bind
         source: ${PERSONAL_DATA_KEYRING_HOST_FILE:?启用个人工作台前必须配置 PERSONAL_DATA_KEYRING_HOST_FILE}
         target: /run/secrets/personal-keyring.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ALPACA_CREDENTIALS_HOST_FILE:?启用 Alpaca 行情前必须配置 ALPACA_CREDENTIALS_HOST_FILE}
+        target: /run/secrets/alpaca-credentials.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ALPACA_AUTHORIZATION_HOST_FILE:?启用 Alpaca 行情前必须配置 ALPACA_AUTHORIZATION_HOST_FILE}
+        target: /run/config/alpaca-authorization.json
         read_only: true
         bind:
           create_host_path: false

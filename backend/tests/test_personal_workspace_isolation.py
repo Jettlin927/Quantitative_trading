@@ -43,6 +43,8 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
             "PRIVATE_DATABASE_URL",
             "PERSONAL_DATA_KEYRING_FILE",
             "OPENAI_API_KEY",
+            "ALPACA_CREDENTIALS_FILE",
+            "ALPACA_AUTHORIZATION_FILE",
         }
 
         violations = {}
@@ -60,6 +62,8 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
             "PERSONAL_GATEWAY_TOKEN_FILE",
             "PERSONAL_DATA_KEYRING_FILE",
             "OPENAI_API_KEY",
+            "ALPACA_CREDENTIALS_FILE",
+            "ALPACA_AUTHORIZATION_FILE",
         }
         for service_name in ("worker", "research-worker"):
             environment = compose["services"][service_name].get("environment", {})
@@ -69,6 +73,8 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
         forbidden = {
             "OPENAI_API_KEY",
             "ALPACA_MARKET_DATA_SECRET_KEY",
+            "ALPACA_CREDENTIALS_FILE",
+            "ALPACA_AUTHORIZATION_FILE",
             "PERSONAL_DATA_KEYRING_FILE",
             "X-Personal-Gateway",
         }

@@ -48,7 +48,9 @@ mkdir -p \
   "$TEST_ROOT/research-artifacts"
 touch \
   "$TEST_ROOT/personal-gateway-token" \
-  "$TEST_ROOT/personal-keyring.json"
+  "$TEST_ROOT/personal-keyring.json" \
+  "$TEST_ROOT/alpaca-credentials.json" \
+  "$TEST_ROOT/alpaca-authorization.json"
 
 POSTGRES_PASSWORD=compose-config-only \
 POSTGRES_DATA_DIR="$TEST_ROOT/postgres" \
@@ -133,6 +135,8 @@ PRIVATE_DATABASE_URL='postgresql+psycopg://quant_personal_api:compose-only@db:54
 PERSONAL_GATEWAY_TOKEN_HOST_FILE="$TEST_ROOT/personal-gateway-token" \
 PERSONAL_DATA_KEYRING_HOST_FILE="$TEST_ROOT/personal-keyring.json" \
 PERSONAL_ALLOWED_ORIGINS='http://127.0.0.1:25173' \
+ALPACA_CREDENTIALS_HOST_FILE="$TEST_ROOT/alpaca-credentials.json" \
+ALPACA_AUTHORIZATION_HOST_FILE="$TEST_ROOT/alpaca-authorization.json" \
 docker compose \
   --profile research-automation \
   --env-file /dev/null \
@@ -160,11 +164,15 @@ assert api["environment"]["PRIVATE_DATABASE_URL"] == (
 assert api["environment"]["PERSONAL_GATEWAY_TOKEN_FILE"] == "/run/secrets/personal-gateway-token"
 assert api["environment"]["PERSONAL_DATA_KEYRING_FILE"] == "/run/secrets/personal-keyring.json"
 assert api["environment"]["PERSONAL_ALLOWED_ORIGINS"] == "http://127.0.0.1:25173"
+assert api["environment"]["ALPACA_CREDENTIALS_FILE"] == "/run/secrets/alpaca-credentials.json"
+assert api["environment"]["ALPACA_AUTHORIZATION_FILE"] == "/run/config/alpaca-authorization.json"
 
 mounts = {mount["target"]: mount for mount in api.get("volumes", [])}
 expected_secrets = {
     "/run/secrets/personal-gateway-token": test_root / "personal-gateway-token",
     "/run/secrets/personal-keyring.json": test_root / "personal-keyring.json",
+    "/run/secrets/alpaca-credentials.json": test_root / "alpaca-credentials.json",
+    "/run/config/alpaca-authorization.json": test_root / "alpaca-authorization.json",
 }
 for target, source in expected_secrets.items():
     mount = mounts[target]
@@ -172,6 +180,19 @@ for target, source in expected_secrets.items():
     assert Path(mount["source"]).resolve() == source, mount
     assert mount["read_only"] is True, mount
     assert mount.get("bind", {}).get("create_host_path") in (None, False), mount
+
+alpaca_environment = {"ALPACA_CREDENTIALS_FILE", "ALPACA_AUTHORIZATION_FILE"}
+alpaca_targets = {
+    "/run/secrets/alpaca-credentials.json",
+    "/run/config/alpaca-authorization.json",
+}
+for service_name, service in services.items():
+    if service_name == "api":
+        continue
+    environment = service.get("environment", {})
+    assert alpaca_environment.isdisjoint(environment), service_name
+    targets = {mount["target"] for mount in service.get("volumes", [])}
+    assert targets.isdisjoint(alpaca_targets), (service_name, targets)
 
 for service_name in ("worker", "research-worker"):
     service = services[service_name]
