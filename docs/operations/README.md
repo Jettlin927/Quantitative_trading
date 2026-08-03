@@ -6,6 +6,7 @@
 - [远端 Docker 只读巡检](remote-docker-inspection.md)
 - [生产服务器安全容器运行环境](new-server-runtime.md)
 - [生产服务器部署、受控变更与家庭电脑访问](production-deployment-and-home-access.md)
+- [生产 PostgreSQL 运行角色与私有权限](production-postgres-runtime-roles.md)
 - [GitHub 研究计划与服务端编排器](research-orchestrator.md)
 - [远程访问决策：仅使用 SSH 隧道](private-https-authentication-decision.md)
 - [研究评价一致发布与恢复](research-publication.md)
