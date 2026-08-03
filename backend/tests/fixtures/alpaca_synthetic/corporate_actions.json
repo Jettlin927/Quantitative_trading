@@ -1,0 +1,32 @@
+{
+  "corporate_actions": {
+    "forward_splits": [
+      {
+        "id": "00000000-0000-0000-0000-000000000144",
+        "cusip": "SYNTHCUSIP",
+        "symbol": "SYNTH",
+        "new_rate": 2,
+        "old_rate": 1,
+        "process_date": "2026-07-31",
+        "ex_date": "2026-07-31",
+        "record_date": "2026-07-30",
+        "payable_date": "2026-07-31"
+      }
+    ],
+    "cash_dividends": [
+      {
+        "id": "00000000-0000-0000-0000-000000000145",
+        "cusip": "SYNTHCUSIP",
+        "symbol": "SYNTH",
+        "rate": 0.125,
+        "special": false,
+        "foreign": false,
+        "process_date": "2026-07-25",
+        "ex_date": "2026-07-24",
+        "record_date": "2026-07-24",
+        "payable_date": "2026-08-01"
+      }
+    ]
+  },
+  "next_page_token": null
+}
