@@ -4,6 +4,17 @@
 
 它不是交易系统：不连接券商或真实账户，不导入真实持仓与成交，不下单，也不把研究结果写成投资建议或收益承诺。
 
+## 工程概览
+
+| 能力 | 实现 |
+|---|---|
+| 数据与研究 | 实际市场数据同步、point-in-time 研究、冻结运行与证据化结论 |
+| 应用架构 | React 前端、FastAPI API、独立 Worker、PostgreSQL 16 |
+| 工程质量 | SQLAlchemy 2.0、Alembic、前后端测试、PostgreSQL 集成验证 |
+| 交付运维 | Docker Compose、生产镜像门禁、SSH 私有访问、可回读部署证据 |
+
+[架构文档](docs/architecture/) · [研究合同](docs/research/contracts/) · [开发验证](#开发验证) · [运维手册](docs/operations/)
+
 ## 产品边界
 
 系统允许：
