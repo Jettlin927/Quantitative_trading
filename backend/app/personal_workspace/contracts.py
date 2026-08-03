@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from .portfolio import PortfolioView
+    from .rules import AttentionItem
 
 
 @dataclass(frozen=True)
@@ -104,6 +106,7 @@ class TodayWorkspace:
     trace: SyntheticTraceView | None
     record: SyntheticRecordView | None
     portfolio: PortfolioView | None = None
+    attention_items: tuple[AttentionItem, ...] = ()
 
     def __getattr__(self, name: str):
         if self.trace is None:
@@ -164,3 +167,23 @@ class PurgeHoldingCommand(PortfolioCommand):
     type: Literal["confirm_purge"] = "confirm_purge"
     holding_id: str = Field(min_length=1, max_length=64)
     challenge: str = Field(min_length=1, max_length=2000)
+
+
+class CreateObservationRuleCommand(BaseModel):
+    type: Literal["create_rule"]
+    template_id: str = Field(min_length=1, max_length=64)
+    symbol: str = Field(min_length=1, max_length=15)
+    parameters: dict[str, Any]
+
+
+class SetObservationRuleStateCommand(BaseModel):
+    type: Literal["set_rule_state"]
+    rule_id: str = Field(min_length=1, max_length=64)
+    expected_revision: int = Field(ge=1)
+    state: Literal["enabled", "paused", "archived"]
+
+
+class EvaluateObservationRulesCommand(BaseModel):
+    type: Literal["evaluate_rules"]
+    symbol: str = Field(min_length=1, max_length=15)
+    as_of: datetime

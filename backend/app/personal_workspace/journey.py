@@ -28,6 +28,7 @@ from .synthetic import SyntheticWorkspaceAdapters
 
 if TYPE_CHECKING:
     from .portfolio import PortfolioBook
+    from .rules import ObservationRuleBook
 
 
 class PersonalResearchJourney:
@@ -38,11 +39,13 @@ class PersonalResearchJourney:
         cipher: PersonalDataCipher,
         adapters: SyntheticWorkspaceAdapters,
         portfolio: "PortfolioBook | None" = None,
+        rulebook: "ObservationRuleBook | None" = None,
     ) -> None:
         self._store = store
         self._cipher = cipher
         self._adapters = adapters
         self._portfolio = portfolio
+        self._rulebook = rulebook
 
     def create_synthetic_trace(
         self,
@@ -169,8 +172,14 @@ class PersonalResearchJourney:
     def open_today(self, actor: PersonalActor) -> TodayWorkspace:
         trace = self._store.latest_trace(actor_id=actor.actor_id)
         portfolio = self._portfolio.open(actor) if self._portfolio is not None else None
+        attention_items = self._rulebook.attention(actor) if self._rulebook is not None else ()
         if trace is None:
-            return TodayWorkspace(trace=None, record=None, portfolio=portfolio)
+            return TodayWorkspace(
+                trace=None,
+                record=None,
+                portfolio=portfolio,
+                attention_items=attention_items,
+            )
         record = self._store.record_for_analysis(
             actor_id=actor.actor_id,
             analysis_id=trace.analysis_id,
@@ -179,6 +188,7 @@ class PersonalResearchJourney:
             trace=self._decode_trace(trace),
             record=self._decode_record(record) if record is not None else None,
             portfolio=portfolio,
+            attention_items=attention_items,
         )
 
     def _decode_trace(self, stored: StoredSyntheticTrace) -> SyntheticTraceView:

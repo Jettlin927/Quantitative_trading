@@ -22,6 +22,26 @@ export class PersonalJourneyClient {
     return this.#request('/api/personal/portfolio', { signal })
   }
 
+  /** @param {string} symbol @param {{ signal?: AbortSignal }} [options] */
+  openInstrument(symbol, { signal } = {}) {
+    return this.#request(`/api/personal/instruments/${encodeURIComponent(symbol)}`, { signal })
+  }
+
+  /** @param {{ signal?: AbortSignal }} [options] */
+  listRuleTemplates({ signal } = {}) {
+    return this.#request('/api/personal/rule-templates', { signal })
+  }
+
+  /** @param {{ signal?: AbortSignal }} [options] */
+  openRules({ signal } = {}) {
+    return this.#request('/api/personal/rules', { signal })
+  }
+
+  /** @param {{ command: unknown, idempotencyKey: string, signal?: AbortSignal }} options */
+  submitRuleCommand({ command, idempotencyKey, signal }) {
+    return this.#command('/api/personal/rules/commands', command, { idempotencyKey, signal })
+  }
+
   /** @param {{ command: unknown, idempotencyKey: string, signal?: AbortSignal }} options */
   submitPortfolioCommand({ command, idempotencyKey, signal }) {
     return this.#command('/api/personal/portfolio/commands', command, { idempotencyKey, signal })
