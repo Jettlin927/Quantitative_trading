@@ -187,3 +187,14 @@ class EvaluateObservationRulesCommand(BaseModel):
     type: Literal["evaluate_rules"]
     symbol: str = Field(min_length=1, max_length=15)
     as_of: datetime
+
+
+class PrepareAnalysisCommand(BaseModel):
+    question: str = Field(min_length=1, max_length=4000)
+    subject_ids: tuple[str, ...] = Field(min_length=1, max_length=20)
+    selected_private_fields: tuple[str, ...] = Field(default=(), max_length=20)
+
+
+class StartAnalysisCommand(BaseModel):
+    draft_id: str = Field(min_length=1, max_length=64)
+    preview_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")

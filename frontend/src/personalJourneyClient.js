@@ -47,6 +47,38 @@ export class PersonalJourneyClient {
     return this.#command('/api/personal/portfolio/commands', command, { idempotencyKey, signal })
   }
 
+  /** @param {{ question: string, subjectIds: string[], selectedPrivateFields?: string[], idempotencyKey: string, signal?: AbortSignal }} options */
+  prepareAnalysis({ question, subjectIds, selectedPrivateFields = [], idempotencyKey, signal }) {
+    return this.#command('/api/personal/analysis-drafts', {
+      question,
+      subject_ids: subjectIds,
+      selected_private_fields: selectedPrivateFields,
+    }, { idempotencyKey, signal })
+  }
+
+  /** @param {string} draftId @param {{ signal?: AbortSignal }} [options] */
+  openAnalysisDraft(draftId, { signal } = {}) {
+    return this.#request(`/api/personal/analysis-drafts/${encodeURIComponent(draftId)}`, { signal })
+  }
+
+  /** @param {{ draftId: string, previewSha256: string, idempotencyKey: string, signal?: AbortSignal }} options */
+  startAnalysis({ draftId, previewSha256, idempotencyKey, signal }) {
+    return this.#command('/api/personal/analyses', {
+      draft_id: draftId,
+      preview_sha256: previewSha256,
+    }, { idempotencyKey, signal })
+  }
+
+  /** @param {string} runId @param {{ signal?: AbortSignal }} [options] */
+  openAnalysis(runId, { signal } = {}) {
+    return this.#request(`/api/personal/analyses/${encodeURIComponent(runId)}`, { signal })
+  }
+
+  /** @param {{ runId: string, idempotencyKey: string, signal?: AbortSignal }} options */
+  cancelAnalysis({ runId, idempotencyKey, signal }) {
+    return this.#command(`/api/personal/analyses/${encodeURIComponent(runId)}/cancel`, {}, { idempotencyKey, signal })
+  }
+
   /** @param {{ question: string, idempotencyKey: string, signal?: AbortSignal }} options */
   createSyntheticTrace({ question, idempotencyKey, signal }) {
     return this.#command('/api/personal/synthetic-traces', { question }, { idempotencyKey, signal })

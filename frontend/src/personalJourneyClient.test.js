@@ -89,4 +89,38 @@ describe('PersonalJourneyClient', () => {
       }),
     ])
   })
+
+  it('AI 只发送问题、对象 ID 与 preview hash，不回传行情或模型正文', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ status: 'ready' }), {
+      status: 202,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    const client = new PersonalJourneyClient({ fetcher })
+
+    await client.prepareAnalysis({
+      question: '官方事实可能如何影响公司？',
+      subjectIds: ['ACME'],
+      selectedPrivateFields: [],
+      idempotencyKey: 'prepare-ai-1',
+    })
+    await client.startAnalysis({
+      draftId: 'draft-1',
+      previewSha256: 'a'.repeat(64),
+      idempotencyKey: 'start-ai-1',
+    })
+
+    const prepareCall = /** @type {any[]} */ (fetcher.mock.calls[0])
+    const startCall = /** @type {any[]} */ (fetcher.mock.calls[1])
+    expect(prepareCall[0]).toBe('/api/personal/analysis-drafts')
+    expect(JSON.parse(prepareCall[1].body)).toEqual({
+      question: '官方事实可能如何影响公司？',
+      subject_ids: ['ACME'],
+      selected_private_fields: [],
+    })
+    expect(JSON.parse(startCall[1].body)).toEqual({
+      draft_id: 'draft-1',
+      preview_sha256: 'a'.repeat(64),
+    })
+    expect(JSON.stringify(fetcher.mock.calls)).not.toMatch(/market_prices|portfolio_weight|model_output/)
+  })
 })

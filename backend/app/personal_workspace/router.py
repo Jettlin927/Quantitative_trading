@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
+import json
 from typing import Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -14,6 +16,7 @@ from .contracts import (
     EditHoldingCommand,
     EvaluateObservationRulesCommand,
     PersonalActor,
+    PrepareAnalysisCommand,
     PurgeHoldingCommand,
     RemoveHoldingCommand,
     RequestPurgeHoldingCommand,
@@ -21,8 +24,10 @@ from .contracts import (
     SaveSyntheticRecordCommand,
     SetUsdCashCommand,
     SetObservationRuleStateCommand,
+    StartAnalysisCommand,
     SyntheticTraceCommand,
 )
+from .analysis import AnalysisIntent, AnalysisWorkspace
 from .journey import PersonalResearchJourney
 from .instrument import InstrumentQuery, InstrumentWorkbench
 from .portfolio import PortfolioBook
@@ -38,6 +43,7 @@ class PersonalRuntime:
     portfolio: PortfolioBook | None = None
     instruments: InstrumentWorkbench | None = None
     rules: ObservationRuleBook | None = None
+    analyses: AnalysisWorkspace | None = None
 
     @classmethod
     def unconfigured(cls) -> "PersonalRuntime":
@@ -52,6 +58,7 @@ class PersonalRuntime:
             portfolio=None,
             instruments=None,
             rules=None,
+            analyses=None,
         )
 
 
@@ -183,6 +190,113 @@ def create_personal_router(
             _raise_domain_error(exc)
         return asdict(result)
 
+    @router.post("/analysis-drafts", status_code=status.HTTP_202_ACCEPTED)
+    async def prepare_analysis(
+        request: Request,
+        runtime: PersonalRuntime = Depends(require_write),
+    ) -> dict:
+        actor, analyses = _configured_analyses(runtime)
+        command = await _parse_command(request, PrepareAnalysisCommand)
+        try:
+            return asdict(
+                analyses.prepare(
+                    actor,
+                    AnalysisIntent(
+                        question=command.question,
+                        subject_ids=command.subject_ids,
+                        selected_private_fields=command.selected_private_fields,
+                    ),
+                    idempotency_key=request.headers["Idempotency-Key"].strip(),
+                )
+            )
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        except ValueError as exc:
+            _raise_domain_error(exc)
+
+    @router.get("/analysis-drafts/{draft_id}")
+    def open_analysis_draft(
+        draft_id: str,
+        runtime: PersonalRuntime = Depends(require_read),
+    ) -> dict:
+        actor, analyses = _configured_analyses(runtime)
+        try:
+            return asdict(analyses.open_draft(actor, draft_id))
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        except ValueError as exc:
+            _raise_domain_error(exc)
+
+    @router.post("/analyses", status_code=status.HTTP_202_ACCEPTED)
+    async def start_analysis(
+        request: Request,
+        runtime: PersonalRuntime = Depends(require_write),
+    ) -> dict:
+        actor, analyses = _configured_analyses(runtime)
+        command = await _parse_command(request, StartAnalysisCommand)
+        try:
+            return asdict(
+                analyses.start(
+                    actor,
+                    draft_id=command.draft_id,
+                    preview_sha256=command.preview_sha256,
+                    idempotency_key=request.headers["Idempotency-Key"].strip(),
+                )
+            )
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        except ValueError as exc:
+            _raise_domain_error(exc)
+
+    @router.get("/analyses/{run_id}")
+    def observe_analysis(
+        run_id: str,
+        runtime: PersonalRuntime = Depends(require_read),
+    ) -> dict:
+        actor, analyses = _configured_analyses(runtime)
+        try:
+            return asdict(analyses.observe(actor, run_id))
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        except ValueError as exc:
+            _raise_domain_error(exc)
+
+    @router.get("/analyses/{run_id}/events")
+    def observe_analysis_events(
+        run_id: str,
+        runtime: PersonalRuntime = Depends(require_read),
+    ) -> StreamingResponse:
+        actor, analyses = _configured_analyses(runtime)
+        try:
+            run = analyses.observe(actor, run_id)
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        except ValueError as exc:
+            _raise_domain_error(exc)
+
+        def stream():
+            for event in run.events:
+                payload = asdict(event)
+                payload["occurred_at"] = event.occurred_at.isoformat()
+                yield "event: analysis_stage\n"
+                yield f"id: {event.sequence}\n"
+                yield f"data: {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}\n\n"
+
+        return StreamingResponse(stream(), media_type="text/event-stream")
+
+    @router.post("/analyses/{run_id}/cancel")
+    def cancel_analysis(
+        run_id: str,
+        runtime: PersonalRuntime = Depends(require_write),
+    ) -> dict:
+        actor, analyses = _configured_analyses(runtime)
+        try:
+            return asdict(analyses.cancel(actor, run_id))
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        except ValueError as exc:
+            _raise_domain_error(exc)
+
     @router.post("/synthetic-traces", status_code=status.HTTP_201_CREATED)
     async def create_synthetic_trace(
         request: Request,
@@ -259,16 +373,31 @@ def _configured_rules(runtime: PersonalRuntime) -> tuple[PersonalActor, Observat
     return runtime.actor, runtime.rules
 
 
+def _configured_analyses(runtime: PersonalRuntime) -> tuple[PersonalActor, AnalysisWorkspace]:
+    if runtime.actor is None or runtime.analyses is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "provider_unavailable", "message": "AI 分析当前不可用。"},
+        )
+    return runtime.actor, runtime.analyses
+
+
 def _raise_domain_error(error: ValueError) -> None:
     code = str(error)
     if code in {
         "preview_changed",
+        "preview_consumed",
+        "preview_expired",
         "revision_conflict",
         "duplicate_symbol",
         "purge_challenge_invalid",
         "purge_challenge_expired",
     }:
         status_code = 409
+    elif code in {"budget_blocked", "provider_rate_limited"}:
+        status_code = 429
+    elif code == "provider_unavailable":
+        status_code = 503
     elif code in {
         "invalid_command",
         "invalid_decimal",
