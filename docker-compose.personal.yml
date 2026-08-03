@@ -7,6 +7,9 @@ services:
       PERSONAL_ALLOWED_ORIGINS: ${PERSONAL_ALLOWED_ORIGINS:?启用个人工作台前必须配置 PERSONAL_ALLOWED_ORIGINS}
       ALPACA_CREDENTIALS_FILE: /run/secrets/alpaca-credentials.json
       ALPACA_AUTHORIZATION_FILE: /run/config/alpaca-authorization.json
+      OFFICIAL_ANALYSIS_QUERY_FILE: /run/config/official-analysis-queries.json
+      OFFICIAL_ANALYSIS_AUTHORIZATION_FILE: /run/config/official-analysis-authorization.json
+      SEC_USER_AGENT: ${SEC_USER_AGENT:?启用官方证据前必须配置 SEC_USER_AGENT}
       PERSONAL_ANALYSIS_PROVIDER: ${PERSONAL_ANALYSIS_PROVIDER:-disabled}
       DEEPSEEK_MONTHLY_SOFT_BUDGET_USD: ${DEEPSEEK_MONTHLY_SOFT_BUDGET_USD:-5}
     volumes:
@@ -31,6 +34,18 @@ services:
       - type: bind
         source: ${ALPACA_AUTHORIZATION_HOST_FILE:?启用 Alpaca 行情前必须配置 ALPACA_AUTHORIZATION_HOST_FILE}
         target: /run/config/alpaca-authorization.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${OFFICIAL_ANALYSIS_QUERY_HOST_FILE:?启用官方证据前必须配置 OFFICIAL_ANALYSIS_QUERY_HOST_FILE}
+        target: /run/config/official-analysis-queries.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${OFFICIAL_ANALYSIS_AUTHORIZATION_HOST_FILE:?启用官方证据前必须配置 OFFICIAL_ANALYSIS_AUTHORIZATION_HOST_FILE}
+        target: /run/config/official-analysis-authorization.json
         read_only: true
         bind:
           create_host_path: false

@@ -39,7 +39,7 @@ const trace = {
     status: 'ready', provider: 'synthetic-model', model: 'scripted-deny-v1',
     included_fields: ['user_symbol', 'user_question'],
     excluded_fields: [{ field: 'market_prices', reason_code: 'source_ai_context_denied' }],
-    preview_sha256: 'a'.repeat(64), retention: 'store=false；不使用真实 provider',
+    preview_sha256: 'a'.repeat(64), retention: '合成路径；不使用真实 provider，也不外发',
   },
   analysis_claim: { claim_id: 'claim-001', kind: 'inference', statement: '合成证据只支持条件性影响机制。', evidence_ids: ['evidence-001'] },
   issues: ['provider_unavailable'],

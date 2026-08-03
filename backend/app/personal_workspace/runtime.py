@@ -18,6 +18,7 @@ from .contracts import PersonalActor
 from .crypto import PersonalDataCipher, load_keyring_file
 from .journey import PersonalResearchJourney
 from .notebook import PostgresNotebookStore, ResearchNotebook
+from .official_evidence_runtime import load_official_analysis_evidence_reader
 from .instrument import (
     InstrumentEvent,
     InstrumentWorkbench,
@@ -112,10 +113,18 @@ def get_personal_runtime() -> PersonalRuntime:
         formal_overlay_reader=lambda symbol: (),
     )
     analysis_store = PostgresAnalysisStore(session_factory, cipher=cipher)
+    official_evidence_reader = load_official_analysis_evidence_reader(
+        query_file=os.getenv("OFFICIAL_ANALYSIS_QUERY_FILE", "").strip(),
+        authorization_file=os.getenv(
+            "OFFICIAL_ANALYSIS_AUTHORIZATION_FILE", ""
+        ).strip(),
+        sec_user_agent=os.getenv("SEC_USER_AGENT", "").strip(),
+    )
     analyses = AnalysisWorkspace(
         store=analysis_store,
-        evidence_reader=lambda request_actor, intent: (),
+        evidence_reader=official_evidence_reader,
         provider=ScriptedResponsesAdapter(script=(), available=provider_available),
+        config_revision=official_evidence_reader.config_revision,
         monthly_soft_budget_usd=Decimal(
             os.getenv("DEEPSEEK_MONTHLY_SOFT_BUDGET_USD", "5")
         ),

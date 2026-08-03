@@ -113,6 +113,17 @@ class PersonalAnalysisApiTest(unittest.TestCase):
         )
 
         self.assertEqual(prepared.status_code, 202)
+        self.assertEqual(
+            draft["evidence"],
+            [
+                {
+                    "evidence_id": "sec-1",
+                    "source": "sec",
+                    "field": "official_facts",
+                    "as_of": "2026-08-03T04:00:00Z",
+                }
+            ],
+        )
         self.assertEqual(readback.status_code, 200)
         self.assertEqual(readback.json()["preview_sha256"], draft["preview_sha256"])
         self.assertEqual(started.status_code, 202)

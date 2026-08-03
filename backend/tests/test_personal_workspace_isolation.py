@@ -130,6 +130,26 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
         )
         self.assertTrue(mounts["/run/secrets/deepseek-credentials.json"]["read_only"])
 
+    def test_only_api_receives_official_analysis_query_and_authorization_files(self) -> None:
+        personal = yaml.safe_load(
+            (REPO_ROOT / "docker-compose.personal.yml").read_text(encoding="utf-8")
+        )
+        api = personal["services"]["api"]
+        mounts = {mount["target"]: mount for mount in api["volumes"]}
+        expected = {
+            "/run/config/official-analysis-queries.json",
+            "/run/config/official-analysis-authorization.json",
+        }
+        self.assertTrue(expected.issubset(mounts))
+        self.assertTrue(all(mounts[target]["read_only"] for target in expected))
+        for service_name in ("frontend", "personal-analysis-worker"):
+            service = personal["services"][service_name]
+            targets = {mount["target"] for mount in service.get("volumes", [])}
+            environment = service.get("environment", {})
+            self.assertTrue(expected.isdisjoint(targets), service_name)
+            self.assertNotIn("OFFICIAL_ANALYSIS_QUERY_FILE", environment)
+            self.assertNotIn("OFFICIAL_ANALYSIS_AUTHORIZATION_FILE", environment)
+
     def test_missing_any_private_configuration_fails_closed_without_initializing_store(self) -> None:
         names = {
             "PRIVATE_DATABASE_URL",

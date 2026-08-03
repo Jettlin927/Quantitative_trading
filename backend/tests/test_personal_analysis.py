@@ -11,6 +11,7 @@ from backend.app.personal_workspace.analysis import (
     AnalysisUsage,
     AnalysisWorkspace,
     EvidenceCandidate,
+    EvidenceReadResult,
     InMemoryAnalysisStore,
     DeepSeekChatAdapter,
     ProviderFailure,
@@ -151,6 +152,13 @@ class PersonalAnalysisTest(unittest.TestCase):
         self.assertRegex(draft.pricing_snapshot_sha256, r"^[0-9a-f]{64}$")
         self.assertEqual(draft.included_fields, ("user_question", "official_facts", "macro_facts"))
         self.assertEqual(
+            [(item.evidence_id, item.source, item.field, item.as_of) for item in draft.evidence],
+            [
+                ("sec-filing-1", "sec", "official_facts", NOW),
+                ("fred-release-1", "federal_reserve", "macro_facts", NOW),
+            ],
+        )
+        self.assertEqual(
             [item.field for item in draft.excluded_fields],
             ["market_prices", "portfolio_weight", "price_rule_results"],
         )
@@ -221,6 +229,73 @@ class PersonalAnalysisTest(unittest.TestCase):
             "price_rule_results",
         ):
             self.assertNotIn(denied, captured.lower())
+
+    def test_evidence_gap_blocks_enqueue_and_provider_execution(self) -> None:
+        provider = ScriptedResponsesAdapter.completed(claims=())
+        workspace = AnalysisWorkspace(
+            store=InMemoryAnalysisStore(),
+            evidence_reader=lambda actor, intent: EvidenceReadResult(
+                candidates=(),
+                gaps=("official_evidence_config_stale",),
+            ),
+            provider=provider,
+            clock=lambda: NOW,
+        )
+
+        draft = workspace.prepare(
+            self.actor,
+            AnalysisIntent(question="只允许合格官方证据", subject_ids=("ACME",)),
+            idempotency_key="prepare-stale-official-config",
+        )
+
+        self.assertEqual(draft.included_fields, ("user_question",))
+        self.assertEqual(draft.evidence, ())
+        self.assertEqual(draft.gaps, ("official_evidence_config_stale",))
+        with self.assertRaisesRegex(ValueError, "evidence_insufficient"):
+            workspace.start(
+                self.actor,
+                draft_id=draft.draft_id,
+                preview_sha256=draft.preview_sha256,
+                idempotency_key="start-stale-official-config",
+            )
+        self.assertIsNone(workspace.run_next(worker_id="worker-must-stay-idle"))
+        self.assertEqual(provider.captured_requests, [])
+
+    def test_worker_uses_only_confirmed_frozen_evidence_pack(self) -> None:
+        reads = []
+        provider = ScriptedResponsesAdapter.completed(claims=())
+
+        def read_evidence(actor, intent):
+            reads.append((actor.actor_id, intent.question))
+            return evidence_candidates()
+
+        workspace = AnalysisWorkspace(
+            store=InMemoryAnalysisStore(),
+            evidence_reader=read_evidence,
+            provider=provider,
+            clock=lambda: NOW,
+        )
+        draft = workspace.prepare(
+            self.actor,
+            AnalysisIntent(question="冻结包不得重抓", subject_ids=("ACME",)),
+            idempotency_key="prepare-frozen-pack",
+        )
+        workspace.start(
+            self.actor,
+            draft_id=draft.draft_id,
+            preview_sha256=draft.preview_sha256,
+            idempotency_key="start-frozen-pack",
+        )
+
+        workspace.run_next(worker_id="worker-frozen-pack")
+
+        self.assertEqual(reads, [("local-owner", "冻结包不得重抓")])
+        payload = provider.captured_requests[0]["messages"][1]["content"]
+        self.assertIn("sec-filing-1", payload)
+        self.assertIn("fred-release-1", payload)
+        self.assertNotIn("alpaca-price-1", payload)
+        self.assertNotIn("private-weight-1", payload)
+        self.assertNotIn("rule-price-1", payload)
 
     def test_preview_is_single_use_and_expiry_requires_prepare_again(self) -> None:
         draft = self.workspace.prepare(

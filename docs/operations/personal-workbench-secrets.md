@@ -18,6 +18,9 @@
 | `DEEPSEEK_CREDENTIALS_HOST_FILE` | 仅含 DeepSeek API key 的 JSON 文件绝对路径 | 只读挂载给个人分析 Worker，必须为 owner-only 权限 |
 | `DEEPSEEK_MONTHLY_SOFT_BUDGET_USD` | DeepSeek 月度软预算 | 必须为正数，超预算 fail-closed |
 | `PERSONAL_ANALYSIS_PROVIDER` | API 侧非 secret 能力开关 | 只有精确值 `deepseek` 才允许入队；默认 `disabled` |
+| `OFFICIAL_ANALYSIS_QUERY_HOST_FILE` | 官方证据查询清单的宿主绝对路径 | 只读挂载给 API；含标的、固定查询类型、来源授权身份、检查时间、过期时间和内容哈希 |
+| `OFFICIAL_ANALYSIS_AUTHORIZATION_HOST_FILE` | 官方证据用途授权快照的宿主绝对路径 | 只读挂载给 API；必须允许 display/internal_analysis/ai_context，禁止 redistribute/formal_research |
+| `SEC_USER_AGENT` | SEC 要求的非空 User-Agent | 不得包含 secret；由 API 访问固定 SEC host 时使用 |
 
 覆盖把个人访问文件只读挂载到 API：
 
@@ -43,6 +46,24 @@ API 只接收非 secret 的 `PERSONAL_ANALYSIS_PROVIDER` 状态；缺省或其�
 `provider_unavailable`，避免凭据尚未就绪时产生无人消费的真实任务。
 未配置 #164 时，Compose 为 profile 内的数据库 URL 和凭据宿主路径保留不可用哨兵值，
 使未启用该 profile 的日常配置检查不被阻断；误启 profile 会因无有效凭据而失败关闭。
+
+## 官方证据查询与用途授权
+
+API 只支持两类固定、无凭据的首期查询：SEC `companyfacts` 与 BLS series。查询清单按
+`subject_id` 选择公司事实，`subject_id="*"` 选择所有问题共享的宏观事实；不得配置任意
+URL、任意请求方法或自定义 header。SEC 查询先读取固定 submissions endpoint 取得
+accession 的精确可得时间，再读取固定 companyfacts endpoint；BLS 只读取固定公开 API。
+
+查询文件与授权文件都是 schema version 1 的 JSON 对象，顶层必须包含 `checked_at`、
+`expires_at` 和 `content_sha256`。哈希口径为：移除顶层 `content_sha256` 后，对剩余对象按
+UTF-8、键排序、无多余空白的 canonical JSON 计算 SHA-256。任一文件缺失、过期、哈希
+不符、用途授权不完整、标的无查询、来源失败或零合格事实时，预览返回明确 gap，API 与
+前端均禁止入队。配置装配阶段不发送外部请求；只有用户生成预览时才执行有界只读 GET/
+POST，且响应只保留最小结构化事实、证据身份、as-of 与内容哈希进入冻结包。
+
+官方证据文件只挂载给 API。个人分析 Worker不接收这些文件，也不在执行阶段重新抓取；
+它只能消费用户确认 preview SHA 后已写入私有数据库的冻结 evidence pack。查询/授权文件
+不含 DeepSeek key、持仓数量、成本、市值、权重、行情或规则结果。
 
 ## Keyring 格式
 
