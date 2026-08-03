@@ -18,3 +18,14 @@ services:
         read_only: true
         bind:
           create_host_path: false
+
+  frontend:
+    environment:
+      PERSONAL_GATEWAY_TOKEN_FILE: /run/secrets/personal-gateway-token
+    volumes:
+      - type: bind
+        source: ${PERSONAL_GATEWAY_TOKEN_HOST_FILE:?启用个人工作台前必须配置 PERSONAL_GATEWAY_TOKEN_HOST_FILE}
+        target: /run/secrets/personal-gateway-token
+        read_only: true
+        bind:
+          create_host_path: false

@@ -173,7 +173,7 @@ for target, source in expected_secrets.items():
     assert mount["read_only"] is True, mount
     assert mount.get("bind", {}).get("create_host_path") in (None, False), mount
 
-for service_name in ("worker", "research-worker", "frontend"):
+for service_name in ("worker", "research-worker"):
     service = services[service_name]
     environment = service.get("environment", {})
     assert "PRIVATE_DATABASE_URL" not in environment, service_name
@@ -182,6 +182,20 @@ for service_name in ("worker", "research-worker", "frontend"):
     assert "PERSONAL_ALLOWED_ORIGINS" not in environment, service_name
     targets = {mount["target"] for mount in service.get("volumes", [])}
     assert targets.isdisjoint(expected_secrets), (service_name, targets)
+
+frontend = services["frontend"]
+assert frontend["environment"]["PERSONAL_GATEWAY_TOKEN_FILE"] == (
+    "/run/secrets/personal-gateway-token"
+)
+for key in ("PRIVATE_DATABASE_URL", "PERSONAL_DATA_KEYRING_FILE", "PERSONAL_ALLOWED_ORIGINS"):
+    assert key not in frontend.get("environment", {}), key
+frontend_mounts = {mount["target"]: mount for mount in frontend.get("volumes", [])}
+assert set(frontend_mounts) == {"/run/secrets/personal-gateway-token"}, frontend_mounts
+frontend_gateway = frontend_mounts["/run/secrets/personal-gateway-token"]
+assert frontend_gateway["type"] == "bind", frontend_gateway
+assert Path(frontend_gateway["source"]).resolve() == test_root / "personal-gateway-token"
+assert frontend_gateway["read_only"] is True, frontend_gateway
+assert frontend_gateway.get("bind", {}).get("create_host_path") in (None, False), frontend_gateway
 PY
 
 echo "新服务器 Compose 合同通过"
