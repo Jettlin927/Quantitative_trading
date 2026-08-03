@@ -86,7 +86,7 @@ python scripts/research/register_historical_issue_mapping.py \
 
 ## 配置与门禁
 
-- `RESEARCH_PUBLIC_BASE_URL`：写入 GitHub 评论的前端根地址。第一阶段固定使用 `http://127.0.0.1:15173`，用户先建立 `ssh -N -L 15173:127.0.0.1:15173 quant-trading-new` 隧道再打开链接；无需域名、HTTPS 网关或公网端口。代码只额外接受完整 HTTPS 地址，拒绝非 loopback HTTP。
+- `RESEARCH_PUBLIC_BASE_URL`：写入 GitHub 评论的前端根地址。当前固定使用 `http://127.0.0.1:15173`，用户先建立 `ssh -N -L 15173:127.0.0.1:15173 quant-trading-prod` 隧道再打开链接；无需域名、HTTPS 网关或公网端口。代码只额外接受完整 HTTPS 地址，拒绝非 loopback HTTP。
 - `RESEARCH_READBACK_BASE_URL`：研究 Worker 实际读回的前端同源入口。Compose 默认使用 `http://frontend:5173`，以验证 Nginx 静态前端的同源 API/工件反代；不能改成绕过前端的数据库内部调用。
 - `RESEARCH_PUBLICATION_RETRY_SECONDS`：发布失败后再次领取同一评价的最短间隔，默认 300 秒，防止外部故障时形成紧密重试。
 - `RESEARCH_ARTIFACT_ROOT`：API 与研究 Worker 共享的持久工件根目录。

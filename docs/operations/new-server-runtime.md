@@ -1,6 +1,8 @@
-# 新服务器安全容器运行环境
+# 生产服务器安全容器运行环境
 
-本文只覆盖 `quant-trading-new` 的 Docker/Compose 基础，不覆盖生产数据恢复、Alembic、应用启动、流量切换或旧服务器清理。
+当前唯一生产服务器统一使用逻辑角色和 SSH 别名 `quant-trading-prod`。本文保留该主机
+最初作为 `quant-trading-new` 初始化时的容器基础合同与验收记录；当前运行状态必须
+现场读回，不能用历史验收代替。
 
 ## 固定边界
 
@@ -71,13 +73,17 @@ scripts/ops/test_frontend_production_image.sh
 bash -n scripts/ops/bootstrap_new_server_runtime.sh
 ```
 
-## 回滚边界
+## 失败停止边界
 
-本阶段没有应用容器、生产数据或流量，因此保留已安装软件和空目录是最安全的回滚状态。若 Docker daemon 本身影响主机，可先 `systemctl disable --now docker containerd`；卸载软件、删除目录或清理 Docker 数据根必须另行确认，不能由本脚本自动执行。未来迁移失败时仍按 #14 切回旧服务器并完整保留旧环境至少 14 天。
+初始化阶段没有应用容器、生产数据或流量，因此当时保留已安装软件和空目录是最安全
+的停止状态。该服务器现已成为唯一生产，旧服务器已经退役，不存在跨服务器回切。
+当前任何失败都必须保留生产现场，并按精确批准的恢复方案处理；卸载软件、删除目录
+或清理 Docker 数据根仍须另行确认。
 
 ## 现场验收
 
-2026-07-19 18:15 +08:00 在 `quant-trading-new` 完成只读回查：
+以下是历史初始化证据：2026-07-19 18:15 +08:00 在当时名为
+`quant-trading-new`、现为 `quant-trading-prod` 的主机完成只读回查：
 
 - Ubuntu 26.04 `resolute` / amd64；Docker Engine 客户端与服务端均为 `29.6.2`，Compose `v5.3.1`，Buildx `v0.35.0`。安装包来自 `https://download.docker.com/linux/ubuntu` 的 `resolute/stable`。
 - Docker 与 containerd 为 `active`，Docker 已设为开机启动；存储驱动为 `overlayfs`、cgroup driver 为 `systemd`、日志驱动为 `json-file`。`daemon.json` 已启用 live restore 与 `10m × 3` 日志轮转。

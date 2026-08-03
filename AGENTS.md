@@ -108,7 +108,7 @@ universe、复权和下一交易日执行口径开展离线研究。
 
 - PostgreSQL 和研究工件是持久资产。未经明确授权，禁止执行
   `docker compose down -v`、`docker volume rm`、覆盖恢复、删除 canonical 工件或
-  清理旧服务器数据。
+  清理生产服务器或其他未知来源的持久数据。
 - 不得把 `.env`、Tushare token、数据库密码、SSH 私钥、GitHub token、真实账户
   数据或其他凭据写入源码、Issue、前端、日志、README、测试或工件。
 - API 数值必须 JSON-safe；`NaN`、`Infinity` 转为 `null` 或明确兜底。
@@ -125,16 +125,18 @@ universe、复权和下一交易日执行口径开展离线研究。
 
 ## 生产门禁
 
+- `quant-trading-prod` 是唯一生产服务器和唯一数据权威；原旧服务器已经退出系统，
+  不承担生产、灾备、回滚、Staging 或计算角色。
 - 服务器连接使用本机 SSH config 与 `.env`；私钥路径和 IP 不写入长期文档。
 - 数据库、API 和前端端口默认只监听 `127.0.0.1`，PostgreSQL 不开放公网。
 - 当前远程访问只使用 SSH 隧道；除非用户明确变更决定，不购买或申请域名，不部署
   Cloudflare Tunnel、Cloudflare Access 或 Tailscale Serve，也不开放公网 IP 端口。
 - 新电脑上的智能体必须先按生产访问文档现场核验目标主机、精确 `main` 提交、SSH
   config、受保护的 `.env` 和当次授权；旧文档、Issue 或历史记录不构成持续授权。
-- 生产 Alembic upgrade、baseline stamp、`DROP INDEX`、覆盖恢复、生产切换、旧服务
-  器清理和凭据变更必须获得针对精确操作的明确授权。
-- 新服务器迁移必须包含停写、备份恢复、工件同步、schema/行数/日期/指纹读回、
-  API/前端验收和旧服务器回滚方案。
+- 生产 Alembic upgrade、baseline stamp、`DROP INDEX`、覆盖恢复、生产切换、持久
+  数据清理和凭据变更必须获得针对精确操作的明确授权。
+- 未来若迁移生产主机，必须包含停写、备份恢复、工件同步、schema/行数/日期/指纹
+  读回、API/前端验收和独立回滚方案；不得默认恢复已退役旧服务器。
 - 代码合并、CI 通过、镜像构建、容器启动、生产读回和研究结论是不同事实，报告时
   必须分开。
 
