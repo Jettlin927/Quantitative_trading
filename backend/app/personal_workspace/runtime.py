@@ -21,13 +21,12 @@ from .notebook import PostgresNotebookStore, ResearchNotebook
 from .instrument import (
     InstrumentEvent,
     InstrumentWorkbench,
-    UnavailableInstrumentObservationReader,
 )
+from .market_runtime import load_personal_market_readers
 from .persistence import PostgresPersonalJourneyStore
 from .portfolio import (
     PortfolioBook,
     PostgresPortfolioStore,
-    UnavailablePortfolioMarketReader,
 )
 from .router import PersonalRuntime
 from .rules import (
@@ -65,9 +64,13 @@ def get_personal_runtime() -> PersonalRuntime:
         bind=private_engine, autoflush=False, expire_on_commit=False
     )
     cipher = PersonalDataCipher(keyring)
+    market_readers = load_personal_market_readers(
+        credentials_file=os.getenv("ALPACA_CREDENTIALS_FILE", "").strip(),
+        authorization_file=os.getenv("ALPACA_AUTHORIZATION_FILE", "").strip(),
+    )
     portfolio = PortfolioBook(
         store=PostgresPortfolioStore(session_factory, cipher=cipher),
-        market=UnavailablePortfolioMarketReader(),
+        market=market_readers.portfolio,
         challenge_key=sha256(
             f"personal-purge|{gateway_token}".encode("utf-8")
         ).digest(),
@@ -99,7 +102,7 @@ def get_personal_runtime() -> PersonalRuntime:
         )
 
     instruments = InstrumentWorkbench(
-        source=UnavailableInstrumentObservationReader(),
+        source=market_readers.instrument,
         cost_reader=read_cost,
         rule_attention_reader=read_rule_events,
         formal_overlay_reader=lambda symbol: (),
