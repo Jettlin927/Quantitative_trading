@@ -20,7 +20,9 @@
 - gateway token：`/run/secrets/personal-gateway-token`
 - keyring：`/run/secrets/personal-keyring.json`
 
-同步 Worker、研究 Worker和前端不得接收上述文件、私库 URL 或个人 Origin。容器内
+前端 Nginx 只额外接收同一个只读 gateway token 文件，用于同源反向代理注入
+`X-Personal-Gateway`；浏览器源码和响应中不得出现 token。前端不得接收 keyring、
+私库 URL 或个人 Origin。同步 Worker和研究 Worker不得接收任何个人 secret。容器内
 路径由覆盖固定，不能在 `.env` 中改写。宿主文件不存在时 `create_host_path: false`
 会拒绝启动，不能静默创建目录代替 secret。
 
@@ -61,7 +63,8 @@ Compose 文件渲染。默认留空时部署入口不加载该覆盖，既有部
 生产读回必须证明：
 
 - API 看到固定的两个容器内路径，两个 mount 均为只读；
-- Worker、研究 Worker和前端看不到个人 secret；
+- 前端只看到只读 gateway token 文件，浏览器看不到 token；
+- Worker和研究 Worker看不到个人 secret，前端看不到 keyring、私库 URL 或个人 Origin；
 - 缺少任一配置时个人路由继续 fail-closed；
 - 错误 gateway token、错误 Origin 和公共数据库角色访问私库均被拒绝；
 - 正确请求的最小成功路径只在 #162 目标镜像启动后验收。
