@@ -79,6 +79,21 @@ export class PersonalJourneyClient {
     return this.#command(`/api/personal/analyses/${encodeURIComponent(runId)}/cancel`, {}, { idempotencyKey, signal })
   }
 
+  /** @param {{ signal?: AbortSignal }} [options] */
+  openRecords({ signal } = {}) {
+    return this.#request('/api/personal/records', { signal })
+  }
+
+  /** @param {string} recordId @param {{ signal?: AbortSignal }} [options] */
+  openRecord(recordId, { signal } = {}) {
+    return this.#request(`/api/personal/records/${encodeURIComponent(recordId)}`, { signal })
+  }
+
+  /** @param {{ command: unknown, idempotencyKey: string, signal?: AbortSignal }} options */
+  commitRecord({ command, idempotencyKey, signal }) {
+    return this.#command('/api/personal/records/commands', command, { idempotencyKey, signal })
+  }
+
   /** @param {{ question: string, idempotencyKey: string, signal?: AbortSignal }} options */
   createSyntheticTrace({ question, idempotencyKey, signal }) {
     return this.#command('/api/personal/synthetic-traces', { question }, { idempotencyKey, signal })

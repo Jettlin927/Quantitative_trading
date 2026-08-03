@@ -20,6 +20,8 @@ from backend.app.models import (
     PersonalAuditEvent,
     PersonalHolding,
     PersonalPortfolioRevision,
+    PersonalRecordPrivateFragment,
+    PersonalRedactionEvent,
     PersonalWorkspace,
 )
 from backend.app.market_observation.alpaca import MarketObservationError
@@ -393,6 +395,12 @@ class PostgresPortfolioStore:
                 )
             )
             session.delete(holding)
+            session.execute(
+                delete(PersonalRecordPrivateFragment).where(
+                    PersonalRecordPrivateFragment.workspace_id == workspace.id,
+                    PersonalRecordPrivateFragment.holding_id == holding_id,
+                )
+            )
             workspace.revision += 1
             state = self._load_state(session, workspace)
             state.revision = workspace.revision
@@ -408,6 +416,20 @@ class PostgresPortfolioStore:
                     status="completed",
                     idempotency_hash=_portfolio_idempotency_hash(actor_id, idempotency_key),
                     portfolio_revision=workspace.revision,
+                    occurred_at=receipt.purged_at,
+                    backup_expires_at=receipt.backup_expires_at,
+                )
+            )
+            session.add(
+                PersonalRedactionEvent(
+                    id=str(uuid4()),
+                    workspace_id=workspace.id,
+                    object_type="holding",
+                    object_id=holding_id,
+                    reason="source_holding_purged",
+                    idempotency_hash=sha256(
+                        f"holding-redaction|{actor_id}|{idempotency_key}".encode("utf-8")
+                    ).hexdigest(),
                     occurred_at=receipt.purged_at,
                     backup_expires_at=receipt.backup_expires_at,
                 )

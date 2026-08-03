@@ -57,14 +57,22 @@ PRIVATE_TABLES = {
     "personal_analysis_attempts",
     "personal_analysis_events",
     "personal_ai_claims",
+    "personal_record_versions",
+    "personal_record_private_fragments",
+    "personal_verification_items",
+    "personal_verification_observations",
+    "personal_redaction_events",
     "personal_research_records",
 }
-ENCRYPTED_PRIVATE_TABLES = PRIVATE_TABLES - {"personal_audit_events"}
+ENCRYPTED_PRIVATE_TABLES = PRIVATE_TABLES - {
+    "personal_audit_events",
+    "personal_redaction_events",
+}
 
 
 class PersonalWorkspaceSchemaIdentityTest(unittest.TestCase):
     def test_private_orm_identity_is_separate_from_public_metadata(self) -> None:
-        self.assertEqual(expected_schema_heads(), ("0016_personal_analysis_t3",))
+        self.assertEqual(expected_schema_heads(), ("0017_personal_notebook_t4",))
         self.assertEqual(
             set(PrivateBase.metadata.tables),
             {f"private_workbench.{table}" for table in PRIVATE_TABLES},
@@ -122,6 +130,11 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                 command.upgrade(alembic_config(connection), "head")
             with engine.begin() as connection:
                 for table in (
+                    "personal_verification_observations",
+                    "personal_verification_items",
+                    "personal_record_private_fragments",
+                    "personal_record_versions",
+                    "personal_redaction_events",
                     "personal_research_records",
                     "personal_ai_claims",
                     "personal_analysis_events",
@@ -214,6 +227,11 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                             "personal_analysis_attempts",
                             "personal_analysis_events",
                             "personal_ai_claims",
+                            "personal_record_versions",
+                            "personal_record_private_fragments",
+                            "personal_verification_items",
+                            "personal_verification_observations",
+                            "personal_redaction_events",
                         }
                         else 1
                     )
@@ -235,6 +253,11 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                 command.upgrade(alembic_config(connection), "head")
             with engine.begin() as connection:
                 for table in (
+                    "personal_verification_observations",
+                    "personal_verification_items",
+                    "personal_record_private_fragments",
+                    "personal_record_versions",
+                    "personal_redaction_events",
                     "personal_audit_events",
                     "personal_portfolio_revisions",
                     "personal_research_records",

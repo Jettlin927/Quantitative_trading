@@ -12,7 +12,12 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from .contracts import (
     AddHoldingCommand,
+    AppendRecordSupplementCommand,
+    AppendVerificationObservationCommand,
+    ChangeRecordStateCommand,
+    ConfirmRecordPurgeCommand,
     CreateObservationRuleCommand,
+    CreateVerificationItemCommand,
     EditHoldingCommand,
     EvaluateObservationRulesCommand,
     PersonalActor,
@@ -20,16 +25,20 @@ from .contracts import (
     PurgeHoldingCommand,
     RemoveHoldingCommand,
     RequestPurgeHoldingCommand,
+    RequestRecordPurgeCommand,
     RestoreHoldingCommand,
     SaveSyntheticRecordCommand,
+    SaveAnalysisRecordCommand,
     SetUsdCashCommand,
     SetObservationRuleStateCommand,
     StartAnalysisCommand,
+    StartReasoningAuditCommand,
     SyntheticTraceCommand,
 )
 from .analysis import AnalysisIntent, AnalysisWorkspace
 from .journey import PersonalResearchJourney
 from .instrument import InstrumentQuery, InstrumentWorkbench
+from .notebook import PrivateFragmentInput, ResearchNotebook, VerificationDraft
 from .portfolio import PortfolioBook
 from .rules import ObservationRuleBook, RuleEvaluationRequest
 from .security import PersonalAccessConfig, authorize_personal_request
@@ -44,6 +53,7 @@ class PersonalRuntime:
     instruments: InstrumentWorkbench | None = None
     rules: ObservationRuleBook | None = None
     analyses: AnalysisWorkspace | None = None
+    notebook: ResearchNotebook | None = None
 
     @classmethod
     def unconfigured(cls) -> "PersonalRuntime":
@@ -59,6 +69,7 @@ class PersonalRuntime:
             instruments=None,
             rules=None,
             analyses=None,
+            notebook=None,
         )
 
 
@@ -297,6 +308,88 @@ def create_personal_router(
         except ValueError as exc:
             _raise_domain_error(exc)
 
+    @router.get("/records")
+    def open_records(runtime: PersonalRuntime = Depends(require_read)) -> list[dict]:
+        actor, notebook = _configured_notebook(runtime)
+        try:
+            return [asdict(item) for item in notebook.open(actor)]
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+
+    @router.get("/records/{record_id}")
+    def open_record(record_id: str, runtime: PersonalRuntime = Depends(require_read)) -> dict:
+        actor, notebook = _configured_notebook(runtime)
+        try:
+            return asdict(notebook.open(actor, record_id))
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        except ValueError as exc:
+            _raise_domain_error(exc)
+
+    @router.post("/records/commands")
+    async def commit_record(
+        request: Request,
+        runtime: PersonalRuntime = Depends(require_write),
+    ) -> dict:
+        actor, notebook = _configured_notebook(runtime)
+        command = await _parse_record_command(request)
+        idempotency_key = request.headers["Idempotency-Key"].strip()
+        try:
+            if isinstance(command, SaveAnalysisRecordCommand):
+                result = notebook.save_analysis(
+                    actor,
+                    analysis_id=command.analysis_id,
+                    accepted_claim_ids=command.accepted_claim_ids,
+                    user_supplement=command.user_supplement,
+                    fragments=tuple(PrivateFragmentInput(item.holding_id, item.text) for item in command.private_fragments),
+                    verification_drafts=tuple(_verification_draft(item) for item in command.verification_drafts),
+                    idempotency_key=idempotency_key,
+                )
+            elif isinstance(command, AppendRecordSupplementCommand):
+                result = notebook.append_supplement(
+                    actor, record_id=command.record_id, expected_version=command.expected_version,
+                    supplement=command.supplement,
+                    fragments=tuple(PrivateFragmentInput(item.holding_id, item.text) for item in command.private_fragments),
+                    idempotency_key=idempotency_key,
+                )
+            elif isinstance(command, StartReasoningAuditCommand):
+                result = notebook.start_reasoning_audit(
+                    actor, record_id=command.record_id, expected_version=command.expected_version,
+                    idempotency_key=idempotency_key,
+                )
+            elif isinstance(command, CreateVerificationItemCommand):
+                result = notebook.create_verification_item(
+                    actor, record_id=command.record_id, expected_version=command.expected_version,
+                    draft=_verification_draft(command.item), idempotency_key=idempotency_key,
+                )
+            elif isinstance(command, AppendVerificationObservationCommand):
+                result = notebook.append_verification_observation(
+                    actor, record_id=command.record_id, expected_version=command.expected_version,
+                    item_id=command.item_id, result=command.result,
+                    evidence_ids=command.evidence_ids, note=command.note,
+                    idempotency_key=idempotency_key,
+                )
+            elif isinstance(command, ChangeRecordStateCommand):
+                state = {"archive": "archived", "trash": "trashed", "restore": "active"}[command.type]
+                result = notebook.change_state(
+                    actor, record_id=command.record_id, expected_version=command.expected_version,
+                    state=state, idempotency_key=idempotency_key,
+                )
+            elif isinstance(command, RequestRecordPurgeCommand):
+                result = notebook.request_purge(
+                    actor, record_id=command.record_id, expected_version=command.expected_version,
+                )
+            else:
+                result = notebook.confirm_purge(
+                    actor, record_id=command.record_id, expected_version=command.expected_version,
+                    challenge=command.challenge, idempotency_key=idempotency_key,
+                )
+            return asdict(result)
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        except ValueError as exc:
+            _raise_domain_error(exc)
+
     @router.post("/synthetic-traces", status_code=status.HTTP_201_CREATED)
     async def create_synthetic_trace(
         request: Request,
@@ -382,6 +475,15 @@ def _configured_analyses(runtime: PersonalRuntime) -> tuple[PersonalActor, Analy
     return runtime.actor, runtime.analyses
 
 
+def _configured_notebook(runtime: PersonalRuntime) -> tuple[PersonalActor, ResearchNotebook]:
+    if runtime.actor is None or runtime.notebook is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "personal_access_unconfigured", "message": "个人记录能力未配置。"},
+        )
+    return runtime.actor, runtime.notebook
+
+
 def _raise_domain_error(error: ValueError) -> None:
     code = str(error)
     if code in {
@@ -392,6 +494,7 @@ def _raise_domain_error(error: ValueError) -> None:
         "duplicate_symbol",
         "purge_challenge_invalid",
         "purge_challenge_expired",
+        "analysis_not_saveable",
     }:
         status_code = 409
     elif code in {"budget_blocked", "provider_rate_limited"}:
@@ -447,6 +550,46 @@ _RULE_COMMAND_TYPES = {
     "set_rule_state": SetObservationRuleStateCommand,
     "evaluate_rules": EvaluateObservationRulesCommand,
 }
+
+_RECORD_COMMAND_TYPES = {
+    "save_analysis": SaveAnalysisRecordCommand,
+    "append_supplement": AppendRecordSupplementCommand,
+    "start_reasoning_audit": StartReasoningAuditCommand,
+    "create_verification_item": CreateVerificationItemCommand,
+    "append_verification_observation": AppendVerificationObservationCommand,
+    "archive": ChangeRecordStateCommand,
+    "trash": ChangeRecordStateCommand,
+    "restore": ChangeRecordStateCommand,
+    "request_purge": RequestRecordPurgeCommand,
+    "confirm_purge": ConfirmRecordPurgeCommand,
+}
+
+
+async def _parse_record_command(request: Request):
+    try:
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise ValueError("invalid_command")
+        command_type = _RECORD_COMMAND_TYPES.get(payload.get("type"))
+        if command_type is None:
+            raise ValueError("invalid_command")
+        return command_type.model_validate(payload)
+    except (ValueError, TypeError, ValidationError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "invalid_command", "message": "个人记录命令格式无效。"},
+        ) from exc
+
+
+def _verification_draft(value) -> VerificationDraft:
+    return VerificationDraft(
+        value.claim_id,
+        value.question,
+        value.target,
+        value.expected_at,
+        value.source,
+        value.criterion,
+    )
 
 
 async def _parse_rule_command(request: Request):
