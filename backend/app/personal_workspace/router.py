@@ -8,11 +8,19 @@ from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
 from .contracts import (
+    AddHoldingCommand,
+    EditHoldingCommand,
     PersonalActor,
+    PurgeHoldingCommand,
+    RemoveHoldingCommand,
+    RequestPurgeHoldingCommand,
+    RestoreHoldingCommand,
     SaveSyntheticRecordCommand,
+    SetUsdCashCommand,
     SyntheticTraceCommand,
 )
 from .journey import PersonalResearchJourney
+from .portfolio import PortfolioBook
 from .security import PersonalAccessConfig, authorize_personal_request
 
 
@@ -21,6 +29,7 @@ class PersonalRuntime:
     access: PersonalAccessConfig
     actor: PersonalActor | None
     journey: PersonalResearchJourney | None
+    portfolio: PortfolioBook | None = None
 
     @classmethod
     def unconfigured(cls) -> "PersonalRuntime":
@@ -32,6 +41,7 @@ class PersonalRuntime:
             ),
             actor=None,
             journey=None,
+            portfolio=None,
         )
 
 
@@ -59,6 +69,46 @@ def create_personal_router(
             _raise_store_error(exc)
         except ValueError as exc:
             _raise_domain_error(exc)
+
+    @router.get("/portfolio")
+    def open_portfolio(runtime: PersonalRuntime = Depends(require_read)) -> dict:
+        actor, portfolio = _configured_portfolio(runtime)
+        try:
+            return asdict(portfolio.open(actor))
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+
+    @router.post("/portfolio/commands")
+    async def revise_portfolio(
+        request: Request,
+        runtime: PersonalRuntime = Depends(require_write),
+    ) -> dict:
+        actor, portfolio = _configured_portfolio(runtime)
+        command = await _parse_portfolio_command(request)
+        try:
+            if isinstance(command, RequestPurgeHoldingCommand):
+                result = portfolio.request_purge(
+                    actor,
+                    holding_id=command.holding_id,
+                    expected_portfolio_revision=command.expected_portfolio_revision,
+                )
+            elif isinstance(command, PurgeHoldingCommand):
+                result = portfolio.purge(
+                    actor,
+                    command,
+                    idempotency_key=request.headers["Idempotency-Key"].strip(),
+                )
+            else:
+                result = portfolio.revise(
+                    actor,
+                    command,
+                    idempotency_key=request.headers["Idempotency-Key"].strip(),
+                )
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        except ValueError as exc:
+            _raise_domain_error(exc)
+        return asdict(result)
 
     @router.post("/synthetic-traces", status_code=status.HTTP_201_CREATED)
     async def create_synthetic_trace(
@@ -109,9 +159,29 @@ def _configured_services(runtime: PersonalRuntime) -> tuple[PersonalActor, Perso
     return runtime.actor, runtime.journey
 
 
+def _configured_portfolio(runtime: PersonalRuntime) -> tuple[PersonalActor, PortfolioBook]:
+    if runtime.actor is None or runtime.portfolio is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "personal_access_unconfigured", "message": "个人持仓尚未配置。"},
+        )
+    return runtime.actor, runtime.portfolio
+
+
 def _raise_domain_error(error: ValueError) -> None:
     code = str(error)
-    status_code = 409 if code == "preview_changed" else 404
+    if code in {
+        "preview_changed",
+        "revision_conflict",
+        "duplicate_symbol",
+        "purge_challenge_invalid",
+        "purge_challenge_expired",
+    }:
+        status_code = 409
+    elif code in {"invalid_command", "invalid_decimal", "unsupported_instrument"}:
+        status_code = 422
+    else:
+        status_code = 404
     raise HTTPException(
         status_code=status_code,
         detail={"code": code, "message": "个人工作台命令未执行。"},
@@ -133,4 +203,42 @@ async def _parse_command(request: Request, command_type):
         raise HTTPException(
             status_code=422,
             detail={"code": "invalid_command", "message": "个人工作台命令格式无效。"},
+        ) from exc
+
+
+_PORTFOLIO_COMMAND_TYPES = {
+    "add_holding": AddHoldingCommand,
+    "edit_holding": EditHoldingCommand,
+    "remove_holding": RemoveHoldingCommand,
+    "restore_holding": RestoreHoldingCommand,
+    "set_usd_cash": SetUsdCashCommand,
+    "request_purge": RequestPurgeHoldingCommand,
+    "confirm_purge": PurgeHoldingCommand,
+}
+
+
+async def _parse_portfolio_command(request: Request):
+    try:
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise ValueError("invalid_command")
+        command_type = _PORTFOLIO_COMMAND_TYPES.get(payload.get("type"))
+        if command_type is None:
+            raise ValueError("invalid_command")
+        return command_type.model_validate(payload)
+    except ValidationError as exc:
+        decimal_fields = {"quantity", "average_cost", "usd_cash"}
+        code = (
+            "invalid_decimal"
+            if any(error.get("loc", (None,))[-1] in decimal_fields for error in exc.errors())
+            else "invalid_command"
+        )
+        raise HTTPException(
+            status_code=422,
+            detail={"code": code, "message": "个人持仓命令格式无效。"},
+        ) from exc
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "invalid_command", "message": "个人持仓命令格式无效。"},
         ) from exc

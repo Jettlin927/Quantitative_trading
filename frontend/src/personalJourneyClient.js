@@ -17,6 +17,16 @@ export class PersonalJourneyClient {
     return this.#request('/api/personal/today', { signal })
   }
 
+  /** @param {{ signal?: AbortSignal }} [options] */
+  openPortfolio({ signal } = {}) {
+    return this.#request('/api/personal/portfolio', { signal })
+  }
+
+  /** @param {{ command: unknown, idempotencyKey: string, signal?: AbortSignal }} options */
+  submitPortfolioCommand({ command, idempotencyKey, signal }) {
+    return this.#command('/api/personal/portfolio/commands', command, { idempotencyKey, signal })
+  }
+
   /** @param {{ question: string, idempotencyKey: string, signal?: AbortSignal }} options */
   createSyntheticTrace({ question, idempotencyKey, signal }) {
     return this.#command('/api/personal/synthetic-traces', { question }, { idempotencyKey, signal })

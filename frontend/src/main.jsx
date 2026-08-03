@@ -19,6 +19,7 @@ import {
 import { AShareDataView } from './AShareDataView.jsx'
 import { OperationsView } from './OperationsView.jsx'
 import { PersonalPlaceholder, PersonalTodayView } from './PersonalTodayView.jsx'
+import { PortfolioView } from './PortfolioView.jsx'
 import { ResearchCockpitView } from './ResearchCockpitView.jsx'
 import { USDataBoundaryView } from './USDataBoundaryView.jsx'
 import { browserPersonalJourneyClient } from './personalJourneyClient.js'
@@ -373,7 +374,7 @@ function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = brows
         <main className="workspace-main">
           {globalError ? <Notice tone="warning" title="部分数据暂不可用" text={globalError} /> : null}
           {activeView === 'today' ? <PersonalTodayView client={personalClient} chartAdapter={chartAdapter} /> : null}
-          {activeView === 'portfolio' ? <PersonalPlaceholder title="我的持仓" description="手工真实持仓将在 T1 受控启用；本阶段不写入任何真实持仓。" /> : null}
+          {activeView === 'portfolio' ? <PortfolioView client={personalClient} /> : null}
           {activeView === 'rules' ? <PersonalPlaceholder title="观察规则" description="T0 只展示 synthetic 四态；规则模板与历史将在 T2 交付。" /> : null}
           {activeView === 'records' ? <PersonalPlaceholder title="研究记录" description="当前只能由今日工作台显式保存 synthetic record。" /> : null}
           {activeView === 'markets' && !pathname.startsWith('/markets/a-share') ? <PersonalTodayView client={personalClient} chartAdapter={chartAdapter} /> : null}

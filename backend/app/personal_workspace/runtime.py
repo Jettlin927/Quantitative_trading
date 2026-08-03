@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from hashlib import sha256
 import os
 from pathlib import Path
 
@@ -11,6 +12,11 @@ from .contracts import PersonalActor
 from .crypto import PersonalDataCipher, load_keyring_file
 from .journey import PersonalResearchJourney
 from .persistence import PostgresPersonalJourneyStore
+from .portfolio import (
+    PortfolioBook,
+    PostgresPortfolioStore,
+    UnavailablePortfolioMarketReader,
+)
 from .router import PersonalRuntime
 from .security import PersonalAccessConfig
 from .synthetic import SyntheticWorkspaceAdapters
@@ -38,8 +44,16 @@ def get_personal_runtime() -> PersonalRuntime:
         return PersonalRuntime.unconfigured()
 
     private_engine = create_engine(database_url, pool_pre_ping=True)
-    store = PostgresPersonalJourneyStore(
-        sessionmaker(bind=private_engine, autoflush=False, expire_on_commit=False)
+    session_factory = sessionmaker(
+        bind=private_engine, autoflush=False, expire_on_commit=False
+    )
+    cipher = PersonalDataCipher(keyring)
+    portfolio = PortfolioBook(
+        store=PostgresPortfolioStore(session_factory, cipher=cipher),
+        market=UnavailablePortfolioMarketReader(),
+        challenge_key=sha256(
+            f"personal-purge|{gateway_token}".encode("utf-8")
+        ).digest(),
     )
     return PersonalRuntime(
         access=PersonalAccessConfig(
@@ -49,8 +63,10 @@ def get_personal_runtime() -> PersonalRuntime:
         ),
         actor=PersonalActor(actor_id="local-owner"),
         journey=PersonalResearchJourney(
-            store=store,
-            cipher=PersonalDataCipher(keyring),
+            store=PostgresPersonalJourneyStore(session_factory),
+            cipher=cipher,
             adapters=SyntheticWorkspaceAdapters(provider_available=False),
+            portfolio=portfolio,
         ),
+        portfolio=portfolio,
     )

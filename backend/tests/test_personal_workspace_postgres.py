@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+from decimal import Decimal
 import unittest
 
 from alembic import command
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.orm import sessionmaker
 
 from backend.app import models  # noqa: F401
+from backend.app.models import PersonalPortfolioRevision
 from backend.app.database import (
     PrivateBase,
     alembic_config,
@@ -15,25 +19,43 @@ from backend.app.database import (
     expected_schema_heads,
     schema_fingerprint,
 )
-from backend.app.personal_workspace.contracts import PersonalActor
-from backend.app.personal_workspace.crypto import FixedKeyring, PersonalDataCipher
+from backend.app.personal_workspace.contracts import (
+    AddHoldingCommand,
+    PersonalActor,
+    PurgeHoldingCommand,
+    SetUsdCashCommand,
+)
+from backend.app.personal_workspace.crypto import (
+    EncryptedEnvelope,
+    FixedKeyring,
+    PersonalDataCipher,
+)
 from backend.app.personal_workspace.journey import PersonalResearchJourney
 from backend.app.personal_workspace.persistence import PostgresPersonalJourneyStore
+from backend.app.personal_workspace.portfolio import (
+    PortfolioBook,
+    PortfolioPriceObservation,
+    PostgresPortfolioStore,
+    UnavailablePortfolioMarketReader,
+)
 from backend.app.personal_workspace.synthetic import SyntheticWorkspaceAdapters
 
 
 PRIVATE_TABLES = {
     "personal_workspaces",
     "personal_holdings",
+    "personal_portfolio_revisions",
+    "personal_audit_events",
     "personal_rule_evaluations",
     "personal_analysis_drafts",
     "personal_research_records",
 }
+ENCRYPTED_PRIVATE_TABLES = PRIVATE_TABLES - {"personal_audit_events"}
 
 
 class PersonalWorkspaceSchemaIdentityTest(unittest.TestCase):
     def test_private_orm_identity_is_separate_from_public_metadata(self) -> None:
-        self.assertEqual(expected_schema_heads(), ("0013_personal_workspace_t0",))
+        self.assertEqual(expected_schema_heads(), ("0014_personal_portfolio_t1",))
         self.assertEqual(
             set(PrivateBase.metadata.tables),
             {f"private_workbench.{table}" for table in PRIVATE_TABLES},
@@ -126,7 +148,17 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                 idempotency_key="pg-record-001",
             )
 
+            portfolio = PortfolioBook(
+                store=PostgresPortfolioStore(
+                    sessionmaker(bind=engine, autoflush=False, expire_on_commit=False),
+                    cipher=cipher,
+                ),
+                market=UnavailablePortfolioMarketReader(),
+                challenge_key=b"portfolio-challenge-key-for-tests" * 2,
+            ).open(actor)
+
             self.assertEqual(journey.open_today(actor).record.record_id, record.record_id)
+            self.assertEqual(portfolio.holdings, ())
             with engine.connect() as connection:
                 counts = {
                     table: connection.scalar(text(f"SELECT count(*) FROM private_workbench.{table}"))
@@ -134,7 +166,7 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                 }
                 raw_ciphertexts = b"|".join(
                     bytes(value)
-                    for table in PRIVATE_TABLES
+                    for table in ENCRYPTED_PRIVATE_TABLES
                     for value in connection.execute(
                         text(f"SELECT ciphertext FROM private_workbench.{table}")
                     ).scalars()
@@ -146,12 +178,188 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                         text(f"SELECT to_jsonb(row_value)::text FROM private_workbench.{table} AS row_value")
                     ).scalars()
                 )
-            self.assertEqual(counts, {table: 1 for table in PRIVATE_TABLES})
+            self.assertEqual(
+                counts,
+                {
+                    table: (0 if table in {"personal_portfolio_revisions", "personal_audit_events"} else 1)
+                    for table in PRIVATE_TABLES
+                },
+            )
             self.assertNotIn(b"SYNTH-001", raw_ciphertexts)
             self.assertNotIn("PostgreSQL 合成问题正文".encode("utf-8"), raw_ciphertexts)
             self.assertNotIn("SYNTH-001", database_projection)
             self.assertNotIn("12.5000", database_projection)
             self.assertNotIn("PostgreSQL 合成问题正文", database_projection)
+        finally:
+            engine.dispose()
+
+    def test_portfolio_current_and_immutable_revision_are_atomic_under_concurrent_writes(self) -> None:
+        engine = create_engine(os.environ["TEST_POSTGRES_URL"])
+        try:
+            with engine.connect() as connection:
+                command.upgrade(alembic_config(connection), "head")
+            with engine.begin() as connection:
+                for table in (
+                    "personal_audit_events",
+                    "personal_portfolio_revisions",
+                    "personal_research_records",
+                    "personal_analysis_drafts",
+                    "personal_rule_evaluations",
+                    "personal_holdings",
+                    "personal_workspaces",
+                ):
+                    connection.execute(text(f"DELETE FROM private_workbench.{table}"))
+
+            cipher = PersonalDataCipher(
+                FixedKeyring(
+                    active_key_id="portfolio-key",
+                    data_keys={"portfolio-key": bytes(range(32))},
+                    lookup_key=b"portfolio-lookup-key-for-tests-only",
+                )
+            )
+            session_factory = sessionmaker(
+                bind=engine, autoflush=False, expire_on_commit=False
+            )
+
+            class FixedMarket:
+                def observe_price(self, symbol: str) -> PortfolioPriceObservation:
+                    return PortfolioPriceObservation.available(
+                        price=Decimal("120.50"),
+                        source_health="fresh",
+                        as_of=datetime(2026, 8, 3, 2, 45, tzinfo=timezone.utc),
+                        feed="sip",
+                        delay_seconds=900,
+                        source_ids=("alpaca-acme",),
+                    )
+
+            book = PortfolioBook(
+                store=PostgresPortfolioStore(session_factory, cipher=cipher),
+                market=FixedMarket(),
+                clock=lambda: datetime(2026, 8, 3, 3, 0, tzinfo=timezone.utc),
+                challenge_key=b"portfolio-challenge-key-for-tests" * 2,
+            )
+            actor = PersonalActor(actor_id="portfolio-owner")
+            created = book.revise(
+                actor,
+                AddHoldingCommand(
+                    type="add_holding",
+                    symbol="ACME",
+                    name="Acme Private Holdings",
+                    quantity="2",
+                    average_cost="100.25",
+                    expected_portfolio_revision=0,
+                ),
+                idempotency_key="pg-add-acme",
+            )
+
+            def update_cash(value: str, key: str):
+                try:
+                    return book.revise(
+                        actor,
+                        SetUsdCashCommand(
+                            type="set_usd_cash",
+                            usd_cash=value,
+                            expected_portfolio_revision=1,
+                        ),
+                        idempotency_key=key,
+                    )
+                except ValueError as exc:
+                    return str(exc)
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                outcomes = list(
+                    executor.map(
+                        lambda args: update_cash(*args),
+                        (("50", "pg-cash-50"), ("60", "pg-cash-60")),
+                    )
+                )
+
+            self.assertEqual(created.portfolio_revision, 1)
+            self.assertEqual(sum(result == "revision_conflict" for result in outcomes), 1)
+            self.assertEqual(sum(not isinstance(result, str) for result in outcomes), 1)
+            readback = book.open(actor)
+            self.assertEqual(readback.portfolio_revision, 2)
+            self.assertIn(readback.usd_cash, {"50.0000", "60.0000"})
+
+            with engine.connect() as connection:
+                holding_id = connection.scalar(
+                    text("SELECT id FROM private_workbench.personal_holdings")
+                )
+                revision_count = connection.scalar(
+                    text("SELECT count(*) FROM private_workbench.personal_portfolio_revisions")
+                )
+                raw_projection = "|".join(
+                    connection.execute(
+                        text(
+                            "SELECT to_jsonb(row_value)::text "
+                            "FROM private_workbench.personal_holdings AS row_value "
+                            "UNION ALL "
+                            "SELECT to_jsonb(row_value)::text "
+                            "FROM private_workbench.personal_portfolio_revisions AS row_value "
+                            "UNION ALL "
+                            "SELECT to_jsonb(row_value)::text "
+                            "FROM private_workbench.personal_workspaces AS row_value"
+                        )
+                    ).scalars()
+                )
+            self.assertEqual(revision_count, 2)
+            for private_value in ("ACME", "Acme Private Holdings", "100.25"):
+                self.assertNotIn(private_value, raw_projection)
+
+            challenge = book.request_purge(
+                actor,
+                holding_id=holding_id,
+                expected_portfolio_revision=2,
+            )
+            receipt = book.purge(
+                actor,
+                PurgeHoldingCommand(
+                    holding_id=holding_id,
+                    expected_portfolio_revision=2,
+                    challenge=challenge.challenge,
+                ),
+                idempotency_key="pg-purge-acme",
+            )
+            with engine.connect() as connection:
+                holding_count = connection.scalar(
+                    text("SELECT count(*) FROM private_workbench.personal_holdings")
+                )
+                holding_revision_count = connection.scalar(
+                    text(
+                        "SELECT count(*) FROM private_workbench.personal_portfolio_revisions "
+                        "WHERE holding_id = :holding_id"
+                    ),
+                    {"holding_id": holding_id},
+                )
+                audit_count = connection.scalar(
+                    text("SELECT count(*) FROM private_workbench.personal_audit_events")
+                )
+            self.assertEqual(receipt.portfolio_revision, 3)
+            self.assertEqual(holding_count, 0)
+            self.assertEqual(holding_revision_count, 0)
+            self.assertEqual(audit_count, 1)
+            with session_factory() as session:
+                remaining_revisions = session.scalars(
+                    select(PersonalPortfolioRevision)
+                ).all()
+                remaining_payloads = [
+                    cipher.decrypt_json(
+                        EncryptedEnvelope(
+                            ciphertext=bytes(row.ciphertext),
+                            nonce=bytes(row.nonce),
+                            key_id=row.key_id,
+                            payload_schema=row.payload_schema,
+                        ),
+                        aad=(
+                            "private_workbench|personal_portfolio_revisions|"
+                            f"{row.id}|payload|1"
+                        ),
+                    )
+                    for row in remaining_revisions
+                ]
+            self.assertEqual(len(remaining_payloads), 1)
+            self.assertNotIn("holdings", remaining_payloads[0]["before"])
+            self.assertNotIn("holdings", remaining_payloads[0]["after"])
         finally:
             engine.dispose()
 
