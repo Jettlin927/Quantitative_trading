@@ -18,6 +18,7 @@ RUN npm run typecheck \
 FROM nginx:stable-alpine
 
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --chmod=755 frontend/docker-entrypoint.d/15-personal-gateway.sh /docker-entrypoint.d/15-personal-gateway.sh
 COPY --from=frontend-build /app/dist/ /usr/share/nginx/html/
 
 EXPOSE 5173

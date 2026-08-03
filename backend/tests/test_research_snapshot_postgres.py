@@ -48,6 +48,7 @@ class ResearchSnapshotPostgresIntegrationTest(unittest.TestCase):
         engine = create_engine(database_url)
         try:
             with engine.begin() as connection:
+                connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
                 connection.execute(text("DROP SCHEMA public CASCADE"))
                 connection.execute(text("CREATE SCHEMA public"))
             with engine.connect() as connection:
@@ -70,6 +71,7 @@ class ResearchSnapshotPostgresIntegrationTest(unittest.TestCase):
                 self.assertTrue(reproduce_quant_research(result.path)["matches"])
         finally:
             with engine.begin() as connection:
+                connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
                 connection.execute(text("DROP SCHEMA public CASCADE"))
                 connection.execute(text("CREATE SCHEMA public"))
             engine.dispose()
@@ -82,6 +84,7 @@ class ResearchSnapshotPostgresIntegrationTest(unittest.TestCase):
         engine = create_engine(database_url)
         try:
             with engine.begin() as connection:
+                connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
                 connection.execute(text("DROP SCHEMA public CASCADE"))
                 connection.execute(text("CREATE SCHEMA public"))
             with engine.connect() as connection:
@@ -116,6 +119,7 @@ class ResearchSnapshotPostgresIntegrationTest(unittest.TestCase):
                     )
         finally:
             with engine.begin() as connection:
+                connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
                 connection.execute(text("DROP SCHEMA public CASCADE"))
                 connection.execute(text("CREATE SCHEMA public"))
             engine.dispose()
@@ -128,6 +132,7 @@ class ResearchSnapshotPostgresIntegrationTest(unittest.TestCase):
         engine = create_engine(database_url)
         try:
             with engine.begin() as connection:
+                connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
                 connection.execute(text("DROP SCHEMA public CASCADE"))
                 connection.execute(text("CREATE SCHEMA public"))
             with engine.connect() as connection:
@@ -219,6 +224,7 @@ class ResearchSnapshotPostgresIntegrationTest(unittest.TestCase):
                 )
         finally:
             with engine.begin() as connection:
+                connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
                 connection.execute(text("DROP SCHEMA public CASCADE"))
                 connection.execute(text("CREATE SCHEMA public"))
             engine.dispose()

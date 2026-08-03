@@ -11,7 +11,7 @@ from alembic import command
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import MetaData, create_engine, inspect
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -61,6 +61,10 @@ class Base(DeclarativeBase):
     pass
 
 
+class PrivateBase(DeclarativeBase):
+    metadata = MetaData(schema="private_workbench")
+
+
 class SchemaRevisionError(RuntimeError):
     pass
 
@@ -106,14 +110,22 @@ def assert_schema_revision_at_head(bind: Engine = engine) -> None:
         )
 
 
-def schema_fingerprint(connection: Connection) -> dict[str, Any]:
+def schema_fingerprint(connection: Connection, *, schema: str = "public") -> dict[str, Any]:
     inspector = inspect(connection)
-    schema = "public" if connection.dialect.name == "postgresql" else None
-    table_names = sorted(name for name in inspector.get_table_names(schema=schema) if name != "alembic_version")
-    sequence_names = sorted(inspector.get_sequence_names(schema=schema)) if connection.dialect.name == "postgresql" else []
+    inspected_schema = schema if connection.dialect.name == "postgresql" else None
+    table_names = sorted(
+        name
+        for name in inspector.get_table_names(schema=inspected_schema)
+        if not (schema == "public" and name == "alembic_version")
+    )
+    sequence_names = (
+        sorted(inspector.get_sequence_names(schema=inspected_schema))
+        if connection.dialect.name == "postgresql"
+        else []
+    )
     table_fingerprints: dict[str, str] = {}
     for table_name in table_names:
-        contract = _table_schema_contract(inspector, connection, table_name, schema)
+        contract = _table_schema_contract(inspector, connection, table_name, inspected_schema)
         table_fingerprints[table_name] = _canonical_sha256(contract)
     return {
         "sha256": _canonical_sha256({"sequences": sequence_names, "tables": table_fingerprints}),

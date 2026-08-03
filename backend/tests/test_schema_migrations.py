@@ -834,6 +834,7 @@ class PostgresSchemaMigrationIntegrationTest(unittest.TestCase):
     @staticmethod
     def _reset_ephemeral_database(engine) -> None:
         with engine.begin() as connection:
+            connection.execute(text("DROP SCHEMA IF EXISTS private_workbench CASCADE"))
             connection.execute(text("DROP SCHEMA public CASCADE"))
             connection.execute(text("CREATE SCHEMA public"))
 

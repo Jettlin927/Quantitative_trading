@@ -181,6 +181,8 @@ from .us_experiment import (
     sync_daily_prices as sync_us_experiment_daily_prices,
 )
 from .strategy_results import build_strategy_results_overview
+from .personal_workspace.router import create_personal_router
+from .personal_workspace.runtime import get_personal_runtime
 
 
 @asynccontextmanager
@@ -190,13 +192,22 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Quant Data Workspace", version="0.3.0", lifespan=lifespan)
+cors_allowed_origins = sorted(
+    {
+        origin.strip()
+        for variable in ("CORS_ALLOWED_ORIGINS", "PERSONAL_ALLOWED_ORIGINS")
+        for origin in os.getenv(variable, "").split(",")
+        if origin.strip()
+    }
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=cors_allowed_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(create_personal_router(get_personal_runtime))
 
 INDEX_BASIC_FIELDS = "ts_code,name,market,publisher,category,base_date,list_date"
 FUND_BASIC_FIELDS = "ts_code,name,management,custodian,fund_type,list_date,market"
