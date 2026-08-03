@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import json
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
@@ -17,6 +18,7 @@ from backend.app.personal_workspace.analysis import (
     ProviderFailure,
     ScriptedResponsesAdapter,
     _deepseek_http_transport,
+    _stored_draft_payload,
 )
 from backend.app.personal_workspace.contracts import PersonalActor
 
@@ -296,6 +298,18 @@ class PersonalAnalysisTest(unittest.TestCase):
         self.assertNotIn("alpaca-price-1", payload)
         self.assertNotIn("private-weight-1", payload)
         self.assertNotIn("rule-price-1", payload)
+
+    def test_persisted_preview_serializes_nested_evidence_as_of(self) -> None:
+        draft = self.workspace.prepare(
+            self.actor,
+            AnalysisIntent(question="持久化冻结证据预览", subject_ids=("ACME",)),
+            idempotency_key="prepare-persisted-preview",
+        )
+        stored = self.store.get_draft(self.actor.actor_id, draft.draft_id)
+
+        payload = json.loads(json.dumps(_stored_draft_payload(stored)))
+
+        self.assertEqual(payload["receipt"]["evidence"][0]["as_of"], NOW.isoformat())
 
     def test_preview_is_single_use_and_expiry_requires_prepare_again(self) -> None:
         draft = self.workspace.prepare(

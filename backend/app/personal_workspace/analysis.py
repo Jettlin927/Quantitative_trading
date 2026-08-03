@@ -1526,6 +1526,13 @@ def _append_event(
 
 def _stored_draft_payload(draft: StoredAnalysisDraft) -> dict[str, Any]:
     receipt = asdict(draft.receipt)
+    receipt["evidence"] = [
+        {
+            **item,
+            "as_of": item["as_of"].isoformat(),
+        }
+        for item in receipt["evidence"]
+    ]
     receipt["expires_at"] = draft.receipt.expires_at.isoformat()
     receipt["consumed_at"] = (
         draft.receipt.consumed_at.isoformat()
