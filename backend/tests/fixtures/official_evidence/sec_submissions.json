@@ -1,0 +1,14 @@
+{
+  "cik": "0000000123",
+  "name": "Synthetic Issuer One",
+  "filings": {
+    "recent": {
+      "accessionNumber": ["0000000123-26-000001"],
+      "filingDate": ["2026-07-30"],
+      "reportDate": ["2026-06-30"],
+      "acceptanceDateTime": ["2026-07-30T20:15:30.000Z"],
+      "form": ["10-Q"],
+      "primaryDocument": ["synthetic-20260630.htm"]
+    }
+  }
+}

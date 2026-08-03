@@ -1,0 +1,16 @@
+{
+  "BEAAPI": {
+    "Results": {
+      "Data": [
+        {
+          "TableName": "T10101",
+          "LineNumber": "1",
+          "LineDescription": "Gross domestic product",
+          "TimePeriod": "2026Q2",
+          "CL_UNIT": "Billions of dollars",
+          "DataValue": "31,000.0"
+        }
+      ]
+    }
+  }
+}
