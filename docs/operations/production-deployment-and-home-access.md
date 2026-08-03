@@ -2,8 +2,8 @@
 
 关联：[ADR 0008：单一生产服务器与旧服务器退役](../adr/0008-single-production-server-and-retired-legacy-host.md)、[远程访问决策：仅使用 SSH 隧道](private-https-authentication-decision.md)。历史双服务器迁移方法见 [ADR 0005](../adr/0005-new-server-replaces-production-safely.md)，不得据此恢复旧服务器角色。
 
-本文是当前生产操作合同。它不记录易变化的提交、运行 ID、表行数或部署状态，也不
-构成生产授权；所有生产事实必须在 `quant-trading-prod` 现场读回。
+本文是稳定操作合同，也是当前生产操作合同。它不记录易变化的提交、运行 ID、表行数
+或部署状态，也不构成生产授权；所有生产事实必须在 `quant-trading-prod` 现场读回。
 
 ## 当前拓扑
 
@@ -90,8 +90,9 @@
 
 ## SSH 隧道访问
 
-多台电脑可以同时建立独立隧道。每台设备必须使用自己的 SSH 密钥；不能复制私钥，
-新增或撤销公钥仍属于凭据变更。
+macOS、Linux 与 Windows 电脑可以同时建立独立隧道。每台设备必须使用自己的 SSH
+密钥；不能复制私钥，新增或撤销公钥仍属于凭据变更。SSH 隧道只提供连接，不会启动
+生产应用、部署代码或迁移数据。
 
 运维别名统一为 `quant-trading-prod`。仅端口转发的独立密钥建议使用
 `quant-trading-prod-tunnel`：
@@ -142,7 +143,7 @@ Windows 任务计划程序如需登录后自动启动，只运行当前用户权
 
 - 未经精确授权执行 `docker compose down -v`、`docker volume rm`、覆盖恢复或删除
   canonical 工件。
-- 复制运行中的 PostgreSQL volume，或跳过逻辑备份校验直接恢复。
+- 不得复制运行中的 PostgreSQL volume，或跳过逻辑备份校验直接恢复。
 - 把 `.env`、IP、用户名、密码、token、私钥、主机指纹或真实账户数据提交到 Git。
 - 为方便访问而把 PostgreSQL、API 或前端绑定到公网，或擅自部署域名、
   Cloudflare/Tailscale 入口。

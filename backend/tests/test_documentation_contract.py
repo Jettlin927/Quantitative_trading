@@ -92,13 +92,14 @@ class DocumentationContractTest(unittest.TestCase):
         self.assertIn("本文是稳定操作合同", handoff)
         self.assertIn("不构成生产授权", handoff)
         self.assertIn("不得复制运行中的 PostgreSQL volume", handoff)
-        self.assertIn("旧服务器保持完整", handoff)
-        self.assertIn("多台设备同时访问", handoff)
-        self.assertIn("macOS 电脑", handoff)
-        self.assertIn("Windows 家庭电脑", handoff)
+        self.assertIn("`quant-trading-prod` 是唯一生产服务器和唯一数据权威", handoff)
+        self.assertIn("原旧服务器已经退出本系统", handoff)
+        self.assertNotIn("旧服务器保持完整", handoff)
+        self.assertIn("macOS、Linux 与 Windows 电脑可以同时建立独立隧道", handoff)
         self.assertIn("127.0.0.1:25173", handoff)
         self.assertIn("SSH 隧道只提供连接", handoff)
         self.assertIn(str(handoff_path.relative_to(REPO_ROOT)), agents)
+        self.assertIn("`quant-trading-prod` 是唯一生产服务器和唯一数据权威", agents)
 
     def test_document_index_routes_every_module(self) -> None:
         index = (DOCS_ROOT / "index.md").read_text(encoding="utf-8")
