@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from functools import lru_cache
 from hashlib import sha256
 import os
@@ -11,6 +12,11 @@ from sqlalchemy.orm import sessionmaker
 from .contracts import PersonalActor
 from .crypto import PersonalDataCipher, load_keyring_file
 from .journey import PersonalResearchJourney
+from .instrument import (
+    InstrumentEvent,
+    InstrumentWorkbench,
+    UnavailableInstrumentObservationReader,
+)
 from .persistence import PostgresPersonalJourneyStore
 from .portfolio import (
     PortfolioBook,
@@ -18,6 +24,11 @@ from .portfolio import (
     UnavailablePortfolioMarketReader,
 )
 from .router import PersonalRuntime
+from .rules import (
+    ObservationRuleBook,
+    PostgresObservationRuleStore,
+    UnavailableRuleInputReader,
+)
 from .security import PersonalAccessConfig
 from .synthetic import SyntheticWorkspaceAdapters
 
@@ -55,18 +66,53 @@ def get_personal_runtime() -> PersonalRuntime:
             f"personal-purge|{gateway_token}".encode("utf-8")
         ).digest(),
     )
+    actor = PersonalActor(actor_id="local-owner")
+    rules = ObservationRuleBook(
+        store=PostgresObservationRuleStore(session_factory, cipher=cipher),
+        inputs=UnavailableRuleInputReader(),
+    )
+
+    def read_cost(request_actor: PersonalActor, symbol: str):
+        for holding in portfolio.open(request_actor).holdings:
+            if holding.symbol == symbol and holding.state == "active":
+                return Decimal(holding.average_cost)
+        return None
+
+    def read_rule_events(request_actor: PersonalActor, symbol: str):
+        return tuple(
+            InstrumentEvent(
+                event_id=item.attention_id,
+                track="personal_rule" if item.kind == "rule_hit" else "data_gap",
+                event_type=item.kind,
+                label=item.label,
+                occurred_at=item.as_of,
+                evidence_ids=(),
+                confirmation_state=item.result,
+            )
+            for item in rules.attention(request_actor, symbol=symbol)
+        )
+
+    instruments = InstrumentWorkbench(
+        source=UnavailableInstrumentObservationReader(),
+        cost_reader=read_cost,
+        rule_attention_reader=read_rule_events,
+        formal_overlay_reader=lambda symbol: (),
+    )
     return PersonalRuntime(
         access=PersonalAccessConfig(
             gateway_token=gateway_token,
             allowed_origins=allowed_origins,
             configured=True,
         ),
-        actor=PersonalActor(actor_id="local-owner"),
+        actor=actor,
         journey=PersonalResearchJourney(
             store=PostgresPersonalJourneyStore(session_factory),
             cipher=cipher,
             adapters=SyntheticWorkspaceAdapters(provider_available=False),
             portfolio=portfolio,
+            rulebook=rules,
         ),
         portfolio=portfolio,
+        instruments=instruments,
+        rules=rules,
     )

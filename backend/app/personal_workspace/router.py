@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from datetime import date, datetime, timezone
 from typing import Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -9,7 +10,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from .contracts import (
     AddHoldingCommand,
+    CreateObservationRuleCommand,
     EditHoldingCommand,
+    EvaluateObservationRulesCommand,
     PersonalActor,
     PurgeHoldingCommand,
     RemoveHoldingCommand,
@@ -17,10 +20,13 @@ from .contracts import (
     RestoreHoldingCommand,
     SaveSyntheticRecordCommand,
     SetUsdCashCommand,
+    SetObservationRuleStateCommand,
     SyntheticTraceCommand,
 )
 from .journey import PersonalResearchJourney
+from .instrument import InstrumentQuery, InstrumentWorkbench
 from .portfolio import PortfolioBook
+from .rules import ObservationRuleBook, RuleEvaluationRequest
 from .security import PersonalAccessConfig, authorize_personal_request
 
 
@@ -30,6 +36,8 @@ class PersonalRuntime:
     actor: PersonalActor | None
     journey: PersonalResearchJourney | None
     portfolio: PortfolioBook | None = None
+    instruments: InstrumentWorkbench | None = None
+    rules: ObservationRuleBook | None = None
 
     @classmethod
     def unconfigured(cls) -> "PersonalRuntime":
@@ -42,6 +50,8 @@ class PersonalRuntime:
             actor=None,
             journey=None,
             portfolio=None,
+            instruments=None,
+            rules=None,
         )
 
 
@@ -77,6 +87,69 @@ def create_personal_router(
             return asdict(portfolio.open(actor))
         except SQLAlchemyError as exc:
             _raise_store_error(exc)
+
+    @router.get("/instruments/{asset_id}")
+    def open_instrument(
+        asset_id: str,
+        as_of: datetime | None = None,
+        selected_date: date | None = None,
+        runtime: PersonalRuntime = Depends(require_read),
+    ) -> dict:
+        actor, instruments = _configured_instruments(runtime)
+        try:
+            return asdict(
+                instruments.open(
+                    actor,
+                    InstrumentQuery(
+                        symbol=asset_id,
+                        as_of=as_of or datetime.now(timezone.utc),
+                        selected_date=selected_date,
+                    ),
+                )
+            )
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        except ValueError as exc:
+            _raise_domain_error(exc)
+
+    @router.get("/rule-templates")
+    def list_rule_templates(runtime: PersonalRuntime = Depends(require_read)) -> list[dict]:
+        actor, rules = _configured_rules(runtime)
+        return [asdict(item) for item in rules.list_templates(actor)]
+
+    @router.get("/rules")
+    def open_rules(runtime: PersonalRuntime = Depends(require_read)) -> dict:
+        actor, rules = _configured_rules(runtime)
+        try:
+            return _asdict_mapping(rules.open(actor))
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+
+    @router.post("/rules/commands")
+    async def revise_rules(
+        request: Request,
+        runtime: PersonalRuntime = Depends(require_write),
+    ) -> dict:
+        actor, rules = _configured_rules(runtime)
+        command = await _parse_rule_command(request)
+        try:
+            if isinstance(command, EvaluateObservationRulesCommand):
+                result = rules.evaluate(
+                    actor,
+                    RuleEvaluationRequest(symbol=command.symbol, as_of=command.as_of),
+                    idempotency_key=request.headers["Idempotency-Key"].strip(),
+                )
+            else:
+                result = rules.revise(
+                    actor,
+                    command,
+                    idempotency_key=request.headers["Idempotency-Key"].strip(),
+                )
+            return asdict(result)
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        except ValueError as exc:
+            _raise_domain_error(exc)
 
     @router.post("/portfolio/commands")
     async def revise_portfolio(
@@ -168,6 +241,24 @@ def _configured_portfolio(runtime: PersonalRuntime) -> tuple[PersonalActor, Port
     return runtime.actor, runtime.portfolio
 
 
+def _configured_instruments(runtime: PersonalRuntime) -> tuple[PersonalActor, InstrumentWorkbench]:
+    if runtime.actor is None or runtime.instruments is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "personal_access_unconfigured", "message": "标的工作台尚未配置。"},
+        )
+    return runtime.actor, runtime.instruments
+
+
+def _configured_rules(runtime: PersonalRuntime) -> tuple[PersonalActor, ObservationRuleBook]:
+    if runtime.actor is None or runtime.rules is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "personal_access_unconfigured", "message": "观察规则尚未配置。"},
+        )
+    return runtime.actor, runtime.rules
+
+
 def _raise_domain_error(error: ValueError) -> None:
     code = str(error)
     if code in {
@@ -178,7 +269,13 @@ def _raise_domain_error(error: ValueError) -> None:
         "purge_challenge_expired",
     }:
         status_code = 409
-    elif code in {"invalid_command", "invalid_decimal", "unsupported_instrument"}:
+    elif code in {
+        "invalid_command",
+        "invalid_decimal",
+        "invalid_rule_parameters",
+        "unsupported_instrument",
+        "as_of_requires_timezone",
+    }:
         status_code = 422
     else:
         status_code = 404
@@ -215,6 +312,35 @@ _PORTFOLIO_COMMAND_TYPES = {
     "request_purge": RequestPurgeHoldingCommand,
     "confirm_purge": PurgeHoldingCommand,
 }
+
+_RULE_COMMAND_TYPES = {
+    "create_rule": CreateObservationRuleCommand,
+    "set_rule_state": SetObservationRuleStateCommand,
+    "evaluate_rules": EvaluateObservationRulesCommand,
+}
+
+
+async def _parse_rule_command(request: Request):
+    try:
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise ValueError("invalid_command")
+        command_type = _RULE_COMMAND_TYPES.get(payload.get("type"))
+        if command_type is None:
+            raise ValueError("invalid_command")
+        return command_type.model_validate(payload)
+    except (ValueError, TypeError, ValidationError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "invalid_command", "message": "观察规则命令格式无效。"},
+        ) from exc
+
+
+def _asdict_mapping(value: dict) -> dict:
+    return {
+        key: [asdict(item) for item in items]
+        for key, items in value.items()
+    }
 
 
 async def _parse_portfolio_command(request: Request):

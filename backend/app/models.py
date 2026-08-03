@@ -308,6 +308,75 @@ class PersonalAuditEvent(PrivateBase):
     backup_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class PersonalRuleInstance(PrivateBase):
+    __tablename__ = "personal_rule_instances"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    template_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    template_version: Mapped[int] = mapped_column(nullable=False)
+    state: Mapped[str] = mapped_column(String(24), nullable=False)
+    revision: Mapped[int] = mapped_column(nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PersonalRuleRevision(PrivateBase):
+    __tablename__ = "personal_rule_revisions"
+    __table_args__ = (
+        UniqueConstraint("rule_id", "revision", name="uq_personal_rule_revision"),
+        UniqueConstraint("workspace_id", "idempotency_hash", name="uq_personal_rule_idempotency"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    rule_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_rule_instances.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    revision: Mapped[int] = mapped_column(nullable=False)
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    idempotency_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PersonalRuleEvaluationBatch(PrivateBase):
+    __tablename__ = "personal_rule_evaluation_batches"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "idempotency_hash", name="uq_personal_rule_batch_idempotency"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    as_of: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    idempotency_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class PersonalRuleEvaluation(PrivateBase):
     __tablename__ = "personal_rule_evaluations"
 
@@ -318,6 +387,16 @@ class PersonalRuleEvaluation(PrivateBase):
     )
     result_summary: Mapped[str] = mapped_column(String(64), nullable=False)
     synthetic: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    batch_id: Mapped[str | None] = mapped_column(
+        ForeignKey("private_workbench.personal_rule_evaluation_batches.id", ondelete="CASCADE")
+    )
+    rule_revision_id: Mapped[str | None] = mapped_column(
+        ForeignKey("private_workbench.personal_rule_revisions.id", ondelete="CASCADE")
+    )
+    result: Mapped[str | None] = mapped_column(String(32))
+    as_of: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    evidence_ids: Mapped[list[str] | None] = mapped_column(JSON)
+    fingerprint: Mapped[str | None] = mapped_column(String(64))
     ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     key_id: Mapped[str] = mapped_column(String(64), nullable=False)

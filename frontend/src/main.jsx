@@ -18,9 +18,11 @@ import {
 } from 'lucide-react'
 import { AShareDataView } from './AShareDataView.jsx'
 import { OperationsView } from './OperationsView.jsx'
+import { InstrumentWorkspaceView } from './InstrumentWorkspaceView.jsx'
 import { PersonalPlaceholder, PersonalTodayView } from './PersonalTodayView.jsx'
 import { PortfolioView } from './PortfolioView.jsx'
 import { ResearchCockpitView } from './ResearchCockpitView.jsx'
+import { RulesView } from './RulesView.jsx'
 import { USDataBoundaryView } from './USDataBoundaryView.jsx'
 import { browserPersonalJourneyClient } from './personalJourneyClient.js'
 import { browserReadAdapter, systemClock } from './readAdapter.js'
@@ -375,9 +377,9 @@ function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = brows
           {globalError ? <Notice tone="warning" title="部分数据暂不可用" text={globalError} /> : null}
           {activeView === 'today' ? <PersonalTodayView client={personalClient} chartAdapter={chartAdapter} /> : null}
           {activeView === 'portfolio' ? <PortfolioView client={personalClient} /> : null}
-          {activeView === 'rules' ? <PersonalPlaceholder title="观察规则" description="T0 只展示 synthetic 四态；规则模板与历史将在 T2 交付。" /> : null}
+          {activeView === 'rules' ? <RulesView client={personalClient} /> : null}
           {activeView === 'records' ? <PersonalPlaceholder title="研究记录" description="当前只能由今日工作台显式保存 synthetic record。" /> : null}
-          {activeView === 'markets' && !pathname.startsWith('/markets/a-share') ? <PersonalTodayView client={personalClient} chartAdapter={chartAdapter} /> : null}
+          {activeView === 'markets' && !pathname.startsWith('/markets/a-share') ? <InstrumentWorkspaceView client={personalClient} symbol={personalInstrumentSymbol(pathname)} chartAdapter={chartAdapter} /> : null}
           {activeView === 'research' ? (
             <ResearchCockpitView
               strategies={strategies}
@@ -510,6 +512,11 @@ function routeView(pathname) {
   if (pathname.startsWith('/system')) return 'system'
   if (pathname.startsWith('/legacy/us-data')) return 'legacy-us-data'
   return 'today'
+}
+
+function personalInstrumentSymbol(pathname) {
+  const value = pathname.split('/')[3] || 'SYNTH-001'
+  return decodeURIComponent(value)
 }
 
 function useWorkspaceRoute({ initialPath, browserHistory }) {

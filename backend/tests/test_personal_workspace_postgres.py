@@ -47,6 +47,9 @@ PRIVATE_TABLES = {
     "personal_portfolio_revisions",
     "personal_audit_events",
     "personal_rule_evaluations",
+    "personal_rule_instances",
+    "personal_rule_revisions",
+    "personal_rule_evaluation_batches",
     "personal_analysis_drafts",
     "personal_research_records",
 }
@@ -55,7 +58,7 @@ ENCRYPTED_PRIVATE_TABLES = PRIVATE_TABLES - {"personal_audit_events"}
 
 class PersonalWorkspaceSchemaIdentityTest(unittest.TestCase):
     def test_private_orm_identity_is_separate_from_public_metadata(self) -> None:
-        self.assertEqual(expected_schema_heads(), ("0014_personal_portfolio_t1",))
+        self.assertEqual(expected_schema_heads(), ("0015_personal_rules_t2",))
         self.assertEqual(
             set(PrivateBase.metadata.tables),
             {f"private_workbench.{table}" for table in PRIVATE_TABLES},
@@ -116,6 +119,9 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                     "personal_research_records",
                     "personal_analysis_drafts",
                     "personal_rule_evaluations",
+                    "personal_rule_evaluation_batches",
+                    "personal_rule_revisions",
+                    "personal_rule_instances",
                     "personal_holdings",
                     "personal_workspaces",
                 ):
@@ -181,7 +187,18 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
             self.assertEqual(
                 counts,
                 {
-                    table: (0 if table in {"personal_portfolio_revisions", "personal_audit_events"} else 1)
+                    table: (
+                        0
+                        if table
+                        in {
+                            "personal_portfolio_revisions",
+                            "personal_audit_events",
+                            "personal_rule_instances",
+                            "personal_rule_revisions",
+                            "personal_rule_evaluation_batches",
+                        }
+                        else 1
+                    )
                     for table in PRIVATE_TABLES
                 },
             )
@@ -205,6 +222,9 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                     "personal_research_records",
                     "personal_analysis_drafts",
                     "personal_rule_evaluations",
+                    "personal_rule_evaluation_batches",
+                    "personal_rule_revisions",
+                    "personal_rule_instances",
                     "personal_holdings",
                     "personal_workspaces",
                 ):

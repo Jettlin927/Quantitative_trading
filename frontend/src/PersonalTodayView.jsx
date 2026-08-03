@@ -94,6 +94,11 @@ export function PersonalTodayView({ client, chartAdapter }) {
         <em>不可用于正式研究</em>
       </section>
 
+      {workspace?.attention_items?.length ? <section className="personal-panel">
+        <header><div><span>ATTENTION QUEUE</span><h2>今日注意事项</h2></div><b>规则命中与数据缺口</b></header>
+        <div className="rule-state-grid">{workspace.attention_items.map((item) => <article className={`rule-state ${item.result}`} key={item.attention_id}><strong>{RULE_STATES[item.result]?.label || item.result}</strong><span>{item.symbol} · {item.label}</span><p>{item.reason_code}</p></article>)}</div>
+      </section> : null}
+
       <section className="personal-context">
         <div><span>当前标的</span><h2>{trace.holding.symbol}</h2><p>{trace.holding.name}</p></div>
         <dl>
