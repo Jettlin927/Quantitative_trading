@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from .contracts import (
@@ -26,6 +26,9 @@ from .persistence import (
 )
 from .synthetic import SyntheticWorkspaceAdapters
 
+if TYPE_CHECKING:
+    from .portfolio import PortfolioBook
+
 
 class PersonalResearchJourney:
     def __init__(
@@ -34,10 +37,12 @@ class PersonalResearchJourney:
         store: InMemoryPersonalJourneyStore,
         cipher: PersonalDataCipher,
         adapters: SyntheticWorkspaceAdapters,
+        portfolio: "PortfolioBook | None" = None,
     ) -> None:
         self._store = store
         self._cipher = cipher
         self._adapters = adapters
+        self._portfolio = portfolio
 
     def create_synthetic_trace(
         self,
@@ -163,8 +168,9 @@ class PersonalResearchJourney:
 
     def open_today(self, actor: PersonalActor) -> TodayWorkspace:
         trace = self._store.latest_trace(actor_id=actor.actor_id)
+        portfolio = self._portfolio.open(actor) if self._portfolio is not None else None
         if trace is None:
-            raise ValueError("private_object_not_found")
+            return TodayWorkspace(trace=None, record=None, portfolio=portfolio)
         record = self._store.record_for_analysis(
             actor_id=actor.actor_id,
             analysis_id=trace.analysis_id,
@@ -172,6 +178,7 @@ class PersonalResearchJourney:
         return TodayWorkspace(
             trace=self._decode_trace(trace),
             record=self._decode_record(record) if record is not None else None,
+            portfolio=portfolio,
         )
 
     def _decode_trace(self, stored: StoredSyntheticTrace) -> SyntheticTraceView:

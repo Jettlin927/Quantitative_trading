@@ -28,7 +28,7 @@ export function PersonalTodayView({ client, chartAdapter }) {
     return () => controller.abort()
   }, [client])
 
-  const trace = workspace?.trace || workspace
+  const trace = workspace?.trace ?? (workspace?.synthetic ? workspace : null)
   const bars = useMemo(() => (trace?.market?.bars || []).map((bar) => ({
     time: bar.date,
     open: Number(bar.open),

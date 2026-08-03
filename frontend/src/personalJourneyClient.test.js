@@ -42,4 +42,51 @@ describe('PersonalJourneyClient', () => {
       expect(error).toBeInstanceOf(PersonalJourneyError)
     })
   })
+
+  it('持仓读写只发送服务端封闭命令和 expected revision', async () => {
+    const responses = [
+      { portfolio_revision: 0, holdings: [] },
+      { portfolio_revision: 1, holdings: [{ holding_id: 'holding-001', symbol: 'ACME' }] },
+    ]
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(responses.shift()), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    const client = new PersonalJourneyClient({ fetcher })
+
+    await client.openPortfolio()
+    await client.submitPortfolioCommand({
+      command: {
+        type: 'add_holding',
+        symbol: 'ACME',
+        name: 'Acme Holdings',
+        quantity: '2',
+        average_cost: '100.25',
+        expected_portfolio_revision: 0,
+      },
+      idempotencyKey: 'portfolio-add-001',
+    })
+
+    const firstCall = /** @type {any[]} */ (fetcher.mock.calls[0])
+    expect(firstCall[0]).toBe('/api/personal/portfolio')
+    expect(fetcher.mock.calls[1]).toEqual([
+      '/api/personal/portfolio/commands',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': 'portfolio-add-001',
+          'X-Personal-Request': '1',
+        },
+        body: JSON.stringify({
+          type: 'add_holding',
+          symbol: 'ACME',
+          name: 'Acme Holdings',
+          quantity: '2',
+          average_cost: '100.25',
+          expected_portfolio_revision: 0,
+        }),
+      }),
+    ])
+  })
 })

@@ -307,6 +307,7 @@ class PostgresPersonalJourneyStore:
                             id=row.row_id,
                             workspace_id=trace.workspace_id,
                             state="active",
+                            synthetic=True,
                             symbol_hmac=row.metadata["symbol_hmac"],
                             revision=1,
                             **values,

@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from decimal import Decimal
 import unittest
 
-from backend.app.personal_workspace.contracts import PersonalActor
+from backend.app.personal_workspace.contracts import AddHoldingCommand, PersonalActor
 from backend.app.personal_workspace.crypto import FixedKeyring, PersonalDataCipher
 from backend.app.personal_workspace.journey import PersonalResearchJourney
 from backend.app.personal_workspace.persistence import InMemoryPersonalJourneyStore
+from backend.app.personal_workspace.portfolio import (
+    InMemoryPortfolioStore,
+    PortfolioBook,
+    PortfolioPriceObservation,
+)
 from backend.app.personal_workspace.synthetic import SyntheticWorkspaceAdapters
 
 
@@ -13,15 +20,16 @@ class PersonalResearchJourneyTest(unittest.TestCase):
     def setUp(self) -> None:
         self.store = InMemoryPersonalJourneyStore()
         self.adapters = SyntheticWorkspaceAdapters(provider_available=False)
+        self.cipher = PersonalDataCipher(
+            FixedKeyring(
+                active_key_id="synthetic-key",
+                data_keys={"synthetic-key": bytes(range(32))},
+                lookup_key=b"synthetic-lookup-key-for-tests-only",
+            )
+        )
         self.journey = PersonalResearchJourney(
             store=self.store,
-            cipher=PersonalDataCipher(
-                FixedKeyring(
-                    active_key_id="synthetic-key",
-                    data_keys={"synthetic-key": bytes(range(32))},
-                    lookup_key=b"synthetic-lookup-key-for-tests-only",
-                )
-            ),
+            cipher=self.cipher,
             adapters=self.adapters,
         )
         self.actor = PersonalActor(actor_id="local-owner")
@@ -117,6 +125,48 @@ class PersonalResearchJourneyTest(unittest.TestCase):
         today = self.journey.open_today(self.actor)
         self.assertEqual(today.record.record_id, record.record_id)
         self.assertEqual(today.analysis_preview.preview_sha256, trace.analysis_preview.preview_sha256)
+
+    def test_today_projection_includes_the_same_complete_portfolio_view(self) -> None:
+        class FixedMarket:
+            def observe_price(self, symbol):
+                return PortfolioPriceObservation.available(
+                    price=Decimal("120.50"),
+                    source_health="fresh",
+                    as_of=datetime(2026, 8, 3, tzinfo=timezone.utc),
+                    feed="sip",
+                    delay_seconds=900,
+                    source_ids=("alpaca-acme",),
+                )
+
+        portfolio = PortfolioBook(store=InMemoryPortfolioStore(), market=FixedMarket())
+        journey = PersonalResearchJourney(
+            store=self.store,
+            cipher=self.cipher,
+            adapters=self.adapters,
+            portfolio=portfolio,
+        )
+        journey.create_synthetic_trace(
+            self.actor,
+            idempotency_key="trace-with-portfolio",
+            question="组合投影测试",
+        )
+        portfolio.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="ACME",
+                name="Acme Holdings",
+                quantity="2",
+                average_cost="100.25",
+                expected_portfolio_revision=0,
+            ),
+            idempotency_key="add-acme-today",
+        )
+
+        today = journey.open_today(self.actor)
+
+        self.assertEqual(today.portfolio, portfolio.open(self.actor))
+        self.assertEqual(today.portfolio.holdings[0].market_value.value, "241.0000")
 
 
 if __name__ == "__main__":

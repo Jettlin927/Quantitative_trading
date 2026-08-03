@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from .portfolio import PortfolioView
 
 
 @dataclass(frozen=True)
@@ -96,10 +101,13 @@ class SyntheticRecordView:
 
 @dataclass(frozen=True)
 class TodayWorkspace:
-    trace: SyntheticTraceView
+    trace: SyntheticTraceView | None
     record: SyntheticRecordView | None
+    portfolio: PortfolioView | None = None
 
     def __getattr__(self, name: str):
+        if self.trace is None:
+            raise AttributeError(name)
         return getattr(self.trace, name)
 
 
@@ -110,3 +118,49 @@ class SyntheticTraceCommand(BaseModel):
 class SaveSyntheticRecordCommand(BaseModel):
     analysis_id: str = Field(min_length=1, max_length=64)
     preview_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class PortfolioCommand(BaseModel):
+    expected_portfolio_revision: int = Field(ge=0)
+
+
+class AddHoldingCommand(PortfolioCommand):
+    type: Literal["add_holding"]
+    symbol: str = Field(min_length=1, max_length=15)
+    name: str = Field(min_length=1, max_length=200)
+    quantity: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
+    average_cost: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
+
+
+class EditHoldingCommand(PortfolioCommand):
+    type: Literal["edit_holding"]
+    holding_id: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=200)
+    quantity: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
+    average_cost: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
+
+
+class RemoveHoldingCommand(PortfolioCommand):
+    type: Literal["remove_holding"]
+    holding_id: str = Field(min_length=1, max_length=64)
+
+
+class RestoreHoldingCommand(PortfolioCommand):
+    type: Literal["restore_holding"]
+    holding_id: str = Field(min_length=1, max_length=64)
+
+
+class SetUsdCashCommand(PortfolioCommand):
+    type: Literal["set_usd_cash"]
+    usd_cash: Decimal = Field(ge=0, max_digits=24, decimal_places=8)
+
+
+class RequestPurgeHoldingCommand(PortfolioCommand):
+    type: Literal["request_purge"]
+    holding_id: str = Field(min_length=1, max_length=64)
+
+
+class PurgeHoldingCommand(PortfolioCommand):
+    type: Literal["confirm_purge"] = "confirm_purge"
+    holding_id: str = Field(min_length=1, max_length=64)
+    challenge: str = Field(min_length=1, max_length=2000)
