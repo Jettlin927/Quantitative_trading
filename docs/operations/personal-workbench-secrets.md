@@ -53,9 +53,10 @@ scripts/ops/test_new_server_runtime.sh
 ```
 
 生产配置获批后，先检查键和文件是否存在、owner/mode 是否精确，不输出内容；再将
-`docker-compose.personal.yml` 作为最后一个 Compose 文件渲染。渲染输出包含数据库
-URL，因此不得写入日志、Issue 或 PR。容器启动与应用版本切换属于 #162，不能在
-#161 的文件准备阶段提前执行。
+`COMPOSE_PERSONAL_FILE=docker-compose.personal.yml` 传给部署入口，使覆盖作为最后一个
+Compose 文件渲染。默认留空时部署入口不加载该覆盖，既有部署行为不变。渲染输出
+包含数据库 URL，因此不得写入日志、Issue 或 PR。容器启动与应用版本切换属于 #162，
+不能在 #161 的文件准备阶段提前执行。
 
 生产读回必须证明：
 

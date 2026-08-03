@@ -7,6 +7,7 @@ REPO_URL="${REPO_URL:-ssh://git@ssh.github.com:443/Jettlin927/Quantitative_tradi
 BRANCH="${BRANCH:-main}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/quantitative_trading_github}"
 COMPOSE_SERVER_FILE="${COMPOSE_SERVER_FILE:-docker-compose.server.yml}"
+COMPOSE_PERSONAL_FILE="${COMPOSE_PERSONAL_FILE:-}"
 SKIP_GIT_PULL="${SKIP_GIT_PULL:-0}"
 
 usage() {
@@ -19,6 +20,7 @@ Environment:
   BRANCH=main
   SSH_KEY=$HOME/.ssh/quantitative_trading_github
   COMPOSE_SERVER_FILE=docker-compose.server.yml
+  COMPOSE_PERSONAL_FILE=docker-compose.personal.yml  # optional
   SKIP_GIT_PULL=1
   APP_GIT_COMMIT=<required when deployment directory has no .git>
   APP_GIT_REF=<required as refs/heads/main for no-.git formal-research builds>
@@ -107,6 +109,14 @@ compose_cmd() {
 
   if [[ -f "$COMPOSE_SERVER_FILE" ]]; then
     cmd+=(-f docker-compose.yml -f "$COMPOSE_SERVER_FILE")
+  fi
+
+  if [[ -n "$COMPOSE_PERSONAL_FILE" ]]; then
+    if [[ ! -f "$COMPOSE_PERSONAL_FILE" ]]; then
+      echo "个人工作台 Compose 覆盖文件不存在：$COMPOSE_PERSONAL_FILE" >&2
+      return 1
+    fi
+    cmd+=(-f "$COMPOSE_PERSONAL_FILE")
   fi
 
   "${cmd[@]}" "$@"
