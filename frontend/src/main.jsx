@@ -20,9 +20,10 @@ import { AShareDataView } from './AShareDataView.jsx'
 import { AnalysisWorkspaceView } from './AnalysisWorkspaceView.jsx'
 import { OperationsView } from './OperationsView.jsx'
 import { InstrumentWorkspaceView } from './InstrumentWorkspaceView.jsx'
-import { PersonalPlaceholder, PersonalTodayView } from './PersonalTodayView.jsx'
+import { PersonalTodayView } from './PersonalTodayView.jsx'
 import { PortfolioView } from './PortfolioView.jsx'
 import { ResearchCockpitView } from './ResearchCockpitView.jsx'
+import { RecordsView } from './RecordsView.jsx'
 import { RulesView } from './RulesView.jsx'
 import { USDataBoundaryView } from './USDataBoundaryView.jsx'
 import { browserPersonalJourneyClient } from './personalJourneyClient.js'
@@ -379,7 +380,7 @@ function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = brows
           {activeView === 'today' ? <div className="today-stack"><PersonalTodayView client={personalClient} chartAdapter={chartAdapter} /><AnalysisWorkspaceView client={personalClient} subjectId="SYNTH-001" /></div> : null}
           {activeView === 'portfolio' ? <PortfolioView client={personalClient} /> : null}
           {activeView === 'rules' ? <RulesView client={personalClient} /> : null}
-          {activeView === 'records' ? <PersonalPlaceholder title="研究记录" description="当前只能由今日工作台显式保存 synthetic record。" /> : null}
+          {activeView === 'records' ? <RecordsView client={personalClient} recordId={personalRecordId(pathname)} /> : null}
           {activeView === 'markets' && !pathname.startsWith('/markets/a-share') ? <InstrumentWorkspaceView client={personalClient} symbol={personalInstrumentSymbol(pathname)} chartAdapter={chartAdapter} /> : null}
           {activeView === 'research' ? (
             <ResearchCockpitView
@@ -518,6 +519,10 @@ function routeView(pathname) {
 function personalInstrumentSymbol(pathname) {
   const value = pathname.split('/')[3] || 'SYNTH-001'
   return decodeURIComponent(value)
+}
+
+function personalRecordId(pathname) {
+  return pathname.split('/')[2] || ''
 }
 
 function useWorkspaceRoute({ initialPath, browserHistory }) {

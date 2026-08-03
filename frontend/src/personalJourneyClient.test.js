@@ -123,4 +123,32 @@ describe('PersonalJourneyClient', () => {
     })
     expect(JSON.stringify(fetcher.mock.calls)).not.toMatch(/market_prices|portfolio_weight|model_output/)
   })
+
+  it('个人记录只提交 analysis 与 claim ID，不提交模型正文', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ record_id: 'record-1' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    const client = new PersonalJourneyClient({ fetcher })
+
+    await client.commitRecord({
+      command: {
+        type: 'save_analysis',
+        analysis_id: 'run-1',
+        accepted_claim_ids: ['claim-1'],
+        user_supplement: '用户说明',
+        private_fragments: [],
+        verification_drafts: [],
+      },
+      idempotencyKey: 'record-save-1',
+    })
+
+    const call = /** @type {any[]} */ (fetcher.mock.calls[0])
+    expect(call[0]).toBe('/api/personal/records/commands')
+    expect(JSON.parse(call[1].body)).toEqual(expect.objectContaining({
+      analysis_id: 'run-1',
+      accepted_claim_ids: ['claim-1'],
+    }))
+    expect(call[1].body).not.toMatch(/model_output|statement|market_prices|portfolio_weight/)
+  })
 })

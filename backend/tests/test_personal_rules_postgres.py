@@ -36,6 +36,11 @@ class PersonalRulesPostgresTest(unittest.TestCase):
                 self.assertEqual(current_schema_heads(connection), expected_schema_heads())
             with engine.begin() as connection:
                 for table in (
+                    "personal_verification_observations",
+                    "personal_verification_items",
+                    "personal_record_private_fragments",
+                    "personal_record_versions",
+                    "personal_redaction_events",
                     "personal_rule_evaluations",
                     "personal_rule_evaluation_batches",
                     "personal_rule_revisions",
