@@ -102,6 +102,7 @@ MANAGED_EXECUTABLE_ROOTS = (
 )
 OUT_OF_SCOPE_DATA_EXECUTABLE_PATHS = {
     "backend/app/database.py",
+    "backend/app/personal_analysis_worker.py",
     "backend/app/sync_worker.py",
 }
 EXCLUDED_DISCOVERY_DIRECTORIES = {

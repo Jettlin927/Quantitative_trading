@@ -136,6 +136,13 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
             errors,
         )
 
+    def test_personal_analysis_worker_stays_outside_formal_research_inventory(self) -> None:
+        inventory_paths = {
+            entry["path"] for entry in self._load_inventory()["entries"]
+        }
+        self.assertNotIn("backend/app/personal_analysis_worker.py", inventory_paths)
+        self.assertEqual([], verify_inventory(INVENTORY_PATH, REPO_ROOT))
+
     def test_managed_discovery_rejects_reversed_main_guard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

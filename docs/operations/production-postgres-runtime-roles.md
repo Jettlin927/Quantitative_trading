@@ -11,7 +11,7 @@
 | `quant_sync_runtime` | 是 | 表 CRUD、序列使用 | 无 | 无 | 数据 Worker 的 `SYNC_WORKER_DATABASE_URL` |
 | `quant_research_runtime` | 是 | 表 CRUD、序列使用 | 无 | 无 | 研究 Worker 的 `RESEARCH_WORKER_DATABASE_URL` |
 | `quant_personal_api` | 是 | 无表/序列权限 | 表 CRUD、序列使用 | 无 | 私有 API 的 `PRIVATE_DATABASE_URL` |
-| `quant_personal_analysis` | 是 | 只读 | 表 CRUD、序列使用 | 无 | 个人分析 Worker 的私有连接 |
+| `quant_personal_analysis` | 是 | 只读 | 表 CRUD、序列使用 | 无 | 个人分析 Worker 的 `PERSONAL_ANALYSIS_DATABASE_URL` |
 
 五个角色固定为 `NOSUPERUSER`、`NOCREATEDB`、`NOCREATEROLE`、`NOREPLICATION`、
 `NOBYPASSRLS` 和 `NOINHERIT`，不能在 `public` 创建对象。公共 API、数据 Worker 和

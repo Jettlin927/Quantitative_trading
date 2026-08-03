@@ -7,6 +7,8 @@ services:
       PERSONAL_ALLOWED_ORIGINS: ${PERSONAL_ALLOWED_ORIGINS:?启用个人工作台前必须配置 PERSONAL_ALLOWED_ORIGINS}
       ALPACA_CREDENTIALS_FILE: /run/secrets/alpaca-credentials.json
       ALPACA_AUTHORIZATION_FILE: /run/config/alpaca-authorization.json
+      PERSONAL_ANALYSIS_PROVIDER: ${PERSONAL_ANALYSIS_PROVIDER:-disabled}
+      DEEPSEEK_MONTHLY_SOFT_BUDGET_USD: ${DEEPSEEK_MONTHLY_SOFT_BUDGET_USD:-5}
     volumes:
       - type: bind
         source: ${PERSONAL_GATEWAY_TOKEN_HOST_FILE:?启用个人工作台前必须配置 PERSONAL_GATEWAY_TOKEN_HOST_FILE}
@@ -40,6 +42,49 @@ services:
       - type: bind
         source: ${PERSONAL_GATEWAY_TOKEN_HOST_FILE:?启用个人工作台前必须配置 PERSONAL_GATEWAY_TOKEN_HOST_FILE}
         target: /run/secrets/personal-gateway-token
+        read_only: true
+        bind:
+          create_host_path: false
+
+  personal-analysis-worker:
+    profiles: ["personal-ai"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
+        APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+        APP_GIT_REF: ${APP_GIT_REF:-unknown}
+    container_name: quant_trading_personal_analysis_worker
+    command: ["python", "-m", "backend.app.personal_analysis_worker"]
+    restart: unless-stopped
+    cpus: ${PERSONAL_ANALYSIS_MAX_CPU_CORES:-0.5}
+    mem_limit: ${PERSONAL_ANALYSIS_MAX_MEMORY_MIB:-512}m
+    pids_limit: 128
+    stop_grace_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PERSONAL_ANALYSIS_DATABASE_URL: ${PERSONAL_ANALYSIS_DATABASE_URL:-disabled}
+      PERSONAL_DATA_KEYRING_FILE: /run/secrets/personal-keyring.json
+      DEEPSEEK_CREDENTIALS_FILE: /run/secrets/deepseek-credentials.json
+      DEEPSEEK_MONTHLY_SOFT_BUDGET_USD: ${DEEPSEEK_MONTHLY_SOFT_BUDGET_USD:-5}
+      PERSONAL_ANALYSIS_WORKER_ID: ${PERSONAL_ANALYSIS_WORKER_ID:-personal-analysis-worker-1}
+      PERSONAL_ANALYSIS_WORKER_POLL_SECONDS: ${PERSONAL_ANALYSIS_WORKER_POLL_SECONDS:-5}
+      APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+      APP_GIT_REF: ${APP_GIT_REF:-unknown}
+    volumes:
+      - type: bind
+        source: ${PERSONAL_DATA_KEYRING_HOST_FILE:?启用个人工作台前必须配置 PERSONAL_DATA_KEYRING_HOST_FILE}
+        target: /run/secrets/personal-keyring.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${DEEPSEEK_CREDENTIALS_HOST_FILE:-/run/disabled/deepseek-credentials.json}
+        target: /run/secrets/deepseek-credentials.json
         read_only: true
         bind:
           create_host_path: false

@@ -103,7 +103,7 @@ class SyntheticWorkspaceAdapters:
                     {"field": "price_rule_results", "reason_code": "local_deterministic_only"},
                 ],
                 "preview_sha256": preview_sha256,
-                "retention": "store=false；不使用真实 provider",
+                "retention": "不调用真实 provider；仅使用合成响应",
             },
             "analysis_claim": analysis_claim,
             "issues": issues,
