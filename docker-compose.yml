@@ -36,9 +36,6 @@ services:
       DATABASE_URL: ${API_DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-quant}:${POSTGRES_PASSWORD:-quant_password}@db:5432/${POSTGRES_DB:-quant_trading}}
       PRIVATE_DATABASE_URL: ${PRIVATE_DATABASE_URL:-}
       TUSHARE_TOKEN: ${TUSHARE_TOKEN:-}
-      DEEPSEEK_TOKEN: ${DEEPSEEK_TOKEN:-}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
-      DEEPSEEK_API_BASE: ${DEEPSEEK_API_BASE:-https://api.deepseek.com}
       APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
       APP_GIT_REF: ${APP_GIT_REF:-unknown}
     ports:
@@ -70,9 +67,6 @@ services:
     environment:
       DATABASE_URL: ${SYNC_WORKER_DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-quant}:${POSTGRES_PASSWORD:-quant_password}@db:5432/${POSTGRES_DB:-quant_trading}}
       TUSHARE_TOKEN: ${TUSHARE_TOKEN:-}
-      DEEPSEEK_TOKEN: ${DEEPSEEK_TOKEN:-}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
-      DEEPSEEK_API_BASE: ${DEEPSEEK_API_BASE:-https://api.deepseek.com}
       SYNC_WORKER_POLL_SECONDS: ${SYNC_WORKER_POLL_SECONDS:-2}
       SYNC_WORKER_HEARTBEAT_SECONDS: ${SYNC_WORKER_HEARTBEAT_SECONDS:-15}
       SYNC_WORKER_LEASE_SECONDS: ${SYNC_WORKER_LEASE_SECONDS:-60}

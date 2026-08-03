@@ -80,6 +80,10 @@ def get_personal_runtime() -> PersonalRuntime:
         store=PostgresObservationRuleStore(session_factory, cipher=cipher),
         inputs=UnavailableRuleInputReader(),
     )
+    personal_analysis_provider = os.getenv(
+        "PERSONAL_ANALYSIS_PROVIDER", "disabled"
+    ).strip()
+    provider_available = personal_analysis_provider == "deepseek"
 
     def read_cost(request_actor: PersonalActor, symbol: str):
         for holding in portfolio.open(request_actor).holdings:
@@ -111,9 +115,9 @@ def get_personal_runtime() -> PersonalRuntime:
     analyses = AnalysisWorkspace(
         store=analysis_store,
         evidence_reader=lambda request_actor, intent: (),
-        provider=ScriptedResponsesAdapter.unavailable(),
+        provider=ScriptedResponsesAdapter(script=(), available=provider_available),
         monthly_soft_budget_usd=Decimal(
-            os.getenv("OPENAI_MONTHLY_SOFT_BUDGET_USD", "25")
+            os.getenv("DEEPSEEK_MONTHLY_SOFT_BUDGET_USD", "5")
         ),
         monthly_spend_reader=lambda request_actor, now: analysis_store.monthly_spend_usd(
             request_actor.actor_id, now
@@ -136,7 +140,7 @@ def get_personal_runtime() -> PersonalRuntime:
         journey=PersonalResearchJourney(
             store=PostgresPersonalJourneyStore(session_factory),
             cipher=cipher,
-            adapters=SyntheticWorkspaceAdapters(provider_available=False),
+            adapters=SyntheticWorkspaceAdapters(provider_available=provider_available),
             portfolio=portfolio,
             rulebook=rules,
         ),

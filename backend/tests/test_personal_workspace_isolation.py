@@ -42,7 +42,7 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
             "personal_workspace",
             "PRIVATE_DATABASE_URL",
             "PERSONAL_DATA_KEYRING_FILE",
-            "OPENAI_API_KEY",
+            "DEEPSEEK_CREDENTIALS_FILE",
             "ALPACA_CREDENTIALS_FILE",
             "ALPACA_AUTHORIZATION_FILE",
         }
@@ -61,7 +61,10 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
             "PRIVATE_DATABASE_URL",
             "PERSONAL_GATEWAY_TOKEN_FILE",
             "PERSONAL_DATA_KEYRING_FILE",
-            "OPENAI_API_KEY",
+            "DEEPSEEK_CREDENTIALS_FILE",
+            "DEEPSEEK_TOKEN",
+            "DEEPSEEK_MODEL",
+            "DEEPSEEK_API_BASE",
             "ALPACA_CREDENTIALS_FILE",
             "ALPACA_AUTHORIZATION_FILE",
         }
@@ -71,7 +74,8 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
 
     def test_frontend_contains_no_provider_or_gateway_secret_configuration(self) -> None:
         forbidden = {
-            "OPENAI_API_KEY",
+            "DEEPSEEK_CREDENTIALS_FILE",
+            "DEEPSEEK_TOKEN",
             "ALPACA_MARKET_DATA_SECRET_KEY",
             "ALPACA_CREDENTIALS_FILE",
             "ALPACA_AUTHORIZATION_FILE",
@@ -87,6 +91,44 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
             if matches:
                 violations[str(path.relative_to(REPO_ROOT))] = matches
         self.assertEqual(violations, {})
+
+    def test_only_personal_analysis_worker_receives_deepseek_secret_file(self) -> None:
+        base = yaml.safe_load((REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+        personal = yaml.safe_load(
+            (REPO_ROOT / "docker-compose.personal.yml").read_text(encoding="utf-8")
+        )
+        forbidden_environment = {
+            "DEEPSEEK_CREDENTIALS_FILE",
+            "DEEPSEEK_TOKEN",
+            "DEEPSEEK_MODEL",
+            "DEEPSEEK_API_BASE",
+        }
+        for service_name, service in base["services"].items():
+            self.assertTrue(
+                forbidden_environment.isdisjoint(service.get("environment", {})),
+                service_name,
+            )
+        for service_name in ("api", "frontend"):
+            self.assertNotIn(
+                "DEEPSEEK_CREDENTIALS_FILE",
+                personal["services"][service_name].get("environment", {}),
+            )
+
+        worker = personal["services"]["personal-analysis-worker"]
+        self.assertEqual(worker["profiles"], ["personal-ai"])
+        self.assertEqual(
+            worker["environment"]["DEEPSEEK_CREDENTIALS_FILE"],
+            "/run/secrets/deepseek-credentials.json",
+        )
+        mounts = {mount["target"]: mount for mount in worker["volumes"]}
+        self.assertEqual(
+            set(mounts),
+            {
+                "/run/secrets/personal-keyring.json",
+                "/run/secrets/deepseek-credentials.json",
+            },
+        )
+        self.assertTrue(mounts["/run/secrets/deepseek-credentials.json"]["read_only"])
 
     def test_missing_any_private_configuration_fails_closed_without_initializing_store(self) -> None:
         names = {

@@ -49,6 +49,7 @@ mkdir -p \
 touch \
   "$TEST_ROOT/personal-gateway-token" \
   "$TEST_ROOT/personal-keyring.json" \
+  "$TEST_ROOT/deepseek-credentials.json" \
   "$TEST_ROOT/alpaca-credentials.json" \
   "$TEST_ROOT/alpaca-authorization.json"
 
@@ -128,6 +129,8 @@ assert memory_total <= 3 * 1024**3, memory_total
 assert cpu_total <= 2.0, cpu_total
 PY
 
+# #164 尚未配置 DeepSeek key 时，未启用 personal-ai profile 的日常 Compose
+# 校验仍必须可执行；哨兵值只用于保持该 Worker 不可启动。
 POSTGRES_PASSWORD=compose-config-only \
 POSTGRES_DATA_DIR="$TEST_ROOT/postgres" \
 RESEARCH_ARTIFACTS_DIR="$TEST_ROOT/research-artifacts" \
@@ -138,7 +141,28 @@ PERSONAL_ALLOWED_ORIGINS='http://127.0.0.1:25173' \
 ALPACA_CREDENTIALS_HOST_FILE="$TEST_ROOT/alpaca-credentials.json" \
 ALPACA_AUTHORIZATION_HOST_FILE="$TEST_ROOT/alpaca-authorization.json" \
 docker compose \
+  --env-file /dev/null \
+  --file "$REPO_ROOT/docker-compose.yml" \
+  --file "$SERVER_COMPOSE_FILE" \
+  --file "$PERSONAL_COMPOSE_FILE" \
+  config >/dev/null
+
+POSTGRES_PASSWORD=compose-config-only \
+POSTGRES_DATA_DIR="$TEST_ROOT/postgres" \
+RESEARCH_ARTIFACTS_DIR="$TEST_ROOT/research-artifacts" \
+PRIVATE_DATABASE_URL='postgresql+psycopg://quant_personal_api:compose-only@db:5432/quant_trading' \
+PERSONAL_ANALYSIS_DATABASE_URL='postgresql+psycopg://quant_personal_analysis:compose-only@db:5432/quant_trading' \
+PERSONAL_GATEWAY_TOKEN_HOST_FILE="$TEST_ROOT/personal-gateway-token" \
+PERSONAL_DATA_KEYRING_HOST_FILE="$TEST_ROOT/personal-keyring.json" \
+DEEPSEEK_CREDENTIALS_HOST_FILE="$TEST_ROOT/deepseek-credentials.json" \
+DEEPSEEK_MONTHLY_SOFT_BUDGET_USD='5' \
+PERSONAL_ANALYSIS_PROVIDER='deepseek' \
+PERSONAL_ALLOWED_ORIGINS='http://127.0.0.1:25173' \
+ALPACA_CREDENTIALS_HOST_FILE="$TEST_ROOT/alpaca-credentials.json" \
+ALPACA_AUTHORIZATION_HOST_FILE="$TEST_ROOT/alpaca-authorization.json" \
+docker compose \
   --profile research-automation \
+  --profile personal-ai \
   --env-file /dev/null \
   --file "$REPO_ROOT/docker-compose.yml" \
   --file "$SERVER_COMPOSE_FILE" \
@@ -166,6 +190,8 @@ assert api["environment"]["PERSONAL_DATA_KEYRING_FILE"] == "/run/secrets/persona
 assert api["environment"]["PERSONAL_ALLOWED_ORIGINS"] == "http://127.0.0.1:25173"
 assert api["environment"]["ALPACA_CREDENTIALS_FILE"] == "/run/secrets/alpaca-credentials.json"
 assert api["environment"]["ALPACA_AUTHORIZATION_FILE"] == "/run/config/alpaca-authorization.json"
+assert api["environment"]["PERSONAL_ANALYSIS_PROVIDER"] == "deepseek"
+assert api["environment"]["DEEPSEEK_MONTHLY_SOFT_BUDGET_USD"] == "5"
 
 mounts = {mount["target"]: mount for mount in api.get("volumes", [])}
 expected_secrets = {
@@ -217,6 +243,45 @@ assert frontend_gateway["type"] == "bind", frontend_gateway
 assert Path(frontend_gateway["source"]).resolve() == test_root / "personal-gateway-token"
 assert frontend_gateway["read_only"] is True, frontend_gateway
 assert frontend_gateway.get("bind", {}).get("create_host_path") in (None, False), frontend_gateway
+
+personal_worker = services["personal-analysis-worker"]
+assert personal_worker["profiles"] == ["personal-ai"], personal_worker["profiles"]
+assert personal_worker["environment"]["PERSONAL_ANALYSIS_DATABASE_URL"] == (
+    "postgresql+psycopg://quant_personal_analysis:compose-only@db:5432/quant_trading"
+)
+assert personal_worker["environment"]["PERSONAL_DATA_KEYRING_FILE"] == (
+    "/run/secrets/personal-keyring.json"
+)
+assert personal_worker["environment"]["DEEPSEEK_CREDENTIALS_FILE"] == (
+    "/run/secrets/deepseek-credentials.json"
+)
+assert personal_worker["environment"]["DEEPSEEK_MONTHLY_SOFT_BUDGET_USD"] == "5"
+assert float(personal_worker["cpus"]) == 0.5
+assert int(personal_worker["mem_limit"]) == 512 * 1024**2
+personal_mounts = {
+    mount["target"]: mount for mount in personal_worker.get("volumes", [])
+}
+assert set(personal_mounts) == {
+    "/run/secrets/personal-keyring.json",
+    "/run/secrets/deepseek-credentials.json",
+}, personal_mounts
+for target, source in {
+    "/run/secrets/personal-keyring.json": test_root / "personal-keyring.json",
+    "/run/secrets/deepseek-credentials.json": test_root / "deepseek-credentials.json",
+}.items():
+    mount = personal_mounts[target]
+    assert mount["type"] == "bind", mount
+    assert Path(mount["source"]).resolve() == source, mount
+    assert mount["read_only"] is True, mount
+    assert mount.get("bind", {}).get("create_host_path") in (None, False), mount
+
+deepseek_environment = {"DEEPSEEK_CREDENTIALS_FILE", "DEEPSEEK_TOKEN"}
+for service_name, service in services.items():
+    if service_name == "personal-analysis-worker":
+        continue
+    assert deepseek_environment.isdisjoint(service.get("environment", {})), service_name
+    targets = {mount["target"] for mount in service.get("volumes", [])}
+    assert "/run/secrets/deepseek-credentials.json" not in targets, service_name
 PY
 
 echo "新服务器 Compose 合同通过"

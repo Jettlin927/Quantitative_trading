@@ -41,10 +41,12 @@ def notebook_fixture(*, status: str = "completed") -> tuple[ResearchNotebook, Pe
     analyses = InMemoryAnalysisStore()
     actor = PersonalActor("notebook-owner")
     receipt = AnalysisDraftReceipt(
-        draft_id="draft-1", status="ready", provider="openai", model="gpt-5.6-sol",
-        config_revision="personal-impact-v1", included_fields=("official_facts",),
+        draft_id="draft-1", status="ready", provider="deepseek", model="deepseek-v4-flash",
+        config_revision="personal-impact-deepseek-v1", included_fields=("official_facts",),
         excluded_fields=(), gaps=("missing_guidance",), preview_sha256="a" * 64,
-        retention="store=false", estimated_cost_usd="0.0040",
+        retention="DeepSeek 默认磁盘上下文缓存", estimated_cost_usd="0.0013",
+        pricing_currency="USD", pricing_effective_on="2026-04-24",
+        pricing_snapshot_sha256="b" * 64,
         expires_at=NOW + timedelta(minutes=30), consumed_at=NOW, evidence_ids=("sec-1",),
     )
     analyses.save_draft(StoredAnalysisDraft(
@@ -56,8 +58,20 @@ def notebook_fixture(*, status: str = "completed") -> tuple[ResearchNotebook, Pe
     analyses.save_run(StoredAnalysisRun(
         actor.actor_id, "run-key",
         AnalysisRunView(
-            "run-1", "draft-1", status, status, "openai", "gpt-5.6-sol", 1,
-            "0.0040", "0.0032", None, claims, (), False,
+            run_id="run-1",
+            draft_id="draft-1",
+            status=status,
+            stage=status,
+            provider="deepseek",
+            model="deepseek-v4-flash",
+            attempts=1,
+            estimated_cost_usd="0.0013",
+            actual_cost_usd="0.0002",
+            usage=None,
+            failure_code=None,
+            claims=claims,
+            events=(),
+            cancellable=False,
         ),
     ))
     return ResearchNotebook(
