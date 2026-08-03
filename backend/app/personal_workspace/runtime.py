@@ -9,6 +9,11 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from .analysis import (
+    AnalysisWorkspace,
+    PostgresAnalysisStore,
+    ScriptedResponsesAdapter,
+)
 from .contracts import PersonalActor
 from .crypto import PersonalDataCipher, load_keyring_file
 from .journey import PersonalResearchJourney
@@ -98,6 +103,18 @@ def get_personal_runtime() -> PersonalRuntime:
         rule_attention_reader=read_rule_events,
         formal_overlay_reader=lambda symbol: (),
     )
+    analysis_store = PostgresAnalysisStore(session_factory, cipher=cipher)
+    analyses = AnalysisWorkspace(
+        store=analysis_store,
+        evidence_reader=lambda request_actor, intent: (),
+        provider=ScriptedResponsesAdapter.unavailable(),
+        monthly_soft_budget_usd=Decimal(
+            os.getenv("OPENAI_MONTHLY_SOFT_BUDGET_USD", "25")
+        ),
+        monthly_spend_reader=lambda request_actor, now: analysis_store.monthly_spend_usd(
+            request_actor.actor_id, now
+        ),
+    )
     return PersonalRuntime(
         access=PersonalAccessConfig(
             gateway_token=gateway_token,
@@ -115,4 +132,5 @@ def get_personal_runtime() -> PersonalRuntime:
         portfolio=portfolio,
         instruments=instruments,
         rules=rules,
+        analyses=analyses,
     )

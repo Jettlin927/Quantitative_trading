@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { AShareDataView } from './AShareDataView.jsx'
+import { AnalysisWorkspaceView } from './AnalysisWorkspaceView.jsx'
 import { OperationsView } from './OperationsView.jsx'
 import { InstrumentWorkspaceView } from './InstrumentWorkspaceView.jsx'
 import { PersonalPlaceholder, PersonalTodayView } from './PersonalTodayView.jsx'
@@ -375,7 +376,7 @@ function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = brows
         <Topbar activeView={activeView} health={health} loading={loading} lastUpdated={lastUpdated} onRefresh={() => refreshAll(true)} />
         <main className="workspace-main">
           {globalError ? <Notice tone="warning" title="部分数据暂不可用" text={globalError} /> : null}
-          {activeView === 'today' ? <PersonalTodayView client={personalClient} chartAdapter={chartAdapter} /> : null}
+          {activeView === 'today' ? <div className="today-stack"><PersonalTodayView client={personalClient} chartAdapter={chartAdapter} /><AnalysisWorkspaceView client={personalClient} subjectId="SYNTH-001" /></div> : null}
           {activeView === 'portfolio' ? <PortfolioView client={personalClient} /> : null}
           {activeView === 'rules' ? <RulesView client={personalClient} /> : null}
           {activeView === 'records' ? <PersonalPlaceholder title="研究记录" description="当前只能由今日工作台显式保存 synthetic record。" /> : null}
