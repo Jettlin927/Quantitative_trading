@@ -32,6 +32,7 @@ REMOTE_SSH_KEY="${REMOTE_SSH_KEY:-$(env_value REMOTE_SSH_KEY "$(env_value DEV_SE
 PROJECT_DIR="${PROJECT_DIR:-$(env_value PROJECT_DIR /opt/quantitative-trading)}"
 REPO_URL="${REPO_URL:-$(env_value REPO_URL ssh://git@ssh.github.com:443/Jettlin927/Quantitative_trading.git)}"
 BRANCH="${BRANCH:-$(env_value BRANCH main)}"
+COMPOSE_PERSONAL_FILE="${COMPOSE_PERSONAL_FILE:-$(env_value COMPOSE_PERSONAL_FILE "")}"
 
 usage() {
   cat <<'EOF'
@@ -44,6 +45,7 @@ Environment:
   PROJECT_DIR=/opt/quantitative-trading
   REPO_URL=ssh://git@ssh.github.com:443/Jettlin927/Quantitative_trading.git
   BRANCH=main
+  COMPOSE_PERSONAL_FILE=docker-compose.personal.yml  # optional
 EOF
 }
 
@@ -61,8 +63,8 @@ case "$TARGET" in
 esac
 
 remote_env=$(
-  printf 'PROJECT_DIR=%q REPO_URL=%q BRANCH=%q bash -s -- %q' \
-    "$PROJECT_DIR" "$REPO_URL" "$BRANCH" "$TARGET"
+  printf 'PROJECT_DIR=%q REPO_URL=%q BRANCH=%q COMPOSE_PERSONAL_FILE=%q bash -s -- %q' \
+    "$PROJECT_DIR" "$REPO_URL" "$BRANCH" "$COMPOSE_PERSONAL_FILE" "$TARGET"
 )
 
 ssh_opts=(-o BatchMode=yes -o StrictHostKeyChecking=accept-new -p "$REMOTE_SSH_PORT")

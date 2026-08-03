@@ -9,9 +9,99 @@ import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "scripts" / "ops" / "sync_today_market_data.sh"
+DEPLOY_SERVER = REPO_ROOT / "scripts" / "ops" / "deploy_server.sh"
+DEPLOY_REMOTE = REPO_ROOT / "scripts" / "ops" / "deploy_remote.sh"
 
 
 class DailySyncScriptTest(unittest.TestCase):
+    def test_deploy_server_loads_personal_overlay_only_when_explicit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            fake_bin = temp / "bin"
+            fake_bin.mkdir()
+            docker_log = temp / "docker.log"
+            for name in ("docker-compose.yml", "docker-compose.server.yml", "docker-compose.personal.yml"):
+                (temp / name).write_text("services: {}\n", encoding="utf-8")
+            self._write_executable(
+                fake_bin / "docker",
+                f"#!/bin/sh\nprintf '%s\\n' \"$*\" > '{docker_log}'\n",
+            )
+
+            base_env = {
+                **os.environ,
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                "PROJECT_DIR": str(temp),
+                "SKIP_GIT_PULL": "1",
+                "COMPOSE_SERVER_FILE": "docker-compose.server.yml",
+            }
+            default_result = subprocess.run(
+                ["bash", str(DEPLOY_SERVER), "status"],
+                env=base_env,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            self.assertEqual(default_result.returncode, 0, default_result.stderr)
+            self.assertEqual(
+                docker_log.read_text(encoding="utf-8").strip(),
+                "compose -f docker-compose.yml -f docker-compose.server.yml ps",
+            )
+
+            personal_result = subprocess.run(
+                ["bash", str(DEPLOY_SERVER), "status"],
+                env={**base_env, "COMPOSE_PERSONAL_FILE": "docker-compose.personal.yml"},
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            self.assertEqual(personal_result.returncode, 0, personal_result.stderr)
+            self.assertEqual(
+                docker_log.read_text(encoding="utf-8").strip(),
+                "compose -f docker-compose.yml -f docker-compose.server.yml "
+                "-f docker-compose.personal.yml ps",
+            )
+
+            missing_result = subprocess.run(
+                ["bash", str(DEPLOY_SERVER), "status"],
+                env={**base_env, "COMPOSE_PERSONAL_FILE": "missing-personal.yml"},
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            self.assertNotEqual(missing_result.returncode, 0)
+            self.assertIn("个人工作台 Compose 覆盖文件不存在", missing_result.stderr)
+
+    def test_deploy_remote_forwards_personal_overlay(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            fake_bin = temp / "bin"
+            fake_bin.mkdir()
+            ssh_log = temp / "ssh.log"
+            self._write_executable(
+                fake_bin / "ssh",
+                f"#!/bin/sh\nprintf '<%s>\\n' \"$@\" > '{ssh_log}'\n",
+            )
+
+            result = subprocess.run(
+                ["bash", str(DEPLOY_REMOTE), "status"],
+                env={
+                    **os.environ,
+                    "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                    "ENV_FILE": str(temp / "missing.env"),
+                    "REMOTE": "quant-trading-prod",
+                    "REMOTE_SSH_KEY": "",
+                    "COMPOSE_PERSONAL_FILE": "docker-compose.personal.yml",
+                },
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(
+                "COMPOSE_PERSONAL_FILE=docker-compose.personal.yml",
+                ssh_log.read_text(encoding="utf-8"),
+            )
+
     def test_contract_uses_flock_durable_job_post_refresh_quality_and_no_docker_exec(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
         dockerfile = (REPO_ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
