@@ -409,7 +409,35 @@ class AlpacaMarketObservationAdapter:
                 }
             )
             url = f"https://data.alpaca.markets/v2/stocks/{quote(normalized_symbol)}/bars?{query}"
-            response = self._send(url, deadline=deadline)
+            try:
+                response = self._send(url, deadline=deadline)
+            except MarketObservationError as exc:
+                if adjustment != "all" or exc.code != "provider_timeout":
+                    raise
+                provenance = ProvenanceEnvelope(
+                    source="alpaca",
+                    dataset=dataset,
+                    provider_record_id=None,
+                    source_url=url,
+                    fetched_at=fetched_at,
+                    content_sha256=_content_sha256({"reason": exc.code}),
+                    authorization_snapshot_id=authorization.snapshot_id,
+                    qualification="online_observation",
+                    source_health="unavailable",
+                    ai_context=authorization.ai_context,
+                    formal_research=authorization.formal_research,
+                    adjustment_policy=adjustment,
+                    missing_reason=exc.code,
+                )
+                observations[adjustment] = ObservedValue(
+                    availability="not_available",
+                    value=None,
+                    reason_code=exc.code,
+                    source_health="unavailable",
+                    as_of=None,
+                    provenance=provenance,
+                )
+                break
             if response.status_code != 200 or not isinstance(response.body, Mapping):
                 raise MarketObservationError("provider_schema_invalid")
             raw = response.body

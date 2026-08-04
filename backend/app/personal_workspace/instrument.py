@@ -222,6 +222,11 @@ class TypedInstrumentObservationReader:
                 "provider_adjusted",
                 bars.provider_adjusted.provenance.content_sha256,
             )
+            if (
+                getattr(bars.provider_adjusted, "availability", "available")
+                != "available"
+            ):
+                issues.append("provider_adjusted_bars_unavailable")
             authorization_ids.extend(
                 (
                     bars.raw.provenance.authorization_snapshot_id,

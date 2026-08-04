@@ -223,6 +223,54 @@ class InstrumentWorkbenchTest(unittest.TestCase):
             ("auth-asset", "auth-bars", "auth-actions", "auth-bls"),
         )
 
+    def test_typed_reader_exposes_adjusted_series_timeout_without_dropping_raw(self) -> None:
+        raw = bars(2)
+
+        def observed(value, adjustment, *, availability="available"):
+            return SimpleNamespace(
+                availability=availability,
+                value=value,
+                source_health="fresh" if value is not None else "unavailable",
+                provenance=SimpleNamespace(
+                    content_sha256="a" * 64,
+                    authorization_snapshot_id="auth-bars",
+                    adjustment_policy=adjustment,
+                ),
+            )
+
+        class PartiallyAvailableMarket:
+            def observe_asset(self, symbol, **kwargs):
+                return SimpleNamespace(
+                    value=SimpleNamespace(name="Acme Holdings"),
+                    provenance=SimpleNamespace(authorization_snapshot_id="auth-asset"),
+                )
+
+            def observe_daily_bars(self, symbol, **kwargs):
+                values = tuple(
+                    SimpleNamespace(symbol=symbol, **item.__dict__)
+                    for item in raw
+                )
+                return SimpleNamespace(
+                    raw=observed(values, "raw"),
+                    provider_adjusted=observed(
+                        None,
+                        "all",
+                        availability="not_available",
+                    ),
+                )
+
+            def observe_corporate_actions(self, symbol, **kwargs):
+                return observed((), None)
+
+        projection = TypedInstrumentObservationReader(
+            market=PartiallyAvailableMarket(),
+            official_events=lambda symbol, as_of: (),
+        ).open("ACME", as_of=NOW, limit=1500)
+
+        self.assertEqual(len(projection.raw_bars), 2)
+        self.assertEqual(projection.provider_adjusted_bars, ())
+        self.assertIn("provider_adjusted_bars_unavailable", projection.issues)
+
     def test_open_separates_raw_adjusted_events_cost_and_evidence_identity(self) -> None:
         raw = bars()
         adjusted = tuple(
