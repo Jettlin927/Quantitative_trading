@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -142,16 +142,21 @@ class TypedInstrumentObservationReader:
         *,
         market: Any,
         official_events: Callable[[str, datetime], tuple[Any, ...]],
+        provider_wait_seconds: float = 1.8,
     ) -> None:
+        if provider_wait_seconds <= 0:
+            raise ValueError("provider_wait_seconds_must_be_positive")
         self._market = market
         self._official_events = official_events
+        self._provider_wait_seconds = provider_wait_seconds
 
     def open(self, symbol: str, *, as_of: datetime, limit: int) -> InstrumentObservation:
         end_date = as_of.astimezone(timezone.utc).date()
         start_date = end_date - timedelta(days=max(limit * 2, 30))
         issues: list[str] = []
         authorization_ids: list[str] = []
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        executor = ThreadPoolExecutor(max_workers=4)
+        try:
             identity_future = executor.submit(
                 self._market.observe_asset, symbol, purpose="display", fetched_at=as_of
             )
@@ -172,8 +177,21 @@ class TypedInstrumentObservationReader:
                 purpose="display",
             )
             official_events_future = executor.submit(self._official_events, symbol, as_of)
+            futures = (
+                identity_future,
+                bars_future,
+                actions_future,
+                official_events_future,
+            )
+            _, unfinished = wait(futures, timeout=self._provider_wait_seconds)
+            for future in unfinished:
+                future.cancel()
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
 
         try:
+            if not identity_future.done():
+                raise TimeoutError("provider_timeout")
             identity = identity_future.result()
             name = identity.value.name if identity.value is not None else symbol
             authorization_ids.append(identity.provenance.authorization_snapshot_id)
@@ -181,6 +199,8 @@ class TypedInstrumentObservationReader:
             name = symbol
             issues.append("asset_identity_unavailable")
         try:
+            if not bars_future.done():
+                raise TimeoutError("provider_timeout")
             bars = bars_future.result()
             raw = _typed_bars(bars.raw.value or (), "raw", bars.raw.provenance.content_sha256)
             adjusted = _typed_bars(
@@ -202,6 +222,8 @@ class TypedInstrumentObservationReader:
             issues.append("daily_bars_unavailable")
         events: list[InstrumentEvent] = []
         try:
+            if not actions_future.done():
+                raise TimeoutError("provider_timeout")
             actions = actions_future.result()
             authorization_ids.append(actions.provenance.authorization_snapshot_id)
             for action in actions.value or ():
@@ -222,6 +244,8 @@ class TypedInstrumentObservationReader:
         except Exception:
             issues.append("corporate_actions_unavailable")
         try:
+            if not official_events_future.done():
+                raise TimeoutError("provider_timeout")
             for event in official_events_future.result():
                 authorization_ids.append(event.authorization.snapshot_id)
                 events.append(

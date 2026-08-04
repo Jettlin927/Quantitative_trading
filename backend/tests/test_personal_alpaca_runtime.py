@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import base64
 from copy import deepcopy
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Event
+from time import monotonic
 import unittest
 from unittest.mock import patch
 
@@ -90,9 +93,53 @@ class PersonalAlpacaRuntimeTest(unittest.TestCase):
         self.assertIsInstance(readers.portfolio, AlpacaPortfolioMarketReader)
         self.assertIsInstance(readers.instrument, TypedInstrumentObservationReader)
         self.assertEqual(readers.portfolio._adapter._request_deadline_seconds, 1.8)
+        self.assertEqual(readers.instrument._provider_wait_seconds, 1.8)
         self.assertEqual(transport.requests, [])
         self.assertNotIn(self.credentials["key_id"], repr(readers))
         self.assertNotIn(self.credentials["secret_key"], repr(readers))
+
+    def test_slow_instrument_sources_stop_blocking_at_the_aggregate_deadline(self) -> None:
+        release = Event()
+
+        class SlowMarket:
+            def observe_asset(self, *args, **kwargs):
+                release.wait(1)
+
+            def observe_daily_bars(self, *args, **kwargs):
+                release.wait(1)
+
+            def observe_corporate_actions(self, *args, **kwargs):
+                release.wait(1)
+
+        def slow_official_events(*args, **kwargs):
+            release.wait(1)
+
+        reader = TypedInstrumentObservationReader(
+            market=SlowMarket(),
+            official_events=slow_official_events,
+            provider_wait_seconds=0.02,
+        )
+
+        started = monotonic()
+        observation = reader.open(
+            "SYNTH",
+            as_of=datetime(2026, 8, 4, tzinfo=timezone.utc),
+            limit=10,
+        )
+        elapsed = monotonic() - started
+        release.set()
+
+        self.assertLess(elapsed, 0.2)
+        self.assertEqual(observation.source_health, "unavailable")
+        self.assertEqual(
+            set(observation.issues),
+            {
+                "asset_identity_unavailable",
+                "daily_bars_unavailable",
+                "corporate_actions_unavailable",
+                "official_events_unavailable",
+            },
+        )
 
     def test_incomplete_or_unauthorized_files_fail_closed_without_request(self) -> None:
         cases = {
