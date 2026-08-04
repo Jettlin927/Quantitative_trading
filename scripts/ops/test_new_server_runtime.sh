@@ -239,7 +239,7 @@ official_targets = {
     "/run/config/official-analysis-authorization.json",
 }
 for service_name, service in services.items():
-    if service_name == "api":
+    if service_name in ("api", "personal-analysis-worker"):
         continue
     environment = service.get("environment", {})
     assert alpaca_environment.isdisjoint(environment), service_name
@@ -284,6 +284,14 @@ assert personal_worker["environment"]["DEEPSEEK_CREDENTIALS_FILE"] == (
     "/run/secrets/deepseek-credentials.json"
 )
 assert personal_worker["environment"]["DEEPSEEK_MONTHLY_SOFT_BUDGET_USD"] == "5"
+assert personal_worker["environment"]["PERSONAL_ANALYSIS_MODE"] == "legacy"
+assert personal_worker["environment"]["ALPACA_CREDENTIALS_FILE"] == (
+    "/run/secrets/alpaca-credentials.json"
+)
+assert personal_worker["environment"]["ALPACA_AUTHORIZATION_FILE"] == (
+    "/run/config/alpaca-authorization.json"
+)
+assert personal_worker["environment"]["INVESTMENT_NEWS_DIR"] == ""
 assert float(personal_worker["cpus"]) == 0.5
 assert int(personal_worker["mem_limit"]) == 512 * 1024**2
 personal_mounts = {
@@ -292,16 +300,26 @@ personal_mounts = {
 assert set(personal_mounts) == {
     "/run/secrets/personal-keyring.json",
     "/run/secrets/deepseek-credentials.json",
+    "/run/secrets/alpaca-credentials.json",
+    "/run/config/alpaca-authorization.json",
+    "/run/disabled/news",
 }, personal_mounts
-for target, source in {
+read_only_mounts = {
     "/run/secrets/personal-keyring.json": test_root / "personal-keyring.json",
     "/run/secrets/deepseek-credentials.json": test_root / "deepseek-credentials.json",
-}.items():
+    "/run/secrets/alpaca-credentials.json": test_root / "alpaca-credentials.json",
+    "/run/config/alpaca-authorization.json": test_root / "alpaca-authorization.json",
+}
+for target, source in read_only_mounts.items():
     mount = personal_mounts[target]
     assert mount["type"] == "bind", mount
     assert Path(mount["source"]).resolve() == source, mount
     assert mount["read_only"] is True, mount
     assert mount.get("bind", {}).get("create_host_path") in (None, False), mount
+news_mount = personal_mounts["/run/disabled/news"]
+assert news_mount["type"] == "bind", news_mount
+assert Path(news_mount["source"]).resolve() == Path("/run/disabled/news"), news_mount
+assert news_mount.get("bind", {}).get("create_host_path") in (None, False), news_mount
 
 deepseek_environment = {"DEEPSEEK_CREDENTIALS_FILE", "DEEPSEEK_TOKEN"}
 for service_name, service in services.items():

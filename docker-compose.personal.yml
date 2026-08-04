@@ -51,11 +51,6 @@ services:
         read_only: true
         bind:
           create_host_path: false
-      - type: bind
-        source: ${INVESTMENT_NEWS_HOST_DIR:-/run/disabled/news}
-        target: ${INVESTMENT_NEWS_DIR:-/run/disabled/news}
-        bind:
-          create_host_path: false
 
   frontend:
     environment:
