@@ -90,7 +90,7 @@ def load_personal_market_readers(
         instrument=TypedInstrumentObservationReader(
             market=adapter,
             official_events=None,
-            provider_wait_seconds=3.5,
+            provider_wait_seconds=4.5,
         ),
     )
 
