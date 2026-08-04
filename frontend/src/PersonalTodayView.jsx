@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Check, Circle, FlaskConical, Save, ShieldX, Triangle, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, BriefcaseBusiness, Check, Circle, FlaskConical, ListChecks, Save, ShieldX, Triangle, X } from 'lucide-react'
 
 import { MarketChart } from './MarketChart.jsx'
 
@@ -10,7 +10,7 @@ const RULE_STATES = {
   calculation_failed: { label: '计算失败 ×', icon: X },
 }
 
-export function PersonalTodayView({ client, chartAdapter }) {
+export function PersonalTodayView({ client, chartAdapter, onNavigate = () => {} }) {
   const [workspace, setWorkspace] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -73,21 +73,24 @@ export function PersonalTodayView({ client, chartAdapter }) {
     }
   }
 
-  if (loading) return <section className="personal-empty"><FlaskConical size={22} /><h2>正在读取合成工作台</h2><p>只读取当前会话，不写浏览器存储。</p></section>
+  if (loading) return <section className="personal-empty"><FlaskConical size={22} /><h2>正在读取今日工作台</h2><p>汇总当前组合、行情覆盖和待验证事项。</p></section>
+  const overview = <TodayOverview workspace={workspace} error={error} onNavigate={onNavigate} />
   if (!trace) return (
-    <section className="personal-empty">
-      <FlaskConical size={24} />
-      <h2>合成信任纵切尚未创建</h2>
-      <p>{error?.code === 'personal_access_unconfigured' ? '私有网关尚未配置；公开研究与市场区域仍可使用。' : '使用虚构数据验证隐私、降级与显式保存边界。'}</p>
-      {error ? <small>{error.code || 'personal_request_failed'} · {error.message}</small> : null}
-      {error?.code !== 'personal_access_unconfigured' ? <button className="primary-action" onClick={createTrace}>启动合成旅程</button> : null}
-    </section>
+    <div className="personal-today enter">
+      {overview}
+      <section className="synthetic-lab-note">
+        <FlaskConical size={18} />
+        <div><strong>合成验收旅程已与真实工作台分开</strong><p>它只验证隐私和降级边界，不再占据每日入口。</p></div>
+        {!error && !workspace?.portfolio ? <button onClick={createTrace}>创建合成测试旅程</button> : null}
+      </section>
+    </div>
   )
 
   const providerUnavailable = trace.issues?.includes('provider_unavailable')
   const record = savedRecord || workspace?.record
   return (
     <div className="personal-today enter">
+      {overview}
       <section className="synthetic-ribbon" aria-label="合成数据边界">
         <span><FlaskConical size={16} /> SYNTHETIC TRACE / T0</span>
         <strong>所有持仓、行情、证据与模型均为虚构夹具</strong>
@@ -152,6 +155,37 @@ export function PersonalTodayView({ client, chartAdapter }) {
       {error ? <div className="notice error"><AlertTriangle size={16} /><span><b>{error.code || 'personal_request_failed'}</b><small>{error.message}</small></span></div> : null}
     </div>
   )
+}
+
+function TodayOverview({ workspace, error, onNavigate }) {
+  const portfolio = workspace?.portfolio
+  const active = portfolio?.holdings?.filter((holding) => holding.state === 'active') || []
+  const covered = active.filter((holding) => holding.market_value?.availability === 'available').length
+  const attention = workspace?.attention_items || []
+  const total = portfolio?.total_equity
+
+  return <section className="today-overview" aria-label="今日组合总览">
+    <header className="today-overview-head">
+      <div><span>TODAY / PRIVATE RESEARCH DESK</span><h2>今天先看组合、数据缺口与待验证事项</h2><p>这里汇总需要你处理的事实；不会生成买卖评级或自动发起 AI。</p></div>
+      <div className="today-overview-actions">
+        <button className="primary-action" onClick={() => onNavigate('/portfolio')}><BriefcaseBusiness size={15} />查看全部持仓</button>
+        <button onClick={() => onNavigate('/rules')}><ListChecks size={15} />查看观察规则</button>
+      </div>
+    </header>
+
+    {error ? <div className="notice error"><AlertTriangle size={16} /><span><b>{error.code || 'personal_request_failed'}</b><small>{error.message}</small></span></div> : null}
+
+    <div className="today-metric-grid">
+      <article><span>组合总值</span><strong>{total?.availability === 'available' ? `${total.value} USD` : '待行情恢复'}</strong><small>{total?.as_of ? `as-of ${new Date(total.as_of).toLocaleString('zh-CN')}` : '手工事实仍可查看'}</small></article>
+      <article><span>持仓范围</span><strong>{active.length} 个活跃持仓</strong><small>组合修订 R{portfolio?.portfolio_revision ?? 0}</small></article>
+      <article><span>行情覆盖</span><strong>行情覆盖 {covered}/{active.length}</strong><small>{portfolio?.issues?.length ? portfolio.issues.join(' · ') : '当前无来源缺口'}</small></article>
+      <article><span>今日事项</span><strong>{attention.length} 项</strong><small>规则命中与数据缺口分列</small></article>
+    </div>
+
+    {active.length ? <div className="today-holding-strip" aria-label="活跃持仓快捷入口">{active.map((holding) => <button key={holding.holding_id} onClick={() => onNavigate(`/markets/us/${encodeURIComponent(holding.symbol)}`)}><span>{holding.symbol}</span><small>{holding.name}</small><ArrowRight size={14} /></button>)}</div> : <p className="today-empty-note">尚无活跃持仓；先在“我的持仓”维护手工事实。</p>}
+
+    {attention.length ? <section className="today-attention-ledger"><header><span>ATTENTION LEDGER</span><b>{attention.length}</b></header><div>{attention.map((item) => <article key={item.attention_id}><strong>{RULE_STATES[item.result]?.label || item.result}</strong><span>{item.symbol} · {item.label}</span><small>{item.reason_code}</small></article>)}</div></section> : null}
+  </section>
 }
 
 export function PersonalPlaceholder({ title, description }) {
