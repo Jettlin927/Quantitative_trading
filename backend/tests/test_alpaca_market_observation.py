@@ -399,15 +399,22 @@ class AlpacaMarketObservationAdapterTest(unittest.TestCase):
             request_deadline_seconds=1.8,
         )
 
-        with self.assertRaises(MarketObservationError) as raised:
-            adapter.observe_daily_bars(
-                "SYNTH",
-                start_date=date(2026, 7, 30),
-                end_date=date(2026, 7, 31),
-                fetched_at=datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc),
-            )
+        observed = adapter.observe_daily_bars(
+            "SYNTH",
+            start_date=date(2026, 7, 30),
+            end_date=date(2026, 7, 31),
+            fetched_at=datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc),
+        )
 
-        self.assertEqual(raised.exception.code, "provider_timeout")
+        self.assertEqual(observed.raw.availability, "available")
+        self.assertEqual(len(observed.raw.value), 2)
+        self.assertEqual(observed.provider_adjusted.availability, "not_available")
+        self.assertIsNone(observed.provider_adjusted.value)
+        self.assertEqual(observed.provider_adjusted.reason_code, "provider_timeout")
+        self.assertEqual(
+            observed.provider_adjusted.provenance.missing_reason,
+            "provider_timeout",
+        )
         self.assertEqual(len(transport.requests), 1)
 
     def test_corporate_actions_are_typed_without_exposing_provider_dicts(self) -> None:
