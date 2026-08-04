@@ -368,6 +368,48 @@ class AlpacaMarketObservationAdapterTest(unittest.TestCase):
         self.assertEqual([query["adjustment"] for query in queries], [["raw"], ["all"]])
         self.assertTrue(all(query["feed"] == ["iex"] for query in queries))
 
+    def test_daily_bars_share_one_total_provider_deadline(self) -> None:
+        raw = json.loads(
+            (FIXTURE_ROOT / "daily_bars_raw.json").read_text(encoding="utf-8")
+        )
+
+        class Clock:
+            value = 100.0
+
+            def __call__(self) -> float:
+                return self.value
+
+        class SlowFirstResponseTransport:
+            def __init__(self, clock: Clock) -> None:
+                self.clock = clock
+                self.requests: list[ProviderRequest] = []
+
+            def send(self, request: ProviderRequest) -> ProviderResponse:
+                self.requests.append(request)
+                self.clock.value += 1.9
+                return ProviderResponse(status_code=200, headers={}, body=raw)
+
+        clock = Clock()
+        transport = SlowFirstResponseTransport(clock)
+        adapter = AlpacaMarketObservationAdapter(
+            transport=transport,
+            authorizations=self.authorization_registry("alpaca_daily_bars"),
+            credentials=AlpacaCredentials("synthetic-id", "synthetic-secret"),
+            monotonic=clock,
+            request_deadline_seconds=1.8,
+        )
+
+        with self.assertRaises(MarketObservationError) as raised:
+            adapter.observe_daily_bars(
+                "SYNTH",
+                start_date=date(2026, 7, 30),
+                end_date=date(2026, 7, 31),
+                fetched_at=datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc),
+            )
+
+        self.assertEqual(raised.exception.code, "provider_timeout")
+        self.assertEqual(len(transport.requests), 1)
+
     def test_corporate_actions_are_typed_without_exposing_provider_dicts(self) -> None:
         body = json.loads(
             (FIXTURE_ROOT / "corporate_actions.json").read_text(encoding="utf-8")

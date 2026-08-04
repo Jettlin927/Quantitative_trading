@@ -395,6 +395,7 @@ class AlpacaMarketObservationAdapter:
         dataset = "alpaca_daily_bars"
         authorization = self._require_authorization(dataset, purpose)
         observations: dict[str, ObservedValue[tuple[DailyBar, ...]]] = {}
+        deadline = self._monotonic() + self._request_deadline_seconds
         for adjustment in ("raw", "all"):
             query = urlencode(
                 {
@@ -408,7 +409,7 @@ class AlpacaMarketObservationAdapter:
                 }
             )
             url = f"https://data.alpaca.markets/v2/stocks/{quote(normalized_symbol)}/bars?{query}"
-            response = self._send(url)
+            response = self._send(url, deadline=deadline)
             if response.status_code != 200 or not isinstance(response.body, Mapping):
                 raise MarketObservationError("provider_schema_invalid")
             raw = response.body
@@ -539,8 +540,9 @@ class AlpacaMarketObservationAdapter:
             provenance=provenance,
         )
 
-    def _send(self, url: str) -> ProviderResponse:
-        deadline = self._monotonic() + self._request_deadline_seconds
+    def _send(self, url: str, *, deadline: float | None = None) -> ProviderResponse:
+        if deadline is None:
+            deadline = self._monotonic() + self._request_deadline_seconds
         budget_after_waits = self._request_deadline_seconds
         for attempt in range(1, 4):
             remaining = min(deadline - self._monotonic(), budget_after_waits)
