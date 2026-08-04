@@ -643,6 +643,14 @@ class PortfolioBook:
     def open(self, actor: PersonalActor) -> PortfolioView:
         return self._project(self._store.load(actor_id=actor.actor_id))
 
+    def average_cost(self, actor: PersonalActor, symbol: str) -> Decimal | None:
+        normalized_symbol = _normalize_symbol(symbol)
+        state = self._store.load(actor_id=actor.actor_id)
+        for holding in state.holdings.values():
+            if holding.symbol == normalized_symbol and holding.state == "active":
+                return holding.average_cost
+        return None
+
     def revise(
         self,
         actor: PersonalActor,

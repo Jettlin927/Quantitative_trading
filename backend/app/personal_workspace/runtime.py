@@ -87,10 +87,7 @@ def get_personal_runtime() -> PersonalRuntime:
     provider_available = personal_analysis_provider == "deepseek"
 
     def read_cost(request_actor: PersonalActor, symbol: str):
-        for holding in portfolio.open(request_actor).holdings:
-            if holding.symbol == symbol and holding.state == "active":
-                return Decimal(holding.average_cost)
-        return None
+        return portfolio.average_cost(request_actor, symbol)
 
     def read_rule_events(request_actor: PersonalActor, symbol: str):
         return tuple(
