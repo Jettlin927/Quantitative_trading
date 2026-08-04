@@ -528,6 +528,61 @@ class ObservationRuleBookTest(unittest.TestCase):
         self.assertEqual(evaluation.reason_code, "adjusted_series_unavailable")
         self.assertEqual(evaluation.source_health, "unavailable")
 
+    def test_attention_only_projects_each_rules_latest_evaluation(self) -> None:
+        draft = self.book.revise(
+            self.actor,
+            CreateObservationRuleCommand(
+                type="create_rule",
+                template_id="price_threshold",
+                symbol="ACME",
+                parameters={"direction": "gte", "price": "110"},
+            ),
+            idempotency_key="create-latest-attention",
+        )
+        self.book.revise(
+            self.actor,
+            SetObservationRuleStateCommand(
+                type="set_rule_state",
+                rule_id=draft.rule_id,
+                expected_revision=1,
+                state="enabled",
+            ),
+            idempotency_key="enable-latest-attention",
+        )
+        self.input_reader.value = RuleInput(
+            symbol="ACME",
+            raw_bars=(),
+            adjusted_bars=(),
+            events=(),
+            source_health="unavailable",
+            evidence_ids=(),
+            corporate_actions_available=False,
+        )
+        self.book.evaluate(
+            self.actor,
+            RuleEvaluationRequest(symbol="ACME", as_of=NOW - timedelta(minutes=1)),
+            idempotency_key="evaluate-attention-missing",
+        )
+        self.input_reader.value = RuleInput(
+            symbol="ACME",
+            raw_bars=bars(),
+            adjusted_bars=bars(),
+            events=(),
+            source_health="fresh",
+            evidence_ids=("bar-latest",),
+            corporate_actions_available=True,
+        )
+        latest = self.book.evaluate(
+            self.actor,
+            RuleEvaluationRequest(symbol="ACME", as_of=NOW),
+            idempotency_key="evaluate-attention-latest",
+        ).evaluations[0]
+
+        attention = self.book.attention(self.actor, symbol="ACME")
+
+        self.assertEqual(tuple(item.attention_id for item in attention), (latest.evaluation_id,))
+        self.assertEqual(attention[0].result, "hit")
+
 
 if __name__ == "__main__":
     unittest.main()

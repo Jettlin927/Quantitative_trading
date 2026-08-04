@@ -724,7 +724,11 @@ class ObservationRuleBook:
         self, actor: PersonalActor, *, symbol: str | None = None
     ) -> tuple[AttentionItem, ...]:
         items = []
-        for evaluation in self._store.list_evaluations(actor_id=actor.actor_id):
+        latest = {
+            evaluation.rule_id: evaluation
+            for evaluation in self._store.list_evaluations(actor_id=actor.actor_id)
+        }
+        for evaluation in latest.values():
             if symbol is not None and evaluation.symbol != symbol:
                 continue
             if evaluation.result not in {"hit", "insufficient_data", "calculation_failed"}:
