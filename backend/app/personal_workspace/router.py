@@ -35,7 +35,7 @@ from .contracts import (
     StartReasoningAuditCommand,
     SyntheticTraceCommand,
 )
-from .analysis import AnalysisIntent, AnalysisWorkspace
+from .analysis import DEEPSEEK_MODEL, AnalysisIntent, AnalysisWorkspace
 from .journey import PersonalResearchJourney
 from .instrument import InstrumentQuery, InstrumentWorkbench
 from .notebook import PrivateFragmentInput, ResearchNotebook, VerificationDraft
@@ -54,6 +54,10 @@ class PersonalRuntime:
     rules: ObservationRuleBook | None = None
     analyses: AnalysisWorkspace | None = None
     notebook: ResearchNotebook | None = None
+    analysis_provider: str = "deepseek"
+    analysis_model: str = DEEPSEEK_MODEL
+    analysis_dispatch_enabled: bool = True
+    analysis_disabled_reason: str | None = None
 
     @classmethod
     def unconfigured(cls) -> "PersonalRuntime":
@@ -70,6 +74,9 @@ class PersonalRuntime:
             rules=None,
             analyses=None,
             notebook=None,
+            analysis_provider="disabled",
+            analysis_dispatch_enabled=False,
+            analysis_disabled_reason="personal_access_unconfigured",
         )
 
 
@@ -225,6 +232,18 @@ def create_personal_router(
         except ValueError as exc:
             _raise_domain_error(exc)
 
+    @router.get("/analysis-capabilities")
+    def analysis_capabilities(runtime: PersonalRuntime = Depends(require_read)) -> dict:
+        return {
+            "provider": runtime.analysis_provider,
+            "model": runtime.analysis_model,
+            "dispatch_enabled": runtime.analysis_dispatch_enabled,
+            "reason_code": runtime.analysis_disabled_reason,
+            "credentials_scope": "analysis_worker_only",
+            "credentials_visible_to_api": False,
+            "history_readable": runtime.analyses is not None,
+        }
+
     @router.get("/analysis-drafts/{draft_id}")
     def open_analysis_draft(
         draft_id: str,
@@ -244,6 +263,14 @@ def create_personal_router(
         runtime: PersonalRuntime = Depends(require_write),
     ) -> dict:
         actor, analyses = _configured_analyses(runtime)
+        if not runtime.analysis_dispatch_enabled:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": runtime.analysis_disabled_reason or "provider_disabled",
+                    "message": "AI Provider 当前由配置主动停用。",
+                },
+            )
         command = await _parse_command(request, StartAnalysisCommand)
         try:
             return asdict(
@@ -258,6 +285,14 @@ def create_personal_router(
             _raise_store_error(exc)
         except ValueError as exc:
             _raise_domain_error(exc)
+
+    @router.get("/analyses")
+    def list_analyses(
+        limit: int = 20,
+        runtime: PersonalRuntime = Depends(require_read),
+    ) -> list[dict]:
+        actor, analyses = _configured_analyses(runtime)
+        return [asdict(item) for item in analyses.history(actor, limit=min(max(limit, 1), 100))]
 
     @router.get("/analyses/{run_id}")
     def observe_analysis(
