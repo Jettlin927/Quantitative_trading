@@ -74,6 +74,16 @@ export class PersonalJourneyClient {
     return this.#request(`/api/personal/analyses/${encodeURIComponent(runId)}`, { signal })
   }
 
+  /** @param {{ signal?: AbortSignal }} [options] */
+  listAnalysisCapabilities({ signal } = {}) {
+    return this.#request('/api/personal/analysis-capabilities', { signal })
+  }
+
+  /** @param {{ signal?: AbortSignal }} [options] */
+  listAnalyses({ signal } = {}) {
+    return this.#request('/api/personal/analyses?limit=20', { signal })
+  }
+
   /** @param {{ runId: string, idempotencyKey: string, signal?: AbortSignal }} options */
   cancelAnalysis({ runId, idempotencyKey, signal }) {
     return this.#command(`/api/personal/analyses/${encodeURIComponent(runId)}/cancel`, {}, { idempotencyKey, signal })

@@ -17,6 +17,18 @@ const RUN_IDENTITIES = {
   cancelled: 'CANCELLED · 已取消',
 }
 
+const FAILURE_IDENTITIES = {
+  provider_disabled: '生产配置主动停用',
+  provider_auth_failed: 'API Key 认证失败',
+  provider_balance_unavailable: '账户余额不足',
+  provider_model_unavailable: '模型不可用',
+  provider_rate_limited: '官方接口限流',
+  provider_upstream_error: '官方接口 5xx',
+  provider_timeout: '官方接口超时',
+  provider_claims_invalid_schema: '官方响应结构不合格',
+  provider_response_invalid_json: '官方响应不是合法 JSON',
+}
+
 export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) {
   const [question, setQuestion] = useState('')
   const [preview, setPreview] = useState(null)
@@ -27,6 +39,28 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) 
   const [acceptedClaimIds, setAcceptedClaimIds] = useState([])
   const [userSupplement, setUserSupplement] = useState('')
   const [savedRecord, setSavedRecord] = useState(null)
+  const [capability, setCapability] = useState(null)
+  const [subjects, setSubjects] = useState([])
+  const [selectedSubject, setSelectedSubject] = useState(subjectId)
+  const [history, setHistory] = useState([])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    Promise.all([
+      typeof client.openPortfolio === 'function' ? client.openPortfolio({ signal: controller.signal }) : Promise.resolve(null),
+      typeof client.listAnalysisCapabilities === 'function' ? client.listAnalysisCapabilities({ signal: controller.signal }) : Promise.resolve(null),
+      typeof client.listAnalyses === 'function' ? client.listAnalyses({ signal: controller.signal }) : Promise.resolve([]),
+    ]).then(([portfolio, providerCapability, runs]) => {
+      const active = (portfolio?.holdings || []).filter((holding) => holding.state === 'active')
+      setSubjects(active)
+      if (active.length && (!subjectId || subjectId.startsWith('SYNTH'))) setSelectedSubject(active[0].symbol)
+      setCapability(providerCapability)
+      setHistory(runs || [])
+    }).catch((reason) => {
+      if (reason?.name !== 'AbortError') setError(reason)
+    })
+    return () => controller.abort()
+  }, [client, subjectId])
 
   useEffect(() => {
     if (!initialRunId) return undefined
@@ -51,7 +85,7 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) 
     try {
       setPreview(await client.prepareAnalysis({
         question,
-        subjectIds: [subjectId],
+        subjectIds: [selectedSubject],
         selectedPrivateFields: [],
         idempotencyKey: crypto.randomUUID(),
       }))
@@ -118,6 +152,8 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) 
   }
 
   const providerUnavailable = error?.code === 'provider_unavailable'
+  const dispatchEnabled = capability?.dispatch_enabled !== false
+  const disabledByConfig = capability?.reason_code === 'provider_disabled'
   return (
     <section className="analysis-workspace enter" aria-label="AI 影响分析">
       <header className="analysis-command-header">
@@ -125,7 +161,11 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) 
         <b><ShieldCheck size={15} /> 先预览，后外发</b>
       </header>
 
+      {capability ? <div className={`analysis-capability ${dispatchEnabled ? 'enabled' : 'disabled'}`} role="status"><ShieldCheck size={18} /><div><strong>{dispatchEnabled ? `DeepSeek 可外发 · ${capability.model}` : disabledByConfig ? 'DeepSeek 由生产配置主动停用' : FAILURE_IDENTITIES[capability.reason_code] || capability.reason_code}</strong><p>{disabledByConfig ? '这是配置门禁，不是 Key 校验失败；Key 只对分析 Worker 可见，API 无权读取。历史运行仍可查看。' : dispatchEnabled ? '仍须先生成预览并逐次确认外发。' : '当前不会入队、重试或自动切换模型。'}</p></div></div> : null}
+
       {!initialRunId ? <div className="analysis-question-panel">
+        <label htmlFor="analysis-subject">分析标的</label>
+        <select id="analysis-subject" aria-label="分析标的" value={selectedSubject} onChange={(event) => setSelectedSubject(event.target.value)}>{subjects.length ? subjects.map((holding) => <option key={holding.holding_id} value={holding.symbol}>{holding.symbol} · {holding.name}</option>) : <option value={selectedSubject}>{selectedSubject}</option>}</select>
         <label htmlFor="analysis-question">分析问题</label>
         <textarea
           id="analysis-question"
@@ -134,8 +174,10 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) 
           placeholder="只问传导机制、证据边界与未知项，不生成交易建议。"
           rows={4}
         />
-        <div><small>上下文标的 {subjectId} · 浏览器不上传行情、组合权重或规则结果</small><button className="primary-action" disabled={busy || !question.trim()} onClick={prepare}><Send size={15} />生成外发预览</button></div>
+        <div><small>上下文标的 {selectedSubject} · 浏览器不上传行情、组合权重或规则结果</small><button className="primary-action" disabled={busy || !question.trim() || !dispatchEnabled} onClick={prepare}><Send size={15} />生成外发预览</button></div>
       </div> : null}
+
+      {history.length ? <section className="analysis-history" aria-label="个人分析运行历史"><header><span>RUN HISTORY</span><h3>最近个人分析</h3></header><div>{history.map((item) => <button key={item.run_id} onClick={() => { setRun(item); setAcceptedClaimIds(saveableClaimIds(item)); setSavedRecord(null) }}><strong>{RUN_IDENTITIES[item.status] || item.status}</strong><code>{item.run_id}</code><small>{item.model} · {item.actual_cost_usd ? `$${item.actual_cost_usd}` : '未产生费用'}{item.failure_code ? ` · ${FAILURE_IDENTITIES[item.failure_code] || item.failure_code}` : ''}</small></button>)}</div></section> : null}
 
       {preview ? <section className="analysis-preview" aria-label="外发预览">
         <header><div><span>PREVIEW HASH</span><code>{preview.preview_sha256.slice(0, 16)}…</code></div><strong>{preview.provider} / {preview.model}</strong></header>
@@ -165,7 +207,7 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) 
       {run ? <section className="analysis-run" aria-label="分析运行">
         <header><div><span>RUN {run.run_id?.slice(0, 8)}</span><h3>{RUN_IDENTITIES[run.status] || run.status}</h3></div>{run.cancellable ? <button disabled={busy} onClick={cancel}><Square size={14} />取消</button> : null}</header>
         <ol className="analysis-stage-line">{(run.events || []).map((event) => <li key={event.sequence}><CircleDot size={13} /><span>{event.stage}</span></li>)}</ol>
-        {run.failure_code ? <p className="analysis-failure"><AlertTriangle size={15} />{run.failure_code} · 失败输出不能保存</p> : null}
+        {run.failure_code ? <p className="analysis-failure"><AlertTriangle size={15} />{FAILURE_IDENTITIES[run.failure_code] || run.failure_code} · 失败输出不能保存</p> : null}
         {run.claims?.length ? <div className="claim-ledger">{run.claims.map((claim) => {
           const identity = CLAIM_IDENTITIES[claim.kind] || { label: claim.kind, mark: '·' }
           return <article className={`analysis-claim ${claim.kind}`} key={claim.claim_id}>

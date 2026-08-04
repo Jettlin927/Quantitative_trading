@@ -31,9 +31,9 @@ from .portfolio import (
 )
 from .router import PersonalRuntime
 from .rules import (
+    InstrumentRuleInputReader,
     ObservationRuleBook,
     PostgresObservationRuleStore,
-    UnavailableRuleInputReader,
 )
 from .security import PersonalAccessConfig
 from .synthetic import SyntheticWorkspaceAdapters
@@ -79,7 +79,7 @@ def get_personal_runtime() -> PersonalRuntime:
     actor = PersonalActor(actor_id="local-owner")
     rules = ObservationRuleBook(
         store=PostgresObservationRuleStore(session_factory, cipher=cipher),
-        inputs=UnavailableRuleInputReader(),
+        inputs=InstrumentRuleInputReader(market_readers.instrument),
     )
     personal_analysis_provider = os.getenv(
         "PERSONAL_ANALYSIS_PROVIDER", "disabled"
@@ -158,4 +158,7 @@ def get_personal_runtime() -> PersonalRuntime:
         rules=rules,
         analyses=analyses,
         notebook=notebook,
+        analysis_provider=personal_analysis_provider,
+        analysis_dispatch_enabled=provider_available,
+        analysis_disabled_reason=None if provider_available else "provider_disabled",
     )

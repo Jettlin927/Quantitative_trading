@@ -242,6 +242,8 @@ class AnalysisStore(Protocol):
 
     def get_run(self, actor_id: str, run_id: str) -> StoredAnalysisRun | None: ...
 
+    def list_runs(self, actor_id: str, *, limit: int) -> tuple[StoredAnalysisRun, ...]: ...
+
 
 class InMemoryAnalysisStore:
     def __init__(self) -> None:
@@ -367,6 +369,17 @@ class InMemoryAnalysisStore:
     def get_run(self, actor_id: str, run_id: str) -> StoredAnalysisRun | None:
         with self._lock:
             return self._runs.get((actor_id, run_id))
+
+    def list_runs(self, actor_id: str, *, limit: int) -> tuple[StoredAnalysisRun, ...]:
+        with self._lock:
+            values = [run for (owner, _), run in self._runs.items() if owner == actor_id]
+            return tuple(
+                sorted(
+                    values,
+                    key=lambda run: run.view.events[-1].occurred_at if run.view.events else datetime.min.replace(tzinfo=timezone.utc),
+                    reverse=True,
+                )[:limit]
+            )
 
     def cancel(self, actor_id: str, run_id: str, now: datetime) -> StoredAnalysisRun:
         with self._lock:
@@ -774,6 +787,19 @@ class PostgresAnalysisStore:
                 return None
             return self._decode_run(actor_id, row)
 
+    def list_runs(self, actor_id: str, *, limit: int) -> tuple[StoredAnalysisRun, ...]:
+        with self._session_factory() as session:
+            workspace = self._workspace(session, actor_id, lock=False)
+            if workspace is None:
+                return ()
+            rows = session.scalars(
+                select(PersonalAnalysisRun)
+                .where(PersonalAnalysisRun.workspace_id == workspace.id)
+                .order_by(PersonalAnalysisRun.created_at.desc(), PersonalAnalysisRun.id.desc())
+                .limit(limit)
+            ).all()
+            return tuple(self._decode_run(actor_id, row) for row in rows)
+
     def cancel(self, actor_id: str, run_id: str, now: datetime) -> StoredAnalysisRun:
         run = self.get_run(actor_id, run_id)
         if run is None:
@@ -988,9 +1014,21 @@ class DeepSeekChatAdapter:
                 timeout_seconds=self._timeout_seconds,
             )
         except HTTPError as exc:
-            if exc.code == 429:
-                raise ProviderFailure("provider_rate_limited", retryable=True) from None
-            raise ProviderFailure("provider_http_error", retryable=exc.code >= 500) from None
+            if exc.code in {401, 403}:
+                code, retryable = "provider_auth_failed", False
+            elif exc.code == 402:
+                code, retryable = "provider_balance_unavailable", False
+            elif exc.code == 404:
+                code, retryable = "provider_model_unavailable", False
+            elif exc.code == 429:
+                code, retryable = "provider_rate_limited", True
+            elif exc.code >= 500:
+                code, retryable = "provider_upstream_error", True
+            elif exc.code in {400, 422}:
+                code, retryable = "provider_request_invalid", False
+            else:
+                code, retryable = "provider_http_error", False
+            raise ProviderFailure(code, retryable=retryable) from None
         except (TimeoutError, URLError):
             raise ProviderFailure("provider_timeout", retryable=False) from None
         return _normalize_deepseek_response(raw)
@@ -1287,6 +1325,9 @@ class AnalysisWorkspace:
         if run is None:
             raise ValueError("private_object_not_found")
         return run.view
+
+    def history(self, actor: PersonalActor, *, limit: int = 20) -> tuple[AnalysisRunView, ...]:
+        return tuple(run.view for run in self._store.list_runs(actor.actor_id, limit=limit))
 
     def cancel(self, actor: PersonalActor, run_id: str) -> AnalysisRunView:
         cancel = getattr(self._store, "cancel", None)

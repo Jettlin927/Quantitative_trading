@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 import unittest
 
@@ -65,6 +66,7 @@ class PersonalAnalysisApiTest(unittest.TestCase):
         app = FastAPI()
         app.include_router(create_personal_router(lambda: runtime))
         self.client = TestClient(app)
+        self.runtime = runtime
 
     @property
     def read_headers(self) -> dict[str, str]:
@@ -111,6 +113,12 @@ class PersonalAnalysisApiTest(unittest.TestCase):
             f"/api/personal/analyses/{run_id}/events",
             headers={**self.read_headers, "Accept": "text/event-stream"},
         )
+        capabilities = self.client.get(
+            "/api/personal/analysis-capabilities", headers=self.read_headers
+        )
+        history = self.client.get(
+            "/api/personal/analyses", headers=self.read_headers
+        )
 
         self.assertEqual(prepared.status_code, 202)
         self.assertEqual(
@@ -132,6 +140,11 @@ class PersonalAnalysisApiTest(unittest.TestCase):
         self.assertEqual(events.headers["content-type"], "text/event-stream; charset=utf-8")
         self.assertIn("event: analysis_stage", events.text)
         self.assertIn('"stage":"completed"', events.text)
+        self.assertTrue(capabilities.json()["dispatch_enabled"])
+        self.assertEqual(capabilities.json()["provider"], "deepseek")
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual(history.json()[0]["run_id"], run_id)
+        self.assertEqual(history.json()[0]["status"], "completed")
 
     def test_cancel_and_stable_preview_error_mapping(self) -> None:
         prepared = self.client.post(
@@ -162,6 +175,39 @@ class PersonalAnalysisApiTest(unittest.TestCase):
         self.assertEqual(changed.json()["detail"]["code"], "preview_changed")
         self.assertEqual(cancelled.status_code, 200)
         self.assertEqual(cancelled.json()["status"], "cancelled")
+
+    def test_disabled_provider_is_distinct_from_key_failure_and_history_remains_readable(self) -> None:
+        disabled = replace(
+            self.runtime,
+            analysis_provider="disabled",
+            analysis_dispatch_enabled=False,
+            analysis_disabled_reason="provider_disabled",
+        )
+        app = FastAPI()
+        app.include_router(create_personal_router(lambda: disabled))
+        client = TestClient(app)
+        prepared = client.post(
+            "/api/personal/analysis-drafts",
+            headers=self.write_headers("disabled-prepare"),
+            json={"question": "只生成预览", "subject_ids": ["ACME"]},
+        ).json()
+
+        capability = client.get(
+            "/api/personal/analysis-capabilities", headers=self.read_headers
+        )
+        started = client.post(
+            "/api/personal/analyses",
+            headers=self.write_headers("disabled-start"),
+            json={"draft_id": prepared["draft_id"], "preview_sha256": prepared["preview_sha256"]},
+        )
+        history = client.get("/api/personal/analyses", headers=self.read_headers)
+
+        self.assertFalse(capability.json()["dispatch_enabled"])
+        self.assertFalse(capability.json()["credentials_visible_to_api"])
+        self.assertEqual(capability.json()["reason_code"], "provider_disabled")
+        self.assertEqual(started.status_code, 503)
+        self.assertEqual(started.json()["detail"]["code"], "provider_disabled")
+        self.assertEqual(history.status_code, 200)
 
 
 if __name__ == "__main__":

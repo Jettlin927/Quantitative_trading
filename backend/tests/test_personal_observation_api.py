@@ -110,6 +110,8 @@ class PersonalObservationApiTest(unittest.TestCase):
         self.assertEqual(enabled.json()["state"], "enabled")
         self.assertEqual(evaluated.json()["evaluations"][0]["result"], "insufficient_data")
         self.assertEqual(readback.json()["rules"][0]["latest_evaluation"]["result"], "insufficient_data")
+        self.assertEqual(evaluated.json()["symbol"], "ACME")
+        self.assertEqual(evaluated.json()["status"], "completed")
 
 
 if __name__ == "__main__":

@@ -759,7 +759,15 @@ class PersonalAnalysisTest(unittest.TestCase):
                 self.assertEqual(raised.exception.code, expected_code)
                 self.assertFalse(raised.exception.retryable)
 
-        for status, expected_retryable in ((429, True), (503, True), (400, False)):
+        expected_http_failures = {
+            401: ("provider_auth_failed", False),
+            402: ("provider_balance_unavailable", False),
+            404: ("provider_model_unavailable", False),
+            429: ("provider_rate_limited", True),
+            503: ("provider_upstream_error", True),
+            400: ("provider_request_invalid", False),
+        }
+        for status, (expected_code, expected_retryable) in expected_http_failures.items():
             with self.subTest(http_status=status):
                 def fail_http(**_kwargs):
                     raise HTTPError(
@@ -778,7 +786,7 @@ class PersonalAnalysisTest(unittest.TestCase):
                     adapter.create_response(request)
                 self.assertEqual(
                     raised.exception.code,
-                    "provider_rate_limited" if status == 429 else "provider_http_error",
+                    expected_code,
                 )
                 self.assertEqual(raised.exception.retryable, expected_retryable)
 

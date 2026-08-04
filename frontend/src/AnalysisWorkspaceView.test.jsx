@@ -18,6 +18,28 @@ const preview = {
 }
 
 describe('AI 影响分析工作台', () => {
+  it('展示主动停用原因、真实持仓标的和历史运行，不把它误报成 Key 失败', async () => {
+    const client = {
+      openPortfolio: vi.fn().mockResolvedValue({ holdings: [{ holding_id: 'holding-net', symbol: 'NET', name: 'Cloudflare', state: 'active' }] }),
+      listAnalysisCapabilities: vi.fn().mockResolvedValue({
+        provider: 'disabled', model: 'deepseek-v4-flash', dispatch_enabled: false,
+        reason_code: 'provider_disabled', credentials_scope: 'analysis_worker_only',
+        credentials_visible_to_api: false, history_readable: true,
+      }),
+      listAnalyses: vi.fn().mockResolvedValue([{ run_id: 'run-old', status: 'completed', model: 'deepseek-v4-flash', claims: [], events: [], actual_cost_usd: '0.0002' }]),
+      prepareAnalysis: vi.fn(), openAnalysis: vi.fn(), startAnalysis: vi.fn(), cancelAnalysis: vi.fn(),
+    }
+
+    render(<AnalysisWorkspaceView client={client} subjectId="SYNTH-001" />)
+
+    expect(await screen.findByText('DeepSeek 由生产配置主动停用')).toBeInTheDocument()
+    expect(screen.getByText(/不是 Key 校验失败/)).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '分析标的' })).toHaveValue('NET')
+    expect(screen.getByText('COMPLETED · 已完成')).toBeInTheDocument()
+    expect(screen.getByText(/run-old/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '生成外发预览' })).toBeDisabled()
+  })
+
   it('先展示外发预览，只有勾选确认后才能入队', async () => {
     const client = {
       prepareAnalysis: vi.fn().mockResolvedValue(preview),
