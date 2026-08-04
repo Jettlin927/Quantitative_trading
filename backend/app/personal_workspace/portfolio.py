@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import base64
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
@@ -634,11 +634,15 @@ class PortfolioBook:
         market: PortfolioMarketReader,
         clock: Callable[[], datetime] | None = None,
         challenge_key: bytes | None = None,
+        provider_wait_seconds: float = 1.8,
     ) -> None:
+        if provider_wait_seconds <= 0:
+            raise ValueError("provider_wait_seconds_must_be_positive")
         self._store = store
         self._market = market
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._challenge_key = challenge_key or os.urandom(32)
+        self._provider_wait_seconds = provider_wait_seconds
 
     def open(self, actor: PersonalActor) -> PortfolioView:
         return self._project(self._store.load(actor_id=actor.actor_id))
@@ -781,17 +785,29 @@ class PortfolioBook:
         active = [holding for holding in state.holdings.values() if holding.state == "active"]
         observations: dict[str, PortfolioPriceObservation] = {}
         if active:
-            with ThreadPoolExecutor(max_workers=min(len(active), 8)) as executor:
+            executor = ThreadPoolExecutor(max_workers=min(len(active), 8))
+            try:
                 futures = {
                     holding.holding_id: executor.submit(
                         self._market.observe_price, holding.symbol
                     )
                     for holding in active
                 }
-                observations = {
-                    holding_id: future.result()
-                    for holding_id, future in futures.items()
-                }
+                finished, unfinished = wait(
+                    futures.values(), timeout=self._provider_wait_seconds
+                )
+                for future in unfinished:
+                    future.cancel()
+            finally:
+                executor.shutdown(wait=False, cancel_futures=True)
+            observations = {
+                holding_id: (
+                    future.result()
+                    if future in finished
+                    else PortfolioPriceObservation.unavailable("provider_timeout")
+                )
+                for holding_id, future in futures.items()
+            }
         available = {
             holding.holding_id: observations[holding.holding_id]
             for holding in active

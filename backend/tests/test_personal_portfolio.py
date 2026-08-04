@@ -150,6 +150,45 @@ class PersonalPortfolioTest(unittest.TestCase):
 
         self.assertGreater(market.maximum, 1)
 
+    def test_open_stops_waiting_for_slow_prices_at_the_aggregate_deadline(self) -> None:
+        class SlowMarket:
+            slow = False
+
+            def observe_price(self, symbol: str) -> PortfolioPriceObservation:
+                if self.slow:
+                    time.sleep(0.2)
+                return PortfolioPriceObservation.unavailable("provider_unavailable")
+
+        market = SlowMarket()
+        book = PortfolioBook(
+            store=InMemoryPortfolioStore(),
+            market=market,
+            clock=FrozenClock(self.now),
+            provider_wait_seconds=0.03,
+        )
+        for revision, symbol in enumerate(("AAA", "BBB", "CCC")):
+            book.revise(
+                self.actor,
+                AddHoldingCommand(
+                    type="add_holding",
+                    symbol=symbol,
+                    name=symbol,
+                    quantity="1",
+                    average_cost="1",
+                    expected_portfolio_revision=revision,
+                ),
+                idempotency_key=f"add-slow-{symbol}",
+            )
+        market.slow = True
+
+        started = time.monotonic()
+        portfolio = book.open(self.actor)
+        elapsed = time.monotonic() - started
+
+        self.assertLess(elapsed, 0.12)
+        self.assertEqual(portfolio.priced_holding_count, 0)
+        self.assertEqual(portfolio.issues, ("provider_timeout",))
+
     def test_average_cost_reads_manual_ledger_without_observing_market(self) -> None:
         class CountingMarket:
             def __init__(self) -> None:
