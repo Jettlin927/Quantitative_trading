@@ -111,13 +111,20 @@ class InvestmentNewsReader:
         )
 
     def refresh(self, *, now: datetime | None = None) -> None:
-        """TTL 内不重复抓取；抓取失败保留旧数据（由调用方处理 stale）。"""
+        """TTL 内不重复抓取；抓取失败保留旧数据（由调用方处理 stale）。
+
+        新鲜度以 data.js 的 mtime 为准（跨进程、重启后依然生效）：mtime 在缓存
+        窗口内则直接跳过子进程抓取；否则执行 fetch.py（成功后 data.js mtime 更新）。
+        """
         config = self._config
         clock_now = now or datetime.now(timezone.utc)
+        data_path = self.checkout_dir / "data.js"
+        if self._data_is_fresh(data_path, clock_now, config.cache_ttl_seconds):
+            self._last_refresh = clock_now
+            return
         with self._lock:
-            if self._last_refresh is not None and (
-                clock_now - self._last_refresh
-            ).total_seconds() < config.cache_ttl_seconds:
+            if self._data_is_fresh(data_path, clock_now, config.cache_ttl_seconds):
+                self._last_refresh = clock_now
                 return
             fetch_script = self.checkout_dir / "scripts" / "fetch.py"
             if not fetch_script.is_file():
@@ -147,6 +154,20 @@ class InvestmentNewsReader:
             self._last_refresh = clock_now
             if return_code != 0:
                 raise RuntimeError("news_fetch_failed")
+
+    @staticmethod
+    def _data_is_fresh(
+        data_path: Path, now: datetime, cache_ttl_seconds: int
+    ) -> bool:
+        if not data_path.is_file():
+            return False
+        try:
+            mtime = datetime.fromtimestamp(
+                data_path.stat().st_mtime, tz=timezone.utc
+            )
+        except OSError:
+            return False
+        return (now - mtime).total_seconds() < cache_ttl_seconds
 
     def load(self) -> dict[str, Any]:
         data_path = self.checkout_dir / "data.js"

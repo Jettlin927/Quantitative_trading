@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -217,7 +218,11 @@ class GetNewsToolTest(unittest.TestCase):
         root = Path(checkout_dir)
         (root / "scripts").mkdir(parents=True, exist_ok=True)
         (root / "scripts" / "fetch.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
-        (root / "data.js").write_text(NEWS_FIXTURE, encoding="utf-8")
+        data_path = root / "data.js"
+        data_path.write_text(NEWS_FIXTURE, encoding="utf-8")
+        # 数据老化到 TTL 窗口之外，确保测试走抓取路径（相对真实时钟）
+        old_mtime = (datetime.now(timezone.utc) - timedelta(hours=2)).timestamp()
+        os.utime(data_path, (old_mtime, old_mtime))
         return InvestmentNewsReader(root, runner=runner, cache_ttl_seconds=3600)
 
     def test_search_by_symbol_matches_sector_and_keyword(self) -> None:
@@ -250,12 +255,33 @@ class GetNewsToolTest(unittest.TestCase):
         root = Path(tempfile.mkdtemp())
         (root / "scripts").mkdir(parents=True)
         (root / "scripts" / "fetch.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
-        (root / "data.js").write_text(NEWS_FIXTURE, encoding="utf-8")
+        data_path = root / "data.js"
+        data_path.write_text(NEWS_FIXTURE, encoding="utf-8")
+        old_mtime = (datetime.now(timezone.utc) - timedelta(hours=2)).timestamp()
+        os.utime(data_path, (old_mtime, old_mtime))
         reader = InvestmentNewsReader(root, runner=lambda argv, cwd: 1, cache_ttl_seconds=3600)
         tool = GetNewsTool(reader=reader).as_tool()
         result = tool.run(make_context(), {"keyword": "NVIDIA"})
         self.assertFalse(result.ok)
         self.assertEqual(result.error, "news_fetch_failed")
+
+    def test_fresh_data_skips_fetch_within_ttl(self) -> None:
+        """data.js mtime 在 TTL 窗口内时跳过子进程抓取（跨进程/重启生效）。"""
+        root = Path(tempfile.mkdtemp())
+        (root / "scripts").mkdir(parents=True)
+        (root / "scripts" / "fetch.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+        (root / "data.js").write_text(NEWS_FIXTURE, encoding="utf-8")
+        calls: list[tuple] = []
+        reader = InvestmentNewsReader(
+            root,
+            runner=lambda argv, cwd: calls.append((argv, cwd)) or 0,
+            cache_ttl_seconds=3600,
+        )
+        tool = GetNewsTool(reader=reader).as_tool()
+        result = tool.run(make_context(), {"keyword": "NVIDIA"})
+        self.assertTrue(result.ok)
+        self.assertEqual(json.loads(result.content)["count"], 1)
+        self.assertEqual(calls, [], "数据新鲜时不应触发子进程抓取")
 
     def test_unconfigured_reader_fails_closed(self) -> None:
         tool = GetNewsTool(reader=None).as_tool()
