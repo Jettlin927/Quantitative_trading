@@ -310,7 +310,7 @@ class InstrumentWorkbenchTest(unittest.TestCase):
             InstrumentQuery(symbol="acme", as_of=NOW, selected_date=date(2026, 6, 30)),
         )
 
-        self.assertEqual(source.call, ("ACME", NOW, 1500))
+        self.assertEqual(source.call, ("ACME", NOW, 120))
         self.assertEqual(workspace.cost_reference.value, "100.2500")
         self.assertEqual(workspace.cost_reference.identity, "current_manual_average_cost")
         self.assertFalse(workspace.cost_reference.historical_position_track)

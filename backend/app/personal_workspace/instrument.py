@@ -19,7 +19,7 @@ class InstrumentQuery:
     symbol: str
     as_of: datetime
     selected_date: date | None = None
-    limit: int = 1500
+    limit: int = 120
 
 
 @dataclass(frozen=True)
