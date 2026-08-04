@@ -89,7 +89,7 @@ def load_personal_market_readers(
         portfolio=AlpacaPortfolioMarketReader(adapter=adapter),
         instrument=TypedInstrumentObservationReader(
             market=adapter,
-            official_events=lambda symbol, as_of: (),
+            official_events=None,
             provider_wait_seconds=3.5,
         ),
     )

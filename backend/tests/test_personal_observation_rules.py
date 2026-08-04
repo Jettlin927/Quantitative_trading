@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from threading import Lock
+from threading import Event, Lock
 import time
 import unittest
 from types import SimpleNamespace
@@ -13,6 +13,7 @@ from backend.app.personal_workspace.contracts import (
     SetObservationRuleStateCommand,
 )
 from backend.app.personal_workspace.instrument import (
+    EventSourceStatusView,
     InstrumentBar,
     InstrumentEvent,
     InstrumentObservation,
@@ -110,19 +111,20 @@ class InstrumentWorkbenchTest(unittest.TestCase):
 
         self.assertGreater(market.maximum, 1)
 
-    def test_typed_reader_fetches_daily_bars_before_optional_sources(self) -> None:
-        calls: list[str] = []
+    def test_typed_reader_starts_optional_sources_within_the_same_deadline(self) -> None:
+        optional_started = Event()
 
-        class PriorityMarket:
+        class BudgetMarket:
             def observe_asset(self, symbol, **kwargs):
-                calls.append("asset")
+                optional_started.set()
                 return SimpleNamespace(
                     value=SimpleNamespace(name=symbol),
                     provenance=SimpleNamespace(authorization_snapshot_id="auth-asset"),
                 )
 
             def observe_daily_bars(self, symbol, **kwargs):
-                calls.append("bars")
+                if not optional_started.wait(0.1):
+                    raise TimeoutError("optional_sources_started_too_late")
                 value = tuple(
                     SimpleNamespace(
                         symbol="ACME",
@@ -147,19 +149,25 @@ class InstrumentWorkbenchTest(unittest.TestCase):
                 return SimpleNamespace(raw=observed, provider_adjusted=observed)
 
             def observe_corporate_actions(self, symbol, **kwargs):
-                calls.append("actions")
-                raise RuntimeError("actions unavailable")
+                optional_started.set()
+                return SimpleNamespace(
+                    value=(),
+                    provenance=SimpleNamespace(authorization_snapshot_id="auth-actions"),
+                )
 
         def official_events(symbol, as_of):
-            calls.append("official")
+            optional_started.set()
             return ()
 
         observation = TypedInstrumentObservationReader(
-            market=PriorityMarket(), official_events=official_events
-        ).open("ACME", as_of=NOW, limit=1500)
+            market=BudgetMarket(),
+            official_events=official_events,
+            provider_wait_seconds=0.05,
+        ).open("ACME", as_of=NOW, limit=120)
 
-        self.assertEqual(calls[0], "bars")
         self.assertEqual(len(observation.raw_bars), 2)
+        self.assertNotIn("asset_identity_unavailable", observation.issues)
+        self.assertNotIn("corporate_actions_unavailable", observation.issues)
 
     def test_typed_d1_d2_adapter_preserves_raw_adjusted_and_authorization_identity(self) -> None:
         raw = bars(2)
@@ -351,6 +359,18 @@ class InstrumentWorkbenchTest(unittest.TestCase):
                 source_health="fresh",
                 authorization_snapshot_ids=("auth-market-display", "auth-sec-display"),
                 issues=(),
+                event_source_statuses=(
+                    EventSourceStatusView(
+                        source="alpaca_corporate_actions",
+                        availability="available",
+                        event_count=0,
+                    ),
+                    EventSourceStatusView(
+                        source="official_events",
+                        availability="not_configured",
+                        event_count=0,
+                    ),
+                ),
             )
         )
         workbench = InstrumentWorkbench(
@@ -373,6 +393,12 @@ class InstrumentWorkbenchTest(unittest.TestCase):
         self.assertEqual(workspace.provider_adjusted_bars[-1].close, "60.0000")
         self.assertEqual(workspace.event_tracks[0].track, "corporate")
         self.assertIn("bar-29", workspace.evidence_inspector.evidence_ids)
+        self.assertEqual(
+            workspace.event_source_statuses[0].availability, "available"
+        )
+        self.assertEqual(
+            workspace.evidence_inspector.items[0].label, "Alpaca 原始日线"
+        )
         self.assertFalse(workspace.formal_research_overlay.research_eligible)
 
 

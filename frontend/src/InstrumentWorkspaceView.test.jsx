@@ -8,7 +8,18 @@ const workspace = {
   provider_adjusted_bars: [{ time: '2026-08-01', open: '50', high: '51.5', low: '49.5', close: '51', volume: 1000 }],
   cost_reference: { availability: 'available', value: '100.2500', identity: 'current_manual_average_cost', historical_position_track: false },
   event_tracks: [{ track: 'corporate', events: [{ event_id: 'sec-1', label: '10-Q 已确认', occurred_at: '2026-08-01T12:00:00Z', confirmation_state: 'confirmed', evidence_ids: ['sec-1'] }] }],
-  evidence_inspector: { selected_date: '2026-08-01', evidence_ids: ['bar-1', 'sec-1'], source_health: 'fresh', authorization_snapshot_ids: ['auth-display'], issues: [] },
+  event_source_statuses: [
+    { source: 'alpaca_corporate_actions', availability: 'available', event_count: 0 },
+    { source: 'official_events', availability: 'not_configured', event_count: 0 },
+  ],
+  evidence_inspector: {
+    selected_date: '2026-08-01',
+    evidence_ids: ['bar-1', 'sec-1'],
+    source_health: 'fresh',
+    authorization_snapshot_ids: ['auth-display'],
+    issues: [],
+    items: [{ label: 'Alpaca 原始日线', source: 'Alpaca', dataset: 'alpaca_daily_bars', observed_date: '2026-08-01', source_health: 'fresh', evidence_id: 'bar-1' }],
+  },
   formal_research_overlay: { research_eligible: false, label: '正式研究发布投影', scale_identity: 'normalized_readonly', events: [] },
   issues: [],
 }
@@ -23,7 +34,11 @@ describe('InstrumentWorkspaceView', () => {
     expect(screen.getByText('当前成本参考线')).toBeTruthy()
     expect(screen.getByText('不是历史持仓轨迹')).toBeTruthy()
     expect(screen.getByRole('heading', { name: '独立事件轨' })).toBeTruthy()
+    expect(screen.getByText('公司行动来源正常，当前区间 0 条')).toBeTruthy()
+    expect(screen.getByText('官方 SEC / IR 事件尚未配置')).toBeTruthy()
     expect(screen.getByRole('heading', { name: '证据检查器' })).toBeTruthy()
+    expect(screen.getByText('Alpaca 原始日线')).toBeTruthy()
+    expect(screen.getByText('alpaca_daily_bars · 2026-08-01 · fresh')).toBeTruthy()
     expect(screen.getByText('正式研究发布投影')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Provider adjusted' }))

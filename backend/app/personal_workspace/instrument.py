@@ -46,6 +46,13 @@ class InstrumentEvent:
 
 
 @dataclass(frozen=True)
+class EventSourceStatusView:
+    source: str
+    availability: str
+    event_count: int
+
+
+@dataclass(frozen=True)
 class InstrumentObservation:
     symbol: str
     name: str
@@ -55,6 +62,7 @@ class InstrumentObservation:
     source_health: str
     authorization_snapshot_ids: tuple[str, ...]
     issues: tuple[str, ...]
+    event_source_statuses: tuple[EventSourceStatusView, ...] = ()
 
 
 class InstrumentObservationReader(Protocol):
@@ -100,6 +108,17 @@ class EvidenceInspectorView:
     source_health: str
     authorization_snapshot_ids: tuple[str, ...]
     issues: tuple[str, ...]
+    items: tuple["EvidenceItemView", ...] = ()
+
+
+@dataclass(frozen=True)
+class EvidenceItemView:
+    label: str
+    source: str
+    dataset: str
+    observed_date: str
+    source_health: str
+    evidence_id: str
 
 
 @dataclass(frozen=True)
@@ -117,6 +136,7 @@ class InstrumentWorkspace:
     provider_adjusted_bars: tuple[InstrumentBarView, ...]
     cost_reference: CostReferenceView
     event_tracks: tuple[EventTrackView, ...]
+    event_source_statuses: tuple[EventSourceStatusView, ...]
     evidence_inspector: EvidenceInspectorView
     formal_research_overlay: FormalResearchOverlayView
     issues: tuple[str, ...]
@@ -133,6 +153,18 @@ class UnavailableInstrumentObservationReader:
             source_health="unavailable",
             authorization_snapshot_ids=(),
             issues=("provider_unavailable", "daily_bars_unavailable"),
+            event_source_statuses=(
+                EventSourceStatusView(
+                    source="alpaca_corporate_actions",
+                    availability="unavailable",
+                    event_count=0,
+                ),
+                EventSourceStatusView(
+                    source="official_events",
+                    availability="not_configured",
+                    event_count=0,
+                ),
+            ),
         )
 
 
@@ -143,7 +175,7 @@ class TypedInstrumentObservationReader:
         self,
         *,
         market: Any,
-        official_events: Callable[[str, datetime], tuple[Any, ...]],
+        official_events: Callable[[str, datetime], tuple[Any, ...]] | None,
         provider_wait_seconds: float = 1.8,
         cache_ttl_seconds: float = 300.0,
         clock: Callable[[], float] = monotonic,
@@ -172,10 +204,8 @@ class TypedInstrumentObservationReader:
         start_date = end_date - timedelta(days=max(limit * 2, 30))
         issues: list[str] = []
         authorization_ids: list[str] = []
+        event_source_statuses: list[EventSourceStatusView] = []
         executor = ThreadPoolExecutor(max_workers=4)
-        identity_future = None
-        actions_future = None
-        official_events_future = None
         deadline = self._clock() + self._provider_wait_seconds
         try:
             bars_future = executor.submit(
@@ -186,36 +216,33 @@ class TypedInstrumentObservationReader:
                 fetched_at=as_of,
                 purpose="display",
             )
-            _, unfinished = wait(
-                (bars_future,), timeout=max(0.0, deadline - self._clock())
+            identity_future = executor.submit(
+                self._market.observe_asset,
+                symbol,
+                purpose="display",
+                fetched_at=as_of,
             )
-            for future in unfinished:
-                future.cancel()
-            remaining = deadline - self._clock()
-            if remaining > 0:
-                identity_future = executor.submit(
-                    self._market.observe_asset,
-                    symbol,
-                    purpose="display",
-                    fetched_at=as_of,
-                )
-                actions_future = executor.submit(
-                    self._market.observe_corporate_actions,
-                    symbol,
-                    start_date=start_date,
-                    end_date=end_date,
-                    fetched_at=as_of,
-                    purpose="display",
-                )
+            actions_future = executor.submit(
+                self._market.observe_corporate_actions,
+                symbol,
+                start_date=start_date,
+                end_date=end_date,
+                fetched_at=as_of,
+                purpose="display",
+            )
+            futures = [bars_future, identity_future, actions_future]
+            official_events_future = None
+            if self._official_events is not None:
                 official_events_future = executor.submit(
                     self._official_events, symbol, as_of
                 )
-                _, unfinished = wait(
-                    (identity_future, actions_future, official_events_future),
-                    timeout=max(0.0, deadline - self._clock()),
-                )
-                for future in unfinished:
-                    future.cancel()
+                futures.append(official_events_future)
+            _, unfinished = wait(
+                futures,
+                timeout=max(0.0, deadline - self._clock()),
+            )
+            for future in unfinished:
+                future.cancel()
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
 
@@ -257,11 +284,19 @@ class TypedInstrumentObservationReader:
             issues.append("daily_bars_unavailable")
         events: list[InstrumentEvent] = []
         try:
-            if actions_future is None or not actions_future.done():
+            if not actions_future.done():
                 raise TimeoutError("provider_timeout")
             actions = actions_future.result()
             authorization_ids.append(actions.provenance.authorization_snapshot_id)
-            for action in actions.value or ():
+            action_values = actions.value or ()
+            event_source_statuses.append(
+                EventSourceStatusView(
+                    source="alpaca_corporate_actions",
+                    availability="available",
+                    event_count=len(action_values),
+                )
+            )
+            for action in action_values:
                 identity_value = f"alpaca:corporate_action:{action.provider_record_id}"
                 events.append(
                     InstrumentEvent(
@@ -278,24 +313,55 @@ class TypedInstrumentObservationReader:
                 )
         except Exception:
             issues.append("corporate_actions_unavailable")
-        try:
-            if official_events_future is None or not official_events_future.done():
-                raise TimeoutError("provider_timeout")
-            for event in official_events_future.result():
-                authorization_ids.append(event.authorization.snapshot_id)
-                events.append(
-                    InstrumentEvent(
-                        event_id=event.identity,
-                        track="macro" if event.event_type == "macro_release" else "corporate",
-                        event_type=event.event_type,
-                        label=event.event_type,
-                        occurred_at=event.occurred_at,
-                        evidence_ids=(event.evidence_identity,),
-                        confirmation_state="confirmed",
+            event_source_statuses.append(
+                EventSourceStatusView(
+                    source="alpaca_corporate_actions",
+                    availability="unavailable",
+                    event_count=0,
+                )
+            )
+        if official_events_future is None:
+            event_source_statuses.append(
+                EventSourceStatusView(
+                    source="official_events",
+                    availability="not_configured",
+                    event_count=0,
+                )
+            )
+        else:
+            try:
+                if not official_events_future.done():
+                    raise TimeoutError("provider_timeout")
+                official_values = official_events_future.result()
+                event_source_statuses.append(
+                    EventSourceStatusView(
+                        source="official_events",
+                        availability="available",
+                        event_count=len(official_values),
                     )
                 )
-        except Exception:
-            issues.append("official_events_unavailable")
+                for event in official_values:
+                    authorization_ids.append(event.authorization.snapshot_id)
+                    events.append(
+                        InstrumentEvent(
+                            event_id=event.identity,
+                            track="macro" if event.event_type == "macro_release" else "corporate",
+                            event_type=event.event_type,
+                            label=event.event_type,
+                            occurred_at=event.occurred_at,
+                            evidence_ids=(event.evidence_identity,),
+                            confirmation_state="confirmed",
+                        )
+                    )
+            except Exception:
+                issues.append("official_events_unavailable")
+                event_source_statuses.append(
+                    EventSourceStatusView(
+                        source="official_events",
+                        availability="unavailable",
+                        event_count=0,
+                    )
+                )
         observation = InstrumentObservation(
             symbol=symbol,
             name=name,
@@ -305,6 +371,7 @@ class TypedInstrumentObservationReader:
             source_health=source_health,
             authorization_snapshot_ids=tuple(dict.fromkeys(authorization_ids)),
             issues=tuple(issues),
+            event_source_statuses=tuple(event_source_statuses),
         )
         if observation.raw_bars:
             with self._cache_lock:
@@ -383,6 +450,38 @@ class InstrumentWorkbench:
                 for evidence_id in event.evidence_ids
             )
         )
+        evidence_items = tuple(
+            EvidenceItemView(
+                label=label,
+                source="Alpaca",
+                dataset="alpaca_daily_bars",
+                observed_date=bar.trade_date.isoformat(),
+                source_health=observed.source_health,
+                evidence_id=bar.evidence_id,
+            )
+            for label, series in (
+                ("Alpaca 原始日线", observed.raw_bars),
+                ("Alpaca Provider adjusted 日线", observed.provider_adjusted_bars),
+            )
+            for bar in series
+            if selected is not None and bar.trade_date == selected
+        ) + tuple(
+            EvidenceItemView(
+                label=event.label,
+                source=("Alpaca" if event.event_id.startswith("alpaca:") else "官方来源"),
+                dataset=(
+                    "alpaca_corporate_actions"
+                    if event.event_id.startswith("alpaca:")
+                    else event.event_type
+                ),
+                observed_date=event.occurred_at.date().isoformat(),
+                source_health="available",
+                evidence_id=evidence_id,
+            )
+            for event in all_events
+            if selected is not None and event.occurred_at.date() == selected
+            for evidence_id in event.evidence_ids
+        )
         cost = self._cost_reader(actor, symbol)
         return InstrumentWorkspace(
             identity=InstrumentIdentityView(symbol=symbol, name=observed.name),
@@ -397,12 +496,14 @@ class InstrumentWorkbench:
                 historical_position_track=False,
             ),
             event_tracks=tracks,
+            event_source_statuses=observed.event_source_statuses,
             evidence_inspector=EvidenceInspectorView(
                 selected_date=selected.isoformat() if selected else None,
                 evidence_ids=tuple(dict.fromkeys(evidence_ids)),
                 source_health=observed.source_health,
                 authorization_snapshot_ids=observed.authorization_snapshot_ids,
                 issues=observed.issues,
+                items=evidence_items,
             ),
             formal_research_overlay=FormalResearchOverlayView(
                 research_eligible=False,

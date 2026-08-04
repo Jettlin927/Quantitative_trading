@@ -10,6 +10,29 @@ const TRACK_LABELS = {
   personal_rule: '个人规则',
 }
 
+const ISSUE_LABELS = {
+  asset_identity_unavailable: '资产名称暂时不可用',
+  corporate_actions_unavailable: '公司行动来源读取失败',
+  daily_bars_unavailable: '日线来源读取失败',
+  official_events_unavailable: '官方 SEC / IR 事件来源读取失败',
+  provider_adjusted_bars_unavailable: 'Provider adjusted 日线暂时不可用',
+}
+
+function eventSourceLabel(status) {
+  if (status.source === 'alpaca_corporate_actions') {
+    return status.availability === 'available'
+      ? `公司行动来源正常，当前区间 ${status.event_count} 条`
+      : '公司行动来源读取失败'
+  }
+  if (status.source === 'official_events') {
+    if (status.availability === 'not_configured') return '官方 SEC / IR 事件尚未配置'
+    return status.availability === 'available'
+      ? `官方 SEC / IR 事件来源正常，当前区间 ${status.event_count} 条`
+      : '官方 SEC / IR 事件来源读取失败'
+  }
+  return `${status.source} · ${status.availability}`
+}
+
 export function InstrumentWorkspaceView({ client, symbol, chartAdapter = undefined, onNavigate = (_path) => {} }) {
   const [workspace, setWorkspace] = useState(null)
   const [series, setSeries] = useState('raw')
@@ -82,13 +105,15 @@ export function InstrumentWorkspaceView({ client, symbol, chartAdapter = undefin
       <section className="personal-panel">
         <header><div><span>02 / EVENT RAILS</span><h2>独立事件轨</h2></div><b>不混入 K 线</b></header>
         <div className="event-rails">
-          {workspace.event_tracks.length ? workspace.event_tracks.map((track) => <article key={track.track}><strong>{TRACK_LABELS[track.track] || track.track}</strong>{track.events.map((event) => <div key={event.event_id}><time>{event.occurred_at.slice(0, 10)}</time><span>{event.label}</span><small>{event.confirmation_state}</small></div>)}</article>) : <p>当前无事件；来源失败不会伪装为无事件。</p>}
+          <div className="event-source-statuses">{(workspace.event_source_statuses || []).map((status) => <p data-availability={status.availability} key={status.source}>{status.availability === 'unavailable' ? <AlertTriangle size={14} /> : null}{eventSourceLabel(status)}</p>)}</div>
+          {workspace.event_tracks.length ? workspace.event_tracks.map((track) => <article key={track.track}><strong>{TRACK_LABELS[track.track] || track.track}</strong>{track.events.map((event) => <div key={event.event_id}><time>{event.occurred_at.slice(0, 10)}</time><span>{event.label}</span><small>{event.confirmation_state}</small></div>)}</article>) : <p className="event-empty">当前区间没有已确认事件；各来源状态如上。</p>}
         </div>
       </section>
       <section className="personal-panel">
         <header><div><span>03 / EVIDENCE</span><h2>证据检查器</h2></div><Database size={17} /></header>
-        <dl className="evidence-list"><div><dt>选中日期</dt><dd>{workspace.evidence_inspector.selected_date || '-'}</dd></div><div><dt>证据身份</dt><dd>{workspace.evidence_inspector.evidence_ids.join(' · ') || '不可用'}</dd></div><div><dt>授权快照</dt><dd>{workspace.evidence_inspector.authorization_snapshot_ids.join(' · ') || '不可用'}</dd></div></dl>
-        {workspace.evidence_inspector.issues.map((issue) => <p className="data-gap" key={issue}><AlertTriangle size={14} />{issue}</p>)}
+        <dl className="evidence-list"><div><dt>选中日期</dt><dd>{workspace.evidence_inspector.selected_date || '-'}</dd></div><div><dt>授权快照</dt><dd>{workspace.evidence_inspector.authorization_snapshot_ids.join(' · ') || '不可用'}</dd></div></dl>
+        <div className="evidence-items">{(workspace.evidence_inspector.items || []).length ? workspace.evidence_inspector.items.map((item) => <article key={item.evidence_id}><strong>{item.label}</strong><span>{item.dataset} · {item.observed_date} · {item.source_health}</span><details><summary>技术身份</summary><code>{item.evidence_id}</code></details></article>) : <p>所选日期暂无可检查证据。</p>}</div>
+        {workspace.evidence_inspector.issues.map((issue) => <p className="data-gap" key={issue}><AlertTriangle size={14} />{ISSUE_LABELS[issue] || issue}</p>)}
       </section>
     </div>
 
