@@ -17,6 +17,7 @@
 - `backend/app/schemas.py`：API 输入输出 schema。
 - `backend/app/sync_worker.py`：数据任务租约、心跳、退避和恢复。
 - `backend/app/personal_analysis_worker.py`：与正式研究隔离的个人 AI 分析队列；只有该进程可读取 DeepSeek secret file。
+- `backend/app/personal_workspace/`：个人投研工作台（真实美股持仓、观察规则、AI 分析、个人记录）；`agent/` 子包是 tool-use agent 运行时（多轮工具循环、DeepSeek agent 适配器、持仓/K线/新闻工具、技能），与单发冻结证据路径并行共存，通过 `PERSONAL_ANALYSIS_MODE=agent` 启用。
 - `backend/app/data_quality/`：研究范围质量、canonical 输入快照和质量运行。
 - `backend/app/quant_research/`：无券商副作用的研究协议、模拟、指标、复现和报告统计。
 - `backend/app/research_analytics.py`：把同一评价版本的 canonical 工件或已校验历史冻结来源投影为只读指标与图表数据；不计算新研究结论。

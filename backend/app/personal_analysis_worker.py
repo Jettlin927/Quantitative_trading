@@ -80,18 +80,56 @@ def build_personal_analysis_worker_from_environment() -> PersonalAnalysisWorker:
         autoflush=False,
         expire_on_commit=False,
     )
-    workspace = AnalysisWorkspace(
-        store=PostgresAnalysisStore(
+    mode = os.getenv("PERSONAL_ANALYSIS_MODE", "legacy").strip().lower()
+    if mode == "agent":
+        workspace = _build_agent_workspace(
+            session_factory=session_factory,
+            keyring=keyring,
+            api_key=credentials.api_key,
+            monthly_budget=monthly_budget,
+        )
+    else:
+        store = PostgresAnalysisStore(
             session_factory,
             cipher=PersonalDataCipher(keyring),
-        ),
-        evidence_reader=lambda actor, intent: (),
-        provider=DeepSeekChatAdapter(api_key=credentials.api_key),
-        monthly_soft_budget_usd=monthly_budget,
-    )
+        )
+        workspace = AnalysisWorkspace(
+            store=store,
+            evidence_reader=lambda actor, intent: (),
+            provider=DeepSeekChatAdapter(api_key=credentials.api_key),
+            monthly_soft_budget_usd=monthly_budget,
+        )
     return PersonalAnalysisWorker(
         workspace=workspace,
         worker_id=os.getenv("PERSONAL_ANALYSIS_WORKER_ID", "personal-analysis-worker-1"),
+    )
+
+
+def _build_agent_workspace(
+    *,
+    session_factory,
+    keyring,
+    api_key: str,
+    monthly_budget: Decimal,
+):
+    """agent 模式：tool-use 循环 + 持仓/K线/新闻工具（数据源缺失时工具降级）。"""
+    from .personal_workspace.agent.deepseek_provider import DeepSeekAgentChatAdapter
+    from .personal_workspace.agent.workspace import build_agent_workspace
+    from .personal_workspace.analysis import PostgresAnalysisStore
+
+    store = PostgresAnalysisStore(
+        session_factory,
+        cipher=PersonalDataCipher(keyring),
+    )
+    return build_agent_workspace(
+        store=store,
+        session_factory=session_factory,
+        cipher=PersonalDataCipher(keyring),
+        provider=DeepSeekAgentChatAdapter(api_key=api_key),
+        monthly_soft_budget_usd=monthly_budget,
+        monthly_spend_reader=lambda actor, now: store.monthly_spend_usd(
+            actor.actor_id, now
+        ),
     )
 
 

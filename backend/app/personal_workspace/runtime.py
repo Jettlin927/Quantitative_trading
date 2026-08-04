@@ -110,25 +110,42 @@ def get_personal_runtime() -> PersonalRuntime:
         formal_overlay_reader=lambda symbol: (),
     )
     analysis_store = PostgresAnalysisStore(session_factory, cipher=cipher)
-    official_evidence_reader = load_official_analysis_evidence_reader(
-        query_file=os.getenv("OFFICIAL_ANALYSIS_QUERY_FILE", "").strip(),
-        authorization_file=os.getenv(
-            "OFFICIAL_ANALYSIS_AUTHORIZATION_FILE", ""
-        ).strip(),
-        sec_user_agent=os.getenv("SEC_USER_AGENT", "").strip(),
-    )
-    analyses = AnalysisWorkspace(
-        store=analysis_store,
-        evidence_reader=official_evidence_reader,
-        provider=ScriptedResponsesAdapter(script=(), available=provider_available),
-        config_revision=official_evidence_reader.config_revision,
-        monthly_soft_budget_usd=Decimal(
-            os.getenv("DEEPSEEK_MONTHLY_SOFT_BUDGET_USD", "5")
-        ),
-        monthly_spend_reader=lambda request_actor, now: analysis_store.monthly_spend_usd(
-            request_actor.actor_id, now
-        ),
-    )
+    analysis_mode = os.getenv("PERSONAL_ANALYSIS_MODE", "legacy").strip().lower()
+    if analysis_mode == "agent":
+        from .agent.workspace import _AgentProviderShim, build_agent_workspace
+
+        analyses = build_agent_workspace(
+            store=analysis_store,
+            session_factory=session_factory,
+            cipher=cipher,
+            provider=_AgentProviderShim(available=provider_available),
+            monthly_soft_budget_usd=Decimal(
+                os.getenv("DEEPSEEK_MONTHLY_SOFT_BUDGET_USD", "5")
+            ),
+            monthly_spend_reader=lambda request_actor, now: analysis_store.monthly_spend_usd(
+                request_actor.actor_id, now
+            ),
+        )
+    else:
+        official_evidence_reader = load_official_analysis_evidence_reader(
+            query_file=os.getenv("OFFICIAL_ANALYSIS_QUERY_FILE", "").strip(),
+            authorization_file=os.getenv(
+                "OFFICIAL_ANALYSIS_AUTHORIZATION_FILE", ""
+            ).strip(),
+            sec_user_agent=os.getenv("SEC_USER_AGENT", "").strip(),
+        )
+        analyses = AnalysisWorkspace(
+            store=analysis_store,
+            evidence_reader=official_evidence_reader,
+            provider=ScriptedResponsesAdapter(script=(), available=provider_available),
+            config_revision=official_evidence_reader.config_revision,
+            monthly_soft_budget_usd=Decimal(
+                os.getenv("DEEPSEEK_MONTHLY_SOFT_BUDGET_USD", "5")
+            ),
+            monthly_spend_reader=lambda request_actor, now: analysis_store.monthly_spend_usd(
+                request_actor.actor_id, now
+            ),
+        )
     notebook = ResearchNotebook(
         store=PostgresNotebookStore(session_factory, cipher=cipher),
         analyses=analysis_store,

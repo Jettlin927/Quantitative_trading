@@ -120,12 +120,24 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
             worker["environment"]["DEEPSEEK_CREDENTIALS_FILE"],
             "/run/secrets/deepseek-credentials.json",
         )
+        self.assertEqual(
+            worker["environment"]["ALPACA_CREDENTIALS_FILE"],
+            "/run/secrets/alpaca-credentials.json",
+        )
+        self.assertEqual(
+            worker["environment"]["ALPACA_AUTHORIZATION_FILE"],
+            "/run/config/alpaca-authorization.json",
+        )
+        self.assertIn("PERSONAL_ANALYSIS_MODE", worker["environment"])
         mounts = {mount["target"]: mount for mount in worker["volumes"]}
         self.assertEqual(
             set(mounts),
             {
                 "/run/secrets/personal-keyring.json",
                 "/run/secrets/deepseek-credentials.json",
+                "/run/secrets/alpaca-credentials.json",
+                "/run/config/alpaca-authorization.json",
+                "${INVESTMENT_NEWS_DIR:-/run/disabled/news}",
             },
         )
         self.assertTrue(mounts["/run/secrets/deepseek-credentials.json"]["read_only"])

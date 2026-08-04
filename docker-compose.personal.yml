@@ -11,6 +11,8 @@ services:
       OFFICIAL_ANALYSIS_AUTHORIZATION_FILE: /run/config/official-analysis-authorization.json
       SEC_USER_AGENT: ${SEC_USER_AGENT:?启用官方证据前必须配置 SEC_USER_AGENT}
       PERSONAL_ANALYSIS_PROVIDER: ${PERSONAL_ANALYSIS_PROVIDER:-disabled}
+      PERSONAL_ANALYSIS_MODE: ${PERSONAL_ANALYSIS_MODE:-legacy}
+      INVESTMENT_NEWS_DIR: ${INVESTMENT_NEWS_DIR:-}
       DEEPSEEK_MONTHLY_SOFT_BUDGET_USD: ${DEEPSEEK_MONTHLY_SOFT_BUDGET_USD:-5}
     volumes:
       - type: bind
@@ -47,6 +49,11 @@ services:
         source: ${OFFICIAL_ANALYSIS_AUTHORIZATION_HOST_FILE:?启用官方证据前必须配置 OFFICIAL_ANALYSIS_AUTHORIZATION_HOST_FILE}
         target: /run/config/official-analysis-authorization.json
         read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${INVESTMENT_NEWS_HOST_DIR:-/run/disabled/news}
+        target: ${INVESTMENT_NEWS_DIR:-/run/disabled/news}
         bind:
           create_host_path: false
 
@@ -88,6 +95,10 @@ services:
       DEEPSEEK_MONTHLY_SOFT_BUDGET_USD: ${DEEPSEEK_MONTHLY_SOFT_BUDGET_USD:-5}
       PERSONAL_ANALYSIS_WORKER_ID: ${PERSONAL_ANALYSIS_WORKER_ID:-personal-analysis-worker-1}
       PERSONAL_ANALYSIS_WORKER_POLL_SECONDS: ${PERSONAL_ANALYSIS_WORKER_POLL_SECONDS:-5}
+      PERSONAL_ANALYSIS_MODE: ${PERSONAL_ANALYSIS_MODE:-legacy}
+      INVESTMENT_NEWS_DIR: ${INVESTMENT_NEWS_DIR:-}
+      ALPACA_CREDENTIALS_FILE: /run/secrets/alpaca-credentials.json
+      ALPACA_AUTHORIZATION_FILE: /run/config/alpaca-authorization.json
       APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
       APP_GIT_REF: ${APP_GIT_REF:-unknown}
     volumes:
@@ -101,5 +112,22 @@ services:
         source: ${DEEPSEEK_CREDENTIALS_HOST_FILE:-/run/disabled/deepseek-credentials.json}
         target: /run/secrets/deepseek-credentials.json
         read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ALPACA_CREDENTIALS_HOST_FILE:?启用 Alpaca 行情前必须配置 ALPACA_CREDENTIALS_HOST_FILE}
+        target: /run/secrets/alpaca-credentials.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ALPACA_AUTHORIZATION_HOST_FILE:?启用 Alpaca 行情前必须配置 ALPACA_AUTHORIZATION_HOST_FILE}
+        target: /run/config/alpaca-authorization.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${INVESTMENT_NEWS_HOST_DIR:-/run/disabled/news}
+        target: ${INVESTMENT_NEWS_DIR:-/run/disabled/news}
         bind:
           create_host_path: false
