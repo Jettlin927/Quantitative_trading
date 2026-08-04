@@ -262,6 +262,7 @@ describe('股票研究 tracer', () => {
     expect(screen.getByRole('button', { name: /A 股数据/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /美股数据/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /数据与系统/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
     await waitFor(() => expect(signals).toHaveLength(1))
 
     view.unmount()

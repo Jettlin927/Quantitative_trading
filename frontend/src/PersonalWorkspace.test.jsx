@@ -53,6 +53,46 @@ function noOpReadAdapter({ path }) {
 }
 
 describe('个人美股 synthetic tracer', () => {
+  it('没有合成 trace 时仍以真实组合和注意事项组成今日入口', async () => {
+    const available = {
+      availability: 'available', value: '241.0000', reason_code: null, source_health: 'fresh',
+      as_of: '2026-08-03T20:00:00Z', source_ids: ['alpaca-acme'], feed: 'delayed_sip', delay_seconds: 900,
+    }
+    const unavailable = {
+      availability: 'not_available', value: null, reason_code: 'provider_unavailable', source_health: 'unavailable',
+      as_of: null, source_ids: [], feed: null, delay_seconds: null,
+    }
+    const portfolio = {
+      portfolio_revision: 7, usd_cash: '100.0000', total_equity: unavailable,
+      total_market_value: unavailable, issues: ['provider_unavailable'],
+      holdings: [
+        { holding_id: 'holding-acme', symbol: 'ACME', name: 'Acme', state: 'active', market_value: available },
+        { holding_id: 'holding-beta', symbol: 'BETA', name: 'Beta', state: 'active', market_value: unavailable },
+      ],
+    }
+    const personalClient = {
+      openToday: vi.fn(() => Promise.resolve({
+        trace: null,
+        record: null,
+        portfolio,
+        attention_items: [{ attention_id: 'attention-1', symbol: 'BETA', label: '行情待恢复', result: 'insufficient_data', reason_code: 'provider_unavailable' }],
+      })),
+      openPortfolio: vi.fn(() => Promise.resolve(portfolio)),
+    }
+
+    render(<App initialPath="/today" readAdapter={noOpReadAdapter} personalClient={personalClient} />)
+
+    expect(await screen.findByRole('heading', { name: '今日工作台' })).toBeInTheDocument()
+    expect(screen.getByText('今天先看组合、数据缺口与待验证事项')).toBeInTheDocument()
+    expect(screen.getByText('2 个活跃持仓')).toBeInTheDocument()
+    expect(screen.getByText('行情覆盖 1/2')).toBeInTheDocument()
+    expect(screen.getByText('BETA · 行情待恢复')).toBeInTheDocument()
+    expect(screen.queryByText('合成信任纵切尚未创建')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '查看全部持仓' }))
+    expect(await screen.findByRole('heading', { name: '手工美股持仓' })).toBeInTheDocument()
+  })
+
   it('标准 URL 七区路由以 /today 为根，A 股留在市场次级入口', () => {
     const personalClient = { openToday: vi.fn(() => Promise.resolve({ trace, record: null })) }
     render(<App readAdapter={noOpReadAdapter} personalClient={personalClient} />)
@@ -63,6 +103,18 @@ describe('个人美股 synthetic tracer', () => {
     expect(screen.getByRole('button', { name: /A 股数据/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
     expect(screen.getByRole('button', { name: /市场与标的/ })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('个人首页不加载其他工作区的全局数据', async () => {
+    const readAdapter = vi.fn(noOpReadAdapter)
+    const personalClient = { openToday: vi.fn(() => Promise.resolve({ trace, record: null })) }
+
+    render(<App initialPath="/today" readAdapter={readAdapter} personalClient={personalClient} />)
+
+    await waitFor(() => expect(readAdapter).toHaveBeenCalledWith({ path: '/api/health?include_counts=false' }))
+    expect(readAdapter.mock.calls.map(([request]) => request.path)).toEqual([
+      '/api/health?include_counts=false',
+    ])
   })
 
   it('K 线先于证据预览，四态不用颜色区分，provider unavailable 不阻断显式保存', async () => {

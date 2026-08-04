@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -150,21 +151,37 @@ class TypedInstrumentObservationReader:
         start_date = end_date - timedelta(days=max(limit * 2, 30))
         issues: list[str] = []
         authorization_ids: list[str] = []
-        try:
-            identity = self._market.observe_asset(symbol, purpose="display", fetched_at=as_of)
-            name = identity.value.name if identity.value is not None else symbol
-            authorization_ids.append(identity.provenance.authorization_snapshot_id)
-        except Exception:
-            name = symbol
-            issues.append("asset_identity_unavailable")
-        try:
-            bars = self._market.observe_daily_bars(
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            identity_future = executor.submit(
+                self._market.observe_asset, symbol, purpose="display", fetched_at=as_of
+            )
+            bars_future = executor.submit(
+                self._market.observe_daily_bars,
                 symbol,
                 start_date=start_date,
                 end_date=end_date,
                 fetched_at=as_of,
                 purpose="display",
             )
+            actions_future = executor.submit(
+                self._market.observe_corporate_actions,
+                symbol,
+                start_date=start_date,
+                end_date=end_date,
+                fetched_at=as_of,
+                purpose="display",
+            )
+            official_events_future = executor.submit(self._official_events, symbol, as_of)
+
+        try:
+            identity = identity_future.result()
+            name = identity.value.name if identity.value is not None else symbol
+            authorization_ids.append(identity.provenance.authorization_snapshot_id)
+        except Exception:
+            name = symbol
+            issues.append("asset_identity_unavailable")
+        try:
+            bars = bars_future.result()
             raw = _typed_bars(bars.raw.value or (), "raw", bars.raw.provenance.content_sha256)
             adjusted = _typed_bars(
                 bars.provider_adjusted.value or (),
@@ -185,13 +202,7 @@ class TypedInstrumentObservationReader:
             issues.append("daily_bars_unavailable")
         events: list[InstrumentEvent] = []
         try:
-            actions = self._market.observe_corporate_actions(
-                symbol,
-                start_date=start_date,
-                end_date=end_date,
-                fetched_at=as_of,
-                purpose="display",
-            )
+            actions = actions_future.result()
             authorization_ids.append(actions.provenance.authorization_snapshot_id)
             for action in actions.value or ():
                 identity_value = f"alpaca:corporate_action:{action.provider_record_id}"
@@ -211,7 +222,7 @@ class TypedInstrumentObservationReader:
         except Exception:
             issues.append("corporate_actions_unavailable")
         try:
-            for event in self._official_events(symbol, as_of):
+            for event in official_events_future.result():
                 authorization_ids.append(event.authorization.snapshot_id)
                 events.append(
                     InstrumentEvent(

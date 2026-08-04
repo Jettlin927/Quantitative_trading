@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from threading import Lock
+import time
 import unittest
 
 from pydantic import ValidationError
@@ -109,6 +111,45 @@ class PersonalPortfolioTest(unittest.TestCase):
         self.assertEqual(repeated.portfolio_revision, 1)
         self.assertEqual(repeated.holdings[0].holding_id, holding.holding_id)
 
+    def test_open_observes_active_holdings_concurrently(self) -> None:
+        class ConcurrentMarket:
+            def __init__(self) -> None:
+                self.active = 0
+                self.maximum = 0
+                self.lock = Lock()
+
+            def observe_price(self, symbol: str) -> PortfolioPriceObservation:
+                with self.lock:
+                    self.active += 1
+                    self.maximum = max(self.maximum, self.active)
+                time.sleep(0.03)
+                with self.lock:
+                    self.active -= 1
+                return PortfolioPriceObservation.unavailable("provider_unavailable")
+
+        market = ConcurrentMarket()
+        book = PortfolioBook(
+            store=InMemoryPortfolioStore(), market=market, clock=FrozenClock(self.now)
+        )
+        for revision, symbol in enumerate(("AAA", "BBB", "CCC")):
+            book.revise(
+                self.actor,
+                AddHoldingCommand(
+                    type="add_holding",
+                    symbol=symbol,
+                    name=symbol,
+                    quantity="1",
+                    average_cost="1",
+                    expected_portfolio_revision=revision,
+                ),
+                idempotency_key=f"add-{symbol}",
+            )
+        market.maximum = 0
+
+        book.open(self.actor)
+
+        self.assertGreater(market.maximum, 1)
+
     def test_unavailable_price_does_not_block_manual_holding_or_turn_missing_values_into_zero(self) -> None:
         self.market.observations.clear()
 
@@ -129,6 +170,33 @@ class PersonalPortfolioTest(unittest.TestCase):
             self.assertIsNone(observed.value)
             self.assertEqual(observed.reason_code, "provider_unavailable")
         self.assertIn("provider_unavailable", portfolio.issues)
+
+    def test_one_unpriced_symbol_keeps_covered_portfolio_value_visible(self) -> None:
+        self.add_acme()
+
+        portfolio = self.book.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="BETA",
+                name="Unsupported Market",
+                quantity="3",
+                average_cost="10",
+                expected_portfolio_revision=1,
+            ),
+            idempotency_key="add-beta-001",
+        )
+
+        self.assertEqual(portfolio.active_holding_count, 2)
+        self.assertEqual(portfolio.priced_holding_count, 1)
+        self.assertEqual(portfolio.total_market_value.availability, "available")
+        self.assertEqual(portfolio.total_market_value.value, "241.0000")
+        self.assertEqual(portfolio.total_market_value.reason_code, "partial_valuation")
+        self.assertEqual(portfolio.total_equity.value, "241.0000")
+        self.assertEqual(portfolio.total_equity.reason_code, "partial_valuation")
+        self.assertEqual(portfolio.holdings[0].weight.reason_code, "portfolio_total_unavailable")
+        self.assertEqual(portfolio.holdings[1].market_value.availability, "not_available")
+        self.assertIn("partial_valuation", portfolio.issues)
 
     def test_duplicate_symbol_revision_conflict_and_decimal_validation_are_explicit(self) -> None:
         self.add_acme()

@@ -35,7 +35,7 @@ import './styles.css'
 const NAV_ITEMS = [
   { id: 'today', path: '/today', label: '今日工作台', eyebrow: '持仓事项优先', icon: LayoutDashboard },
   { id: 'portfolio', path: '/portfolio', label: '我的持仓', eyebrow: '私有手工账本', icon: BriefcaseBusiness },
-  { id: 'markets', path: '/markets/us/SYNTH-001', label: '市场与标的', eyebrow: '标的与证据', icon: Globe2 },
+  { id: 'markets', path: '/markets/us', label: '市场与标的', eyebrow: '标的与证据', icon: Globe2 },
   { id: 'rules', path: '/rules', label: '规则与策略', eyebrow: '确定性四态', icon: ListChecks },
   { id: 'research', path: '/research', label: '研究驾驶舱', eyebrow: '正式研究隔离', icon: BookOpenCheck },
   { id: 'records', path: '/records', label: '研究记录', eyebrow: '不可变版本', icon: FileClock },
@@ -91,21 +91,35 @@ function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = brows
     setGlobalError('')
     setResearchError('')
     const { startDate: catalogStartDate, endDate: catalogEndDate } = recentCatalogRange(clock.now())
-    const requests = [
-      ['health', '/api/health?include_counts=false'],
-      ['progress', '/api/tushare/sync-progress?include_coverage=false'],
-      ['stockReadiness', '/api/research/readiness?scope=a_share_cross_section'],
-      ['etfReadiness', '/api/research/readiness?scope=etf_time_series'],
-      ['overview', '/api/db/overview'],
-      ['stocks', null],
-      ['indices', '/api/indices?limit=1000'],
-      ['funds', `/api/funds?limit=1000&daily_start_date=${catalogStartDate}&daily_end_date=${catalogEndDate}`],
-      ['industries', '/api/industries?limit=1000'],
-      ['usDb', '/api/us-research/db-overview'],
-      ['usExperiment', '/api/us-experiment/overview'],
-      ['usInstruments', null],
-      ['strategies', '/api/research/strategies'],
-    ]
+    const requests = [['health', '/api/health?include_counts=false']]
+    if (activeView === 'markets' && pathname.startsWith('/markets/a-share')) {
+      requests.push(
+        ['progress', '/api/tushare/sync-progress?include_coverage=false'],
+        ['stockReadiness', '/api/research/readiness?scope=a_share_cross_section'],
+        ['etfReadiness', '/api/research/readiness?scope=etf_time_series'],
+        ['overview', '/api/db/overview'],
+        ['stocks', null],
+        ['indices', '/api/indices?limit=1000'],
+        ['funds', `/api/funds?limit=1000&daily_start_date=${catalogStartDate}&daily_end_date=${catalogEndDate}`],
+        ['industries', '/api/industries?limit=1000'],
+      )
+    }
+    if (activeView === 'legacy-us-data') {
+      requests.push(
+        ['usDb', '/api/us-research/db-overview'],
+        ['usExperiment', '/api/us-experiment/overview'],
+        ['usInstruments', null],
+      )
+    }
+    if (activeView === 'research') requests.push(['strategies', '/api/research/strategies'])
+    if (activeView === 'system') {
+      requests.push(
+        ['progress', '/api/tushare/sync-progress?include_coverage=false'],
+        ['stockReadiness', '/api/research/readiness?scope=a_share_cross_section'],
+        ['etfReadiness', '/api/research/readiness?scope=etf_time_series'],
+        ['overview', '/api/db/overview'],
+      )
+    }
     const results = await Promise.allSettled(requests.map(([key, path]) => {
       if (key === 'stocks') return stockResearch.aShare.refreshList()
       if (key === 'usInstruments') return stockResearch.us.refreshList()
@@ -169,12 +183,15 @@ function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = brows
         }
       }
     })
-    const detailRequests = [Promise.resolve(stockListOutcome), Promise.resolve(usListOutcome)]
+    const detailRequests = []
     if (refreshSelected && activeView === 'markets' && pathname.startsWith('/markets/a-share')) {
+      detailRequests.push(Promise.resolve(stockListOutcome))
       detailRequests.push(stockResearch.aShare.refreshSelected())
       if (selectedCatalogRef.current.code) detailRequests.push(loadSelectedCatalogData(selectedCatalogRef.current))
     }
-    if (refreshSelected && activeView === 'legacy-us-data') detailRequests.push(stockResearch.us.refreshSelected())
+    if (refreshSelected && activeView === 'legacy-us-data') {
+      detailRequests.push(Promise.resolve(usListOutcome), stockResearch.us.refreshSelected())
+    }
     if (refreshSelected && activeView === 'research') {
       detailRequests.push(refreshSelectedResearchData(selectedStrategyIdRef.current))
     }
@@ -337,31 +354,31 @@ function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = brows
     const timer = window.setTimeout(() => refreshAll(), 0)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [activeView, pathname])
 
   useEffect(() => {
-    if (!selectedCatalog.code) return undefined
+    if (activeView !== 'markets' || !pathname.startsWith('/markets/a-share') || !selectedCatalog.code) return undefined
     loadSelectedCatalogData(selectedCatalog)
     return () => { catalogRequestId.current += 1 }
-  }, [loadSelectedCatalogData, selectedCatalog])
+  }, [activeView, loadSelectedCatalogData, pathname, selectedCatalog])
 
   useEffect(() => {
-    if (!selectedStrategyId) return undefined
+    if (activeView !== 'research' || !selectedStrategyId) return undefined
     const timer = window.setTimeout(() => loadStrategyProfileData(selectedStrategyId), 0)
     return () => {
       window.clearTimeout(timer)
       strategyRequestId.current += 1
     }
-  }, [loadStrategyProfileData, selectedStrategyId])
+  }, [activeView, loadStrategyProfileData, selectedStrategyId])
 
   useEffect(() => {
-    if (!selectedResearchId) return undefined
+    if (activeView !== 'research' || !selectedResearchId) return undefined
     const timer = window.setTimeout(() => loadResearchDetailData(selectedResearchId), 0)
     return () => {
       window.clearTimeout(timer)
       researchRequestId.current += 1
     }
-  }, [loadResearchDetailData, selectedResearchId])
+  }, [activeView, loadResearchDetailData, selectedResearchId])
 
   const aShareResearch = stockResearch.aShare
   const usResearch = stockResearch.us
@@ -377,11 +394,11 @@ function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = brows
         <Topbar activeView={activeView} health={health} loading={loading} lastUpdated={lastUpdated} onRefresh={() => refreshAll(true)} />
         <main className="workspace-main">
           {globalError ? <Notice tone="warning" title="部分数据暂不可用" text={globalError} /> : null}
-          {activeView === 'today' ? <div className="today-stack"><PersonalTodayView client={personalClient} chartAdapter={chartAdapter} /><AnalysisWorkspaceView client={personalClient} subjectId="SYNTH-001" /></div> : null}
+          {activeView === 'today' ? <div className="today-stack"><PersonalTodayView client={personalClient} chartAdapter={chartAdapter} onNavigate={navigate} /><AnalysisWorkspaceView client={personalClient} subjectId="SYNTH-001" /></div> : null}
           {activeView === 'portfolio' ? <PortfolioView client={personalClient} /> : null}
           {activeView === 'rules' ? <RulesView client={personalClient} /> : null}
           {activeView === 'records' ? <RecordsView client={personalClient} recordId={personalRecordId(pathname)} /> : null}
-          {activeView === 'markets' && !pathname.startsWith('/markets/a-share') ? <InstrumentWorkspaceView client={personalClient} symbol={personalInstrumentSymbol(pathname)} chartAdapter={chartAdapter} /> : null}
+          {activeView === 'markets' && !pathname.startsWith('/markets/a-share') ? <div key={personalInstrumentSymbol(pathname)}><InstrumentWorkspaceView client={personalClient} symbol={personalInstrumentSymbol(pathname)} chartAdapter={chartAdapter} onNavigate={navigate} /></div> : null}
           {activeView === 'research' ? (
             <ResearchCockpitView
               strategies={strategies}
@@ -497,7 +514,7 @@ function Topbar({ activeView, health, loading, lastUpdated, onRefresh }) {
         <SystemState label="同步 Worker" value={health?.worker ? `${translateStatus(health.worker.status)} · ${health.worker.ageSeconds ?? '-'} 秒` : '未知'} healthy={health?.worker?.status === 'ok' && !health.worker.stale} icon={Activity} />
         <SystemState label="同步队列" value={health?.queue ? `${health.queue.active} 个运行中` : '未知'} healthy={Boolean(health?.queue) && health.queue.status !== 'stalled'} icon={ListChecks} />
         <span className="updated-at"><Clock3 size={14} /> {lastUpdated ? `界面刷新 ${lastUpdated.toLocaleTimeString()}` : '尚未刷新'}</span>
-        <button className="primary-action" onClick={onRefresh} disabled={loading}><RefreshCw size={15} className={loading ? 'spin' : ''} />全局刷新</button>
+        <button className="primary-action" onClick={onRefresh} disabled={loading} title="只刷新当前页面所需数据"><RefreshCw size={15} className={loading ? 'spin' : ''} />全局刷新</button>
       </div>
     </header>
   )
@@ -517,7 +534,7 @@ function routeView(pathname) {
 }
 
 function personalInstrumentSymbol(pathname) {
-  const value = pathname.split('/')[3] || 'SYNTH-001'
+  const value = pathname.split('/')[3] || ''
   return decodeURIComponent(value)
 }
 

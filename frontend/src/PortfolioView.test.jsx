@@ -8,7 +8,7 @@ afterEach(() => cleanup())
 
 const available = (value, extras = {}) => ({
   availability: 'available', value, reason_code: null, source_health: 'fresh',
-  as_of: '2026-08-03T02:45:00Z', source_ids: ['alpaca-acme'], feed: 'sip', delay_seconds: 900,
+  as_of: '2026-08-03T02:45:00Z', source_ids: ['alpaca-acme'], feed: 'delayed_sip', delay_seconds: 900,
   ...extras,
 })
 
@@ -25,6 +25,8 @@ const emptyPortfolio = {
   holdings: [],
   total_market_value: available('0.0000', { as_of: null, source_ids: [], feed: null, delay_seconds: null }),
   total_equity: available('0.0000', { as_of: null, source_ids: [], feed: null, delay_seconds: null }),
+  active_holding_count: 0,
+  priced_holding_count: 0,
   issues: [],
 }
 
@@ -42,6 +44,8 @@ const activePortfolio = {
   }],
   total_market_value: available('241.0000'),
   total_equity: available('241.0000'),
+  active_holding_count: 1,
+  priced_holding_count: 1,
 }
 
 describe('手工美股持仓工作台', () => {
@@ -125,5 +129,36 @@ describe('手工美股持仓工作台', () => {
       },
     })))
     expect(await screen.findByText(/备份副本最迟于/)).toBeInTheDocument()
+  })
+
+  it('单一标的无行情时展示已覆盖估值而不冒充完整总值', async () => {
+    const partial = available('241.0000', {
+      reason_code: 'partial_valuation', source_health: 'degraded',
+    })
+    const portfolio = {
+      ...activePortfolio,
+      holdings: [
+        activePortfolio.holdings[0],
+        {
+          ...activePortfolio.holdings[0], holding_id: 'holding-002', symbol: 'BETA', name: 'Beta',
+          market_price: unavailable, market_value: unavailable, unrealized_profit_loss: unavailable,
+          unrealized_return: unavailable, weight: unavailable,
+        },
+      ],
+      total_market_value: partial,
+      total_equity: partial,
+      active_holding_count: 2,
+      priced_holding_count: 1,
+      issues: ['provider_unavailable', 'partial_valuation'],
+    }
+    const client = { openPortfolio: vi.fn(() => Promise.resolve(portfolio)) }
+
+    render(<PortfolioView client={client} />)
+
+    expect(await screen.findByText('已覆盖组合值')).toBeInTheDocument()
+    expect(screen.getByText('已覆盖持仓市值')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('行情覆盖 1 / 2')
+    expect(screen.getByRole('status')).toHaveTextContent('其余标的保持不可用')
+    expect(screen.getAllByText('241.0000')).toHaveLength(3)
   })
 })

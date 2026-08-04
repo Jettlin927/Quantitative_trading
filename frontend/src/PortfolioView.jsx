@@ -177,7 +177,9 @@ export function PortfolioView({ client }) {
     </section>
   )
 
-  const sourceUnavailable = activeCount > 0 && portfolio.total_market_value?.availability !== 'available'
+  const pricedCount = portfolio.priced_holding_count ?? portfolio.holdings.filter((holding) => holding.state === 'active' && holding.market_value?.availability === 'available').length
+  const partialValuation = portfolio.total_market_value?.reason_code === 'partial_valuation'
+  const sourceUnavailable = activeCount > 0 && (partialValuation || portfolio.total_market_value?.availability !== 'available')
   return (
     <div className="portfolio-workbench enter">
       <header className="portfolio-command-bar">
@@ -189,6 +191,7 @@ export function PortfolioView({ client }) {
         <dl>
           <div><dt>组合修订</dt><dd>R{portfolio.portfolio_revision}</dd></div>
           <div><dt>在册 / 活跃</dt><dd>{portfolio.holdings.length} / {activeCount}</dd></div>
+          <div><dt>行情覆盖</dt><dd>{pricedCount} / {activeCount}</dd></div>
           <div><dt>币种</dt><dd>USD</dd></div>
         </dl>
       </header>
@@ -196,7 +199,7 @@ export function PortfolioView({ client }) {
       {sourceUnavailable ? (
         <div className="portfolio-source-warning" role="status">
           <AlertTriangle size={17} />
-          <span><strong>行情来源不可用，手工持仓仍可编辑。</strong>市值、盈亏和权重保持 Unavailable，不以 0 代替。</span>
+          <span>{partialValuation ? <><strong>行情覆盖 {pricedCount} / {activeCount}，当前展示已覆盖估值。</strong>其余标的保持不可用，不以 0 代替，也不计算组合权重。</> : <><strong>行情来源不可用，手工持仓仍可编辑。</strong>市值、盈亏和权重保持 Unavailable，不以 0 代替。</>}</span>
         </div>
       ) : null}
 
@@ -215,8 +218,8 @@ export function PortfolioView({ client }) {
       ) : null}
 
       <section className="portfolio-summary-grid" aria-label="组合摘要">
-        <article><span>组合总值</span><ObservedValue observed={portfolio.total_equity} kind="money" /></article>
-        <article><span>持仓市值</span><ObservedValue observed={portfolio.total_market_value} kind="money" /></article>
+        <article><span>{partialValuation ? '已覆盖组合值' : '组合总值'}</span><ObservedValue observed={portfolio.total_equity} kind="money" /></article>
+        <article><span>{partialValuation ? '已覆盖持仓市值' : '持仓市值'}</span><ObservedValue observed={portfolio.total_market_value} kind="money" /></article>
         <article><span>USD 现金</span><strong>{portfolio.usd_cash}</strong></article>
         <form onSubmit={setUsdCash}>
           <label htmlFor="portfolio-cash">修订现金</label>
@@ -303,7 +306,7 @@ function ObservedValue({ observed, kind, compact = false, signed = false }) {
 
 function sourceLabel(observed) {
   if (!observed || observed.availability !== 'available') return '行情不可用'
-  if (observed.feed === 'sip') return `延迟 SIP · ${Math.round((observed.delay_seconds || 0) / 60)} 分钟`
+  if (observed.feed === 'sip' || observed.feed === 'delayed_sip') return `延迟 SIP · ${Math.round((observed.delay_seconds || 0) / 60)} 分钟`
   if (observed.feed === 'eod') return `EOD 回退 · ${formatTime(observed.as_of)}`
   return observed.source_health || '来源未知'
 }
