@@ -149,6 +149,38 @@ body {
   padding: 10px 0;
 }
 
+.event-source-statuses {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.event-source-statuses p {
+  align-items: center;
+  background: color-mix(in srgb, var(--cyan) 8%, transparent);
+  border-left: 2px solid var(--cyan);
+  display: flex;
+  gap: 7px;
+  margin: 0;
+  padding: 7px 9px;
+  font-size: 12px;
+}
+
+.event-source-statuses p[data-availability="not_configured"] {
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+  border-left-color: var(--amber);
+}
+
+.event-source-statuses p[data-availability="unavailable"] {
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  border-left-color: var(--red);
+}
+
+.event-empty {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
 .event-rails article > div {
   display: grid;
   grid-template-columns: 90px 1fr auto;
@@ -177,6 +209,32 @@ body {
 .evidence-list dd {
   margin: 4px 0 0;
   overflow-wrap: anywhere;
+}
+
+.evidence-items {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.evidence-items article {
+  border: 1px solid var(--line-soft);
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+}
+
+.evidence-items span,
+.evidence-items summary {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.evidence-items code {
+  display: block;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .data-gap {
