@@ -150,6 +150,38 @@ class PersonalPortfolioTest(unittest.TestCase):
 
         self.assertGreater(market.maximum, 1)
 
+    def test_average_cost_reads_manual_ledger_without_observing_market(self) -> None:
+        class CountingMarket:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def observe_price(self, symbol: str) -> PortfolioPriceObservation:
+                self.calls += 1
+                return PortfolioPriceObservation.unavailable("provider_unavailable")
+
+        market = CountingMarket()
+        book = PortfolioBook(
+            store=InMemoryPortfolioStore(), market=market, clock=FrozenClock(self.now)
+        )
+        book.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="ACME",
+                name="Acme Holdings",
+                quantity="2",
+                average_cost="100.25",
+                expected_portfolio_revision=0,
+            ),
+            idempotency_key="add-acme-cost-read",
+        )
+        market.calls = 0
+
+        cost = book.average_cost(self.actor, " acme ")
+
+        self.assertEqual(cost, Decimal("100.25"))
+        self.assertEqual(market.calls, 0)
+
     def test_unavailable_price_does_not_block_manual_holding_or_turn_missing_values_into_zero(self) -> None:
         self.market.observations.clear()
 
