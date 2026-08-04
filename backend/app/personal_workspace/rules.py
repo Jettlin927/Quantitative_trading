@@ -119,7 +119,9 @@ class AttentionItem:
 
 
 class RuleInputReader(Protocol):
-    def read(self, symbol: str, *, as_of: datetime) -> RuleInput: ...
+    def read(
+        self, symbol: str, *, as_of: datetime, minimum_bars: int
+    ) -> RuleInput: ...
 
 
 class ObservationRuleStore(Protocol):
@@ -556,7 +558,9 @@ class PostgresObservationRuleStore:
 
 
 class UnavailableRuleInputReader:
-    def read(self, symbol: str, *, as_of: datetime) -> RuleInput:
+    def read(
+        self, symbol: str, *, as_of: datetime, minimum_bars: int
+    ) -> RuleInput:
         return RuleInput(
             symbol=symbol,
             raw_bars=(),
@@ -573,8 +577,14 @@ class InstrumentRuleInputReader:
         self._source = source
         self._limit = limit
 
-    def read(self, symbol: str, *, as_of: datetime) -> RuleInput:
-        observation = self._source.open(symbol, as_of=as_of, limit=self._limit)
+    def read(
+        self, symbol: str, *, as_of: datetime, minimum_bars: int
+    ) -> RuleInput:
+        observation = self._source.open(
+            symbol,
+            as_of=as_of,
+            limit=min(self._limit, max(1, minimum_bars)),
+        )
         evidence_ids = tuple(
             dict.fromkeys(
                 [bar.evidence_id for bar in observation.raw_bars]
@@ -674,12 +684,20 @@ class ObservationRuleBook:
         symbol = _normalize_symbol(request.symbol)
         if request.as_of.tzinfo is None:
             raise ValueError("as_of_requires_timezone")
-        source = self._inputs.read(symbol, as_of=request.as_of)
+        rules = tuple(
+            rule
+            for rule in self._store.list_rules(actor_id=actor.actor_id)
+            if rule.symbol == symbol and rule.state == "enabled"
+        )
+        source = self._inputs.read(
+            symbol,
+            as_of=request.as_of,
+            minimum_bars=max((_minimum_bars(rule) for rule in rules), default=1),
+        )
         batch_id = str(uuid4())
         evaluations = tuple(
             _evaluate_rule(batch_id, rule, source, request.as_of)
-            for rule in self._store.list_rules(actor_id=actor.actor_id)
-            if rule.symbol == symbol and rule.state == "enabled"
+            for rule in rules
         )
         fingerprint = _fingerprint(
             {
@@ -728,6 +746,18 @@ class ObservationRuleBook:
                 )
             )
         return tuple(sorted(items, key=lambda item: (item.priority, -item.as_of.timestamp())))
+
+
+def _minimum_bars(rule: RuleInstanceView) -> int:
+    if rule.template_id == "price_threshold":
+        return 1
+    if rule.template_id in {"return_window", "realized_volatility", "volume_ratio"}:
+        return int(rule.parameters["window"]) + 1
+    if rule.template_id in {"moving_average_state", "rolling_drawdown"}:
+        return int(rule.parameters["window"])
+    if rule.template_id in {"confirmed_event_window", "macro_release_window"}:
+        return max(1, int(rule.parameters["days"]))
+    return 1
 
 
 def _evaluate_rule(
