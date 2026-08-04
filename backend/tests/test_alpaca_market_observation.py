@@ -612,25 +612,26 @@ class AlpacaMarketObservationAdapterTest(unittest.TestCase):
             adapter.observe_asset("SYNTH")
         self.assertEqual(transport.requests, [])
 
-        unsafe = self.authorization_registry("alpaca_assets")
-        original = unsafe.snapshots[0]
-        unsafe = AppendOnlyAuthorizationRegistry()
-        unsafe.append(
+        # ai_context 是逐请求用途：未授予时 entitlement_denied，授予后由用途门禁放行
+        registry = self.authorization_registry("alpaca_assets")  # ai_context=False
+        with self.assertRaisesRegex(AuthorizationDenied, "entitlement_denied"):
+            registry.require(
+                "alpaca", "alpaca_assets", "basic_delayed_sip_eod", "ai_context"
+            )
+        granted = AppendOnlyAuthorizationRegistry()
+        granted.append(
             SourceAuthorizationSnapshot(
                 **{
-                    **original.__dict__,
-                    "snapshot_id": "unsafe-ai-context",
+                    **registry.snapshots[0].__dict__,
+                    "snapshot_id": "granted-ai-context",
                     "ai_context": True,
                 }
             )
         )
-        adapter = AlpacaMarketObservationAdapter(
-            transport=transport,
-            authorizations=unsafe,
-            credentials=AlpacaCredentials("synthetic-id", "synthetic-secret"),
+        granted_snapshot = granted.require(
+            "alpaca", "alpaca_assets", "basic_delayed_sip_eod", "ai_context"
         )
-        with self.assertRaisesRegex(AuthorizationDenied, "authorization_policy_invalid"):
-            adapter.observe_asset("SYNTH")
+        self.assertTrue(granted_snapshot.ai_context)
         self.assertEqual(transport.requests, [])
 
     def test_local_limit_rejects_the_121st_request_without_touching_transport(self) -> None:
