@@ -110,6 +110,57 @@ class InstrumentWorkbenchTest(unittest.TestCase):
 
         self.assertGreater(market.maximum, 1)
 
+    def test_typed_reader_fetches_daily_bars_before_optional_sources(self) -> None:
+        calls: list[str] = []
+
+        class PriorityMarket:
+            def observe_asset(self, symbol, **kwargs):
+                calls.append("asset")
+                return SimpleNamespace(
+                    value=SimpleNamespace(name=symbol),
+                    provenance=SimpleNamespace(authorization_snapshot_id="auth-asset"),
+                )
+
+            def observe_daily_bars(self, symbol, **kwargs):
+                calls.append("bars")
+                value = tuple(
+                    SimpleNamespace(
+                        symbol="ACME",
+                        trade_date=item.trade_date,
+                        open=item.open,
+                        high=item.high,
+                        low=item.low,
+                        close=item.close,
+                        volume=item.volume,
+                    )
+                    for item in bars(2)
+                )
+                observed = SimpleNamespace(
+                    value=value,
+                    source_health="fresh",
+                    provenance=SimpleNamespace(
+                        content_sha256="a" * 64,
+                        authorization_snapshot_id="auth-bars",
+                        adjustment_policy="raw",
+                    ),
+                )
+                return SimpleNamespace(raw=observed, provider_adjusted=observed)
+
+            def observe_corporate_actions(self, symbol, **kwargs):
+                calls.append("actions")
+                raise RuntimeError("actions unavailable")
+
+        def official_events(symbol, as_of):
+            calls.append("official")
+            return ()
+
+        observation = TypedInstrumentObservationReader(
+            market=PriorityMarket(), official_events=official_events
+        ).open("ACME", as_of=NOW, limit=1500)
+
+        self.assertEqual(calls[0], "bars")
+        self.assertEqual(len(observation.raw_bars), 2)
+
     def test_typed_d1_d2_adapter_preserves_raw_adjusted_and_authorization_identity(self) -> None:
         raw = bars(2)
         adjusted = bars(2, latest="60")
