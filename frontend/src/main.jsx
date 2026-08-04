@@ -394,7 +394,7 @@ function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = brows
         <Topbar activeView={activeView} health={health} loading={loading} lastUpdated={lastUpdated} onRefresh={() => refreshAll(true)} />
         <main className="workspace-main">
           {globalError ? <Notice tone="warning" title="部分数据暂不可用" text={globalError} /> : null}
-          {activeView === 'today' ? <div className="today-stack"><PersonalTodayView client={personalClient} chartAdapter={chartAdapter} onNavigate={navigate} /><AnalysisWorkspaceView client={personalClient} subjectId="SYNTH-001" /></div> : null}
+          {activeView === 'today' ? <div className="today-stack"><PersonalTodayView client={personalClient} chartAdapter={chartAdapter} onNavigate={navigate} /><AnalysisWorkspaceView client={personalClient} subjectId="" /></div> : null}
           {activeView === 'portfolio' ? <PortfolioView client={personalClient} /> : null}
           {activeView === 'rules' ? <RulesView client={personalClient} /> : null}
           {activeView === 'records' ? <RecordsView client={personalClient} recordId={personalRecordId(pathname)} /> : null}

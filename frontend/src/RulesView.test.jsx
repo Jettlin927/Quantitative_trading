@@ -10,7 +10,7 @@ describe('RulesView', () => {
       listRuleTemplates: vi.fn().mockResolvedValue(templates),
       openRules: vi.fn().mockResolvedValue({ rules: [rule], evaluations: [] }),
       submitRuleCommand: vi.fn(({ command }) => command.type === 'evaluate_rules'
-        ? Promise.resolve({ symbol: 'ACME', status: 'completed', evaluations: [{ rule_id: 'rule-1', result: 'insufficient_data', reason_code: 'price_unavailable' }] })
+        ? Promise.resolve({ symbol: 'ACME', status: 'completed', evaluations: [{ rule_id: 'rule-1', result: 'hit', reason_code: 'condition_met', observed_value: '120.5000', threshold: '110.0000', source_health: 'fresh', as_of: '2026-08-04T09:30:00Z' }] })
         : Promise.resolve({ ...rule, state: 'enabled', revision: 2 })),
     }
     render(<RulesView client={client} />)
@@ -21,7 +21,9 @@ describe('RulesView', () => {
     await waitFor(() => expect(client.submitRuleCommand).toHaveBeenCalledWith(expect.objectContaining({ command: expect.objectContaining({ type: 'set_rule_state', state: 'enabled' }) })))
     fireEvent.click(screen.getByRole('button', { name: '立即评估 ACME' }))
     await waitFor(() => expect(client.submitRuleCommand).toHaveBeenCalledWith(expect.objectContaining({ command: expect.objectContaining({ type: 'evaluate_rules', symbol: 'ACME' }) })))
-    expect(await screen.findByText('数据不足 △')).toBeTruthy()
-    expect(screen.getByText('price_unavailable')).toBeTruthy()
+    expect(await screen.findByText('命中 ◆')).toBeTruthy()
+    expect(screen.getByText('观测 120.5000')).toBeTruthy()
+    expect(screen.getByText('阈值 110.0000')).toBeTruthy()
+    expect(screen.getByText(/fresh/)).toBeTruthy()
   })
 })

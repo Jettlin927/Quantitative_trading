@@ -169,8 +169,14 @@ class PersonalResearchJourney:
         )
         return self._decode_record(stored)
 
-    def open_today(self, actor: PersonalActor) -> TodayWorkspace:
-        trace = self._store.latest_trace(actor_id=actor.actor_id)
+    def open_today(
+        self, actor: PersonalActor, *, include_synthetic: bool = False
+    ) -> TodayWorkspace:
+        trace = (
+            self._store.latest_trace(actor_id=actor.actor_id)
+            if include_synthetic
+            else None
+        )
         portfolio = self._portfolio.open(actor) if self._portfolio is not None else None
         attention_items = self._rulebook.attention(actor) if self._rulebook is not None else ()
         if trace is None:

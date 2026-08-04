@@ -112,7 +112,7 @@ class PersonalWorkspaceSecurityTest(unittest.TestCase):
         self.assertEqual(non_json.status_code, 422)
         self.assertEqual(non_json.json()["detail"]["code"], "invalid_command")
 
-    def test_valid_proxy_request_creates_and_reads_synthetic_trace_without_exposing_token(self) -> None:
+    def test_valid_proxy_request_keeps_synthetic_trace_out_of_today(self) -> None:
         headers = {
             "X-Personal-Gateway": self.gateway_token,
             "Origin": "http://127.0.0.1:5173",
@@ -142,13 +142,14 @@ class PersonalWorkspaceSecurityTest(unittest.TestCase):
         self.assertEqual(saved.status_code, 201)
         self.assertEqual(read.status_code, 200)
         self.assertEqual(created.json()["holding"]["symbol"], "SYNTH-001")
-        self.assertEqual(read.json()["record"]["record_id"], saved.json()["record_id"])
+        self.assertIsNone(read.json()["trace"])
+        self.assertIsNone(read.json()["record"])
         self.assertNotIn(self.gateway_token, created.text)
         self.assertNotIn(self.gateway_token, read.text)
 
     def test_private_store_failure_is_stable_503_and_does_not_expose_database_error(self) -> None:
         class FailingStore(InMemoryPersonalJourneyStore):
-            def latest_trace(self, *, actor_id: str):
+            def get_trace_by_idempotency(self, *, actor_id: str, idempotency_key: str):
                 raise SQLAlchemyError("synthetic database detail must stay private")
 
         runtime = PersonalRuntime(
@@ -173,9 +174,16 @@ class PersonalWorkspaceSecurityTest(unittest.TestCase):
         app = FastAPI()
         app.include_router(create_personal_router(lambda: runtime))
 
-        response = TestClient(app).get(
-            "/api/personal/today",
-            headers={"X-Personal-Gateway": self.gateway_token},
+        response = TestClient(app).post(
+            "/api/personal/synthetic-traces",
+            headers={
+                "X-Personal-Gateway": self.gateway_token,
+                "Origin": "http://127.0.0.1:5173",
+                "Sec-Fetch-Site": "same-origin",
+                "X-Personal-Request": "1",
+                "Idempotency-Key": "failing-store-trace",
+            },
+            json={"question": "合成问题"},
         )
 
         self.assertEqual(response.status_code, 503)

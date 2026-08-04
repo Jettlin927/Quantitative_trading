@@ -63,8 +63,8 @@ class ScriptedRuleInputReader:
     def __init__(self, value: RuleInput):
         self.value = value
 
-    def read(self, symbol: str, *, as_of: datetime) -> RuleInput:
-        self.call = (symbol, as_of)
+    def read(self, symbol: str, *, as_of: datetime, minimum_bars: int = 600) -> RuleInput:
+        self.call = (symbol, as_of, minimum_bars)
         return self.value
 
 
@@ -483,6 +483,7 @@ class ObservationRuleBookTest(unittest.TestCase):
         self.assertEqual(batch.evaluations[0].result, "hit")
         self.assertEqual(batch.evaluations[0].observed_value, "120.0000")
         self.assertEqual(batch.evaluations[0].threshold, "110.0000")
+        self.assertEqual(self.input_reader.call, ("ACME", NOW, 1))
         self.assertEqual(len(batch.evaluations[0].fingerprint), 64)
         self.assertEqual(self.book.attention(self.actor, symbol="ACME")[0].kind, "rule_hit")
 

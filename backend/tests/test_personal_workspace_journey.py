@@ -122,7 +122,7 @@ class PersonalResearchJourneyTest(unittest.TestCase):
         self.assertFalse(record.research_eligible)
         self.assertEqual(record.status, "saved")
 
-        today = self.journey.open_today(self.actor)
+        today = self.journey.open_today(self.actor, include_synthetic=True)
         self.assertEqual(today.record.record_id, record.record_id)
         self.assertEqual(today.analysis_preview.preview_sha256, trace.analysis_preview.preview_sha256)
 
@@ -167,6 +167,18 @@ class PersonalResearchJourneyTest(unittest.TestCase):
 
         self.assertEqual(today.portfolio, portfolio.open(self.actor))
         self.assertEqual(today.portfolio.holdings[0].market_value.value, "241.0000")
+
+    def test_today_default_does_not_return_synthetic_trace(self) -> None:
+        self.journey.create_synthetic_trace(
+            self.actor,
+            idempotency_key="trace-hidden-from-today",
+            question="只用于隔离测试",
+        )
+
+        today = self.journey.open_today(self.actor)
+
+        self.assertIsNone(today.trace)
+        self.assertIsNone(today.record)
 
 
 if __name__ == "__main__":

@@ -224,7 +224,7 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                 challenge_key=b"portfolio-challenge-key-for-tests" * 2,
             ).open(actor)
 
-            today = journey.open_today(actor)
+            today = journey.open_today(actor, include_synthetic=True)
             self.assertEqual(today.trace.analysis_id, trace.analysis_id)
             self.assertEqual(today.record.record_id, record.record_id)
             self.assertEqual(portfolio.holdings, ())

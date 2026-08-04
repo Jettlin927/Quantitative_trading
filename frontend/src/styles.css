@@ -355,6 +355,9 @@ body {
 }
 
 .rule-result small { color: var(--ink-faint); font: 8px Consolas, monospace; }
+.rule-evaluation { display: grid; gap: 3px; min-width: 170px; }
+.rule-evaluation > span { color: var(--ink); font: 10px Consolas, monospace; }
+.rule-evaluation > small { color: var(--ink-faint); font: 8px Consolas, monospace; }
 .rule-explainer { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--line); background: var(--surface-strong); }
 .rule-explainer > div { min-height: 82px; border-right: 1px solid var(--line); padding: 13px 15px; }
 .rule-explainer > div:last-child { border-right: 0; }
