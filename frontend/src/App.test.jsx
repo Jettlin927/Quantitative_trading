@@ -407,7 +407,7 @@ describe('研究驾驶舱', () => {
     expect(screen.getAllByText('研究通过').length).toBeGreaterThan(0)
   })
 
-  it('全局刷新复用库存投影并重读策略、研究与发布，不在 API 请求内扫描整库', async () => {
+  it('研究页刷新只重读研究投影，不加载数据库总览或扫描整库', async () => {
     render(<App initialPath="/research" />)
     await screen.findByRole('link', { name: /打开原始 HTML 证据/ })
     const fetchMock = vi.mocked(globalThis.fetch)
@@ -421,14 +421,14 @@ describe('研究驾驶舱', () => {
     fireEvent.click(screen.getByRole('button', { name: /全局刷新/ }))
     await waitFor(() => expect(document.querySelector('.updated-at')).not.toHaveTextContent('尚未刷新'))
     expect(fetchMock.mock.calls.some(([path]) => path === '/api/db/overview?refresh=true')).toBe(false)
-    expect(fetchMock.mock.calls.filter(([path]) => path === '/api/db/overview').length).toBeGreaterThan(before.overview)
+    expect(fetchMock.mock.calls.filter(([path]) => path === '/api/db/overview').length).toBe(before.overview)
     expect(fetchMock.mock.calls.filter(([path]) => path === '/api/research/strategies/momentum-v1').length).toBeGreaterThan(before.profile)
     expect(fetchMock.mock.calls.filter(([path]) => path === `/api/research/formal-researches/${RESEARCH_ID}`).length).toBeGreaterThan(before.detail)
     expect(fetchMock.mock.calls.filter(([path]) => path === `/api/research/publications/${PUBLICATION_ID}`).length).toBeGreaterThan(before.publication)
     expect(document.querySelector('.updated-at')).toHaveTextContent('界面刷新')
 
     fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
-    expect(screen.getByText(/覆盖快照.*07.*21/)).toBeInTheDocument()
+    expect(await screen.findByText(/覆盖快照.*07.*21/)).toBeInTheDocument()
   })
 
   it('发布投影刷新失败时保留一致旧事实且不伪造刷新时间', async () => {
@@ -731,6 +731,7 @@ describe('研究驾驶舱', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 6, 21, 0, 30))
     render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
 
     await vi.runAllTimersAsync()
 

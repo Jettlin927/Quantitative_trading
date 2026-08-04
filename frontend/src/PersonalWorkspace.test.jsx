@@ -65,6 +65,18 @@ describe('个人美股 synthetic tracer', () => {
     expect(screen.getByRole('button', { name: /市场与标的/ })).toHaveAttribute('aria-current', 'page')
   })
 
+  it('个人首页不加载其他工作区的全局数据', async () => {
+    const readAdapter = vi.fn(noOpReadAdapter)
+    const personalClient = { openToday: vi.fn(() => Promise.resolve({ trace, record: null })) }
+
+    render(<App initialPath="/today" readAdapter={readAdapter} personalClient={personalClient} />)
+
+    await waitFor(() => expect(readAdapter).toHaveBeenCalledWith({ path: '/api/health?include_counts=false' }))
+    expect(readAdapter.mock.calls.map(([request]) => request.path)).toEqual([
+      '/api/health?include_counts=false',
+    ])
+  })
+
   it('K 线先于证据预览，四态不用颜色区分，provider unavailable 不阻断显式保存', async () => {
     const personalClient = {
       openToday: vi.fn(() => Promise.resolve({ trace, record: null })),

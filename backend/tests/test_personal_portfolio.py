@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from threading import Lock
+import time
 import unittest
 
 from pydantic import ValidationError
@@ -108,6 +110,45 @@ class PersonalPortfolioTest(unittest.TestCase):
         repeated = self.add_acme(idempotency_key="add-acme-001")
         self.assertEqual(repeated.portfolio_revision, 1)
         self.assertEqual(repeated.holdings[0].holding_id, holding.holding_id)
+
+    def test_open_observes_active_holdings_concurrently(self) -> None:
+        class ConcurrentMarket:
+            def __init__(self) -> None:
+                self.active = 0
+                self.maximum = 0
+                self.lock = Lock()
+
+            def observe_price(self, symbol: str) -> PortfolioPriceObservation:
+                with self.lock:
+                    self.active += 1
+                    self.maximum = max(self.maximum, self.active)
+                time.sleep(0.03)
+                with self.lock:
+                    self.active -= 1
+                return PortfolioPriceObservation.unavailable("provider_unavailable")
+
+        market = ConcurrentMarket()
+        book = PortfolioBook(
+            store=InMemoryPortfolioStore(), market=market, clock=FrozenClock(self.now)
+        )
+        for revision, symbol in enumerate(("AAA", "BBB", "CCC")):
+            book.revise(
+                self.actor,
+                AddHoldingCommand(
+                    type="add_holding",
+                    symbol=symbol,
+                    name=symbol,
+                    quantity="1",
+                    average_cost="1",
+                    expected_portfolio_revision=revision,
+                ),
+                idempotency_key=f"add-{symbol}",
+            )
+        market.maximum = 0
+
+        book.open(self.actor)
+
+        self.assertGreater(market.maximum, 1)
 
     def test_unavailable_price_does_not_block_manual_holding_or_turn_missing_values_into_zero(self) -> None:
         self.market.observations.clear()

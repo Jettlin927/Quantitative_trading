@@ -83,6 +83,7 @@ def load_personal_market_readers(
         transport=transport or UrllibProviderTransport(),
         authorizations=authorizations,
         credentials=credentials,
+        request_deadline_seconds=1.8,
     )
     return PersonalMarketReaders(
         portfolio=AlpacaPortfolioMarketReader(adapter=adapter),

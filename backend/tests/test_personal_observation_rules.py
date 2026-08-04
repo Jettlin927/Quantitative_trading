@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
+from threading import Lock
+import time
 import unittest
 from types import SimpleNamespace
 
@@ -66,6 +68,48 @@ class ScriptedRuleInputReader:
 
 
 class InstrumentWorkbenchTest(unittest.TestCase):
+    def test_typed_reader_fetches_independent_sources_concurrently(self) -> None:
+        class ConcurrentMarket:
+            def __init__(self) -> None:
+                self.active = 0
+                self.maximum = 0
+                self.lock = Lock()
+
+            def enter(self):
+                with self.lock:
+                    self.active += 1
+                    self.maximum = max(self.maximum, self.active)
+                time.sleep(0.03)
+                with self.lock:
+                    self.active -= 1
+
+            def observe_asset(self, symbol, **kwargs):
+                self.enter()
+                return SimpleNamespace(
+                    value=SimpleNamespace(name=symbol),
+                    provenance=SimpleNamespace(authorization_snapshot_id="auth-asset"),
+                )
+
+            def observe_daily_bars(self, symbol, **kwargs):
+                self.enter()
+                raise RuntimeError("bars unavailable")
+
+            def observe_corporate_actions(self, symbol, **kwargs):
+                self.enter()
+                raise RuntimeError("actions unavailable")
+
+        market = ConcurrentMarket()
+
+        def official_events(symbol, as_of):
+            market.enter()
+            return ()
+
+        TypedInstrumentObservationReader(
+            market=market, official_events=official_events
+        ).open("ACME", as_of=NOW, limit=1500)
+
+        self.assertGreater(market.maximum, 1)
+
     def test_typed_d1_d2_adapter_preserves_raw_adjusted_and_authorization_identity(self) -> None:
         raw = bars(2)
         adjusted = bars(2, latest="60")

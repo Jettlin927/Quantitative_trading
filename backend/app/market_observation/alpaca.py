@@ -8,6 +8,7 @@ from hashlib import sha256
 import json
 import re
 import time
+from threading import Lock
 from typing import Any, Callable, Mapping, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urljoin, urlsplit
@@ -187,7 +188,10 @@ class AlpacaMarketObservationAdapter:
         eod_fallback: Callable[[str], EodFallbackPrice | None] | None = None,
         sleeper: Callable[[float], None] = time.sleep,
         monotonic: Callable[[], float] = time.monotonic,
+        request_deadline_seconds: float = 15.0,
     ) -> None:
+        if request_deadline_seconds <= 0:
+            raise ValueError("request_deadline_seconds_must_be_positive")
         self._transport = transport
         self._authorizations = authorizations
         self._credentials = credentials
@@ -195,7 +199,9 @@ class AlpacaMarketObservationAdapter:
         self._eod_fallback = eod_fallback
         self._sleeper = sleeper
         self._monotonic = monotonic
+        self._request_deadline_seconds = request_deadline_seconds
         self._request_times: deque[float] = deque()
+        self._request_budget_lock = Lock()
 
     def observe_asset(
         self,
@@ -501,8 +507,8 @@ class AlpacaMarketObservationAdapter:
         )
 
     def _send(self, url: str) -> ProviderResponse:
-        deadline = self._monotonic() + 15.0
-        budget_after_waits = 15.0
+        deadline = self._monotonic() + self._request_deadline_seconds
+        budget_after_waits = self._request_deadline_seconds
         for attempt in range(1, 4):
             remaining = min(deadline - self._monotonic(), budget_after_waits)
             if remaining <= 0:
@@ -550,15 +556,16 @@ class AlpacaMarketObservationAdapter:
         raise AssertionError("unreachable")
 
     def _acquire_local_request_budget(self) -> None:
-        now = self._monotonic()
-        while self._request_times and self._request_times[0] <= now - 60.0:
-            self._request_times.popleft()
-        if len(self._request_times) >= 120:
-            retry_after = max(0.0, 60.0 - (now - self._request_times[0]))
-            raise MarketObservationError(
-                "provider_rate_limited", retry_after_seconds=retry_after
-            )
-        self._request_times.append(now)
+        with self._request_budget_lock:
+            now = self._monotonic()
+            while self._request_times and self._request_times[0] <= now - 60.0:
+                self._request_times.popleft()
+            if len(self._request_times) >= 120:
+                retry_after = max(0.0, 60.0 - (now - self._request_times[0]))
+                raise MarketObservationError(
+                    "provider_rate_limited", retry_after_seconds=retry_after
+                )
+            self._request_times.append(now)
 
     def _require_authorization(
         self, dataset: str, purpose: AuthorizationPurpose
