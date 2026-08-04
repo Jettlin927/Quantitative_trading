@@ -10,3 +10,4 @@
 - [历史研究导入是来源记录，不是研究批准](0006-history-import-is-provenance-not-approval.md)
 - [个人工作台使用私有存储并与正式研究隔离](0007-personal-workbench-is-private-and-separated-from-formal-research.md)
 - [单一生产服务器与旧服务器退役](0008-single-production-server-and-retired-legacy-host.md)
+- [个人 AI 分析 agent 化：通过工具访问持仓、行情与新闻](0009-personal-ai-analysis-agent-tools.md)

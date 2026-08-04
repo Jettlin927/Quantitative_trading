@@ -29,6 +29,17 @@ const FAILURE_IDENTITIES = {
   provider_response_invalid_json: '官方响应不是合法 JSON',
 }
 
+const PROVIDER_LABELS = {
+  'deepseek-agent': 'DeepSeek Agent',
+  deepseek: 'DeepSeek',
+}
+
+const TOOL_LABELS = {
+  get_holdings: { label: '查当前持仓', mark: '◈' },
+  get_kline: { label: '查目标标的日 K 线', mark: '▤' },
+  get_news: { label: '查产业新闻', mark: '✦' },
+}
+
 export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) {
   const [question, setQuestion] = useState('')
   const [preview, setPreview] = useState(null)
@@ -154,14 +165,16 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) 
   const providerUnavailable = error?.code === 'provider_unavailable'
   const dispatchEnabled = capability?.dispatch_enabled !== false
   const disabledByConfig = capability?.reason_code === 'provider_disabled'
+  const agentMode = capability?.analysis_mode === 'agent' || preview?.provider === 'deepseek-agent'
+  const agentTools = (preview?.included_fields || []).filter((field) => field !== 'user_question')
   return (
     <section className="analysis-workspace enter" aria-label="AI 影响分析">
       <header className="analysis-command-header">
-        <div><span>AI IMPACT / READ-ONLY EVIDENCE</span><h2>可审计影响分析</h2></div>
+        <div><span>AI IMPACT / {agentMode ? 'TOOL-USE AGENT' : 'READ-ONLY EVIDENCE'}</span><h2>可审计影响分析</h2></div>
         <b><ShieldCheck size={15} /> 先预览，后外发</b>
       </header>
 
-      {capability ? <div className={`analysis-capability ${dispatchEnabled ? 'enabled' : 'disabled'}`} role="status"><ShieldCheck size={18} /><div><strong>{dispatchEnabled ? `DeepSeek 可外发 · ${capability.model}` : disabledByConfig ? 'DeepSeek 由生产配置主动停用' : FAILURE_IDENTITIES[capability.reason_code] || capability.reason_code}</strong><p>{disabledByConfig ? '这是配置门禁，不是 Key 校验失败；Key 只对分析 Worker 可见，API 无权读取。历史运行仍可查看。' : dispatchEnabled ? '仍须先生成预览并逐次确认外发。' : '当前不会入队、重试或自动切换模型。'}</p></div></div> : null}
+      {capability ? <div className={`analysis-capability ${dispatchEnabled ? 'enabled' : 'disabled'}`} role="status"><ShieldCheck size={18} /><div><strong>{dispatchEnabled ? `DeepSeek 可外发 · ${capability.model}${agentMode ? ' · 工具模式' : ''}` : disabledByConfig ? 'DeepSeek 由生产配置主动停用' : FAILURE_IDENTITIES[capability.reason_code] || capability.reason_code}</strong><p>{disabledByConfig ? '这是配置门禁，不是 Key 校验失败；Key 只对分析 Worker 可见，API 无权读取。历史运行仍可查看。' : dispatchEnabled ? (agentMode ? 'agent 在服务端按需调用持仓 / K线 / 新闻工具后产出结构化影响分析；仍须先生成预览并逐次确认外发。' : '仍须先生成预览并逐次确认外发。') : '当前不会入队、重试或自动切换模型。'}</p></div></div> : null}
 
       {!initialRunId ? <div className="analysis-question-panel">
         <label htmlFor="analysis-subject">分析标的</label>
@@ -174,30 +187,36 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) 
           placeholder="只问传导机制、证据边界与未知项，不生成交易建议。"
           rows={4}
         />
-        <div><small>上下文标的 {selectedSubject} · 浏览器不上传行情、组合权重或规则结果</small><button className="primary-action" disabled={busy || !question.trim() || !dispatchEnabled} onClick={prepare}><Send size={15} />生成外发预览</button></div>
+        <div><small>{agentMode ? `上下文标的 ${selectedSubject} · 分析在服务端执行，agent 按需调用持仓/K线/新闻工具，浏览器不上传私有字段` : `上下文标的 ${selectedSubject} · 浏览器不上传行情、组合权重或规则结果`}</small><button className="primary-action" disabled={busy || !question.trim() || !dispatchEnabled} onClick={prepare}><Send size={15} />生成外发预览</button></div>
       </div> : null}
 
       {history.length ? <section className="analysis-history" aria-label="个人分析运行历史"><header><span>RUN HISTORY</span><h3>最近个人分析</h3></header><div>{history.map((item) => <button key={item.run_id} onClick={() => { setRun(item); setAcceptedClaimIds(saveableClaimIds(item)); setSavedRecord(null) }}><strong>{RUN_IDENTITIES[item.status] || item.status}</strong><code>{item.run_id}</code><small>{item.model} · {item.actual_cost_usd ? `$${item.actual_cost_usd}` : '未产生费用'}{item.failure_code ? ` · ${FAILURE_IDENTITIES[item.failure_code] || item.failure_code}` : ''}</small></button>)}</div></section> : null}
 
       {preview ? <section className="analysis-preview" aria-label="外发预览">
-        <header><div><span>PREVIEW HASH</span><code>{preview.preview_sha256.slice(0, 16)}…</code></div><strong>{preview.provider} / {preview.model}</strong></header>
+        <header><div><span>PREVIEW HASH</span><code>{preview.preview_sha256.slice(0, 16)}…</code></div><strong>{PROVIDER_LABELS[preview.provider] || preview.provider} / {preview.model}</strong></header>
         <div className="analysis-preview-meta">
           <span><Clock3 size={14} />过期 {new Date(preview.expires_at).toLocaleString('zh-CN')}</span>
           <span>估算 ${preview.estimated_cost_usd}</span>
           <span>{preview.retention}</span>
         </div>
         <div className="preview-columns">
-          <div><h3>允许外发字段</h3><ul>{preview.included_fields.map((field) => <li key={field}><Check size={14} />{field}</li>)}</ul></div>
+          <div><h3>{agentMode ? '外发内容' : '允许外发字段'}</h3><ul>{preview.included_fields.map((field) => <li key={field}><Check size={14} />{field}</li>)}</ul></div>
           <div><h3>强制排除字段</h3><ul>{preview.excluded_fields.map((item) => <li key={item.field}><Ban size={14} /><span>{item.field}<small>{item.reason_code}</small></span></li>)}</ul></div>
           <div><h3>仍缺证据</h3><ul>{preview.gaps.length ? preview.gaps.map((gap) => <li key={gap}><AlertTriangle size={14} />{gap}</li>) : <li><Check size={14} />未识别缺口</li>}</ul></div>
         </div>
-        <div className="analysis-preview-evidence">
+        {agentMode ? <div className="analysis-preview-evidence" aria-label="服务端工具">
+          <h3>服务端工具</h3>
+          <ul>{agentTools.length ? agentTools.map((tool) => {
+            const identity = TOOL_LABELS[tool] || { label: tool, mark: '⚙' }
+            return <li key={tool}><Check size={14} />{identity.mark} {identity.label}<small>{tool} · 数据由服务端在确认后按需获取</small></li>
+          }) : <li><AlertTriangle size={14} />未配置任何工具</li>}</ul>
+        </div> : <div className="analysis-preview-evidence">
           <h3>冻结官方证据</h3>
           <ul>{(preview.evidence || []).length ? preview.evidence.map((item) => <li key={item.evidence_id}><Check size={14} />{item.evidence_id} · {item.source} · {item.field} · as-of {new Date(item.as_of).toLocaleString('zh-CN')}</li>) : <li><AlertTriangle size={14} />没有可外发的合格官方证据</li>}</ul>
-        </div>
+        </div>}
         <div className="analysis-confirm-row">
           <label><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />确认 preview {preview.preview_sha256.slice(0, 8)} 的 provider、字段、排除项、保留政策与费用</label>
-          <button className="primary-action" disabled={!confirmed || busy || Boolean(run) || preview.gaps.length > 0 || !(preview.evidence || []).length} onClick={start}><Play size={15} />确认外发并开始分析</button>
+          <button className="primary-action" disabled={!confirmed || busy || Boolean(run) || preview.gaps.length > 0 || (!agentMode && !(preview.evidence || []).length)} onClick={start}><Play size={15} />确认外发并开始分析</button>
         </div>
       </section> : null}
 

@@ -56,12 +56,14 @@ _BOOLEAN_FIELDS = frozenset(
 class PersonalMarketReaders:
     portfolio: PortfolioMarketReader
     instrument: InstrumentObservationReader
+    market: AlpacaMarketObservationAdapter | None = None
 
     @classmethod
     def unavailable(cls) -> "PersonalMarketReaders":
         return cls(
             portfolio=UnavailablePortfolioMarketReader(),
             instrument=UnavailableInstrumentObservationReader(),
+            market=None,
         )
 
 
@@ -92,6 +94,7 @@ def load_personal_market_readers(
             official_events=None,
             provider_wait_seconds=4.5,
         ),
+        market=adapter,
     )
 
 

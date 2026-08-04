@@ -142,6 +142,7 @@ class PersonalAnalysisApiTest(unittest.TestCase):
         self.assertIn('"stage":"completed"', events.text)
         self.assertTrue(capabilities.json()["dispatch_enabled"])
         self.assertEqual(capabilities.json()["provider"], "deepseek")
+        self.assertEqual(capabilities.json()["analysis_mode"], "legacy")
         self.assertEqual(history.status_code, 200)
         self.assertEqual(history.json()[0]["run_id"], run_id)
         self.assertEqual(history.json()[0]["status"], "completed")

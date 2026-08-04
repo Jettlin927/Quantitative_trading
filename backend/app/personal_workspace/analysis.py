@@ -1151,6 +1151,7 @@ class AnalysisWorkspace:
         monthly_soft_budget_usd: Decimal = Decimal("25"),
         monthly_spend_reader: Callable[[PersonalActor, datetime], Decimal]
         | None = None,
+        lease_seconds: int = 30,
     ) -> None:
         self._store = store
         self._evidence_reader = evidence_reader
@@ -1163,6 +1164,7 @@ class AnalysisWorkspace:
         self._monthly_spend_reader = monthly_spend_reader or (
             lambda actor, now: Decimal("0")
         )
+        self._lease_seconds = lease_seconds
 
     def prepare(
         self,
@@ -1339,13 +1341,19 @@ class AnalysisWorkspace:
         leased = self._store.lease_next(
             worker_id=worker_id,
             now=self._clock(),
-            lease_seconds=30,
+            lease_seconds=self._lease_seconds,
         )
         if leased is None:
             return None
         draft, run = leased
         validating = _append_event(run, "validating", "running", self._clock())
         self._store.save_run(validating)
+        return self._execute_provider(validating, draft, run)
+
+    def _execute_provider(
+        self, validating: StoredAnalysisRun, draft: StoredAnalysisDraft, run: StoredAnalysisRun
+    ) -> AnalysisRunView | None:
+        """单发 provider 执行：请求→重试→校验→记账→完成事件。子类可覆写为 agent 循环。"""
         request = _responses_request(
             model=run.view.model,
             question=draft.intent.question,
