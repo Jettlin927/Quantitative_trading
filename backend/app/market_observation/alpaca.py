@@ -29,6 +29,7 @@ from .contracts import (
 
 
 _STOCK_BARS_PATH = re.compile(r"/v2/stocks/[A-Z][A-Z0-9.-]{0,14}/bars")
+_STOCK_SNAPSHOT_PATH = re.compile(r"/v2/stocks/[A-Z][A-Z0-9.-]{0,14}/snapshot")
 _ASSET_PATH = re.compile(r"/v2/assets(?:/[A-Z0-9.-]{1,40})?")
 _CORPORATE_ACTION_TYPES = frozenset(
     {
@@ -156,7 +157,11 @@ class AlpacaRequestPolicy:
 
         path = parsed.path
         if parsed.hostname == "data.alpaca.markets":
-            allowed = bool(_STOCK_BARS_PATH.fullmatch(path)) or path == "/v1/corporate-actions"
+            allowed = (
+                bool(_STOCK_BARS_PATH.fullmatch(path))
+                or bool(_STOCK_SNAPSHOT_PATH.fullmatch(path))
+                or path == "/v1/corporate-actions"
+            )
         elif parsed.hostname == "paper-api.alpaca.markets":
             allowed = bool(_ASSET_PATH.fullmatch(path))
         else:
@@ -272,18 +277,8 @@ class AlpacaMarketObservationAdapter:
         cutoff = observed_at.astimezone(timezone.utc).replace(second=0, microsecond=0) - timedelta(
             minutes=15
         )
-        query = urlencode(
-            {
-                "timeframe": "1Min",
-                "start": _rfc3339(cutoff - timedelta(minutes=5)),
-                "end": _rfc3339(cutoff),
-                "limit": "1",
-                "adjustment": "raw",
-                "feed": "sip",
-                "sort": "desc",
-            }
-        )
-        url = f"https://data.alpaca.markets/v2/stocks/{quote(normalized_symbol)}/bars?{query}"
+        query = urlencode({"feed": "delayed_sip"})
+        url = f"https://data.alpaca.markets/v2/stocks/{quote(normalized_symbol)}/snapshot?{query}"
         try:
             response = self._send(url)
         except MarketObservationError as exc:
@@ -298,19 +293,57 @@ class AlpacaMarketObservationAdapter:
         if response.status_code != 200 or not isinstance(response.body, Mapping):
             raise MarketObservationError("provider_schema_invalid")
         raw = response.body
-        bars = raw.get("bars")
-        if not isinstance(bars, list) or len(bars) != 1 or not isinstance(bars[0], Mapping):
-            raise MarketObservationError("provider_schema_invalid")
-        record = bars[0]
+        try:
+            provider_symbol = _normalize_symbol(_required_text(raw, "symbol"))
+        except (TypeError, ValueError) as exc:
+            raise MarketObservationError("provider_schema_invalid") from exc
+        if provider_symbol != normalized_symbol:
+            raise MarketObservationError("provider_symbol_mismatch")
+        record = raw.get("minuteBar")
+        feed = "delayed_sip"
+        reason = None
+        health: str = "fresh"
+        if not isinstance(record, Mapping):
+            record = raw.get("dailyBar")
+            if not isinstance(record, Mapping):
+                record = raw.get("prevDailyBar")
+            feed = "eod"
+            reason = "latest_close_fallback"
+            health = "stale"
+        if not isinstance(record, Mapping):
+            provenance = ProvenanceEnvelope(
+                source="alpaca",
+                dataset=dataset,
+                provider_record_id=None,
+                source_url=url,
+                fetched_at=observed_at,
+                content_sha256=_content_sha256(raw),
+                authorization_snapshot_id=authorization.snapshot_id,
+                qualification="online_observation",
+                source_health="unavailable",
+                ai_context=authorization.ai_context,
+                formal_research=authorization.formal_research,
+                adjustment_policy="raw",
+                missing_reason="price_unavailable",
+            )
+            return ObservedValue(
+                availability="not_available",
+                value=None,
+                reason_code="price_unavailable",
+                source_health="unavailable",
+                as_of=None,
+                provenance=provenance,
+            )
         try:
             as_of = _required_datetime(record, "t")
             price_value = _required_decimal(record, "c")
         except (TypeError, ValueError) as exc:
             raise MarketObservationError("provider_schema_invalid") from exc
         delay_seconds = int((observed_at.astimezone(timezone.utc) - as_of).total_seconds())
-        is_authorized_delay = as_of <= cutoff
-        health = "fresh" if is_authorized_delay else "degraded"
-        reason = None if is_authorized_delay else "sip_delay_not_proven"
+        is_authorized_delay = feed == "eod" or as_of <= cutoff
+        if not is_authorized_delay:
+            health = "degraded"
+            reason = "sip_delay_not_proven"
         provenance = ProvenanceEnvelope(
             source="alpaca",
             dataset=dataset,
@@ -333,7 +366,7 @@ class AlpacaMarketObservationAdapter:
                     symbol=normalized_symbol,
                     price=price_value,
                     currency="USD",
-                    feed="sip",
+                    feed=feed,
                     delay_seconds=delay_seconds,
                 )
                 if is_authorized_delay
@@ -370,7 +403,7 @@ class AlpacaMarketObservationAdapter:
                     "end": end_date.isoformat(),
                     "limit": "10000",
                     "adjustment": adjustment,
-                    "feed": "sip",
+                    "feed": "iex",
                     "sort": "asc",
                 }
             )

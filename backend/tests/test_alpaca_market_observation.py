@@ -37,6 +37,7 @@ class AlpacaRequestPolicyTest(unittest.TestCase):
     def test_only_fixed_market_data_and_paper_asset_gets_are_allowed(self) -> None:
         allowed = (
             "https://data.alpaca.markets/v2/stocks/SYNTH/bars?timeframe=1Day&feed=sip",
+            "https://data.alpaca.markets/v2/stocks/SYNTH/snapshot?feed=delayed_sip",
             "https://data.alpaca.markets/v1/corporate-actions?symbols=SYNTH",
             "https://paper-api.alpaca.markets/v2/assets",
             "https://paper-api.alpaca.markets/v2/assets/SYNTH",
@@ -255,9 +256,9 @@ class AlpacaMarketObservationAdapterTest(unittest.TestCase):
 
         self.assertEqual(raised.exception.code, "provider_symbol_mismatch")
 
-    def test_delayed_price_explicitly_requests_sip_only_before_the_fifteen_minute_cutoff(self) -> None:
+    def test_delayed_price_uses_basic_plan_delayed_sip_snapshot(self) -> None:
         body = json.loads(
-            (FIXTURE_ROOT / "delayed_price.json").read_text(encoding="utf-8")
+            (FIXTURE_ROOT / "delayed_snapshot.json").read_text(encoding="utf-8")
         )
         transport = DenyRecordingTransport(
             [ProviderResponse(status_code=200, headers={}, body=body)]
@@ -274,25 +275,19 @@ class AlpacaMarketObservationAdapterTest(unittest.TestCase):
         self.assertEqual(observed.availability, "available")
         self.assertEqual(str(observed.value.price), "101.25")
         self.assertEqual(observed.value.currency, "USD")
-        self.assertEqual(observed.value.feed, "sip")
+        self.assertEqual(observed.value.feed, "delayed_sip")
         self.assertEqual(observed.value.delay_seconds, 960)
         self.assertEqual(observed.as_of.isoformat(), "2026-08-03T13:44:00+00:00")
         query = parse_qs(urlsplit(transport.requests[0].url).query)
-        self.assertEqual(query["feed"], ["sip"])
-        self.assertEqual(query["adjustment"], ["raw"])
-        self.assertEqual(query["sort"], ["desc"])
-        self.assertEqual(query["limit"], ["1"])
-        self.assertLessEqual(
-            datetime.fromisoformat(query["end"][0].replace("Z", "+00:00")),
-            observed_at.replace(second=0, microsecond=0) - timedelta(minutes=15),
-        )
+        self.assertEqual(query["feed"], ["delayed_sip"])
+        self.assertEqual(urlsplit(transport.requests[0].url).path, "/v2/stocks/SYNTH/snapshot")
         self.assertFalse(observed.provenance.ai_context)
 
     def test_recent_sip_payload_is_rejected_instead_of_being_silently_used(self) -> None:
         body = json.loads(
-            (FIXTURE_ROOT / "delayed_price.json").read_text(encoding="utf-8")
+            (FIXTURE_ROOT / "delayed_snapshot.json").read_text(encoding="utf-8")
         )
-        body["bars"][0]["t"] = "2026-08-03T13:59:00Z"
+        body["minuteBar"]["t"] = "2026-08-03T13:59:00Z"
         transport = DenyRecordingTransport(
             [ProviderResponse(status_code=200, headers={}, body=body)]
         )
@@ -309,6 +304,30 @@ class AlpacaMarketObservationAdapterTest(unittest.TestCase):
         self.assertEqual(observed.availability, "not_available")
         self.assertEqual(observed.reason_code, "sip_delay_not_proven")
         self.assertIsNone(observed.value)
+
+    def test_closed_market_snapshot_falls_back_to_latest_daily_close(self) -> None:
+        body = json.loads(
+            (FIXTURE_ROOT / "delayed_snapshot.json").read_text(encoding="utf-8")
+        )
+        body["minuteBar"] = None
+        transport = DenyRecordingTransport(
+            [ProviderResponse(status_code=200, headers={}, body=body)]
+        )
+        adapter = AlpacaMarketObservationAdapter(
+            transport=transport,
+            authorizations=self.authorization_registry("alpaca_delayed_sip_prices"),
+            credentials=AlpacaCredentials("synthetic-id", "synthetic-secret"),
+        )
+
+        observed = adapter.observe_delayed_price(
+            "SYNTH", observed_at=datetime(2026, 8, 4, 3, 0, tzinfo=timezone.utc)
+        )
+
+        self.assertEqual(observed.availability, "available")
+        self.assertEqual(str(observed.value.price), "101.25")
+        self.assertEqual(observed.value.feed, "eod")
+        self.assertEqual(observed.source_health, "stale")
+        self.assertEqual(observed.reason_code, "latest_close_fallback")
 
     def test_daily_bars_keep_raw_and_provider_adjusted_series_separate(self) -> None:
         raw = json.loads(
@@ -347,7 +366,7 @@ class AlpacaMarketObservationAdapterTest(unittest.TestCase):
         self.assertEqual(observed.raw.provenance.qualification, "traceable_history")
         queries = [parse_qs(urlsplit(request.url).query) for request in transport.requests]
         self.assertEqual([query["adjustment"] for query in queries], [["raw"], ["all"]])
-        self.assertTrue(all(query["feed"] == ["sip"] for query in queries))
+        self.assertTrue(all(query["feed"] == ["iex"] for query in queries))
 
     def test_corporate_actions_are_typed_without_exposing_provider_dicts(self) -> None:
         body = json.loads(
