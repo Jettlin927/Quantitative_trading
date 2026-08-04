@@ -153,9 +153,6 @@ class PersonalAlpacaRuntimeTest(unittest.TestCase):
             "display_denied": lambda credentials, authorization: authorization[
                 "snapshots"
             ][0].update({"display": False}),
-            "ai_context_allowed": lambda credentials, authorization: authorization[
-                "snapshots"
-            ][0].update({"ai_context": True}),
             "wrong_feed": lambda credentials, authorization: authorization.update(
                 {"feed": "iex"}
             ),
@@ -186,6 +183,27 @@ class PersonalAlpacaRuntimeTest(unittest.TestCase):
                     readers.instrument, UnavailableInstrumentObservationReader
                 )
                 self.assertEqual(transport.requests, [])
+
+    def test_ai_context_grant_loads_and_is_enforced_per_request(self) -> None:
+        """授权文件允许授予 ai_context；执行门禁在 registry.require 按请求层。"""
+        authorization = deepcopy(self.authorization)
+        for snapshot in authorization["snapshots"]:
+            snapshot["ai_context"] = True
+        self._write_json(self.authorization_path, authorization)
+        self._write_json(self.credentials_path, self.credentials)
+        transport = RecordingTransport()
+
+        readers = load_personal_market_readers(
+            credentials_file=self.credentials_path,
+            authorization_file=self.authorization_path,
+            transport=transport,
+        )
+
+        self.assertIsInstance(readers.portfolio, AlpacaPortfolioMarketReader)
+        adapter = readers.portfolio._adapter
+        granted = adapter._require_authorization("alpaca_daily_bars", "ai_context")
+        self.assertTrue(granted.ai_context)
+        self.assertEqual(transport.requests, [])
 
     def test_missing_authorization_file_fails_closed_without_request(self) -> None:
         self._write_json(self.credentials_path, self.credentials)

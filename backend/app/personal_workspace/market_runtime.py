@@ -133,7 +133,6 @@ def _load_authorizations(path: str | Path) -> AppendOnlyAuthorizationRegistry:
             raw_snapshot["display"]
             and raw_snapshot["internal_analysis"]
             and raw_snapshot["persist"]
-            and not raw_snapshot["ai_context"]
             and not raw_snapshot["backfill"]
             and not raw_snapshot["redistribute"]
             and not raw_snapshot["formal_research"]

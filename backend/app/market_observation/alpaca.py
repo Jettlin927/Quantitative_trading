@@ -636,7 +636,7 @@ class AlpacaMarketObservationAdapter:
         snapshot = self._authorizations.require(
             "alpaca", dataset, self.PLAN, purpose
         )
-        if snapshot.ai_context or snapshot.formal_research or snapshot.redistribute:
+        if snapshot.formal_research or snapshot.redistribute:
             raise AuthorizationDenied("authorization_policy_invalid")
         return snapshot
 
