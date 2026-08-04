@@ -215,7 +215,14 @@ class PersonalAnalysisTest(unittest.TestCase):
         self.assertEqual(request["max_tokens"], 4096)
         self.assertIs(request["stream"], False)
         self.assertEqual(request["thinking"], {"type": "disabled"})
-        self.assertIn("示例 JSON", request["messages"][0]["content"])
+        system_prompt = request["messages"][0]["content"]
+        self.assertIn("claims 必须恰好包含 4 项", system_prompt)
+        self.assertIn(
+            "confirmed_fact、inference、conditional_scenario、unknown 各一项",
+            system_prompt,
+        )
+        self.assertIn("所有复数字段必须是 JSON 字符串数组", system_prompt)
+        self.assertIn("不得输出 Markdown 或代码围栏", system_prompt)
         self.assertNotIn("store", request)
         self.assertNotIn("tools", request)
         captured = str(request)
@@ -403,7 +410,7 @@ class PersonalAnalysisTest(unittest.TestCase):
     def test_refusal_invalid_schema_and_advice_fail_without_savable_claims(self) -> None:
         scripts = {
             "provider_refusal": {"status": "refusal", "claims": []},
-            "provider_invalid_schema": {"status": "completed", "claims": []},
+            "provider_claims_invalid_schema": {"status": "completed", "claims": []},
             "prohibited_advice": {
                 "status": "completed",
                 "claims": [
@@ -534,7 +541,7 @@ class PersonalAnalysisTest(unittest.TestCase):
         run = workspace.run_next(worker_id="worker-invalid-usage")
 
         self.assertEqual(run.status, "failed")
-        self.assertEqual(run.failure_code, "provider_invalid_schema")
+        self.assertEqual(run.failure_code, "provider_usage_invalid")
         self.assertIsNone(run.usage)
 
     def test_queued_run_can_be_cancelled_before_worker_reads_it(self) -> None:
@@ -722,7 +729,23 @@ class PersonalAnalysisTest(unittest.TestCase):
                     ],
                     "usage": usage,
                 },
-                "provider_invalid_schema",
+                "provider_content_invalid_json",
+            ),
+            (
+                {"choices": []},
+                "provider_response_envelope_invalid",
+            ),
+            (
+                {
+                    "choices": [
+                        {
+                            "finish_reason": "stop",
+                            "message": {"content": '{"claims":[]}'},
+                        }
+                    ],
+                    "usage": {},
+                },
+                "provider_usage_invalid",
             ),
         )
         for raw, expected_code in cases:
@@ -814,7 +837,7 @@ class PersonalAnalysisTest(unittest.TestCase):
                     body={"model": "deepseek-v4-flash"},
                     timeout_seconds=1,
                 )
-        self.assertEqual(raised.exception.code, "provider_invalid_schema")
+        self.assertEqual(raised.exception.code, "provider_response_invalid_json")
         self.assertFalse(raised.exception.retryable)
 
 
