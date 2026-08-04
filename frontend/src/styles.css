@@ -93,6 +93,31 @@ body {
   background: var(--nav-soft);
 }
 
+.instrument-picker {
+  display: flex;
+  align-items: end;
+  gap: 6px;
+}
+
+.instrument-picker label {
+  align-self: center;
+  color: var(--ink-soft);
+  font-size: 10px;
+}
+
+.instrument-picker input,
+.instrument-picker select {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--surface);
+  padding: 0 9px;
+  font: 700 11px Consolas, monospace;
+}
+
+.instrument-picker input { width: 88px; text-transform: uppercase; }
+.instrument-picker button { min-height: 34px; border: 0; color: #fff; background: var(--nav-soft); padding: 0 12px; }
+
 .cost-reference {
   display: grid;
   grid-template-columns: 1fr auto auto;

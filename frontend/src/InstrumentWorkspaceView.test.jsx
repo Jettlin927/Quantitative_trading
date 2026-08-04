@@ -29,4 +29,23 @@ describe('InstrumentWorkspaceView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Provider adjusted' }))
     await waitFor(() => expect(chartAdapter.create).toHaveBeenCalled())
   })
+
+  it('默认入口从真实活跃持仓选择，并允许手工输入代码', async () => {
+    const onNavigate = vi.fn()
+    const client = {
+      openPortfolio: vi.fn().mockResolvedValue({
+        holdings: [{ holding_id: 'holding-net', symbol: 'NET', name: 'Cloudflare', state: 'active' }],
+      }),
+      openInstrument: vi.fn(),
+    }
+
+    render(<InstrumentWorkspaceView client={client} symbol="" onNavigate={onNavigate} />)
+
+    expect(screen.getByRole('heading', { name: '选择一个真实标的' })).toBeTruthy()
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith('/markets/us/NET'))
+    expect(client.openInstrument).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('美股代码'), { target: { value: 'glw' } })
+    fireEvent.click(screen.getByRole('button', { name: '打开标的' }))
+    expect(onNavigate).toHaveBeenLastCalledWith('/markets/us/GLW')
+  })
 })
