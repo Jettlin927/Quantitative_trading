@@ -25,6 +25,13 @@ from backend.app.personal_workspace.contracts import (
     PurgeHoldingCommand,
     SetUsdCashCommand,
 )
+from backend.app.personal_workspace.analysis import (
+    AnalysisIntent,
+    AnalysisWorkspace,
+    EvidenceCandidate,
+    PostgresAnalysisStore,
+    ScriptedResponsesAdapter,
+)
 from backend.app.personal_workspace.crypto import (
     EncryptedEnvelope,
     FixedKeyring,
@@ -179,6 +186,35 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                 idempotency_key="pg-record-001",
             )
 
+            analyses = AnalysisWorkspace(
+                store=PostgresAnalysisStore(
+                    sessionmaker(bind=engine, autoflush=False, expire_on_commit=False),
+                    cipher=cipher,
+                ),
+                evidence_reader=lambda request_actor, intent: (
+                    EvidenceCandidate(
+                        evidence_id="sec:acme:revenue:2026q1",
+                        kind="official_filing",
+                        source="sec",
+                        field="official_facts",
+                        excerpt="ACME 2026-Q1 revenue was USD 100.",
+                        content_sha256="a" * 64,
+                        authorized_for_ai=True,
+                        as_of=datetime(2026, 8, 3, 3, 0, tzinfo=timezone.utc),
+                    ),
+                ),
+                provider=ScriptedResponsesAdapter.completed(claims=()),
+                clock=lambda: datetime(2026, 8, 3, 4, 0, tzinfo=timezone.utc),
+            )
+            analyses.prepare(
+                actor,
+                AnalysisIntent(
+                    question="真实分析草稿不能覆盖合成旅程。",
+                    subject_ids=("ACME",),
+                ),
+                idempotency_key="pg-real-analysis-draft",
+            )
+
             portfolio = PortfolioBook(
                 store=PostgresPortfolioStore(
                     sessionmaker(bind=engine, autoflush=False, expire_on_commit=False),
@@ -188,7 +224,9 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                 challenge_key=b"portfolio-challenge-key-for-tests" * 2,
             ).open(actor)
 
-            self.assertEqual(journey.open_today(actor).record.record_id, record.record_id)
+            today = journey.open_today(actor)
+            self.assertEqual(today.trace.analysis_id, trace.analysis_id)
+            self.assertEqual(today.record.record_id, record.record_id)
             self.assertEqual(portfolio.holdings, ())
             with engine.connect() as connection:
                 counts = {
@@ -213,7 +251,9 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                 counts,
                 {
                     table: (
-                        0
+                        2
+                        if table == "personal_analysis_drafts"
+                        else 0
                         if table
                         in {
                             "personal_portfolio_revisions",
@@ -221,8 +261,6 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                             "personal_rule_instances",
                             "personal_rule_revisions",
                             "personal_rule_evaluation_batches",
-                            "personal_evidence_packs",
-                            "personal_evidence_refs",
                             "personal_analysis_runs",
                             "personal_analysis_attempts",
                             "personal_analysis_events",

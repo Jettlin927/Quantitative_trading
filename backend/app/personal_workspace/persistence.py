@@ -155,6 +155,7 @@ class PostgresPersonalJourneyStore:
             row = session.scalar(
                 select(PersonalAnalysisDraft).where(
                     PersonalAnalysisDraft.workspace_id == workspace_id,
+                    PersonalAnalysisDraft.synthetic.is_(True),
                     PersonalAnalysisDraft.idempotency_hash
                     == _idempotency_hash(actor_id, idempotency_key),
                 )
@@ -167,7 +168,7 @@ class PostgresPersonalJourneyStore:
             if workspace_id is None:
                 return None
             row = session.get(PersonalAnalysisDraft, analysis_id)
-            if row is None or row.workspace_id != workspace_id:
+            if row is None or row.workspace_id != workspace_id or not row.synthetic:
                 return None
             return self._stored_trace(actor_id, row)
 
@@ -178,7 +179,10 @@ class PostgresPersonalJourneyStore:
                 return None
             row = session.scalar(
                 select(PersonalAnalysisDraft)
-                .where(PersonalAnalysisDraft.workspace_id == workspace_id)
+                .where(
+                    PersonalAnalysisDraft.workspace_id == workspace_id,
+                    PersonalAnalysisDraft.synthetic.is_(True),
+                )
                 .order_by(PersonalAnalysisDraft.created_at.desc(), PersonalAnalysisDraft.id.desc())
                 .limit(1)
             )
@@ -338,6 +342,7 @@ class PostgresPersonalJourneyStore:
         return session.scalar(
             select(PersonalAnalysisDraft).where(
                 PersonalAnalysisDraft.workspace_id == workspace_id,
+                PersonalAnalysisDraft.synthetic.is_(True),
                 PersonalAnalysisDraft.idempotency_hash
                 == _idempotency_hash(actor_id, idempotency_key),
             )
