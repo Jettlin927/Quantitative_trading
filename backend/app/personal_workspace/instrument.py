@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 import re
+from time import monotonic
 from typing import Any, Callable, Literal, Protocol
 
 from .contracts import PersonalActor
@@ -156,10 +157,11 @@ class TypedInstrumentObservationReader:
         issues: list[str] = []
         authorization_ids: list[str] = []
         executor = ThreadPoolExecutor(max_workers=4)
+        identity_future = None
+        actions_future = None
+        official_events_future = None
+        deadline = monotonic() + self._provider_wait_seconds
         try:
-            identity_future = executor.submit(
-                self._market.observe_asset, symbol, purpose="display", fetched_at=as_of
-            )
             bars_future = executor.submit(
                 self._market.observe_daily_bars,
                 symbol,
@@ -168,29 +170,41 @@ class TypedInstrumentObservationReader:
                 fetched_at=as_of,
                 purpose="display",
             )
-            actions_future = executor.submit(
-                self._market.observe_corporate_actions,
-                symbol,
-                start_date=start_date,
-                end_date=end_date,
-                fetched_at=as_of,
-                purpose="display",
+            _, unfinished = wait(
+                (bars_future,), timeout=max(0.0, deadline - monotonic())
             )
-            official_events_future = executor.submit(self._official_events, symbol, as_of)
-            futures = (
-                identity_future,
-                bars_future,
-                actions_future,
-                official_events_future,
-            )
-            _, unfinished = wait(futures, timeout=self._provider_wait_seconds)
             for future in unfinished:
                 future.cancel()
+            remaining = deadline - monotonic()
+            if remaining > 0:
+                identity_future = executor.submit(
+                    self._market.observe_asset,
+                    symbol,
+                    purpose="display",
+                    fetched_at=as_of,
+                )
+                actions_future = executor.submit(
+                    self._market.observe_corporate_actions,
+                    symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                    fetched_at=as_of,
+                    purpose="display",
+                )
+                official_events_future = executor.submit(
+                    self._official_events, symbol, as_of
+                )
+                _, unfinished = wait(
+                    (identity_future, actions_future, official_events_future),
+                    timeout=max(0.0, deadline - monotonic()),
+                )
+                for future in unfinished:
+                    future.cancel()
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
 
         try:
-            if not identity_future.done():
+            if identity_future is None or not identity_future.done():
                 raise TimeoutError("provider_timeout")
             identity = identity_future.result()
             name = identity.value.name if identity.value is not None else symbol
@@ -222,7 +236,7 @@ class TypedInstrumentObservationReader:
             issues.append("daily_bars_unavailable")
         events: list[InstrumentEvent] = []
         try:
-            if not actions_future.done():
+            if actions_future is None or not actions_future.done():
                 raise TimeoutError("provider_timeout")
             actions = actions_future.result()
             authorization_ids.append(actions.provenance.authorization_snapshot_id)
@@ -244,7 +258,7 @@ class TypedInstrumentObservationReader:
         except Exception:
             issues.append("corporate_actions_unavailable")
         try:
-            if not official_events_future.done():
+            if official_events_future is None or not official_events_future.done():
                 raise TimeoutError("provider_timeout")
             for event in official_events_future.result():
                 authorization_ids.append(event.authorization.snapshot_id)
