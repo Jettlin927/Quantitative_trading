@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
@@ -769,11 +770,20 @@ class PortfolioBook:
             raise ValueError("invalid_command")
 
     def _project(self, state: PortfolioState) -> PortfolioView:
-        observations: dict[str, PortfolioPriceObservation] = {}
-        for holding in state.holdings.values():
-            if holding.state == "active":
-                observations[holding.holding_id] = self._market.observe_price(holding.symbol)
         active = [holding for holding in state.holdings.values() if holding.state == "active"]
+        observations: dict[str, PortfolioPriceObservation] = {}
+        if active:
+            with ThreadPoolExecutor(max_workers=min(len(active), 8)) as executor:
+                futures = {
+                    holding.holding_id: executor.submit(
+                        self._market.observe_price, holding.symbol
+                    )
+                    for holding in active
+                }
+                observations = {
+                    holding_id: future.result()
+                    for holding_id, future in futures.items()
+                }
         available = {
             holding.holding_id: observations[holding.holding_id]
             for holding in active
