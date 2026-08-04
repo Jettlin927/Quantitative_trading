@@ -130,6 +130,33 @@ class PersonalPortfolioTest(unittest.TestCase):
             self.assertEqual(observed.reason_code, "provider_unavailable")
         self.assertIn("provider_unavailable", portfolio.issues)
 
+    def test_one_unpriced_symbol_keeps_covered_portfolio_value_visible(self) -> None:
+        self.add_acme()
+
+        portfolio = self.book.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="BETA",
+                name="Unsupported Market",
+                quantity="3",
+                average_cost="10",
+                expected_portfolio_revision=1,
+            ),
+            idempotency_key="add-beta-001",
+        )
+
+        self.assertEqual(portfolio.active_holding_count, 2)
+        self.assertEqual(portfolio.priced_holding_count, 1)
+        self.assertEqual(portfolio.total_market_value.availability, "available")
+        self.assertEqual(portfolio.total_market_value.value, "241.0000")
+        self.assertEqual(portfolio.total_market_value.reason_code, "partial_valuation")
+        self.assertEqual(portfolio.total_equity.value, "241.0000")
+        self.assertEqual(portfolio.total_equity.reason_code, "partial_valuation")
+        self.assertEqual(portfolio.holdings[0].weight.reason_code, "portfolio_total_unavailable")
+        self.assertEqual(portfolio.holdings[1].market_value.availability, "not_available")
+        self.assertIn("partial_valuation", portfolio.issues)
+
     def test_duplicate_symbol_revision_conflict_and_decimal_validation_are_explicit(self) -> None:
         self.add_acme()
 

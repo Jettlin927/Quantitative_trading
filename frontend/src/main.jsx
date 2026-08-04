@@ -35,7 +35,7 @@ import './styles.css'
 const NAV_ITEMS = [
   { id: 'today', path: '/today', label: '今日工作台', eyebrow: '持仓事项优先', icon: LayoutDashboard },
   { id: 'portfolio', path: '/portfolio', label: '我的持仓', eyebrow: '私有手工账本', icon: BriefcaseBusiness },
-  { id: 'markets', path: '/markets/us/SYNTH-001', label: '市场与标的', eyebrow: '标的与证据', icon: Globe2 },
+  { id: 'markets', path: '/markets/us', label: '市场与标的', eyebrow: '标的与证据', icon: Globe2 },
   { id: 'rules', path: '/rules', label: '规则与策略', eyebrow: '确定性四态', icon: ListChecks },
   { id: 'research', path: '/research', label: '研究驾驶舱', eyebrow: '正式研究隔离', icon: BookOpenCheck },
   { id: 'records', path: '/records', label: '研究记录', eyebrow: '不可变版本', icon: FileClock },
@@ -381,7 +381,7 @@ function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = brows
           {activeView === 'portfolio' ? <PortfolioView client={personalClient} /> : null}
           {activeView === 'rules' ? <RulesView client={personalClient} /> : null}
           {activeView === 'records' ? <RecordsView client={personalClient} recordId={personalRecordId(pathname)} /> : null}
-          {activeView === 'markets' && !pathname.startsWith('/markets/a-share') ? <InstrumentWorkspaceView client={personalClient} symbol={personalInstrumentSymbol(pathname)} chartAdapter={chartAdapter} /> : null}
+          {activeView === 'markets' && !pathname.startsWith('/markets/a-share') ? <div key={personalInstrumentSymbol(pathname)}><InstrumentWorkspaceView client={personalClient} symbol={personalInstrumentSymbol(pathname)} chartAdapter={chartAdapter} onNavigate={navigate} /></div> : null}
           {activeView === 'research' ? (
             <ResearchCockpitView
               strategies={strategies}
@@ -517,7 +517,7 @@ function routeView(pathname) {
 }
 
 function personalInstrumentSymbol(pathname) {
-  const value = pathname.split('/')[3] || 'SYNTH-001'
+  const value = pathname.split('/')[3] || ''
   return decodeURIComponent(value)
 }
 

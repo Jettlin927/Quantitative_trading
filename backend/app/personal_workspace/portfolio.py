@@ -142,6 +142,8 @@ class PortfolioView:
     holdings: tuple[HoldingView, ...]
     total_market_value: ObservedDecimalView
     total_equity: ObservedDecimalView
+    active_holding_count: int
+    priced_holding_count: int
     issues: tuple[str, ...]
 
 
@@ -772,16 +774,20 @@ class PortfolioBook:
             if holding.state == "active":
                 observations[holding.holding_id] = self._market.observe_price(holding.symbol)
         active = [holding for holding in state.holdings.values() if holding.state == "active"]
-        all_available = all(
-            observations[holding.holding_id].availability == "available" for holding in active
-        )
-        issues = tuple(
-            dict.fromkeys(
-                observation.reason_code
-                for observation in observations.values()
-                if observation.reason_code is not None
-            )
-        )
+        available = {
+            holding.holding_id: observations[holding.holding_id]
+            for holding in active
+            if observations[holding.holding_id].availability == "available"
+        }
+        all_available = len(available) == len(active)
+        issue_values = [
+            observation.reason_code
+            for observation in observations.values()
+            if observation.reason_code is not None
+        ]
+        if available and not all_available:
+            issue_values.append("partial_valuation")
+        issues = tuple(dict.fromkeys(issue_values))
         if all_available:
             total_market = sum(
                 (
@@ -793,6 +799,29 @@ class PortfolioBook:
             total_equity = total_market + state.usd_cash
             total_market_view = _observed_available(total_market, observations.values())
             total_equity_view = _observed_available(total_equity, observations.values())
+        elif available:
+            total_market = sum(
+                (
+                    holding.quantity * available[holding.holding_id].price
+                    for holding in active
+                    if holding.holding_id in available
+                ),
+                Decimal("0"),
+            )
+            covered_observations = available.values()
+            total_market_view = _observed_available(
+                total_market,
+                covered_observations,
+                reason_code="partial_valuation",
+                source_health="degraded",
+            )
+            total_equity_view = _observed_available(
+                total_market + state.usd_cash,
+                covered_observations,
+                reason_code="partial_valuation",
+                source_health="degraded",
+            )
+            total_equity = None
         else:
             reason = issues[0] if issues else "provider_unavailable"
             source_health = _worst_health(observations.values())
@@ -816,6 +845,8 @@ class PortfolioBook:
             holdings=holdings,
             total_market_value=total_market_view,
             total_equity=total_equity_view,
+            active_holding_count=len(active),
+            priced_holding_count=len(available),
             issues=issues,
         )
 
@@ -990,23 +1021,27 @@ def _observed_not_applicable(reason_code: str) -> ObservedDecimalView:
 
 
 def _observed_available(
-    value: Decimal, observations
+    value: Decimal,
+    observations,
+    *,
+    reason_code: str | None = None,
+    source_health: SourceHealth | None = None,
 ) -> ObservedDecimalView:
     items = tuple(observations)
     if not items:
         return ObservedDecimalView(
             availability="available",
             value=_money(value),
-            reason_code=None,
-            source_health="fresh",
+            reason_code=reason_code,
+            source_health=source_health or "fresh",
             as_of=None,
             source_ids=(),
         )
     return ObservedDecimalView(
         availability="available",
         value=_money(value),
-        reason_code=None,
-        source_health=_worst_health(items),
+        reason_code=reason_code,
+        source_health=source_health or _worst_health(items),
         as_of=min(item.as_of for item in items if item.as_of is not None),
         source_ids=tuple(source_id for item in items for source_id in item.source_ids),
     )
