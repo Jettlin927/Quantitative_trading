@@ -83,13 +83,14 @@ def load_personal_market_readers(
         transport=transport or UrllibProviderTransport(),
         authorizations=authorizations,
         credentials=credentials,
-        request_deadline_seconds=1.8,
+        request_deadline_seconds=3.2,
     )
     return PersonalMarketReaders(
         portfolio=AlpacaPortfolioMarketReader(adapter=adapter),
         instrument=TypedInstrumentObservationReader(
             market=adapter,
             official_events=lambda symbol, as_of: (),
+            provider_wait_seconds=3.5,
         ),
     )
 
