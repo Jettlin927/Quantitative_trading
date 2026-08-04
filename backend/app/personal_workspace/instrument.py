@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, wait
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 import re
+from threading import Lock
 from time import monotonic
 from typing import Any, Callable, Literal, Protocol
 
@@ -144,15 +145,30 @@ class TypedInstrumentObservationReader:
         market: Any,
         official_events: Callable[[str, datetime], tuple[Any, ...]],
         provider_wait_seconds: float = 1.8,
+        cache_ttl_seconds: float = 300.0,
+        clock: Callable[[], float] = monotonic,
     ) -> None:
         if provider_wait_seconds <= 0:
             raise ValueError("provider_wait_seconds_must_be_positive")
+        if cache_ttl_seconds <= 0:
+            raise ValueError("cache_ttl_seconds_must_be_positive")
         self._market = market
         self._official_events = official_events
         self._provider_wait_seconds = provider_wait_seconds
+        self._cache_ttl_seconds = cache_ttl_seconds
+        self._clock = clock
+        self._cache: dict[
+            tuple[str, date, int], tuple[float, InstrumentObservation]
+        ] = {}
+        self._cache_lock = Lock()
 
     def open(self, symbol: str, *, as_of: datetime, limit: int) -> InstrumentObservation:
         end_date = as_of.astimezone(timezone.utc).date()
+        cache_key = (symbol, end_date, limit)
+        with self._cache_lock:
+            cached = self._cache.get(cache_key)
+        if cached is not None and self._clock() - cached[0] < self._cache_ttl_seconds:
+            return cached[1]
         start_date = end_date - timedelta(days=max(limit * 2, 30))
         issues: list[str] = []
         authorization_ids: list[str] = []
@@ -160,7 +176,7 @@ class TypedInstrumentObservationReader:
         identity_future = None
         actions_future = None
         official_events_future = None
-        deadline = monotonic() + self._provider_wait_seconds
+        deadline = self._clock() + self._provider_wait_seconds
         try:
             bars_future = executor.submit(
                 self._market.observe_daily_bars,
@@ -171,11 +187,11 @@ class TypedInstrumentObservationReader:
                 purpose="display",
             )
             _, unfinished = wait(
-                (bars_future,), timeout=max(0.0, deadline - monotonic())
+                (bars_future,), timeout=max(0.0, deadline - self._clock())
             )
             for future in unfinished:
                 future.cancel()
-            remaining = deadline - monotonic()
+            remaining = deadline - self._clock()
             if remaining > 0:
                 identity_future = executor.submit(
                     self._market.observe_asset,
@@ -196,7 +212,7 @@ class TypedInstrumentObservationReader:
                 )
                 _, unfinished = wait(
                     (identity_future, actions_future, official_events_future),
-                    timeout=max(0.0, deadline - monotonic()),
+                    timeout=max(0.0, deadline - self._clock()),
                 )
                 for future in unfinished:
                     future.cancel()
@@ -280,7 +296,7 @@ class TypedInstrumentObservationReader:
                 )
         except Exception:
             issues.append("official_events_unavailable")
-        return InstrumentObservation(
+        observation = InstrumentObservation(
             symbol=symbol,
             name=name,
             raw_bars=raw[-limit:],
@@ -290,6 +306,22 @@ class TypedInstrumentObservationReader:
             authorization_snapshot_ids=tuple(dict.fromkeys(authorization_ids)),
             issues=tuple(issues),
         )
+        if observation.raw_bars:
+            with self._cache_lock:
+                self._cache[cache_key] = (self._clock(), observation)
+            return observation
+        if cached is not None:
+            stale = replace(
+                cached[1],
+                source_health="stale",
+                issues=tuple(
+                    dict.fromkeys((*cached[1].issues, "stale_cached_observation"))
+                ),
+            )
+            with self._cache_lock:
+                self._cache[cache_key] = (self._clock(), stale)
+            return stale
+        return observation
 
 
 class InstrumentWorkbench:
