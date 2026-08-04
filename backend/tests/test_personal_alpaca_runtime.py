@@ -92,8 +92,8 @@ class PersonalAlpacaRuntimeTest(unittest.TestCase):
 
         self.assertIsInstance(readers.portfolio, AlpacaPortfolioMarketReader)
         self.assertIsInstance(readers.instrument, TypedInstrumentObservationReader)
-        self.assertEqual(readers.portfolio._adapter._request_deadline_seconds, 1.8)
-        self.assertEqual(readers.instrument._provider_wait_seconds, 1.8)
+        self.assertEqual(readers.portfolio._adapter._request_deadline_seconds, 3.2)
+        self.assertEqual(readers.instrument._provider_wait_seconds, 3.5)
         self.assertEqual(transport.requests, [])
         self.assertNotIn(self.credentials["key_id"], repr(readers))
         self.assertNotIn(self.credentials["secret_key"], repr(readers))
