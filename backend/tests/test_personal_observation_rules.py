@@ -271,6 +271,61 @@ class InstrumentWorkbenchTest(unittest.TestCase):
         self.assertEqual(projection.provider_adjusted_bars, ())
         self.assertIn("provider_adjusted_bars_unavailable", projection.issues)
 
+    def test_typed_reader_caches_success_and_falls_back_to_stale_success(self) -> None:
+        clock = [100.0]
+
+        class IntermittentMarket:
+            calls = 0
+
+            def observe_asset(self, symbol, **kwargs):
+                raise RuntimeError("asset unavailable")
+
+            def observe_daily_bars(self, symbol, **kwargs):
+                self.calls += 1
+                if self.calls > 1:
+                    raise RuntimeError("bars unavailable")
+                values = tuple(
+                    SimpleNamespace(symbol=symbol, **item.__dict__)
+                    for item in bars(2)
+                )
+                observed = SimpleNamespace(
+                    availability="available",
+                    value=values,
+                    source_health="fresh",
+                    provenance=SimpleNamespace(
+                        content_sha256="a" * 64,
+                        authorization_snapshot_id="auth-bars",
+                    ),
+                )
+                return SimpleNamespace(raw=observed, provider_adjusted=observed)
+
+            def observe_corporate_actions(self, symbol, **kwargs):
+                raise RuntimeError("actions unavailable")
+
+        market = IntermittentMarket()
+        reader = TypedInstrumentObservationReader(
+            market=market,
+            official_events=lambda symbol, as_of: (),
+            cache_ttl_seconds=300,
+            clock=lambda: clock[0],
+        )
+
+        first = reader.open("ACME", as_of=NOW, limit=120)
+        clock[0] += 1
+        cached = reader.open("ACME", as_of=NOW, limit=120)
+        clock[0] += 300
+        stale = reader.open("ACME", as_of=NOW, limit=120)
+        clock[0] += 1
+        cached_stale = reader.open("ACME", as_of=NOW, limit=120)
+
+        self.assertEqual(market.calls, 2)
+        self.assertEqual(len(first.raw_bars), 2)
+        self.assertEqual(cached, first)
+        self.assertEqual(len(stale.raw_bars), 2)
+        self.assertEqual(stale.source_health, "stale")
+        self.assertIn("stale_cached_observation", stale.issues)
+        self.assertEqual(cached_stale, stale)
+
     def test_open_separates_raw_adjusted_events_cost_and_evidence_identity(self) -> None:
         raw = bars()
         adjusted = tuple(
