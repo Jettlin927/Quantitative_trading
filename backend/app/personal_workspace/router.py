@@ -234,9 +234,15 @@ def create_personal_router(
 
     @router.get("/analysis-capabilities")
     def analysis_capabilities(runtime: PersonalRuntime = Depends(require_read)) -> dict:
+        from .agent.workspace import AgentAnalysisWorkspace
+
+        analysis_mode = (
+            "agent" if isinstance(runtime.analyses, AgentAnalysisWorkspace) else "legacy"
+        )
         return {
             "provider": runtime.analysis_provider,
             "model": runtime.analysis_model,
+            "analysis_mode": analysis_mode,
             "dispatch_enabled": runtime.analysis_dispatch_enabled,
             "reason_code": runtime.analysis_disabled_reason,
             "credentials_scope": "analysis_worker_only",

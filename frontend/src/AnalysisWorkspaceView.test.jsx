@@ -52,7 +52,7 @@ describe('AI 影响分析工作台', () => {
     fireEvent.change(screen.getByLabelText('分析问题'), { target: { value: '官方事实可能如何影响公司？' } })
     fireEvent.click(screen.getByRole('button', { name: '生成外发预览' }))
 
-    expect(await screen.findByText('deepseek / deepseek-v4-flash')).toBeInTheDocument()
+    expect(await screen.findByText('DeepSeek / deepseek-v4-flash')).toBeInTheDocument()
     expect(screen.getByText('official_facts')).toBeInTheDocument()
     expect(screen.getByText('market_prices')).toBeInTheDocument()
     expect(screen.getByText(/sec-1 · sec · official_facts/)).toBeInTheDocument()
@@ -78,7 +78,7 @@ describe('AI 影响分析工作台', () => {
     render(<AnalysisWorkspaceView client={client} subjectId="ACME" />)
     fireEvent.change(screen.getByLabelText('分析问题'), { target: { value: '降级验证' } })
     fireEvent.click(screen.getByRole('button', { name: '生成外发预览' }))
-    await screen.findByText('deepseek / deepseek-v4-flash')
+    await screen.findByText('DeepSeek / deepseek-v4-flash')
     fireEvent.click(screen.getByRole('checkbox', { name: /确认 preview/ }))
     fireEvent.click(screen.getByRole('button', { name: '确认外发并开始分析' }))
 
@@ -106,6 +106,63 @@ describe('AI 影响分析工作台', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /确认 preview/ }))
     expect(screen.getByRole('button', { name: '确认外发并开始分析' })).toBeDisabled()
     expect(client.startAnalysis).not.toHaveBeenCalled()
+  })
+
+  it('agent 模式展示工具模式徽标与服务端执行说明', async () => {
+    const client = {
+      openPortfolio: vi.fn().mockResolvedValue({ holdings: [{ holding_id: 'h1', symbol: 'NVDA', name: 'NVIDIA', state: 'active' }] }),
+      listAnalysisCapabilities: vi.fn().mockResolvedValue({
+        provider: 'deepseek', model: 'deepseek-v4-flash', analysis_mode: 'agent',
+        dispatch_enabled: true, reason_code: null, credentials_scope: 'analysis_worker_only',
+        credentials_visible_to_api: false, history_readable: true,
+      }),
+      listAnalyses: vi.fn().mockResolvedValue([]),
+      prepareAnalysis: vi.fn(), openAnalysis: vi.fn(), startAnalysis: vi.fn(), cancelAnalysis: vi.fn(),
+    }
+    render(<AnalysisWorkspaceView client={client} subjectId="NVDA" />)
+
+    expect(await screen.findByText(/工具模式/)).toBeInTheDocument()
+    expect(screen.getByText(/agent 在服务端按需调用持仓/)).toBeInTheDocument()
+    expect(screen.getByText(/分析在服务端执行，agent 按需调用/)).toBeInTheDocument()
+    expect(screen.getByText(/TOOL-USE AGENT/)).toBeInTheDocument()
+  })
+
+  it('agent 模式预览展示服务端工具，无冻结证据也能确认外发', async () => {
+    const agentPreview = {
+      draft_id: 'draft-agent-1', status: 'ready', provider: 'deepseek-agent', model: 'deepseek-v4-flash',
+      config_revision: 'personal-agent-deepseek-v1',
+      included_fields: ['user_question', 'get_holdings', 'get_kline', 'get_news'],
+      excluded_fields: [], gaps: [], preview_sha256: 'b'.repeat(64),
+      retention: 'DeepSeek 默认磁盘上下文缓存；输入/输出按当次政策处理',
+      estimated_cost_usd: '0.0200', expires_at: '2026-08-10T04:30:00Z', consumed_at: null,
+      evidence_ids: [], evidence: [],
+    }
+    const client = {
+      prepareAnalysis: vi.fn().mockResolvedValue(agentPreview),
+      startAnalysis: vi.fn().mockResolvedValue({ run_id: 'run-agent-1', status: 'queued', stage: 'queued', claims: [], events: [] }),
+      openAnalysis: vi.fn(), cancelAnalysis: vi.fn(),
+    }
+    render(<AnalysisWorkspaceView client={client} subjectId="NVDA" />)
+    fireEvent.change(screen.getByLabelText('分析问题'), { target: { value: 'NVDA 当前持仓与近期走势？' } })
+    fireEvent.click(screen.getByRole('button', { name: '生成外发预览' }))
+
+    expect(await screen.findByText('DeepSeek Agent / deepseek-v4-flash')).toBeInTheDocument()
+    expect(screen.getByText('服务端工具')).toBeInTheDocument()
+    expect(screen.getByText(/查当前持仓/)).toBeInTheDocument()
+    expect(screen.getByText(/查目标标的日 K 线/)).toBeInTheDocument()
+    expect(screen.getByText(/查产业新闻/)).toBeInTheDocument()
+    expect(screen.queryByText('冻结官方证据')).not.toBeInTheDocument()
+
+    const start = screen.getByRole('button', { name: '确认外发并开始分析' })
+    expect(start).toBeDisabled()
+    fireEvent.click(screen.getByRole('checkbox', { name: /确认 preview/ }))
+    expect(start).toBeEnabled()
+    fireEvent.click(start)
+
+    await waitFor(() => expect(client.startAnalysis).toHaveBeenCalledWith(expect.objectContaining({
+      draftId: 'draft-agent-1', previewSha256: 'b'.repeat(64),
+    })))
+    expect(await screen.findByText('QUEUED · 已入队')).toBeInTheDocument()
   })
 
   it('按四类身份展示证据、反对证据、假设、期限和失效条件', async () => {
