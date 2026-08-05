@@ -52,8 +52,7 @@ body {
 }
 
 .instrument-head,
-.rules-summary,
-.formal-overlay {
+.rules-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -129,8 +128,7 @@ body {
   padding: 10px 12px;
 }
 
-.cost-reference em,
-.formal-overlay span {
+.cost-reference em {
   color: var(--ink-soft);
   font-size: 12px;
 }
@@ -242,20 +240,6 @@ body {
   gap: 7px;
   margin-top: 10px;
   color: #8d5510;
-}
-
-.formal-overlay {
-  justify-content: flex-start;
-}
-
-.formal-overlay div {
-  display: grid;
-  gap: 2px;
-}
-
-.formal-overlay b {
-  margin-left: auto;
-  font: 700 11px Consolas, monospace;
 }
 
 .rules-summary p {
@@ -379,16 +363,11 @@ body {
 
   .instrument-head,
   .rules-summary,
-  .formal-overlay,
   .cost-reference,
   .rule-register article {
     align-items: flex-start;
     grid-template-columns: 1fr;
     flex-direction: column;
-  }
-
-  .formal-overlay b {
-    margin-left: 0;
   }
 }
 
