@@ -1,10 +1,16 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 import unittest
 
-from backend.app.personal_workspace.contracts import AddHoldingCommand, PersonalActor
+from backend.app.personal_workspace.contracts import (
+    AddHoldingCommand,
+    CreateObservationRuleCommand,
+    PersonalActor,
+    RemoveHoldingCommand,
+    SetObservationRuleStateCommand,
+)
 from backend.app.personal_workspace.crypto import FixedKeyring, PersonalDataCipher
 from backend.app.personal_workspace.journey import PersonalResearchJourney
 from backend.app.personal_workspace.persistence import InMemoryPersonalJourneyStore
@@ -12,6 +18,13 @@ from backend.app.personal_workspace.portfolio import (
     InMemoryPortfolioStore,
     PortfolioBook,
     PortfolioPriceObservation,
+)
+from backend.app.personal_workspace.instrument import InstrumentBar
+from backend.app.personal_workspace.rules import (
+    InMemoryObservationRuleStore,
+    ObservationRuleBook,
+    RuleEvaluationRequest,
+    RuleInput,
 )
 from backend.app.personal_workspace.synthetic import SyntheticWorkspaceAdapters
 
@@ -140,6 +153,96 @@ class PersonalResearchJourneyTest(unittest.TestCase):
         today = self.journey.open_today(self.actor)
 
         self.assertIsNone(today.trace)
+
+    def test_today_does_not_project_old_rule_hit_after_holding_is_removed(self) -> None:
+        class FixedMarket:
+            def observe_price(self, symbol):
+                return PortfolioPriceObservation.unavailable("provider_unavailable")
+
+        class FixedRuleInputs:
+            def read(self, symbol, *, as_of, minimum_bars):
+                bar = InstrumentBar(
+                    trade_date=date(2026, 8, 5),
+                    open=Decimal("119"),
+                    high=Decimal("121"),
+                    low=Decimal("118"),
+                    close=Decimal("120"),
+                    volume=100,
+                    evidence_id="acme-bar",
+                )
+                return RuleInput(
+                    symbol=symbol,
+                    raw_bars=(bar,),
+                    adjusted_bars=(bar,),
+                    events=(),
+                    source_health="fresh",
+                    evidence_ids=(bar.evidence_id,),
+                    corporate_actions_available=True,
+                )
+
+        portfolio = PortfolioBook(store=InMemoryPortfolioStore(), market=FixedMarket())
+        rules = ObservationRuleBook(
+            store=InMemoryObservationRuleStore(), inputs=FixedRuleInputs()
+        )
+        created_portfolio = portfolio.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="ACME",
+                name="Acme",
+                quantity="1",
+                average_cost="100",
+                expected_portfolio_revision=0,
+            ),
+            idempotency_key="add-attention-holding",
+        )
+        draft = rules.revise(
+            self.actor,
+            CreateObservationRuleCommand(
+                type="create_rule",
+                template_id="price_threshold",
+                symbol="ACME",
+                parameters={"direction": "gte", "price": "110"},
+            ),
+            idempotency_key="create-attention-rule",
+        )
+        rules.revise(
+            self.actor,
+            SetObservationRuleStateCommand(
+                type="set_rule_state",
+                rule_id=draft.rule_id,
+                expected_revision=draft.revision,
+                state="enabled",
+            ),
+            idempotency_key="enable-attention-rule",
+        )
+        rules.evaluate(
+            self.actor,
+            RuleEvaluationRequest(
+                symbol="ACME", as_of=datetime(2026, 8, 5, tzinfo=timezone.utc)
+            ),
+            idempotency_key="evaluate-attention-rule",
+        )
+        portfolio.revise(
+            self.actor,
+            RemoveHoldingCommand(
+                type="remove_holding",
+                holding_id=created_portfolio.holdings[0].holding_id,
+                expected_portfolio_revision=created_portfolio.portfolio_revision,
+            ),
+            idempotency_key="remove-attention-holding",
+        )
+        journey = PersonalResearchJourney(
+            store=self.store,
+            cipher=self.cipher,
+            adapters=self.adapters,
+            portfolio=portfolio,
+            rulebook=rules,
+        )
+
+        today = journey.open_today(self.actor)
+
+        self.assertEqual(today.attention_items, ())
 
 
 if __name__ == "__main__":

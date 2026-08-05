@@ -10,7 +10,7 @@
 | `quant_api_runtime` | 是 | 表 CRUD、序列使用 | 无 | 无 | 公共 API 的 `API_DATABASE_URL` |
 | `quant_research_runtime` | 是 | 表 CRUD、序列使用 | 无 | 无 | 研究 Worker 的 `RESEARCH_WORKER_DATABASE_URL` |
 | `quant_personal_api` | 是 | 无表/序列权限 | 表 CRUD、序列使用 | 无 | 私有 API 的 `PRIVATE_DATABASE_URL` |
-| `quant_personal_analysis` | 是 | 只读 | 表 CRUD、序列使用 | 无 | 个人分析 Worker 的 `PERSONAL_ANALYSIS_DATABASE_URL` |
+| `quant_personal_analysis` | 是 | 只读 | 表 CRUD、序列使用 | 无 | 个人分析与持仓规则 Worker 的 `PERSONAL_ANALYSIS_DATABASE_URL` |
 
 四个定义角色固定为 `NOSUPERUSER`、`NOCREATEDB`、`NOCREATEROLE`、`NOREPLICATION`、
 `NOBYPASSRLS` 和 `NOINHERIT`，不能在 `public` 创建对象。公共 API 和研究 Worker 对

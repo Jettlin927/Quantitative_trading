@@ -24,13 +24,13 @@ const personalClient = {
 }
 
 describe('美股优先工作台路由', () => {
-  it('只保留五个美股工作区，不再展示 A 股、旧实验美股、个人记录或旧策略驾驶舱', async () => {
+  it('只保留四个美股工作区，不再展示独立规则页或旧主线', async () => {
     render(<App readAdapter={createReadAdapter()} personalClient={personalClient} />)
 
-    for (const name of ['今日工作台', '我的持仓', '市场与标的', '规则与策略', '数据与系统']) {
+    for (const name of ['今日工作台', '我的持仓', '市场与标的', '数据与系统']) {
       expect(screen.getByRole('button', { name: new RegExp(name) })).toBeInTheDocument()
     }
-    for (const name of ['A 股数据', '美股数据', '研究记录', '研究驾驶舱']) {
+    for (const name of ['规则与策略', 'A 股数据', '美股数据', '研究记录', '研究驾驶舱']) {
       expect(screen.queryByRole('button', { name: new RegExp(name) })).not.toBeInTheDocument()
     }
     expect(await screen.findByRole('heading', { name: '今天先看组合、数据缺口与待验证事项' })).toBeInTheDocument()
@@ -54,6 +54,13 @@ describe('美股优先工作台路由', () => {
     cleanup()
     readAdapter.mockClear()
     render(<App initialPath="/research" readAdapter={readAdapter} personalClient={personalClient} />)
+    await waitFor(() => expect(readAdapter).toHaveBeenCalledWith({ path: '/api/health?include_counts=false' }))
+    expect(readAdapter.mock.calls.map(([request]) => request.path)).toEqual(['/api/health?include_counts=false'])
+    expect(await screen.findByRole('heading', { name: '今天先看组合、数据缺口与待验证事项' })).toBeInTheDocument()
+
+    cleanup()
+    readAdapter.mockClear()
+    render(<App initialPath="/rules" readAdapter={readAdapter} personalClient={personalClient} />)
     await waitFor(() => expect(readAdapter).toHaveBeenCalledWith({ path: '/api/health?include_counts=false' }))
     expect(readAdapter.mock.calls.map(([request]) => request.path)).toEqual(['/api/health?include_counts=false'])
     expect(await screen.findByRole('heading', { name: '今天先看组合、数据缺口与待验证事项' })).toBeInTheDocument()

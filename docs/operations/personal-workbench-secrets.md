@@ -14,7 +14,7 @@
 | `PERSONAL_GATEWAY_TOKEN_HOST_FILE` | gateway token 的宿主绝对路径 | 普通文件，最小权限，不得放进 release 目录 |
 | `PERSONAL_DATA_KEYRING_HOST_FILE` | keyring JSON 的宿主绝对路径 | 普通文件，最小权限，不得放进 release 目录 |
 | `PERSONAL_ALLOWED_ORIGINS` | 逗号分隔的精确浏览器 Origin | 不允许 `*`，按当次 SSH 隧道入口冻结 |
-| `PERSONAL_ANALYSIS_DATABASE_URL` | `quant_personal_analysis` 的完整 PostgreSQL URL | 只供个人分析 Worker，不得与 API 连接复用 |
+| `PERSONAL_ANALYSIS_DATABASE_URL` | `quant_personal_analysis` 的完整 PostgreSQL URL | 只供个人分析与持仓规则 Worker，不得与 API 连接复用 |
 | `DEEPSEEK_CREDENTIALS_HOST_FILE` | 仅含 DeepSeek API key 的 JSON 文件绝对路径 | 只读挂载给个人分析 Worker，必须为 owner-only 权限 |
 | `DEEPSEEK_MONTHLY_SOFT_BUDGET_USD` | DeepSeek 月度软预算 | 必须为正数，超预算 fail-closed |
 | `PERSONAL_ANALYSIS_PROVIDER` | API 侧非 secret 能力开关 | 只有精确值 `deepseek` 才允许入队；默认 `disabled` |

@@ -11,11 +11,18 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.app.database import alembic_config, current_schema_heads, expected_schema_heads
 from backend.app.personal_workspace.contracts import (
+    AddHoldingCommand,
     CreateObservationRuleCommand,
     PersonalActor,
     SetObservationRuleStateCommand,
 )
 from backend.app.personal_workspace.crypto import FixedKeyring, PersonalDataCipher
+from backend.app.personal_workspace.portfolio import (
+    PortfolioBook,
+    PostgresPortfolioStore,
+    UnavailablePortfolioMarketReader,
+)
+from backend.app.personal_workspace.rule_automation import HoldingRuleAutomation
 from backend.app.personal_workspace.rules import (
     ObservationRuleBook,
     PostgresObservationRuleStore,
@@ -170,6 +177,28 @@ class PersonalRulesPostgresTest(unittest.TestCase):
             self.assertEqual(repeated, batch)
             self.assertEqual(book.open(actor)["evaluations"][0].result, "hit")
 
+            portfolio = PortfolioBook(
+                store=PostgresPortfolioStore(session_factory, cipher=cipher),
+                market=UnavailablePortfolioMarketReader(),
+            )
+            portfolio.revise(
+                actor,
+                AddHoldingCommand(
+                    type="add_holding",
+                    symbol="ACME",
+                    name="Acme",
+                    quantity="1",
+                    average_cost="100",
+                    expected_portfolio_revision=0,
+                ),
+                idempotency_key="pg-add-automation-holding",
+            )
+            automation = HoldingRuleAutomation(portfolio=portfolio, rules=book)
+            automatic_as_of = datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc)
+            first_automatic = automation.run_once(actor, as_of=automatic_as_of)
+            repeated_automatic = automation.run_once(actor, as_of=automatic_as_of)
+            self.assertEqual(repeated_automatic, first_automatic)
+
             with engine.connect() as connection:
                 counts = connection.execute(
                     text(
@@ -189,7 +218,7 @@ class PersonalRulesPostgresTest(unittest.TestCase):
                         )
                     ).scalars()
                 )
-            self.assertEqual(counts, (2, 5, 1, 1))
+            self.assertEqual(counts, (2, 5, 2, 2))
             self.assertNotIn("ACME", projection)
             self.assertNotIn('"threshold": "110"', projection)
             self.assertNotIn('"price": "110"', projection)

@@ -14,7 +14,7 @@ from .analysis import (
     PostgresAnalysisStore,
     ScriptedResponsesAdapter,
 )
-from .contracts import PersonalActor
+from .contracts import LOCAL_PERSONAL_ACTOR, PersonalActor
 from .crypto import PersonalDataCipher, load_keyring_file
 from .journey import PersonalResearchJourney
 from .official_evidence_runtime import load_official_analysis_evidence_reader
@@ -81,7 +81,7 @@ def get_personal_runtime() -> PersonalRuntime:
             f"personal-purge|{gateway_token}".encode("utf-8")
         ).digest(),
     )
-    actor = PersonalActor(actor_id="local-owner")
+    actor = LOCAL_PERSONAL_ACTOR
     rules = ObservationRuleBook(
         store=PostgresObservationRuleStore(session_factory, cipher=cipher),
         inputs=InstrumentRuleInputReader(market_readers.instrument),

@@ -123,6 +123,10 @@ class PersonalResearchJourney:
         )
         portfolio = self._portfolio.open(actor) if self._portfolio is not None else None
         attention_items = self._rulebook.attention(actor) if self._rulebook is not None else ()
+        if portfolio is not None:
+            attention_items = tuple(
+                item for item in attention_items if item.symbol in portfolio.active_symbols
+            )
         if trace is None:
             return TodayWorkspace(
                 trace=None,
