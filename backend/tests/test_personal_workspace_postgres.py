@@ -458,7 +458,7 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                 ),
                 idempotency_key="pg-sell-acme",
             )
-            self.assertEqual(sold.usd_cash, "180.0000")  # 1.5 × 120
+            self.assertEqual(sold.usd_cash, "-221.0000")  # 首笔 4×100.25=−401，卖出 +1.5×120=+180
             self.assertEqual(sold.holdings[0].quantity, "2.5000")
             self.assertEqual(sold.holdings[0].state, "active")
             self.assertEqual(sold.realized_pnl_total.value, "29.6250")  # (120-100.25)×1.5
@@ -508,7 +508,8 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
             )
             self.assertEqual(closed_holding.state, "sold")
             self.assertEqual(closed_holding.quantity, "0.0000")
-            self.assertEqual(trades.total(actor_id=actor.actor_id), Decimal("104.3750"))
+            # 累计已实现 = 29.6250 + (130−100.25)×2.5 = 104.0000
+            self.assertEqual(trades.total(actor_id=actor.actor_id), Decimal("104.0000"))
 
             # 私有业务值不落明文：成交价/均价不在数据库投影中
             with engine.connect() as connection:
