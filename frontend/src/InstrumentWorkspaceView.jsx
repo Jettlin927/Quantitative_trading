@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Database, Layers3 } from 'lucide-react'
+import { AlertTriangle, Database } from 'lucide-react'
 
 import { MarketChart } from './MarketChart.jsx'
 
@@ -111,12 +111,11 @@ export function InstrumentWorkspaceView({ client, symbol, chartAdapter = undefin
       </section>
       <section className="personal-panel">
         <header><div><span>03 / EVIDENCE</span><h2>证据检查器</h2></div><Database size={17} /></header>
-        <dl className="evidence-list"><div><dt>选中日期</dt><dd>{workspace.evidence_inspector.selected_date || '-'}</dd></div><div><dt>授权快照</dt><dd>{workspace.evidence_inspector.authorization_snapshot_ids.join(' · ') || '不可用'}</dd></div></dl>
+        <dl className="evidence-list"><div><dt>选中日期</dt><dd>{workspace.evidence_inspector.selected_date || '-'}</dd></div><div><dt>授权快照</dt><dd>{workspace.evidence_inspector.authorization_snapshot_ids.length ? `授权快照 ${workspace.evidence_inspector.authorization_snapshot_ids.length} 条` : '不可用'}{workspace.evidence_inspector.authorization_snapshot_ids.length ? <details><summary>原始 ID</summary><code>{workspace.evidence_inspector.authorization_snapshot_ids.join(' · ')}</code></details> : null}</dd></div></dl>
         <div className="evidence-items">{(workspace.evidence_inspector.items || []).length ? workspace.evidence_inspector.items.map((item) => <article key={item.evidence_id}><strong>{item.label}</strong><span>{item.dataset} · {item.observed_date} · {item.source_health}</span><details><summary>技术身份</summary><code>{item.evidence_id}</code></details></article>) : <p>所选日期暂无可检查证据。</p>}</div>
         {workspace.evidence_inspector.issues.map((issue) => <p className="data-gap" key={issue}><AlertTriangle size={14} />{ISSUE_LABELS[issue] || issue}</p>)}
       </section>
     </div>
 
-    <section className="formal-overlay"><Layers3 size={16} /><div><strong>{workspace.formal_research_overlay.label}</strong><span>只读归一化叠加 · 不改变个人观察规则的研究资格</span></div><b>research_eligible = false</b></section>
   </div>
 }

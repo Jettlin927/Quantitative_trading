@@ -39,7 +39,7 @@ describe('InstrumentWorkspaceView', () => {
     expect(screen.getByRole('heading', { name: '证据检查器' })).toBeTruthy()
     expect(screen.getByText('Alpaca 原始日线')).toBeTruthy()
     expect(screen.getByText('alpaca_daily_bars · 2026-08-01 · fresh')).toBeTruthy()
-    expect(screen.getByText('正式研究发布投影')).toBeTruthy()
+    expect(screen.getByText('授权快照 1 条')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Provider adjusted' }))
     await waitFor(() => expect(chartAdapter.create).toHaveBeenCalled())
