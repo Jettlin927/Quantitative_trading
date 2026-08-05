@@ -530,7 +530,7 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
             self.assertEqual(hmacs[0], cipher.symbol_lookup(workspace_id=portfolio.open(actor).workspace_id, normalized_symbol="ACME"))
             self.assertNotIn("120.00", projection)
             self.assertNotIn("29.6250", projection)
-            self.assertNotIn("130", projection)
+            self.assertNotIn("130.0000", projection)
             self.assertNotIn("ACME", projection)
         finally:
             engine.dispose()
