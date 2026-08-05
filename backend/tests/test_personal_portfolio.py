@@ -92,7 +92,8 @@ class PersonalPortfolioTest(unittest.TestCase):
 
         self.assertEqual(portfolio.portfolio_revision, 1)
         self.assertEqual(portfolio.currency, "USD")
-        self.assertEqual(portfolio.usd_cash, "0.0000")
+        # 新增持仓按数量×均价自动扣减现金：0 - 2×100.25 = -200.50
+        self.assertEqual(portfolio.usd_cash, "-200.5000")
         self.assertEqual(len(portfolio.holdings), 1)
         holding = portfolio.holdings[0]
         self.assertEqual(holding.symbol, "ACME")
@@ -103,15 +104,89 @@ class PersonalPortfolioTest(unittest.TestCase):
         self.assertEqual(holding.market_value.value, "241.0000")
         self.assertEqual(holding.unrealized_profit_loss.value, "40.5000")
         self.assertEqual(holding.unrealized_return.value, "0.201995")
-        self.assertEqual(holding.weight.value, "1.000000")
+        # 权重 = 市值 / 总权益 = 241 / 40.50（现金被扣减后权益变小）
+        self.assertEqual(holding.weight.value, "5.950617")
         self.assertEqual(holding.market_price.feed, "sip")
         self.assertEqual(holding.market_price.delay_seconds, 900)
         self.assertEqual(portfolio.total_market_value.value, "241.0000")
-        self.assertEqual(portfolio.total_equity.value, "241.0000")
+        # 总权益 = 市值 + 现金 = 241 + (-200.50)
+        self.assertEqual(portfolio.total_equity.value, "40.5000")
 
         repeated = self.add_acme(idempotency_key="add-acme-001")
         self.assertEqual(repeated.portfolio_revision, 1)
         self.assertEqual(repeated.holdings[0].holding_id, holding.holding_id)
+        # 幂等重复提交不重复扣现金
+        self.assertEqual(repeated.usd_cash, "-200.5000")
+
+    def test_add_holding_debits_cash_but_edit_remove_restore_do_not(self) -> None:
+        added = self.add_acme()
+        self.assertEqual(added.usd_cash, "-200.5000")  # 0 - 2×100.25
+
+        holding_id = added.holdings[0].holding_id
+        edited = self.book.revise(
+            self.actor,
+            EditHoldingCommand(
+                type="edit_holding",
+                holding_id=holding_id,
+                name="Acme Revised",
+                quantity="3",
+                average_cost="90",
+                expected_portfolio_revision=1,
+            ),
+            idempotency_key="edit-acme-cash",
+        )
+        # 编辑数量/均价视为修正录入，不改变现金
+        self.assertEqual(edited.usd_cash, "-200.5000")
+
+        removed = self.book.revise(
+            self.actor,
+            RemoveHoldingCommand(
+                type="remove_holding",
+                holding_id=holding_id,
+                expected_portfolio_revision=2,
+            ),
+            idempotency_key="remove-acme-cash",
+        )
+        # 移出不是卖出，不贷记现金
+        self.assertEqual(removed.usd_cash, "-200.5000")
+
+        restored = self.book.revise(
+            self.actor,
+            RestoreHoldingCommand(
+                type="restore_holding",
+                holding_id=holding_id,
+                expected_portfolio_revision=3,
+            ),
+            idempotency_key="restore-acme-cash",
+        )
+        # 恢复不是重新买入，不再次扣现金
+        self.assertEqual(restored.usd_cash, "-200.5000")
+
+        # 多笔新增累计扣减：再加 BETA 3×10=30
+        with_cash = self.book.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="BETA",
+                name="Beta",
+                quantity="3",
+                average_cost="10",
+                expected_portfolio_revision=4,
+            ),
+            idempotency_key="add-beta-cash",
+        )
+        self.assertEqual(with_cash.usd_cash, "-230.5000")
+        # set_usd_cash 仍可手工覆盖
+        override = self.book.revise(
+            self.actor,
+            SetUsdCashCommand(
+                type="set_usd_cash",
+                usd_cash="59",
+                expected_portfolio_revision=5,
+            ),
+            idempotency_key="override-cash",
+        )
+        self.assertEqual(override.usd_cash, "59.0000")
 
     def test_open_observes_active_holdings_concurrently(self) -> None:
         class ConcurrentMarket:
@@ -265,7 +340,7 @@ class PersonalPortfolioTest(unittest.TestCase):
         self.assertEqual(portfolio.total_market_value.availability, "available")
         self.assertEqual(portfolio.total_market_value.value, "241.0000")
         self.assertEqual(portfolio.total_market_value.reason_code, "partial_valuation")
-        self.assertEqual(portfolio.total_equity.value, "241.0000")
+        self.assertEqual(portfolio.total_equity.value, "10.5000")
         self.assertEqual(portfolio.total_equity.reason_code, "partial_valuation")
         self.assertEqual(portfolio.holdings[0].weight.reason_code, "portfolio_total_unavailable")
         self.assertEqual(portfolio.holdings[1].market_value.availability, "not_available")
@@ -557,7 +632,7 @@ class PortfolioEquityTrackingTest(unittest.TestCase):
         self.assertEqual(holding.market_price.value, "120.5000")
         self.assertEqual(holding.market_price.feed, "delayed_sip")
         self.assertEqual(holding.market_price.source_health, "stale")
-        self.assertEqual(second.total_equity.value, "241.0000")
+        self.assertEqual(second.total_equity.value, "40.5000")
         self.assertNotIn("partial_valuation", second.issues)
 
     def test_cached_fallback_older_than_max_age_stays_unavailable(self) -> None:
@@ -662,9 +737,10 @@ class PortfolioEquityTrackingTest(unittest.TestCase):
         history = book.equity_history(self.actor)
         self.assertEqual(len(history), 1)
         self.assertEqual(history[0].market_day, "2026-08-03")
-        self.assertEqual(history[0].total_equity, "241.0000")
+        # 现金被新增持仓扣减：0 - 2×100.25 = -200.50；权益 = 市值 241 + 现金
+        self.assertEqual(history[0].total_equity, "40.5000")
         self.assertEqual(history[0].total_market_value, "241.0000")
-        self.assertEqual(history[0].usd_cash, "0.0000")
+        self.assertEqual(history[0].usd_cash, "-200.5000")
         self.assertEqual(history[0].holdings_count, 1)
         self.assertEqual(history[0].priced_count, 1)
         self.assertFalse(history[0].after_close)

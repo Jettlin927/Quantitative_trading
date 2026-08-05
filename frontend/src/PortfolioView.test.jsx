@@ -61,6 +61,9 @@ describe('手工美股持仓工作台', () => {
     fireEvent.change(screen.getByLabelText('标的名称'), { target: { value: 'Acme Holdings' } })
     fireEvent.change(screen.getByLabelText('持股数量'), { target: { value: '2' } })
     fireEvent.change(screen.getByLabelText('平均买入价'), { target: { value: '100.25' } })
+    // 新增持仓提示占用现金：2 × 100.25 = 200.50，添加后现金 = 0 - 200.50
+    expect(screen.getByText(/占用现金 ≈/)).toBeInTheDocument()
+    expect(screen.getByText(/-200.50/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '添加持仓' }))
 
     await waitFor(() => expect(client.submitPortfolioCommand).toHaveBeenCalledWith(expect.objectContaining({

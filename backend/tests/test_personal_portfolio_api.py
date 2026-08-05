@@ -187,9 +187,10 @@ class PersonalPortfolioApiTest(unittest.TestCase):
         snapshots = payload["snapshots"]
         self.assertTrue(snapshots)
         latest = snapshots[-1]
-        self.assertEqual(latest["total_equity"], "241.0000")
+        # 新增持仓自动扣现金：0 - 2×100.25 = -200.50；权益 = 市值 241 + 现金
+        self.assertEqual(latest["total_equity"], "40.5000")
         self.assertEqual(latest["total_market_value"], "241.0000")
-        self.assertEqual(latest["usd_cash"], "0.0000")
+        self.assertEqual(latest["usd_cash"], "-200.5000")
         self.assertEqual(latest["holdings_count"], 1)
         self.assertEqual(latest["priced_count"], 1)
         self.assertIn("market_day", latest)
@@ -261,7 +262,7 @@ class PersonalPortfolioApiTest(unittest.TestCase):
         self.assertEqual(market_price["availability"], "available")
         self.assertEqual(market_price["source_health"], "stale")
         self.assertEqual(second["priced_holding_count"], 1)
-        self.assertEqual(second["total_equity"]["value"], "241.0000")
+        self.assertEqual(second["total_equity"]["value"], "40.5000")
         self.assertNotIn("partial_valuation", second["issues"])
 
 

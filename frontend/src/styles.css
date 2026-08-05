@@ -3936,6 +3936,19 @@ button:disabled {
 .portfolio-field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .portfolio-derived-lock { display: flex; align-items: flex-start; gap: 8px; border-left: 2px solid var(--cyan); color: #55707d; background: #eef6f8; padding: 9px; font-size: 9px; line-height: 1.5; }
 .portfolio-derived-lock svg { flex: 0 0 auto; color: var(--cyan); }
+.portfolio-add-cash-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px dashed #9fc3cf;
+  color: #2d5c6c;
+  background: #f0f8fa;
+  padding: 9px;
+  font-size: 9px;
+  line-height: 1.55;
+}
+.portfolio-add-cash-hint svg { flex: 0 0 auto; color: #338098; }
+.portfolio-add-cash-hint strong { color: #0c3446; font-family: Consolas, monospace; }
 .portfolio-editor-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .portfolio-editor .primary-action { border-color: #056e91; color: #fff; background: #087ea4; }
 
