@@ -21,8 +21,15 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
             {
                 "/api/personal/today",
                 "/api/personal/synthetic-traces",
-                "/api/personal/synthetic-records",
             }.issubset(route_paths)
+        )
+        self.assertTrue(
+            {
+                "/api/personal/records",
+                "/api/personal/records/{record_id}",
+                "/api/personal/records/commands",
+                "/api/personal/synthetic-records",
+            }.isdisjoint(route_paths)
         )
         cors = next(
             middleware
@@ -68,7 +75,7 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
             "ALPACA_CREDENTIALS_FILE",
             "ALPACA_AUTHORIZATION_FILE",
         }
-        for service_name in ("worker", "research-worker"):
+        for service_name in ("research-worker",):
             environment = compose["services"][service_name].get("environment", {})
             self.assertTrue(forbidden.isdisjoint(environment), service_name)
 

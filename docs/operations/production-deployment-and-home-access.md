@@ -8,7 +8,7 @@
 ## 当前拓扑
 
 - `quant-trading-prod` 是唯一生产服务器和唯一数据权威。
-- PostgreSQL、API、数据 Worker、研究 Worker、前端和 canonical 研究工件均在该
+- PostgreSQL、API、研究 Worker、前端和 canonical 研究工件均在该
   服务器运行；前端与后端不跨服务器拆分。
 - 原旧服务器已经退出本系统，不是备机、灾备、回滚源、Staging 或计算节点。
 - PostgreSQL `5432`、API `18000` 和前端 `15173` 只监听服务器 loopback；用户只
@@ -50,7 +50,7 @@
 | SSH 调用 | `REMOTE`、`REMOTE_SSH_PORT`、`REMOTE_SSH_KEY`、`PROJECT_DIR` | `REMOTE` 必须解析到 `quant-trading-prod` |
 | 发布身份 | `REPO_URL`、`BRANCH` | 生产固定为仓库 `main`，仍须核验精确提交 |
 | PostgreSQL | `POSTGRES_DB`、`POSTGRES_USER`、`POSTGRES_PASSWORD` | 密码不得回显 |
-| 应用凭据 | `TUSHARE_TOKEN`、`DEEPSEEK_TOKEN`、`RESEARCH_GITHUB_TOKEN` | 只配置服务实际需要的权限 |
+| 应用凭据 | `DEEPSEEK_TOKEN`、`RESEARCH_GITHUB_TOKEN`；Alpaca 凭据使用受保护只读文件 | 只配置服务实际需要的权限；不再配置 Tushare |
 | 监听与工件 | `POSTGRES_PORT`、`API_PORT`、`FRONTEND_PORT`、`POSTGRES_DATA_DIR`、`RESEARCH_ARTIFACTS_DIR` | 持久目录必须显式存在，端口必须绑定 loopback |
 
 不要把 `.env.example` 当成生产配置，也不要用 `cat .env`、PowerShell
@@ -67,7 +67,7 @@
 ### 2. 执行受控部署
 
 - 只有取得当次授权后，才能在 `quant-trading-prod` 执行发布或 migration。
-- 数据库、API、Worker、研究 Worker、前端和工件必须保持同一生产身份；不得只更新
+- 数据库、API、研究 Worker、个人分析 Worker、前端和工件必须保持同一生产身份；不得只更新
   一个服务后笼统宣称发布完成。
 - migration、镜像构建和正式研究不得并行；失败时停止在现场，不通过删除 volume、
   覆盖数据或临时手工 DDL 强行继续。
@@ -79,7 +79,7 @@
 | 代码 | GitHub `main` SHA、目标 CI、服务器 checkout SHA |
 | 镜像与进程 | 镜像摘要、容器实际 `APP_GIT_COMMIT`、健康和重启状态 |
 | PostgreSQL | Alembic revision、schema 指纹、关键计数和最大业务日期 |
-| Worker | 心跳新鲜、队列状态、租约和最近任务结果 |
+| Worker | 已启用的研究/个人分析 Worker 心跳、队列、租约和最近任务结果；未启用时记录为未启用 |
 | 工件 | canonical 路径、数据库引用、文件数量和必要指纹 |
 | API | `/api/health` 与目标业务读回，数值保持 JSON-safe |
 | 前端 | 首页、SPA 深链、同源 `/api/health` 和实际数据页面 |

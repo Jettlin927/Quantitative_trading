@@ -35,7 +35,7 @@ class ResearchStrategyDispatchTest(unittest.TestCase):
                 self._assert_rejected_before_data_access(config, "策略 ID")
 
     def test_scope_mismatch_fails_before_quality_or_snapshot(self):
-        config = {**self.config, "scope": "a_share_cross_section"}
+        config = {**self.config, "scope": "invalid_scope"}
         self._assert_rejected_before_data_access(config, "scope")
 
     def test_strategy_parameter_contract_fails_before_quality_or_snapshot(self):

@@ -88,44 +88,6 @@ class PersonalResearchJourneyTest(unittest.TestCase):
         ):
             self.assertNotIn(private_value, raw_store)
 
-    def test_record_requires_same_preview_hash_and_is_immutable(self) -> None:
-        trace = self.journey.create_synthetic_trace(
-            self.actor,
-            idempotency_key="trace-002",
-            question="保存前先确认外发字段。",
-        )
-
-        with self.assertRaisesRegex(ValueError, "preview_changed"):
-            self.journey.save_synthetic_record(
-                self.actor,
-                analysis_id=trace.analysis_id,
-                preview_sha256="0" * 64,
-                idempotency_key="record-002",
-            )
-
-        record = self.journey.save_synthetic_record(
-            self.actor,
-            analysis_id=trace.analysis_id,
-            preview_sha256=trace.analysis_preview.preview_sha256,
-            idempotency_key="record-002",
-        )
-        repeated = self.journey.save_synthetic_record(
-            self.actor,
-            analysis_id=trace.analysis_id,
-            preview_sha256=trace.analysis_preview.preview_sha256,
-            idempotency_key="record-002",
-        )
-
-        self.assertEqual(record.record_id, repeated.record_id)
-        self.assertEqual(record.version, 1)
-        self.assertTrue(record.synthetic)
-        self.assertFalse(record.research_eligible)
-        self.assertEqual(record.status, "saved")
-
-        today = self.journey.open_today(self.actor, include_synthetic=True)
-        self.assertEqual(today.record.record_id, record.record_id)
-        self.assertEqual(today.analysis_preview.preview_sha256, trace.analysis_preview.preview_sha256)
-
     def test_today_projection_includes_the_same_complete_portfolio_view(self) -> None:
         class FixedMarket:
             def observe_price(self, symbol):
@@ -178,7 +140,6 @@ class PersonalResearchJourneyTest(unittest.TestCase):
         today = self.journey.open_today(self.actor)
 
         self.assertIsNone(today.trace)
-        self.assertIsNone(today.record)
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ class SentinelBaselineTest(unittest.TestCase):
 
     def test_baseline_rejects_non_etf_scope_or_parameter_search(self):
         config = golden_run_config("quality", "a" * 64)
-        config["scope"] = "a_share_cross_section"
+        config["scope"] = "invalid_scope"
         with self.assertRaises(ValueError):
             run_sentinel_etf_baseline(FIXTURE_DIR, config, compressed=False)
 

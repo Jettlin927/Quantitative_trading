@@ -88,7 +88,7 @@ python -m backend.app.research_plan /path/to/issue-body.md
 
 ## 启用门禁
 
-`research-worker` 位于 `research-automation` Compose profile，普通 `docker compose up` 不会启动。完成代码合并、CI、生产 migration、独立 token 配置和用户上线批准后，才可在目标服务器显式启用该 profile。启用前还必须确认数据 Worker、镜像构建和 migration 不与正式研究并行。
+`research-worker` 位于 `research-automation` Compose profile，普通 `docker compose up` 不会启动。完成代码合并、CI、生产 migration、独立 token 配置和用户上线批准后，才可在目标服务器显式启用该 profile。启用前还必须确认个人分析 Worker、镜像构建和 migration 不与正式研究争用资源。
 
 仅做配置解析：
 

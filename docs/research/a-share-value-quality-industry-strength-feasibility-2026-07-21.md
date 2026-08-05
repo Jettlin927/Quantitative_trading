@@ -1,5 +1,9 @@
 # A 股价值质量、行业相对强度与低换手组合可行性审查
 
+> 历史研究证据：A 股数据拉取与策略执行入口已于 2026-08-05 按
+> [ADR 0010](../adr/0010-us-first-workbench-and-retired-legacy-data-paths.md) 退役。本文中的
+> 源文件路径和后续实施建议不再是当前路线图。
+
 - 审查日期：2026-07-21（Asia/Shanghai）
 - 审查基线：`main@22747c9c5f41474894c8204f10659b8ee005cc74`
 - 建议策略身份：`a_share_value_quality_industry_strength` / version `1`

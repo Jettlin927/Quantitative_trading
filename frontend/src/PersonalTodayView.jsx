@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, BriefcaseBusiness, Check, Circle, FlaskConical, ListChecks, Save, ShieldX, Triangle, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, BriefcaseBusiness, Check, Circle, FlaskConical, ListChecks, ShieldX, Triangle, X } from 'lucide-react'
 
 import { MarketChart } from './MarketChart.jsx'
 
@@ -14,8 +14,6 @@ export function PersonalTodayView({ client, chartAdapter, onNavigate = () => {} 
   const [workspace, setWorkspace] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [savedRecord, setSavedRecord] = useState(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -48,28 +46,11 @@ export function PersonalTodayView({ client, chartAdapter, onNavigate = () => {} 
         question: '这个虚构事件可能通过什么机制影响合成标的？',
         idempotencyKey: crypto.randomUUID(),
       })
-      setWorkspace({ trace: created, record: null })
+      setWorkspace({ trace: created })
     } catch (reason) {
       setError(reason)
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function saveRecord() {
-    setSaving(true)
-    setError(null)
-    try {
-      const record = await client.saveSyntheticRecord({
-        analysisId: trace.analysis_id,
-        previewSha256: trace.analysis_preview.preview_sha256,
-        idempotencyKey: crypto.randomUUID(),
-      })
-      setSavedRecord(record)
-    } catch (reason) {
-      setError(reason)
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -87,7 +68,6 @@ export function PersonalTodayView({ client, chartAdapter, onNavigate = () => {} 
   )
 
   const providerUnavailable = trace.issues?.includes('provider_unavailable')
-  const record = savedRecord || workspace?.record
   return (
     <div className="personal-today enter">
       {overview}
@@ -148,10 +128,6 @@ export function PersonalTodayView({ client, chartAdapter, onNavigate = () => {} 
         <button disabled title="Synthetic provider 当前不可用">Provider 恢复后可追问</button>
       </section>
 
-      <section className="personal-panel save-panel">
-        <div><span>06 / EXPLICIT COMMIT</span><h2>显式保存</h2><p>保存只提交 analysis ID 与当前 preview hash；服务端重新组装记录。</p></div>
-        {record ? <strong className="saved-state"><Check size={16} />合成记录 v{record.version} 已保存</strong> : <button className="primary-action" disabled={saving} onClick={saveRecord}><Save size={15} />确认并保存合成记录</button>}
-      </section>
       {error ? <div className="notice error"><AlertTriangle size={16} /><span><b>{error.code || 'personal_request_failed'}</b><small>{error.message}</small></span></div> : null}
     </div>
   )

@@ -20,8 +20,6 @@ class ResearchCliTest(unittest.TestCase):
         self.assertEqual(
             [definition.strategy_id for definition in definitions],
             [
-                "a_share_b1_trend_pullback",
-                "a_share_price_baseline",
                 "etf_low_volatility_gate",
                 "etf_trend_120d",
                 "etf_volatility_managed",
@@ -59,7 +57,7 @@ class ResearchCliTest(unittest.TestCase):
         payload = json.loads(output.getvalue())
         self.assertEqual(exit_code, 0)
         self.assertEqual(payload["status"], "ok")
-        self.assertEqual(len(payload["strategies"]), 6)
+        self.assertEqual(len(payload["strategies"]), 4)
         self.assertEqual(
             set(payload["strategies"][0]),
             {

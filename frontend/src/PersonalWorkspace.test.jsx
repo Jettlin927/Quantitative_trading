@@ -73,7 +73,6 @@ describe('个人美股 synthetic tracer', () => {
     const personalClient = {
       openToday: vi.fn(() => Promise.resolve({
         trace: null,
-        record: null,
         portfolio,
         attention_items: [{ attention_id: 'attention-1', symbol: 'BETA', label: '行情待恢复', result: 'insufficient_data', reason_code: 'provider_unavailable' }],
       })),
@@ -93,21 +92,19 @@ describe('个人美股 synthetic tracer', () => {
     expect(await screen.findByRole('heading', { name: '手工美股持仓' })).toBeInTheDocument()
   })
 
-  it('标准 URL 七区路由以 /today 为根，A 股留在市场次级入口', () => {
-    const personalClient = { openToday: vi.fn(() => Promise.resolve({ trace, record: null })) }
+  it('标准 URL 五区路由以 /today 为根，只保留美股工作区入口', () => {
+    const personalClient = { openToday: vi.fn(() => Promise.resolve({ trace })) }
     render(<App readAdapter={noOpReadAdapter} personalClient={personalClient} />)
 
-    for (const name of ['今日工作台', '我的持仓', '市场与标的', '规则与策略', '研究驾驶舱', '研究记录', '数据与系统']) {
+    for (const name of ['今日工作台', '我的持仓', '市场与标的', '规则与策略', '数据与系统']) {
       expect(screen.getByRole('button', { name: new RegExp(name) })).toBeInTheDocument()
     }
-    expect(screen.getByRole('button', { name: /A 股数据/ })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /A 股数据/ }))
-    expect(screen.getByRole('button', { name: /市场与标的/ })).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByRole('button', { name: /研究记录|研究驾驶舱|A 股数据|美股数据/ })).not.toBeInTheDocument()
   })
 
   it('个人首页不加载其他工作区的全局数据', async () => {
     const readAdapter = vi.fn(noOpReadAdapter)
-    const personalClient = { openToday: vi.fn(() => Promise.resolve({ trace, record: null })) }
+    const personalClient = { openToday: vi.fn(() => Promise.resolve({ trace })) }
 
     render(<App initialPath="/today" readAdapter={readAdapter} personalClient={personalClient} />)
 
@@ -117,10 +114,9 @@ describe('个人美股 synthetic tracer', () => {
     ])
   })
 
-  it('K 线先于证据预览，四态不用颜色区分，provider unavailable 不阻断显式保存', async () => {
+  it('K 线先于证据预览，四态不用颜色区分，provider unavailable 不恢复记录保存', async () => {
     const personalClient = {
-      openToday: vi.fn(() => Promise.resolve({ trace, record: null })),
-      saveSyntheticRecord: vi.fn(() => Promise.resolve({ record_id: 'record-001', version: 1, status: 'saved', synthetic: true })),
+      openToday: vi.fn(() => Promise.resolve({ trace })),
     }
     const chartAdapter = { create: vi.fn(() => ({ setData: vi.fn(), setRange: vi.fn(), resize: vi.fn(), dispose: vi.fn() })) }
     render(<App initialPath="/today" readAdapter={noOpReadAdapter} personalClient={personalClient} chartAdapter={chartAdapter} />)
@@ -136,10 +132,6 @@ describe('个人美股 synthetic tracer', () => {
     expect(chart.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Provider 恢复后可追问' })).toBeDisabled()
 
-    fireEvent.click(screen.getByRole('button', { name: '确认并保存合成记录' }))
-    await waitFor(() => expect(personalClient.saveSyntheticRecord).toHaveBeenCalledWith(expect.objectContaining({
-      analysisId: 'analysis-001', previewSha256: 'a'.repeat(64),
-    })))
-    expect(await screen.findByText('合成记录 v1 已保存')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /保存.*记录/ })).not.toBeInTheDocument()
   })
 })

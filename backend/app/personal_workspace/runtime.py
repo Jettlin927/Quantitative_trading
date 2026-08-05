@@ -17,7 +17,6 @@ from .analysis import (
 from .contracts import PersonalActor
 from .crypto import PersonalDataCipher, load_keyring_file
 from .journey import PersonalResearchJourney
-from .notebook import PostgresNotebookStore, ResearchNotebook
 from .official_evidence_runtime import load_official_analysis_evidence_reader
 from .instrument import (
     InstrumentEvent,
@@ -152,13 +151,6 @@ def get_personal_runtime() -> PersonalRuntime:
                 request_actor.actor_id, now
             ),
         )
-    notebook = ResearchNotebook(
-        store=PostgresNotebookStore(session_factory, cipher=cipher),
-        analyses=analysis_store,
-        challenge_key=sha256(
-            f"personal-record-purge|{gateway_token}".encode("utf-8")
-        ).digest(),
-    )
     return PersonalRuntime(
         access=PersonalAccessConfig(
             gateway_token=gateway_token,
@@ -177,7 +169,6 @@ def get_personal_runtime() -> PersonalRuntime:
         instruments=instruments,
         rules=rules,
         analyses=analyses,
-        notebook=notebook,
         analysis_provider=personal_analysis_provider,
         analysis_dispatch_enabled=provider_available,
         analysis_disabled_reason=None if provider_available else "provider_disabled",

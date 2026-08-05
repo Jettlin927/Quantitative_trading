@@ -29,39 +29,21 @@ def parse_date(value: str) -> date:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="按显式研究切片执行只读数据质量检查并登记结果。")
-    parser.add_argument("--scope", required=True, choices=["a_share_cross_section", "etf_time_series"])
+    parser.add_argument("--scope", required=True, choices=["etf_time_series"])
     parser.add_argument("--start-date", required=True, type=parse_date)
     parser.add_argument("--end-date", required=True, type=parse_date)
     parser.add_argument(
         "--universe",
         nargs="+",
         default=[],
-        help="显式 universe 的证券代码；历史行业 universe 必须省略。",
+        help="显式 ETF universe 的证券代码。",
     )
     parser.add_argument(
         "--universe-type",
-        choices=[
-            "explicit_snapshot",
-            "static_current",
-            "industry_membership",
-            "industry_level_membership",
-        ],
+        choices=["explicit_snapshot", "static_current"],
         default="explicit_snapshot",
     )
-    parser.add_argument("--universe-source", help="股票池文件、配置或历史成员来源标识。")
-    parser.add_argument(
-        "--universe-source-key",
-        help="industry_membership 的唯一规范化行业代码。",
-    )
-    parser.add_argument(
-        "--universe-classification-src",
-        help="industry_level_membership 的行业分类来源，例如 SW2021。",
-    )
-    parser.add_argument(
-        "--universe-classification-level",
-        choices=["L1", "L2", "L3"],
-        help="industry_level_membership 的行业层级。",
-    )
+    parser.add_argument("--universe-source", help="ETF 股票池文件或配置来源标识。")
     parser.add_argument("--universe-as-of-date", type=parse_date, help="显式快照的形成日期。")
     parser.add_argument("--required-datasets", nargs="*", choices=sorted(SUPPORTED_DATASETS), default=[])
     parser.add_argument("--benchmark")
@@ -82,9 +64,6 @@ def main(argv: list[str] | None = None) -> int:
             universe=universe,
             universe_type=args.universe_type,
             universe_source=args.universe_source,
-            universe_source_key=args.universe_source_key,
-            universe_classification_src=args.universe_classification_src,
-            universe_classification_level=args.universe_classification_level,
             universe_as_of_date=args.universe_as_of_date,
             required_datasets=args.required_datasets,
             benchmark=args.benchmark,

@@ -1,70 +1,38 @@
 # 美股数据边界
 
-仓库同时保留两条严格隔离的数据线：旧 `assets` / `asset_daily_prices` 是 sample 开发夹具；`us_experiment_*` 是免费公开源驱动的实际市场实验数据。两者都不能冒充研究级数据，也不能单独支持正式研究结论。
+美股是当前产品主线。在线市场观察通过 Alpaca adapter 按用途授权读取，个人持仓只由用户手工维护；正式研究仍需独立满足 point-in-time、历史 universe、许可、质量、冻结快照和人工批准合同。
 
-## 免费实验合同
+## 当前数据线
 
-- 当前标的目录通过 AKShare `stock_us_spot_em` 获取 Eastmoney `m:105,m:106,m:107` 全量快照，不设置人工票数上限。2026-07-21 现场发现 13,672 个代码；该数值会随目录变化，不是固定承诺。
-- 主日线通过 yfinance 分批获取，显式使用 `interval=1d`、`auto_adjust=false`，保存 raw OHLCV、Adj Close、现金分红与拆股比例。
-- 目标回填起点为 `2010-01-01`；上市较晚或源端历史不足的标的，以实际最早可得日留痕。
-- AKShare `stock_us_hist(adjust="")` 只对每日确定性轮换样本和 yfinance 失败代码做同日校验；结果写入 `us_experiment_daily_checks`，绝不覆盖 yfinance 主表。
-- API 与前端固定返回 `isExperimental=true`、`researchEligible=false`、`executionEnabled=false`。
-- 当前目录不是历史 point-in-time universe，退市代码、历史成分、数据许可和长期可复现性仍是正式研究门禁。
+### Alpaca 市场观察
 
-当全市场目录源不可用时，可切换为 Git 忽略的显式 ticker 名单。该模式使用 `TGT.SYMBOL` 隔离命名空间，只保存 ticker 和 yfinance 行情，不伪造 NASDAQ/NYSE 归属，不保存账户、持仓、成交或邮件来源。API 和前端必须显示“显式目标名单；非全市场目录”。之后全市场刷新成功时，`TGT` 标的会退出 current 目录，历史事实继续保留。
+- `backend/app/market_observation/` 负责 Alpaca 适配、来源健康、用途授权和追加式授权注册。
+- API、个人标的页、规则和 AI 工具必须显式声明用途；凭据或授权缺失时返回 unavailable/fail-closed，不伪造价格或零值。
+- 在线观察只代表其 `as_of` 时点和授权范围，不能自动晋升为正式研究证据。
 
-## 表与只读接口
+### 私有个人上下文
 
-- `us_experiment_instruments`：当前目录、数据源代码、Yahoo 映射和逐标的同步状态。
-- `us_experiment_daily_bars`：yfinance 主日线。
-- `us_experiment_daily_checks`：AKShare 独立对照。
-- `GET /api/us-experiment/overview`：只读取已持久化的重型覆盖汇总、近期任务、失败标的和校验异常，不执行聚合写入。
-- `GET /api/us-experiment/sync-jobs`：分页读取带实验边界标识的目录、日线与覆盖快照任务。
-- `GET /api/us-experiment/instruments`
-- `GET /api/us-experiment/daily-checks`：分页读取逐票两源 OHLCV、差异、状态与错误，可按代码、状态和日期过滤。
-- `GET /api/us-experiment/instruments/{source_code}/daily-bars`
+- 持仓、现金、成本、规则与分析存放在隔离的 `private_workbench` schema，并按私有工作台安全合同访问。
+- 持仓只接受用户手工命令；不连接券商、不读取真实订单、不从 Gmail 或 broker export 自动同步。
+- Alpaca/DeepSeek secret 只通过只读文件注入被授权进程，不进入源码、数据库、日志或浏览器。
 
-## 回填与每日同步
+### 正式研究
 
-首次或断点回填通过持久 Worker 分批执行：
+- `backend/app/quant_research/` 保存与券商无副作用的运行、评价和复现内核。
+- 实际市场观察、个人持仓、合成夹具和正式研究证据必须保持 schema、权限和结论隔离。
+- 研究运行成功不等于研究通过；正式结论只来自获批冻结计划的结构化评价与一致发布。
 
-```bash
-python3 scripts/ops/backfill_us_experiment.py --start-date 2010-01-01 --end-date 2026-07-21
-```
+## 已退役数据线
 
-显式目标名单每行一个 Yahoo ticker，允许空行和 `#` 注释，不接受纯数字代码。名单文件不得提交到 Git：
+- `us_experiment_*` 的 AKShare 目录、yfinance 主日线、双源校验、回填、checkpoint、cron、API 和前端入口已退役。
+- 旧 `assets` / `asset_daily_prices` sample 预览、`my_quant/us_research` 观察池及 `my_quant/us_holdings` HSBC ledger 已退出当前代码路径。
+- 对应历史表仍可存在于 Alembic schema；历史研究文档继续作为当时证据保留，但不能当作当前操作手册或研究级数据。
 
-```bash
-python3 scripts/ops/backfill_us_experiment.py --source-codes-file /srv/quantitative-trading/private/us-market-symbols.txt --start-date 2010-01-01 --validation-sample-size 0
-```
+本地与 CI 测试只需建立完整 schema 并插入合成数据，不调用上述退役源。未来若要恢复任何第三方源，必须新建设计与授权，不得借历史表名绕过 [ADR 0010](../../adr/0010-us-first-workbench-and-retired-legacy-data-paths.md)。
 
-显式名单模式不调用 AKShare 逐票校验；yfinance 成功票继续落库，限流、无效或无历史的 ticker 会按票留下失败事实。
+## 运维与验证
 
-回填默认每批 20 票、批间等待 5 秒，重试采用 15 秒起的指数退避；yfinance 内部线程关闭，避免批次外并发绕过限速。仍有失败标的或校验异常时脚本返回退出码 `2`，shell/cron 不会打印完整成功。
-
-checkpoint 位于被 Git 忽略的 `outputs/us-experiment-checkpoints/`，并保留尚未解除的校验异常事实。整轮结束后通过持久 Worker 的 `us_experiment_overview_refresh` 任务执行一次覆盖快照聚合；普通页面读取不会写库或扫描全量日线和校验表。每日任务使用最近 10 个日历日的短窗口，以覆盖周末、节假日和短暂停机：
-
-```bash
-scripts/ops/sync_us_experiment_daily.sh
-scripts/ops/install_us_experiment_cron.sh
-```
-
-显式名单的每日同步通过环境变量传递私有文件路径，crontab 只保存路径，不嵌入 ticker：
-
-```bash
-SOURCE_CODES_FILE=/srv/quantitative-trading/private/us-market-symbols.txt scripts/ops/install_us_experiment_cron.sh
-```
-
-cron 固定为 `CRON_TZ=Asia/Shanghai` 的每日 `10:00`。安装 cron、执行 migration、全量回填和部署生产是不同操作，不能因代码合入而自动发生。
-
-## Sample 保留边界
-
-- 只读预览 `my_quant/us_research/` 的 sample 资产、快照和观察池。
-- 将 sample 数据幂等写入明确标注的 sample schema。
-- 在 API 和前端继续显著展示 sample 身份与限制。
-
-## 历史实施记录
-
-- [数据库确认清单（2026-06-27）](../../archive/data/us/us-db-confirmation-checklist-2026-06-27.md)
-- [sample schema 实施记录（2026-06-27）](../../archive/data/us/us-sample-db-schema-implementation-2026-06-27.md)
-- [sample 只读 API 记录（2026-06-27）](../../archive/data/us/us-sample-readonly-api-2026-06-27.md)
+- 私有 secret 与 Compose 覆盖：[个人工作台生产 secret](../../operations/personal-workbench-secrets.md)
+- schema 与 PostgreSQL 集成验证：[变更验证](../../agents/validation.md)
+- 正式研究资格：[量化研究可信合同](../../research/contracts/quant-foundation-trust-contract.md)
+- 当前方向：[ADR 0010](../../adr/0010-us-first-workbench-and-retired-legacy-data-paths.md)

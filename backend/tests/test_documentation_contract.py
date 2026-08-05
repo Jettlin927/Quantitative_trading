@@ -119,11 +119,9 @@ class DocumentationContractTest(unittest.TestCase):
             with self.subTest(target=target):
                 self.assertIn(f"]({target})", index)
 
-    def test_strategy_result_path_remains_compatible(self) -> None:
+    def test_historical_strategy_results_remain_archived(self) -> None:
         results_root = DOCS_ROOT / "research" / "strategy-results"
         self.assertTrue((results_root / "manifest.json").is_file())
-        implementation = (REPO_ROOT / "backend" / "app" / "strategy_results.py").read_text(encoding="utf-8")
-        self.assertIn('repo_root / "docs" / "research" / "strategy-results"', implementation)
 
     def test_strategy_conclusion_terms_match_the_domain_contract(self) -> None:
         standard = (

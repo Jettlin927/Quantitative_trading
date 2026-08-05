@@ -26,7 +26,6 @@ from backend.app.github_research import (
     poll_research_issues_once,
 )
 from backend.app.models import (
-    DataSyncJob,
     FormalResearch,
     FrozenResearchPlan,
     ResearchEvent,
@@ -54,7 +53,6 @@ from backend.app.research_plan import (
 )
 from backend.app.research_publication import PublicationConflictError
 from backend.app import research_worker
-from backend.app import sync_worker
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -2169,38 +2167,6 @@ class ResearchWorkerTest(unittest.TestCase):
             self.assertEqual(work.status, "succeeded")
             self.assertEqual(orchestration.state, "stopped")
             self.assertEqual(formal.phase, "stopped")
-
-    def test_data_sync_and_formal_research_do_not_claim_concurrently(self) -> None:
-        approved_issue_graph(self.Session, issue_number=912)
-        research_claim = research_worker.claim_next_research_work(
-            "research-worker",
-            github_available=True,
-            session_factory=self.Session,
-            now=NOW,
-            lease_seconds=30,
-        )
-        self.assertIsNotNone(research_claim)
-        with self.Session.begin() as db:
-            db.add(
-                DataSyncJob(
-                    id="sync-after-research",
-                    action="trade_calendar",
-                    status="queued",
-                    payload={},
-                    payload_hash="s" * 64,
-                    active_key="sync-after-research",
-                    next_attempt_at=NOW,
-                )
-            )
-        self.assertIsNone(
-            sync_worker.claim_next_job(
-                "data-worker",
-                session_factory=self.Session,
-                now=NOW,
-                lease_seconds=30,
-            )
-        )
-
 
 @unittest.skipUnless(
     os.getenv("TEST_RESEARCH_WORKER_POSTGRES_URL"),

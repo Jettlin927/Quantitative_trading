@@ -108,7 +108,6 @@ for service_name, (source, target) in expected_mounts.items():
     assert mount["target"] == target, (service_name, mount)
     assert mount.get("bind", {}).get("create_host_path") in (None, False), (service_name, mount)
 
-assert services["worker"].get("volumes", []) == [], services["worker"].get("volumes")
 assert services["frontend"].get("volumes", []) == [], services["frontend"].get("volumes")
 assert not config.get("volumes"), config.get("volumes")
 research_worker = services["research-worker"]
@@ -120,7 +119,7 @@ assert research_worker["environment"]["RESEARCH_MAX_MEMORY_MIB"] == "768"
 
 memory_total = 0
 cpu_total = 0.0
-for service_name in ("db", "api", "worker", "frontend"):
+for service_name in ("db", "api", "frontend"):
     service = services[service_name]
     memory_total += int(service["mem_limit"])
     cpu_total += float(service["cpus"])
@@ -248,7 +247,7 @@ for service_name, service in services.items():
     assert official_environment.isdisjoint(environment), service_name
     assert targets.isdisjoint(official_targets), (service_name, targets)
 
-for service_name in ("worker", "research-worker"):
+for service_name in ("research-worker",):
     service = services[service_name]
     environment = service.get("environment", {})
     assert "PRIVATE_DATABASE_URL" not in environment, service_name

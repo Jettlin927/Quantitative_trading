@@ -1,5 +1,0 @@
-ticker,name,role,theme,subtheme,instrument_type,leverage_factor,risk_tag,notes
-NVDA,NVIDIA,holding,AI infrastructure,accelerator,equity,1,core,sample watchlist row, not a real position
-MU,Micron,watch,AI infrastructure,memory,equity,1,cyclical,sample watchlist row, not a real position
-VRT,Vertiv,watch,AI infrastructure,power and cooling,equity,1,infrastructure,sample watchlist row, not a real position
-SOXL,Direxion Daily Semiconductor Bull 3X Shares,watch,AI infrastructure,leveraged semiconductor ETF,leveraged ETF,3,leveraged,sample leveraged risk row, not a real position

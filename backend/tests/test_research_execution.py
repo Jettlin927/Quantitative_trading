@@ -26,11 +26,7 @@ from backend.app.quant_research.runner import (
     mark_stale_research_runs,
 )
 from backend.app.quant_research.snapshot import SnapshotCapacityPolicy
-from backend.tests.research_test_support import (
-    a_share_snapshot_config,
-    create_golden_database,
-    golden_run_config,
-)
+from backend.tests.research_test_support import create_golden_database, golden_run_config
 
 
 class UnsupportedConfigValue:
@@ -242,20 +238,6 @@ class ResearchExecutionTest(unittest.TestCase):
                         )
                     self.assertEqual(raised.exception.category, "request")
                     self.assertIsInstance(raised.exception.__cause__, TypeError)
-            self.assertIsNone(db.scalar(select(ResearchRun)))
-
-    def test_strategy_specific_type_error_is_a_request_rejection(self) -> None:
-        config = a_share_snapshot_config(self.config["qualityRunId"])
-        config["targetWeightParameters"]["maxWeight"] = None
-
-        with Session(self.engine) as db:
-            with self.assertRaises(RequestRejected) as raised:
-                execute(
-                    ExecutionRuntime(registry_db=db, output_root=self.output_root),
-                    StartRun(config=config),
-                )
-            self.assertEqual(raised.exception.category, "request")
-            self.assertIsInstance(raised.exception.__cause__, TypeError)
             self.assertIsNone(db.scalar(select(ResearchRun)))
 
     def test_pipeline_type_error_remains_an_execution_failure(self) -> None:

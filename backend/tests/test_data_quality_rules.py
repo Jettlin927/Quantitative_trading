@@ -4,10 +4,10 @@ import unittest
 from datetime import date, datetime, timezone
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pandas as pd
+from pydantic import ValidationError
 from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -39,10 +39,6 @@ from backend.app.models import (
 )
 from backend.app.quant_research.readiness import evaluate_quality_run_readiness, evaluate_research_readiness
 from backend.app.schemas import DataQualityRunRequest
-from scripts.research.check_data_quality import (
-    main as quality_cli_main,
-    parse_args as parse_quality_cli_args,
-)
 
 
 class DataQualityRulesTest(unittest.TestCase):
@@ -182,6 +178,19 @@ class DataQualityRulesTest(unittest.TestCase):
 
         self.assertEqual(summarize_quality_status(results), "ready")
         self.assertTrue(all(result.status == "passed" for result in results))
+
+    def test_public_quality_request_only_exposes_etf_scope(self):
+        with self.assertRaises(ValidationError):
+            DataQualityRunRequest(
+                scope="a_share_cross_section",
+                start_date=date(2026, 1, 2),
+                end_date=date(2026, 1, 5),
+                universe=["000001.SZ"],
+            )
+
+        self.assertNotIn("universe_source_key", DataQualityRunRequest.model_fields)
+        self.assertNotIn("universe_classification_src", DataQualityRunRequest.model_fields)
+        self.assertNotIn("universe_classification_level", DataQualityRunRequest.model_fields)
 
     def test_unlisted_limit_prices_are_warning_and_samples_are_capped(self):
         with Session(self.engine) as db:
@@ -389,18 +398,20 @@ class DataQualityRulesTest(unittest.TestCase):
 
     def test_verified_observed_financial_revisions_pass_point_in_time_gate(self):
         with Session(self.engine) as db:
-            row = main.financial_indicator_record_to_row(
-                {
-                    "ts_code": "000001.SZ",
-                    "ann_date": "20251231",
-                    "end_date": "20250930",
-                    "roe": "10.5",
-                    "update_flag": "1",
-                },
-                source_observed_at=datetime(2025, 12, 31, 10, 0, tzinfo=timezone.utc),
-                available_from=date(2026, 1, 2),
+            db.add(
+                StockFinancialIndicator(
+                    ts_code="000001.SZ",
+                    ann_date=date(2025, 12, 31),
+                    end_date=date(2025, 9, 30),
+                    roe=10.5,
+                    source_update_flag="1",
+                    source_revision_sha256="a" * 64,
+                    source_observed_at=datetime(2025, 12, 31, 10, 0, tzinfo=timezone.utc),
+                    available_from=date(2026, 1, 2),
+                    revision_status="observed",
+                )
             )
-            main.insert_financial_revision_rows(db, [row])
+            db.commit()
 
         results = self.evaluate(
             self.contract(required_datasets=["stock_financial_indicators"])
@@ -518,12 +529,30 @@ class DataQualityRulesTest(unittest.TestCase):
         )
 
     def test_api_runs_quality_and_research_readiness_requires_quality_run(self):
+        with Session(self.engine) as db:
+            db.add(Fund(ts_code="510300.SH", name="合成 ETF", market="E", fund_type="ETF"))
+            for trade_date, close in [(date(2026, 1, 2), 680), (date(2026, 1, 5), 682)]:
+                db.add(
+                    FundDailyBar(
+                        ts_code="510300.SH",
+                        trade_date=trade_date,
+                        open=close,
+                        high=close + 1,
+                        low=close - 1,
+                        close=close,
+                        vol=100,
+                        amount=1000,
+                    )
+                )
+                db.add(FundAdjustFactor(ts_code="510300.SH", trade_date=trade_date, adj_factor=1))
+            db.commit()
+
         payload = DataQualityRunRequest(
-            scope="a_share_cross_section",
+            scope="etf_time_series",
             start_date=date(2026, 1, 2),
             end_date=date(2026, 1, 5),
-            universe=["000001.SZ"],
-            universe_source="backend/tests/fixtures/quality-universe.txt",
+            universe=["510300.SH"],
+            universe_source="backend/tests/fixtures/etf-universe.txt",
             universe_as_of_date=date(2026, 1, 2),
             benchmark="000300.SH",
         )
@@ -540,121 +569,6 @@ class DataQualityRulesTest(unittest.TestCase):
         self.assertEqual(readiness["level"], "research")
         self.assertEqual(readiness["status"], "ready")
         self.assertTrue(readiness["researchReady"])
-
-    def test_cli_exit_codes_distinguish_ready_blocked_and_failed(self):
-        with TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "quality.sqlite3"
-            engine = create_engine(f"sqlite+pysqlite:///{db_path}")
-            Base.metadata.create_all(engine)
-            try:
-                with Session(engine) as target, Session(self.engine) as source:
-                    for row in source.scalars(select(TradeCalendar)).all():
-                        target.add(
-                            TradeCalendar(
-                                exchange=row.exchange,
-                                cal_date=row.cal_date,
-                                is_open=row.is_open,
-                                pretrade_date=row.pretrade_date,
-                            )
-                        )
-                    for model in [StockListing, Index, StockDailyBar, StockAdjustFactor, StockLimitPrice, IndexDailyBar]:
-                        for row in source.scalars(select(model)).all():
-                            values = {
-                                column.name: getattr(row, column.name)
-                                for column in model.__table__.columns
-                                if column.name != "id"
-                            }
-                            target.add(model(**values))
-                    target.commit()
-            finally:
-                engine.dispose()
-
-            args = [
-                "--scope",
-                "a_share_cross_section",
-                "--start-date",
-                "2026-01-02",
-                "--end-date",
-                "2026-01-05",
-                "--universe",
-                "000001.SZ",
-                "--universe-source",
-                "backend/tests/fixtures/quality-universe.txt",
-                "--universe-as-of-date",
-                "2026-01-02",
-                "--benchmark",
-                "000300.SH",
-                "--database-url",
-                f"sqlite+pysqlite:///{db_path}",
-            ]
-            with patch("builtins.print"):
-                self.assertEqual(quality_cli_main(args), 0)
-
-            engine = create_engine(f"sqlite+pysqlite:///{db_path}")
-            try:
-                with Session(engine) as db:
-                    db.delete(
-                        db.scalar(
-                            select(StockAdjustFactor).where(
-                                StockAdjustFactor.ts_code == "000001.SZ",
-                                StockAdjustFactor.trade_date == date(2026, 1, 5),
-                            )
-                        )
-                    )
-                    db.commit()
-            finally:
-                engine.dispose()
-            with patch("builtins.print"):
-                self.assertEqual(quality_cli_main(args), 2)
-                self.assertEqual(quality_cli_main([*args[:-1], "not-a-database-url"]), 3)
-
-    def test_cli_accepts_industry_source_key_without_inline_members(self):
-        args = parse_quality_cli_args(
-            [
-                "--scope",
-                "a_share_cross_section",
-                "--start-date",
-                "2025-06-02",
-                "--end-date",
-                "2026-06-29",
-                "--universe-type",
-                "industry_membership",
-                "--universe-source",
-                "industry_members",
-                "--universe-source-key",
-                "801080.SI",
-                "--benchmark",
-                "000300.SH",
-            ]
-        )
-        self.assertEqual(args.universe, [])
-        self.assertEqual(args.universe_source_key, "801080.SI")
-
-    def test_cli_accepts_industry_classification_scope_without_inline_members(self):
-        args = parse_quality_cli_args(
-            [
-                "--scope",
-                "a_share_cross_section",
-                "--start-date",
-                "2025-06-02",
-                "--end-date",
-                "2026-06-29",
-                "--universe-type",
-                "industry_level_membership",
-                "--universe-source",
-                "industry_classifications+industry_members",
-                "--universe-classification-src",
-                "SW2021",
-                "--universe-classification-level",
-                "L1",
-                "--benchmark",
-                "H00985.CSI",
-            ]
-        )
-        self.assertEqual(args.universe, [])
-        self.assertEqual(args.universe_classification_src, "SW2021")
-        self.assertEqual(args.universe_classification_level, "L1")
-
 
 class DataQualityRegistryAndReadinessTest(unittest.TestCase):
     def test_registry_constraints_and_migration_parent_are_explicit(self):

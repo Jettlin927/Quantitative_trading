@@ -23,16 +23,12 @@ CLASSIFICATIONS = {
     "active_architecture",
     "compatibility_entry",
     "historical_evidence",
-    "legacy_executable_candidate",
 }
 REQUIRED_COVERAGE = {
     "registry",
     "cli",
     "renderer",
     "migration",
-    "ma",
-    "value_sector",
-    "sample",
     "report",
     "config",
 }
@@ -58,18 +54,11 @@ EXPECTED_ENTRY_CLASSIFICATIONS = {
     "active.research_plan_cli": "active_architecture",
     "active.research_worker": "active_architecture",
     "compat.history_issue_mapping_cli": "compatibility_entry",
-    "candidate.audit_cli": "legacy_executable_candidate",
     "compat.render_etf_volatility_managed": "compatibility_entry",
     "compat.render_etf_trend_120d": "compatibility_entry",
-    "compat.render_a_share_b1": "compatibility_entry",
     "compat.history_migration_cli": "compatibility_entry",
-    "candidate.ma_executable": "legacy_executable_candidate",
-    "candidate.value_sector_executable": "legacy_executable_candidate",
     "active.inventory_verifier": "active_architecture",
-    "active.sample_snapshot": "active_architecture",
-    "compat.strategy_results_projection": "compatibility_entry",
     "historical.published_reports": "historical_evidence",
-    "active.a_share_b1_long_history_config": "active_architecture",
     "historical.us_trade_migration_inventory": "historical_evidence",
 }
 EXPECTED_ENTRY_PATHS = {
@@ -81,29 +70,20 @@ EXPECTED_ENTRY_PATHS = {
     "active.research_plan_cli": "backend/app/research_plan.py",
     "active.research_worker": "backend/app/research_worker.py",
     "compat.history_issue_mapping_cli": "scripts/research/register_historical_issue_mapping.py",
-    "candidate.audit_cli": "scripts/research/audit_quant_research.py",
     "compat.render_etf_volatility_managed": "scripts/research/render_etf_volatility_managed_report.py",
     "compat.render_etf_trend_120d": "scripts/research/render_etf_trend_120d_report.py",
-    "compat.render_a_share_b1": "scripts/research/render_a_share_b1_report.py",
     "compat.history_migration_cli": "scripts/research/migrate_research_history.py",
-    "candidate.ma_executable": "scripts/research/run_ma_strategy_stats.py",
-    "candidate.value_sector_executable": "scripts/research/run_value_sector_strategy.py",
     "active.inventory_verifier": "scripts/research/verify_entrypoint_inventory.py",
-    "active.sample_snapshot": "my_quant/us_research/scripts/refresh_us_snapshot.py",
-    "compat.strategy_results_projection": "backend/app/strategy_results.py",
     "historical.published_reports": "docs/research/strategy-results",
-    "active.a_share_b1_long_history_config": "configs/research/a_share_b1_long_history.json",
     "historical.us_trade_migration_inventory": "docs/research/us-trade-migration-inventory-2026-07-22.md",
 }
 MANAGED_EXECUTABLE_ROOTS = (
     "scripts/research",
-    "my_quant/us_research/scripts",
     "backend/app",
 )
 OUT_OF_SCOPE_DATA_EXECUTABLE_PATHS = {
     "backend/app/database.py",
     "backend/app/personal_analysis_worker.py",
-    "backend/app/sync_worker.py",
 }
 EXCLUDED_DISCOVERY_DIRECTORIES = {
     ".mypy_cache",
@@ -320,11 +300,7 @@ def verify_inventory(inventory_path: Path, repo_root: Path = REPO_ROOT) -> list[
             errors.append(f"{prefix} 的 stable_behavior 必须是非空字符串")
 
         retirement_conditions = entry.get("retirement_conditions")
-        if classification == "legacy_executable_candidate" and not _non_empty_strings(
-            retirement_conditions
-        ):
-            errors.append(f"{prefix} 候选入口缺少退役条件")
-        elif not _non_empty_strings(retirement_conditions):
+        if not _non_empty_strings(retirement_conditions):
             errors.append(f"{prefix} 的 retirement_conditions 必须是非空字符串数组")
 
         for field, label in (("test_seams", "测试 seam"), ("stable_references", "稳定引用")):
