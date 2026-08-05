@@ -90,6 +90,26 @@ describe('PersonalJourneyClient', () => {
     ])
   })
 
+  it('权益历史只请求 limit 参数并返回同一端点投影', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({
+      currency: 'USD',
+      snapshots: [
+        { market_day: '2026-08-03', total_equity: '241.0000', after_close: true },
+      ],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    const client = new PersonalJourneyClient({ fetcher })
+
+    const result = await client.openEquityHistory({ limit: 30 })
+
+    const firstCall = /** @type {any[]} */ (fetcher.mock.calls[0])
+    expect(firstCall[0]).toBe('/api/personal/portfolio/equity-history?limit=30')
+    expect(result.snapshots).toHaveLength(1)
+    expect(result.snapshots[0].market_day).toBe('2026-08-03')
+  })
+
   it('AI 只发送问题、对象 ID 与 preview hash，不回传行情或模型正文', async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ status: 'ready' }), {
       status: 202,

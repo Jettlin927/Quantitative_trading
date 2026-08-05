@@ -4,23 +4,26 @@ import base64
 from concurrent.futures import ThreadPoolExecutor, wait
 from copy import deepcopy
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, time, timezone
 from decimal import Decimal
 from hashlib import sha256
 import hmac
 import json
 import os
 import re
-from typing import Callable, Literal, Protocol
+from typing import Any, Callable, Literal, Mapping, Protocol, Sequence
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from backend.app.models import (
     PersonalAuditEvent,
+    PersonalEquitySnapshot,
     PersonalHolding,
     PersonalPortfolioRevision,
+    PersonalPriceObservation,
     PersonalRecordPrivateFragment,
     PersonalRedactionEvent,
     PersonalWorkspace,
@@ -55,6 +58,7 @@ class PortfolioPriceObservation:
     feed: str | None
     delay_seconds: int | None
     source_ids: tuple[str, ...]
+    cached: bool = False
 
     @classmethod
     def available(
@@ -113,6 +117,7 @@ class ObservedDecimalView:
     source_ids: tuple[str, ...]
     feed: str | None = None
     delay_seconds: int | None = None
+    cached: bool = False
 
 
 @dataclass(frozen=True)
@@ -277,6 +282,320 @@ class InMemoryPortfolioStore:
         self, *, actor_id: str, idempotency_key: str
     ) -> DeletionReceipt | None:
         return self._purge_receipts.get((actor_id, idempotency_key))
+
+
+_US_MARKET_TZ = ZoneInfo("America/New_York")
+_ET_CLOSE = time(16, 0)
+
+
+@dataclass(frozen=True)
+class EquitySnapshot:
+    market_day: date
+    total_equity: Decimal
+    total_market_value: Decimal
+    usd_cash: Decimal
+    holdings_count: int
+    priced_count: int
+    after_close: bool
+    observed_at: datetime
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class EquitySnapshotView:
+    market_day: str
+    total_equity: str
+    total_market_value: str
+    usd_cash: str
+    holdings_count: int
+    priced_count: int
+    after_close: bool
+    observed_at: datetime
+
+
+class PriceObservationStore(Protocol):
+    def upsert(
+        self, *, actor_id: str, observations: Mapping[str, PortfolioPriceObservation]
+    ) -> None: ...
+
+    def latest(
+        self, *, actor_id: str, symbols: Sequence[str]
+    ) -> dict[str, PortfolioPriceObservation]: ...
+
+
+class InMemoryPriceObservationStore:
+    def __init__(self) -> None:
+        self._by_actor: dict[str, dict[str, PortfolioPriceObservation]] = {}
+
+    def upsert(
+        self, *, actor_id: str, observations: Mapping[str, PortfolioPriceObservation]
+    ) -> None:
+        bucket = self._by_actor.setdefault(actor_id, {})
+        for symbol, observation in observations.items():
+            if observation.availability == "available" and observation.price is not None:
+                bucket[symbol] = observation
+
+    def latest(
+        self, *, actor_id: str, symbols: Sequence[str]
+    ) -> dict[str, PortfolioPriceObservation]:
+        bucket = self._by_actor.get(actor_id, {})
+        return {
+            symbol: replace(bucket[symbol], cached=True, source_health="stale")
+            for symbol in symbols
+            if symbol in bucket
+        }
+
+
+class PostgresPriceObservationStore:
+    def __init__(
+        self,
+        session_factory: Callable[[], Session],
+        *,
+        cipher: PersonalDataCipher,
+    ) -> None:
+        self._session_factory = session_factory
+        self._cipher = cipher
+
+    def upsert(
+        self, *, actor_id: str, observations: Mapping[str, PortfolioPriceObservation]
+    ) -> None:
+        available = {
+            symbol: observation
+            for symbol, observation in observations.items()
+            if observation.availability == "available" and observation.price is not None
+        }
+        if not available:
+            return
+        observed_at = datetime.now(timezone.utc)
+        with self._session_factory() as session, session.begin():
+            workspace = self._workspace(session, actor_id, lock=True)
+            if workspace is None:
+                return
+            for symbol, observation in available.items():
+                symbol_hmac = self._cipher.symbol_lookup(
+                    workspace_id=workspace.id, normalized_symbol=symbol
+                )
+                row = session.scalar(
+                    select(PersonalPriceObservation).where(
+                        PersonalPriceObservation.workspace_id == workspace.id,
+                        PersonalPriceObservation.symbol_hmac == symbol_hmac,
+                    )
+                )
+                envelope = self._cipher.encrypt_json(
+                    _price_payload(observation),
+                    aad=_portfolio_aad(
+                        "personal_price_observations", f"{workspace.id}|{symbol}"
+                    ),
+                )
+                if row is None:
+                    session.add(
+                        PersonalPriceObservation(
+                            id=str(uuid4()),
+                            workspace_id=workspace.id,
+                            symbol_hmac=symbol_hmac,
+                            observed_at=observed_at,
+                            ciphertext=envelope.ciphertext,
+                            nonce=envelope.nonce,
+                            key_id=envelope.key_id,
+                            payload_schema=envelope.payload_schema,
+                        )
+                    )
+                else:
+                    row.observed_at = observed_at
+                    row.ciphertext = envelope.ciphertext
+                    row.nonce = envelope.nonce
+                    row.key_id = envelope.key_id
+                    row.payload_schema = envelope.payload_schema
+
+    def latest(
+        self, *, actor_id: str, symbols: Sequence[str]
+    ) -> dict[str, PortfolioPriceObservation]:
+        if not symbols:
+            return {}
+        with self._session_factory() as session:
+            workspace = self._workspace(session, actor_id, lock=False)
+            if workspace is None:
+                return {}
+            hmac_to_symbol = {
+                self._cipher.symbol_lookup(
+                    workspace_id=workspace.id, normalized_symbol=symbol
+                ): symbol
+                for symbol in symbols
+            }
+            rows = session.scalars(
+                select(PersonalPriceObservation).where(
+                    PersonalPriceObservation.workspace_id == workspace.id,
+                    PersonalPriceObservation.symbol_hmac.in_(tuple(hmac_to_symbol)),
+                )
+            ).all()
+            result: dict[str, PortfolioPriceObservation] = {}
+            for row in rows:
+                symbol = hmac_to_symbol.get(row.symbol_hmac)
+                if symbol is None:
+                    continue
+                payload = self._cipher.decrypt_json(
+                    _portfolio_row_envelope(row),
+                    aad=_portfolio_aad(
+                        "personal_price_observations", f"{workspace.id}|{symbol}"
+                    ),
+                )
+                result[symbol] = PortfolioPriceObservation(
+                    availability="available",
+                    price=Decimal(str(payload["price"])),
+                    reason_code=payload.get("reason_code") or "cached_price_fallback",
+                    source_health="stale",
+                    as_of=_payload_datetime(payload.get("as_of")),
+                    feed=payload.get("feed"),
+                    delay_seconds=payload.get("delay_seconds"),
+                    source_ids=(),
+                    cached=True,
+                )
+            return result
+
+    @staticmethod
+    def _workspace(
+        session: Session, actor_id: str, *, lock: bool
+    ) -> PersonalWorkspace | None:
+        statement = select(PersonalWorkspace).where(
+            PersonalWorkspace.actor_identity_hash == _portfolio_identity_hash(actor_id)
+        )
+        if lock:
+            statement = statement.with_for_update()
+        return session.scalar(statement)
+
+
+class EquitySnapshotStore(Protocol):
+    def upsert(self, *, actor_id: str, snapshot: EquitySnapshot) -> None: ...
+
+    def history(self, *, actor_id: str, limit: int) -> tuple[EquitySnapshotView, ...]: ...
+
+
+class InMemoryEquitySnapshotStore:
+    def __init__(self) -> None:
+        self._by_actor: dict[str, dict[date, EquitySnapshot]] = {}
+
+    def upsert(self, *, actor_id: str, snapshot: EquitySnapshot) -> None:
+        self._by_actor.setdefault(actor_id, {})[snapshot.market_day] = snapshot
+
+    def history(
+        self, *, actor_id: str, limit: int
+    ) -> tuple[EquitySnapshotView, ...]:
+        rows = sorted(
+            self._by_actor.get(actor_id, {}).values(), key=lambda item: item.market_day
+        )
+        return tuple(_snapshot_view(item) for item in rows[-max(limit, 0) :])
+
+
+class PostgresEquitySnapshotStore:
+    def __init__(
+        self,
+        session_factory: Callable[[], Session],
+        *,
+        cipher: PersonalDataCipher,
+    ) -> None:
+        self._session_factory = session_factory
+        self._cipher = cipher
+
+    def upsert(self, *, actor_id: str, snapshot: EquitySnapshot) -> None:
+        with self._session_factory() as session, session.begin():
+            workspace = self._workspace(session, actor_id, lock=True)
+            if workspace is None:
+                return
+            aad = _portfolio_aad(
+                "personal_equity_snapshots",
+                f"{workspace.id}|{snapshot.market_day.isoformat()}",
+            )
+            envelope = self._cipher.encrypt_json(snapshot.payload, aad=aad)
+            row = session.scalar(
+                select(PersonalEquitySnapshot).where(
+                    PersonalEquitySnapshot.workspace_id == workspace.id,
+                    PersonalEquitySnapshot.market_day == snapshot.market_day,
+                )
+            )
+            if row is None:
+                session.add(
+                    PersonalEquitySnapshot(
+                        id=str(uuid4()),
+                        workspace_id=workspace.id,
+                        market_day=snapshot.market_day,
+                        total_equity=snapshot.total_equity,
+                        total_market_value=snapshot.total_market_value,
+                        usd_cash=snapshot.usd_cash,
+                        holdings_count=snapshot.holdings_count,
+                        priced_count=snapshot.priced_count,
+                        after_close=snapshot.after_close,
+                        observed_at=snapshot.observed_at,
+                        ciphertext=envelope.ciphertext,
+                        nonce=envelope.nonce,
+                        key_id=envelope.key_id,
+                        payload_schema=envelope.payload_schema,
+                    )
+                )
+            else:
+                row.total_equity = snapshot.total_equity
+                row.total_market_value = snapshot.total_market_value
+                row.usd_cash = snapshot.usd_cash
+                row.holdings_count = snapshot.holdings_count
+                row.priced_count = snapshot.priced_count
+                row.after_close = snapshot.after_close
+                row.observed_at = snapshot.observed_at
+                row.ciphertext = envelope.ciphertext
+                row.nonce = envelope.nonce
+                row.key_id = envelope.key_id
+                row.payload_schema = envelope.payload_schema
+
+    def history(
+        self, *, actor_id: str, limit: int
+    ) -> tuple[EquitySnapshotView, ...]:
+        if limit <= 0:
+            return ()
+        with self._session_factory() as session:
+            workspace = self._workspace(session, actor_id, lock=False)
+            if workspace is None:
+                return ()
+            rows = session.scalars(
+                select(PersonalEquitySnapshot)
+                .where(PersonalEquitySnapshot.workspace_id == workspace.id)
+                .order_by(PersonalEquitySnapshot.market_day.desc())
+                .limit(limit)
+            ).all()
+            return tuple(
+                EquitySnapshotView(
+                    market_day=row.market_day.isoformat(),
+                    total_equity=_money(row.total_equity),
+                    total_market_value=_money(row.total_market_value),
+                    usd_cash=_money(row.usd_cash),
+                    holdings_count=row.holdings_count,
+                    priced_count=row.priced_count,
+                    after_close=row.after_close,
+                    observed_at=row.observed_at,
+                )
+                for row in reversed(rows)
+            )
+
+    @staticmethod
+    def _workspace(
+        session: Session, actor_id: str, *, lock: bool
+    ) -> PersonalWorkspace | None:
+        statement = select(PersonalWorkspace).where(
+            PersonalWorkspace.actor_identity_hash == _portfolio_identity_hash(actor_id)
+        )
+        if lock:
+            statement = statement.with_for_update()
+        return session.scalar(statement)
+
+
+def _snapshot_view(snapshot: EquitySnapshot) -> EquitySnapshotView:
+    return EquitySnapshotView(
+        market_day=snapshot.market_day.isoformat(),
+        total_equity=_money(snapshot.total_equity),
+        total_market_value=_money(snapshot.total_market_value),
+        usd_cash=_money(snapshot.usd_cash),
+        holdings_count=snapshot.holdings_count,
+        priced_count=snapshot.priced_count,
+        after_close=snapshot.after_close,
+        observed_at=snapshot.observed_at,
+    )
 
 
 class PostgresPortfolioStore:
@@ -635,17 +954,25 @@ class PortfolioBook:
         clock: Callable[[], datetime] | None = None,
         challenge_key: bytes | None = None,
         provider_wait_seconds: float = 1.8,
+        prices: PriceObservationStore | None = None,
+        snapshots: EquitySnapshotStore | None = None,
+        cached_price_max_age_days: int = 7,
     ) -> None:
         if provider_wait_seconds <= 0:
             raise ValueError("provider_wait_seconds_must_be_positive")
+        if cached_price_max_age_days < 0:
+            raise ValueError("cached_price_max_age_days_must_be_non_negative")
         self._store = store
         self._market = market
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._challenge_key = challenge_key or os.urandom(32)
         self._provider_wait_seconds = provider_wait_seconds
+        self._prices = prices or InMemoryPriceObservationStore()
+        self._snapshots = snapshots or InMemoryEquitySnapshotStore()
+        self._cached_price_max_age_days = cached_price_max_age_days
 
     def open(self, actor: PersonalActor) -> PortfolioView:
-        return self._project(self._store.load(actor_id=actor.actor_id))
+        return self._project(actor, self._store.load(actor_id=actor.actor_id))
 
     def average_cost(self, actor: PersonalActor, symbol: str) -> Decimal | None:
         normalized_symbol = _normalize_symbol(symbol)
@@ -654,6 +981,13 @@ class PortfolioBook:
             if holding.symbol == normalized_symbol and holding.state == "active":
                 return holding.average_cost
         return None
+
+    def equity_history(
+        self, actor: PersonalActor, *, limit: int = 120
+    ) -> tuple[EquitySnapshotView, ...]:
+        return self._snapshots.history(
+            actor_id=actor.actor_id, limit=max(1, min(limit, 1000))
+        )
 
     def revise(
         self,
@@ -671,7 +1005,7 @@ class PortfolioBook:
             action=command.type,
             mutate=lambda current: self._apply(current, command),
         )
-        return self._project(state)
+        return self._project(actor, state)
 
     def request_purge(
         self,
@@ -781,7 +1115,7 @@ class PortfolioBook:
         else:
             raise ValueError("invalid_command")
 
-    def _project(self, state: PortfolioState) -> PortfolioView:
+    def _project(self, actor: PersonalActor, state: PortfolioState) -> PortfolioView:
         active = [holding for holding in state.holdings.values() if holding.state == "active"]
         observations: dict[str, PortfolioPriceObservation] = {}
         if active:
@@ -808,6 +1142,8 @@ class PortfolioBook:
                 )
                 for holding_id, future in futures.items()
             }
+            self._persist_available_prices(actor, active, observations)
+            self._apply_cached_fallback(actor, active, observations)
         available = {
             holding.holding_id: observations[holding.holding_id]
             for holding in active
@@ -822,6 +1158,8 @@ class PortfolioBook:
         if available and not all_available:
             issue_values.append("partial_valuation")
         issues = tuple(dict.fromkeys(issue_values))
+        total_equity: Decimal | None = None
+        total_market: Decimal | None = None
         if all_available:
             total_market = sum(
                 (
@@ -855,14 +1193,21 @@ class PortfolioBook:
                 reason_code="partial_valuation",
                 source_health="degraded",
             )
-            total_equity = None
         else:
             reason = issues[0] if issues else "provider_unavailable"
             source_health = _worst_health(observations.values())
             total_market_view = _observed_unavailable(reason, source_health=source_health)
             total_equity_view = _observed_unavailable(reason, source_health=source_health)
-            total_equity = None
 
+        self._write_equity_snapshot(
+            actor,
+            state,
+            active=active,
+            observations=observations,
+            total_equity=total_equity,
+            total_market_value=total_market,
+            priced_count=len(available),
+        )
         holdings = tuple(
             self._holding_view(
                 holding,
@@ -882,6 +1227,99 @@ class PortfolioBook:
             active_holding_count=len(active),
             priced_holding_count=len(available),
             issues=issues,
+        )
+
+    def _persist_available_prices(
+        self,
+        actor: PersonalActor,
+        active: Sequence[HoldingState],
+        observations: Mapping[str, PortfolioPriceObservation],
+    ) -> None:
+        self._prices.upsert(
+            actor_id=actor.actor_id,
+            observations={
+                holding.symbol: observations[holding.holding_id]
+                for holding in active
+                if observations[holding.holding_id].availability == "available"
+            },
+        )
+
+    def _apply_cached_fallback(
+        self,
+        actor: PersonalActor,
+        active: Sequence[HoldingState],
+        observations: dict[str, PortfolioPriceObservation],
+    ) -> None:
+        missing = [
+            holding
+            for holding in active
+            if observations[holding.holding_id].availability != "available"
+        ]
+        if not missing or self._cached_price_max_age_days == 0:
+            return
+        cached = self._prices.latest(
+            actor_id=actor.actor_id, symbols=[holding.symbol for holding in missing]
+        )
+        now = self._clock()
+        for holding in missing:
+            cached_observation = cached.get(holding.symbol)
+            if cached_observation is None or cached_observation.price is None:
+                continue
+            quote_time = cached_observation.as_of or now
+            if quote_time.tzinfo is None:
+                quote_time = quote_time.replace(tzinfo=timezone.utc)
+            if now.tzinfo is None:
+                now = now.replace(tzinfo=timezone.utc)
+            if (now - quote_time) > timedelta(days=self._cached_price_max_age_days):
+                continue
+            observations[holding.holding_id] = cached_observation
+
+    def _write_equity_snapshot(
+        self,
+        actor: PersonalActor,
+        state: PortfolioState,
+        *,
+        active: Sequence[HoldingState],
+        observations: Mapping[str, PortfolioPriceObservation],
+        total_equity: Decimal | None,
+        total_market_value: Decimal | None,
+        priced_count: int,
+    ) -> None:
+        if not active or total_equity is None or total_market_value is None:
+            return
+        now = self._clock()
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        et_now = now.astimezone(_US_MARKET_TZ)
+        if et_now.weekday() >= 5:
+            return
+        payload = {
+            "holdings": [
+                {
+                    "symbol": holding.symbol,
+                    "quantity": str(holding.quantity),
+                    "average_cost": str(holding.average_cost),
+                }
+                for holding in active
+            ],
+            "prices": {
+                holding.symbol: _price_payload(observations.get(holding.holding_id))
+                for holding in active
+            },
+        }
+        self._snapshots.upsert(
+            actor_id=actor.actor_id,
+            snapshot=EquitySnapshot(
+                market_day=et_now.date(),
+                total_equity=total_equity,
+                total_market_value=total_market_value,
+                usd_cash=state.usd_cash,
+                holdings_count=len(active),
+                priced_count=priced_count,
+                after_close=et_now.time() >= _ET_CLOSE,
+                observed_at=now,
+                payload=payload,
+            ),
         )
 
     def _holding_view(
@@ -995,6 +1433,30 @@ def _money(value: Decimal) -> str:
     return format(value.quantize(Decimal("0.0001")), "f")
 
 
+def _price_payload(
+    observation: PortfolioPriceObservation | None,
+) -> dict[str, Any] | None:
+    if observation is None or observation.price is None:
+        return None
+    return {
+        "price": str(observation.price),
+        "feed": observation.feed,
+        "as_of": observation.as_of.isoformat() if observation.as_of else None,
+        "delay_seconds": observation.delay_seconds,
+        "source_health": observation.source_health,
+        "cached": observation.cached,
+    }
+
+
+def _payload_datetime(value: Any) -> datetime | None:
+    if value is None or not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
 def _ratio(value: Decimal) -> str:
     return format(value.quantize(Decimal("0.000001")), "f")
 
@@ -1014,6 +1476,7 @@ def _from_price(
         source_ids=observation.source_ids,
         feed=observation.feed,
         delay_seconds=observation.delay_seconds,
+        cached=observation.cached,
     )
 
 
@@ -1027,6 +1490,7 @@ def _observation_unavailable(observation: PortfolioPriceObservation) -> Observed
         source_ids=observation.source_ids,
         feed=observation.feed,
         delay_seconds=observation.delay_seconds,
+        cached=observation.cached,
     )
 
 

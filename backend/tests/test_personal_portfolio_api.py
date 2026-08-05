@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import unittest
 
@@ -9,7 +9,9 @@ from fastapi.testclient import TestClient
 
 from backend.app.personal_workspace.contracts import PersonalActor
 from backend.app.personal_workspace.portfolio import (
+    InMemoryEquitySnapshotStore,
     InMemoryPortfolioStore,
+    InMemoryPriceObservationStore,
     PortfolioBook,
     PortfolioPriceObservation,
 )
@@ -168,6 +170,99 @@ class PersonalPortfolioApiTest(unittest.TestCase):
             self.client.get("/api/personal/portfolio", headers=self.read_headers).json()["holdings"],
             [],
         )
+
+    def test_equity_history_returns_ordered_daily_snapshots(self) -> None:
+        created = self.add_acme()
+        self.assertEqual(created.status_code, 200)
+        readback = self.client.get("/api/personal/portfolio", headers=self.read_headers)
+        self.assertEqual(readback.status_code, 200)
+
+        response = self.client.get(
+            "/api/personal/portfolio/equity-history?limit=10",
+            headers=self.read_headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["currency"], "USD")
+        snapshots = payload["snapshots"]
+        self.assertTrue(snapshots)
+        latest = snapshots[-1]
+        self.assertEqual(latest["total_equity"], "241.0000")
+        self.assertEqual(latest["total_market_value"], "241.0000")
+        self.assertEqual(latest["usd_cash"], "0.0000")
+        self.assertEqual(latest["holdings_count"], 1)
+        self.assertEqual(latest["priced_count"], 1)
+        self.assertIn("market_day", latest)
+        self.assertIn("observed_at", latest)
+        self.assertIn(latest["after_close"], (True, False))
+        self.assertEqual(
+            [item["market_day"] for item in snapshots],
+            sorted(item["market_day"] for item in snapshots),
+        )
+
+    def test_portfolio_view_marks_cached_fallback_prices(self) -> None:
+        now = datetime(2026, 8, 3, 20, 5, tzinfo=timezone.utc)
+
+        class FlakyMarket:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def observe_price(self, symbol: str) -> PortfolioPriceObservation:
+                self.calls += 1
+                if self.calls <= 2:
+                    return PortfolioPriceObservation.available(
+                        price=Decimal("120.50"),
+                        source_health="fresh",
+                        as_of=now - timedelta(minutes=15),
+                        feed="sip",
+                        delay_seconds=900,
+                        source_ids=("alpaca-acme",),
+                    )
+                return PortfolioPriceObservation.unavailable("provider_timeout")
+
+        runtime = PersonalRuntime(
+            access=PersonalAccessConfig(
+                gateway_token=self.gateway,
+                allowed_origins=frozenset({"http://127.0.0.1:5173"}),
+                configured=True,
+            ),
+            actor=PersonalActor(actor_id="local-owner"),
+            journey=None,
+            portfolio=PortfolioBook(
+                store=InMemoryPortfolioStore(),
+                market=FlakyMarket(),
+                clock=lambda: now,
+                prices=InMemoryPriceObservationStore(),
+                snapshots=InMemoryEquitySnapshotStore(),
+            ),
+        )
+        app = FastAPI()
+        app.include_router(create_personal_router(lambda: runtime))
+        client = TestClient(app)
+
+        add = client.post(
+            "/api/personal/portfolio/commands",
+            headers=self.write_headers("add-acme-api"),
+            json={
+                "type": "add_holding",
+                "symbol": "ACME",
+                "name": "Acme Holdings",
+                "quantity": "2",
+                "average_cost": "100.25",
+                "expected_portfolio_revision": 0,
+            },
+        )
+        self.assertEqual(add.status_code, 200)
+        first = client.get("/api/personal/portfolio", headers=self.read_headers).json()
+        self.assertFalse(first["holdings"][0]["market_price"]["cached"])
+        second = client.get("/api/personal/portfolio", headers=self.read_headers).json()
+        market_price = second["holdings"][0]["market_price"]
+        self.assertTrue(market_price["cached"])
+        self.assertEqual(market_price["availability"], "available")
+        self.assertEqual(market_price["source_health"], "stale")
+        self.assertEqual(second["priced_holding_count"], 1)
+        self.assertEqual(second["total_equity"]["value"], "241.0000")
+        self.assertNotIn("partial_valuation", second["issues"])
 
 
 if __name__ == "__main__":

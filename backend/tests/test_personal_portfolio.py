@@ -19,8 +19,10 @@ from backend.app.personal_workspace.contracts import (
 )
 from backend.app.personal_workspace.portfolio import (
     AlpacaPortfolioMarketReader,
+    InMemoryEquitySnapshotStore,
     InMemoryPortfolioStore,
     PortfolioBook,
+    PortfolioMarketReader,
     PortfolioPriceObservation,
 )
 from backend.app.market_observation.contracts import (
@@ -473,6 +475,316 @@ class AlpacaPortfolioMarketReaderTest(unittest.TestCase):
         self.assertEqual(observed.source_health, "stale")
         self.assertEqual(observed.reason_code, "provider_timeout_eod_fallback")
         self.assertEqual(observed.source_ids, ("eod-acme-2026-08-01", "auth-snapshot-001"))
+
+
+class PortfolioEquityTrackingTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.actor = PersonalActor(actor_id="local-owner")
+
+    def build_book(
+        self,
+        market: PortfolioMarketReader,
+        *,
+        now: datetime,
+        prices=None,
+        snapshots=None,
+        cached_price_max_age_days: int = 7,
+    ) -> PortfolioBook:
+        return PortfolioBook(
+            store=InMemoryPortfolioStore(),
+            market=market,
+            clock=MutableClock(now),
+            prices=prices,
+            snapshots=snapshots,
+            cached_price_max_age_days=cached_price_max_age_days,
+        )
+
+    @staticmethod
+    def available(
+        symbol: str, price: Decimal, *, as_of: datetime
+    ) -> PortfolioPriceObservation:
+        return PortfolioPriceObservation.available(
+            price=price,
+            source_health="fresh",
+            as_of=as_of,
+            feed="delayed_sip",
+            delay_seconds=900,
+            source_ids=(f"alpaca-{symbol.lower()}",),
+        )
+
+    def test_unavailable_live_price_falls_back_to_last_persisted_observation(self) -> None:
+        now = datetime(2026, 8, 3, 20, 5, tzinfo=timezone.utc)
+
+        class FailingMarket:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def observe_price(self, symbol: str) -> PortfolioPriceObservation:
+                self.calls += 1
+                if self.calls <= 2:
+                    return self.available(symbol, Decimal("120.5000"), as_of=now)
+                return PortfolioPriceObservation.unavailable("provider_timeout")
+
+            available = staticmethod(
+                lambda symbol, price, *, as_of: PortfolioEquityTrackingTest.available(
+                    symbol, price, as_of=as_of
+                )
+            )
+
+        book = self.build_book(FailingMarket(), now=now)
+        book.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="ACME",
+                name="Acme Holdings",
+                quantity="2",
+                average_cost="100.25",
+                expected_portfolio_revision=0,
+            ),
+            idempotency_key="add-acme-001",
+        )
+
+        first = book.open(self.actor)
+        self.assertEqual(first.holdings[0].market_price.value, "120.5000")
+        self.assertFalse(first.holdings[0].market_price.cached)
+
+        second = book.open(self.actor)
+        holding = second.holdings[0]
+        self.assertEqual(second.priced_holding_count, 1)
+        self.assertEqual(holding.market_price.availability, "available")
+        self.assertTrue(holding.market_price.cached)
+        self.assertEqual(holding.market_price.value, "120.5000")
+        self.assertEqual(holding.market_price.feed, "delayed_sip")
+        self.assertEqual(holding.market_price.source_health, "stale")
+        self.assertEqual(second.total_equity.value, "241.0000")
+        self.assertNotIn("partial_valuation", second.issues)
+
+    def test_cached_fallback_older_than_max_age_stays_unavailable(self) -> None:
+        now = datetime(2026, 8, 3, 20, 5, tzinfo=timezone.utc)
+
+        class AgingMarket:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def observe_price(self, symbol: str) -> PortfolioPriceObservation:
+                self.calls += 1
+                if self.calls <= 2:
+                    return PortfolioEquityTrackingTest.available(
+                        symbol, Decimal("120.5000"), as_of=now - timedelta(days=3)
+                    )
+                return PortfolioPriceObservation.unavailable("provider_timeout")
+
+        book = self.build_book(AgingMarket(), now=now)
+        book.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="ACME",
+                name="Acme Holdings",
+                quantity="2",
+                average_cost="100.25",
+                expected_portfolio_revision=0,
+            ),
+            idempotency_key="add-acme-001",
+        )
+        self.assertEqual(book.open(self.actor).priced_holding_count, 1)
+
+        stale = book.open(self.actor)
+        self.assertEqual(stale.holdings[0].market_price.value, "120.5000")
+        self.assertTrue(stale.holdings[0].market_price.cached)
+
+        aged_book = self.build_book(
+            ScriptedPortfolioMarket({}), now=now
+        )
+        aged_book.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="ACME",
+                name="Acme Holdings",
+                quantity="2",
+                average_cost="100.25",
+                expected_portfolio_revision=0,
+            ),
+            idempotency_key="add-acme-001",
+        )
+        # 缓存 10 天前的报价，超过 7 天有效期：不回落，保持不可用
+        aged_book._prices.upsert(
+            actor_id=self.actor.actor_id,
+            observations={
+                "ACME": PortfolioPriceObservation(
+                    availability="available",
+                    price=Decimal("120.5000"),
+                    reason_code=None,
+                    source_health="fresh",
+                    as_of=now - timedelta(days=10),
+                    feed="delayed_sip",
+                    delay_seconds=900,
+                    source_ids=(),
+                )
+            },
+        )
+        aged = aged_book.open(self.actor)
+        self.assertEqual(aged.priced_holding_count, 0)
+        self.assertEqual(aged.holdings[0].market_price.availability, "not_available")
+        self.assertEqual(aged.total_equity.availability, "not_available")
+
+    def test_equity_snapshot_upserted_per_market_day_after_close_flag(self) -> None:
+        now = datetime(2026, 8, 3, 15, 0, tzinfo=timezone.utc)  # 周一 11:00 EDT 盘中
+        clock = MutableClock(now)
+        market = ScriptedPortfolioMarket(
+            {
+                "ACME": self.available(
+                    "ACME", Decimal("120.5000"), as_of=now - timedelta(minutes=15)
+                )
+            }
+        )
+        snapshots = InMemoryEquitySnapshotStore()
+        book = PortfolioBook(
+            store=InMemoryPortfolioStore(),
+            market=market,
+            clock=clock,
+            snapshots=snapshots,
+        )
+        book.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="ACME",
+                name="Acme Holdings",
+                quantity="2",
+                average_cost="100.25",
+                expected_portfolio_revision=0,
+            ),
+            idempotency_key="add-acme-001",
+        )
+        history = book.equity_history(self.actor)
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0].market_day, "2026-08-03")
+        self.assertEqual(history[0].total_equity, "241.0000")
+        self.assertEqual(history[0].total_market_value, "241.0000")
+        self.assertEqual(history[0].usd_cash, "0.0000")
+        self.assertEqual(history[0].holdings_count, 1)
+        self.assertEqual(history[0].priced_count, 1)
+        self.assertFalse(history[0].after_close)
+
+        # 同日收盘后再次打开：upsert 覆盖当天行，标记收盘
+        clock.advance(timedelta(hours=5, minutes=5))  # 16:05 EDT
+        book.open(self.actor)
+        history = book.equity_history(self.actor)
+        self.assertEqual(len(history), 1)
+        self.assertTrue(history[0].after_close)
+
+        # 次日打开：新增第二天行
+        clock.advance(timedelta(days=1))
+        book.open(self.actor)
+        history = book.equity_history(self.actor, limit=10)
+        self.assertEqual([item.market_day for item in history], ["2026-08-03", "2026-08-04"])
+        self.assertTrue(history[-1].after_close)
+
+    def test_equity_snapshot_skipped_on_weekend_and_when_unpriced(self) -> None:
+        now = datetime(2026, 8, 1, 20, 5, tzinfo=timezone.utc)  # 周六 16:05 EDT
+        clock = MutableClock(now)
+        market = ScriptedPortfolioMarket(
+            {
+                "ACME": self.available(
+                    "ACME", Decimal("120.5000"), as_of=now - timedelta(days=1)
+                )
+            }
+        )
+        snapshots = InMemoryEquitySnapshotStore()
+        book = PortfolioBook(
+            store=InMemoryPortfolioStore(),
+            market=market,
+            clock=clock,
+            snapshots=snapshots,
+        )
+        book.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="ACME",
+                name="Acme Holdings",
+                quantity="2",
+                average_cost="100.25",
+                expected_portfolio_revision=0,
+            ),
+            idempotency_key="add-acme-001",
+        )
+        # 周六：ET 非工作日，不写快照
+        self.assertEqual(book.equity_history(self.actor), ())
+
+        # 从未成功定价的组合（无落盘缓存）：权益不可计算，不写快照
+        monday = datetime(2026, 8, 3, 20, 5, tzinfo=timezone.utc)  # 周一 16:05 EDT
+        fresh_book = PortfolioBook(
+            store=InMemoryPortfolioStore(),
+            market=ScriptedPortfolioMarket({}),
+            clock=FrozenClock(monday),
+            snapshots=InMemoryEquitySnapshotStore(),
+        )
+        fresh_book.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="ACME",
+                name="Acme Holdings",
+                quantity="2",
+                average_cost="100.25",
+                expected_portfolio_revision=0,
+            ),
+            idempotency_key="add-acme-001",
+        )
+        self.assertEqual(fresh_book.equity_history(self.actor), ())
+        self.assertEqual(fresh_book.open(self.actor).total_equity.availability, "not_available")
+
+    def test_equity_history_respects_limit(self) -> None:
+        now = datetime(2026, 8, 3, 20, 5, tzinfo=timezone.utc)
+        clock = MutableClock(now)
+        market = ScriptedPortfolioMarket(
+            {
+                "ACME": self.available(
+                    "ACME", Decimal("120.5000"), as_of=now - timedelta(minutes=15)
+                )
+            }
+        )
+        snapshots = InMemoryEquitySnapshotStore()
+        book = PortfolioBook(
+            store=InMemoryPortfolioStore(),
+            market=market,
+            clock=clock,
+            snapshots=snapshots,
+        )
+        book.revise(
+            self.actor,
+            AddHoldingCommand(
+                type="add_holding",
+                symbol="ACME",
+                name="Acme Holdings",
+                quantity="2",
+                average_cost="100.25",
+                expected_portfolio_revision=0,
+            ),
+            idempotency_key="add-acme-001",
+        )
+        for _ in range(7):
+            clock.advance(timedelta(days=1))
+            book.open(self.actor)
+        full = book.equity_history(self.actor)
+        self.assertEqual(len(full), 6)
+        limited = book.equity_history(self.actor, limit=2)
+        self.assertEqual([item.market_day for item in limited], ["2026-08-07", "2026-08-10"])
+
+
+class MutableClock:
+    def __init__(self, now: datetime) -> None:
+        self.now = now
+
+    def __call__(self) -> datetime:
+        return self.now
+
+    def advance(self, delta: timedelta) -> None:
+        self.now = self.now + delta
 
 
 if __name__ == "__main__":

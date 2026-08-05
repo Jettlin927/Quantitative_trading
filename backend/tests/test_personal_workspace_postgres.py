@@ -40,9 +40,13 @@ from backend.app.personal_workspace.crypto import (
 from backend.app.personal_workspace.journey import PersonalResearchJourney
 from backend.app.personal_workspace.persistence import PostgresPersonalJourneyStore
 from backend.app.personal_workspace.portfolio import (
+    EquitySnapshot,
+    HoldingState,
     PortfolioBook,
     PortfolioPriceObservation,
+    PostgresEquitySnapshotStore,
     PostgresPortfolioStore,
+    PostgresPriceObservationStore,
     UnavailablePortfolioMarketReader,
 )
 from backend.app.personal_workspace.synthetic import SyntheticWorkspaceAdapters
@@ -70,6 +74,8 @@ PRIVATE_TABLES = {
     "personal_verification_observations",
     "personal_redaction_events",
     "personal_research_records",
+    "personal_price_observations",
+    "personal_equity_snapshots",
 }
 ENCRYPTED_PRIVATE_TABLES = PRIVATE_TABLES - {
     "personal_audit_events",
@@ -79,7 +85,7 @@ ENCRYPTED_PRIVATE_TABLES = PRIVATE_TABLES - {
 
 class PersonalWorkspaceSchemaIdentityTest(unittest.TestCase):
     def test_private_orm_identity_is_separate_from_public_metadata(self) -> None:
-        self.assertEqual(expected_schema_heads(), ("0017_personal_notebook_t4",))
+        self.assertEqual(expected_schema_heads(), ("0018_personal_equity_tracking",))
         self.assertEqual(
             set(PrivateBase.metadata.tables),
             {f"private_workbench.{table}" for table in PRIVATE_TABLES},
@@ -270,17 +276,125 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                             "personal_verification_items",
                             "personal_verification_observations",
                             "personal_redaction_events",
+                            "personal_price_observations",
+                            "personal_equity_snapshots",
                         }
                         else 1
                     )
                     for table in PRIVATE_TABLES
                 },
             )
+            # 行情落盘与权益快照表在合成旅程中不应产生明文业务行：
+            # 本场景行情不可用 → 无可用观察可落盘、权益不可计算 → 无快照。
+            self.assertEqual(counts["personal_price_observations"], 0)
+            self.assertEqual(counts["personal_equity_snapshots"], 0)
             self.assertNotIn(b"SYNTH-001", raw_ciphertexts)
             self.assertNotIn("PostgreSQL 合成问题正文".encode("utf-8"), raw_ciphertexts)
             self.assertNotIn("SYNTH-001", database_projection)
             self.assertNotIn("12.5000", database_projection)
             self.assertNotIn("PostgreSQL 合成问题正文", database_projection)
+        finally:
+            engine.dispose()
+
+    def test_price_observation_and_equity_snapshot_round_trip_through_postgres(self) -> None:
+        engine = create_engine(os.environ["TEST_POSTGRES_URL"])
+        try:
+            with engine.connect() as connection:
+                command.upgrade(alembic_config(connection), "head")
+            with engine.begin() as connection:
+                for table in (
+                    "personal_holdings",
+                    "personal_workspaces",
+                    "personal_price_observations",
+                    "personal_equity_snapshots",
+                ):
+                    connection.execute(text(f"DELETE FROM private_workbench.{table}"))
+
+            cipher = PersonalDataCipher(
+                FixedKeyring(
+                    active_key_id="synthetic-key",
+                    data_keys={"synthetic-key": bytes(range(32))},
+                    lookup_key=b"synthetic-lookup-key-for-tests-only",
+                )
+            )
+            actor = PersonalActor(actor_id="local-owner")
+            session_factory = sessionmaker(
+                bind=engine, autoflush=False, expire_on_commit=False
+            )
+            store = PostgresPortfolioStore(session_factory, cipher=cipher)
+            store.revise(
+                actor_id=actor.actor_id,
+                expected_revision=0,
+                idempotency_key="pg-add-acme",
+                action="add_holding",
+                mutate=lambda state: state.holdings.__setitem__(
+                    "holding-acme",
+                    HoldingState(
+                        holding_id="holding-acme",
+                        symbol="ACME",
+                        name="Acme Holdings",
+                        quantity=Decimal("2"),
+                        average_cost=Decimal("100.25"),
+                    ),
+                ),
+            )
+
+            observed_at = datetime(2026, 8, 3, 20, 5, tzinfo=timezone.utc)
+            prices = PostgresPriceObservationStore(session_factory, cipher=cipher)
+            prices.upsert(
+                actor_id=actor.actor_id,
+                observations={
+                    "ACME": PortfolioPriceObservation(
+                        availability="available",
+                        price=Decimal("120.5000"),
+                        reason_code=None,
+                        source_health="fresh",
+                        as_of=observed_at,
+                        feed="delayed_sip",
+                        delay_seconds=900,
+                        source_ids=(),
+                    )
+                },
+            )
+            latest = prices.latest(actor_id=actor.actor_id, symbols=["ACME", "MISSING"])
+            self.assertEqual(set(latest), {"ACME"})
+            self.assertEqual(latest["ACME"].price, Decimal("120.5000"))
+            self.assertEqual(latest["ACME"].feed, "delayed_sip")
+            self.assertTrue(latest["ACME"].cached)
+            self.assertEqual(latest["ACME"].source_health, "stale")
+
+            snapshots = PostgresEquitySnapshotStore(session_factory, cipher=cipher)
+            snapshots.upsert(
+                actor_id=actor.actor_id,
+                snapshot=EquitySnapshot(
+                    market_day=observed_at.date(),
+                    total_equity=Decimal("241.0000"),
+                    total_market_value=Decimal("241.0000"),
+                    usd_cash=Decimal("0"),
+                    holdings_count=1,
+                    priced_count=1,
+                    after_close=True,
+                    observed_at=observed_at,
+                    payload={"holdings": [], "prices": {}},
+                ),
+            )
+            history = snapshots.history(actor_id=actor.actor_id, limit=10)
+            self.assertEqual(len(history), 1)
+            self.assertEqual(history[0].total_equity, "241.0000")
+            self.assertEqual(history[0].market_day, observed_at.date().isoformat())
+            self.assertTrue(history[0].after_close)
+
+            with engine.connect() as connection:
+                projection = "|".join(
+                    connection.execute(
+                        text(
+                            "SELECT to_jsonb(row_value)::text FROM private_workbench."
+                            "personal_price_observations AS row_value"
+                        )
+                    ).scalars().all()
+                )
+            self.assertNotIn("120.5000", projection)
+            self.assertNotIn("delayed_sip", projection)
         finally:
             engine.dispose()
 
