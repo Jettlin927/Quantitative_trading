@@ -30,7 +30,8 @@
 - `analysis.py` / `agent/`：个人分析草稿、运行及 tool-use agent。
 - `journey.py` / `persistence.py` / `synthetic.py`：今日旅程投影、私有持久化与不依赖真实数据的合成 tracer。
 - `security.py` / `crypto.py`：gateway、Origin、幂等与私有字段加密。
-- `personal_analysis_worker.py`：个人 AI 分析队列；只有私有覆盖中的该进程可读取 DeepSeek secret。
+- `personal_analysis_worker.py`：个人 AI 分析队列与持仓规则周期调度；只有私有覆盖中的该进程可读取 DeepSeek secret。
+- `rule_automation.py`：求取活跃持仓与已启用规则的标的交集，并按固定时间槽幂等评估。
 
 个人不可变记录版本链路已删除；`private_workbench` 中的历史表仍由 Alembic revision 保留。
 
@@ -76,11 +77,10 @@
 | `/today` | `PersonalTodayView.jsx` | 今日持仓事项与旅程入口 |
 | `/portfolio` | `PortfolioView.jsx` | 私有手工持仓与每日权益 |
 | `/markets/us` | `InstrumentWorkspaceView.jsx` + `MarketChart.jsx` | 美股标的与证据 |
-| `/rules` | `RulesView.jsx` | 确定性观察规则 |
 | `/system` | `OperationsView.jsx` | 来源授权、schema 与服务健康 |
 | 个人 AI 分析 | `AnalysisWorkspaceView.jsx` | 分析草稿、确认、运行与事件 |
 
-已无 `/markets/a-share`、`/records`、`/research` 或旧美股实验页面。旧研究驾驶舱只展示 A 股历史策略，已从产品入口和前端代码退役；正式研究后端合同继续作为隔离的治理基础设施保留。支撑模块包括 `readAdapter.js`、`personalJourneyClient.js`、图表 adapter、`viewSupport.jsx` 与 `styles.css`。
+已无 `/markets/a-share`、`/records`、`/rules`、`/research` 或旧美股实验页面。规则领域模型和 API 作为活跃持仓的后台检查继续保留，最新异常只投影到 `/today`；旧研究驾驶舱只展示 A 股历史策略，已从产品入口和前端代码退役。正式研究后端合同继续作为隔离的治理基础设施保留。支撑模块包括 `readAdapter.js`、`personalJourneyClient.js`、图表 adapter、`viewSupport.jsx` 与 `styles.css`。
 
 ## 脚本与配置
 

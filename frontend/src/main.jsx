@@ -8,7 +8,6 @@ import {
   Database,
   Globe2,
   LayoutDashboard,
-  ListChecks,
   RefreshCw,
   Server,
 } from 'lucide-react'
@@ -17,7 +16,6 @@ import { OperationsView } from './OperationsView.jsx'
 import { InstrumentWorkspaceView } from './InstrumentWorkspaceView.jsx'
 import { PersonalTodayView } from './PersonalTodayView.jsx'
 import { PortfolioView } from './PortfolioView.jsx'
-import { RulesView } from './RulesView.jsx'
 import { browserPersonalJourneyClient } from './personalJourneyClient.js'
 import { browserReadAdapter, systemClock } from './readAdapter.js'
 import { Notice, translateStatus } from './viewSupport.jsx'
@@ -27,7 +25,6 @@ const NAV_ITEMS = [
   { id: 'today', path: '/today', label: '今日工作台', eyebrow: '持仓事项优先', icon: LayoutDashboard },
   { id: 'portfolio', path: '/portfolio', label: '我的持仓', eyebrow: '私有手工账本', icon: BriefcaseBusiness },
   { id: 'markets', path: '/markets/us', label: '市场与标的', eyebrow: '标的与证据', icon: Globe2 },
-  { id: 'rules', path: '/rules', label: '规则与策略', eyebrow: '确定性四态', icon: ListChecks },
   { id: 'system', path: '/system', label: '数据与系统', eyebrow: '授权与健康', icon: Server },
 ]
 
@@ -80,7 +77,6 @@ function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = brows
           {globalError ? <Notice tone="warning" title="部分数据暂不可用" text={globalError} /> : null}
           {activeView === 'today' ? <div className="today-stack"><PersonalTodayView client={personalClient} chartAdapter={chartAdapter} onNavigate={navigate} /><AnalysisWorkspaceView client={personalClient} subjectId="" /></div> : null}
           {activeView === 'portfolio' ? <PortfolioView client={personalClient} /> : null}
-          {activeView === 'rules' ? <RulesView client={personalClient} /> : null}
           {activeView === 'markets' ? <div key={personalInstrumentSymbol(pathname)}><InstrumentWorkspaceView client={personalClient} symbol={personalInstrumentSymbol(pathname)} chartAdapter={chartAdapter} onNavigate={navigate} /></div> : null}
           {activeView === 'system' ? <OperationsView health={health} /> : null}
         </main>
@@ -131,7 +127,7 @@ function routeView(pathname) {
   if (pathname.startsWith('/portfolio')) return 'portfolio'
   if (pathname.startsWith('/markets/a-share')) return 'today'
   if (pathname.startsWith('/markets/')) return 'markets'
-  if (pathname.startsWith('/rules')) return 'rules'
+  if (pathname.startsWith('/rules')) return 'today'
   if (pathname.startsWith('/research') || pathname.startsWith('/strategies')) return 'today'
   if (pathname.startsWith('/system')) return 'system'
   return 'today'

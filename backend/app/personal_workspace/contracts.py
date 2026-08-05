@@ -17,6 +17,9 @@ class PersonalActor:
     actor_id: str
 
 
+LOCAL_PERSONAL_ACTOR = PersonalActor(actor_id="local-owner")
+
+
 @dataclass(frozen=True)
 class SyntheticHoldingView:
     holding_id: str

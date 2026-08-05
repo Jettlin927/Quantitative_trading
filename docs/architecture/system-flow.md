@@ -19,7 +19,8 @@ GitHub Issues ──► research-worker ──► quant_research ──► canon
                            └──── PostgreSQL 编排/评价 ◄────────┘
 
 personal-analysis-worker ──► DeepSeek + 受控工具
-        （只读私有 secret，与正式研究隔离）
+          │                  （只读私有 secret，与正式研究隔离）
+          └───────────────► 活跃持仓规则周期评估 ──► 今日注意事项
 ```
 
 `docker-compose.yml` 定义 `db`、`api`、`research-worker` 和 `frontend`；`research-worker` 默认不随普通启动运行。`docker-compose.personal.yml` 添加私有 API 配置与 `personal-analysis-worker`。
@@ -28,10 +29,10 @@ personal-analysis-worker ──► DeepSeek + 受控工具
 
 ## 个人工作台流程
 
-1. 用户通过 `/today`、`/portfolio`、`/markets/us` 和 `/rules` 查看或维护手工美股投研上下文。
+1. 用户通过 `/today`、`/portfolio` 和 `/markets/us` 查看或维护手工美股投研上下文；`/rules` 旧地址回到今日页。
 2. 私有写请求经过 gateway、Origin、Fetch Metadata、JSON、显式个人请求头和幂等校验；配置不完整时 fail-closed。
 3. `PortfolioBook` 保存手工持仓和权益事实；市场价格与 K 线通过 Alpaca adapter 按用途授权读取。
-4. 规则引擎生成确定性的 `triggered`、`not_triggered`、`unavailable` 或 `invalid` 结果，不把缺失数据伪造成零值。
+4. 私有 Worker 每 15 分钟求取“活跃持仓标的 ∩ 已启用规则标的”，按时间槽幂等生成四态结果；移出持仓后不再自动评估，也不再把旧命中投影到今日页。
 5. 个人 AI 分析先生成外发预览，再显式确认并进入独立 worker；工具证据必须带可校验 `evidence_id`。
 6. AI 输出、规则命中和 synthetic trace 都不是正式研究批准、运行、评价或结论。
 

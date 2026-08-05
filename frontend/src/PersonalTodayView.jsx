@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, BriefcaseBusiness, Check, Circle, FlaskConical, ListChecks, ShieldX, Triangle, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, BriefcaseBusiness, Check, Circle, FlaskConical, ShieldX, Triangle, X } from 'lucide-react'
 
 import { MarketChart } from './MarketChart.jsx'
 
@@ -145,7 +145,6 @@ function TodayOverview({ workspace, error, onNavigate }) {
       <div><span>TODAY / PRIVATE RESEARCH DESK</span><h2>今天先看组合、数据缺口与待验证事项</h2><p>这里汇总需要你处理的事实；不会生成买卖评级或自动发起 AI。</p></div>
       <div className="today-overview-actions">
         <button className="primary-action" onClick={() => onNavigate('/portfolio')}><BriefcaseBusiness size={15} />查看全部持仓</button>
-        <button onClick={() => onNavigate('/rules')}><ListChecks size={15} />查看观察规则</button>
       </div>
     </header>
 

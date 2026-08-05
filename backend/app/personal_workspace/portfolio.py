@@ -11,7 +11,7 @@ import hmac
 import json
 import os
 import re
-from typing import Any, Callable, Literal, Mapping, Protocol, Sequence
+from typing import Any, Callable, Iterable, Literal, Mapping, Protocol, Sequence
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -142,6 +142,12 @@ class HoldingView:
     weight: ObservedDecimalView
 
 
+def _active_holding_symbols(holdings: Iterable[Any]) -> tuple[str, ...]:
+    return tuple(
+        sorted(holding.symbol for holding in holdings if holding.state == "active")
+    )
+
+
 @dataclass(frozen=True)
 class PortfolioView:
     workspace_id: str | None
@@ -156,6 +162,10 @@ class PortfolioView:
     issues: tuple[str, ...]
     realized_pnl_total: ObservedDecimalView
     realized_trades: tuple[RealizedTradeView, ...] = ()
+
+    @property
+    def active_symbols(self) -> tuple[str, ...]:
+        return _active_holding_symbols(self.holdings)
 
 
 @dataclass(frozen=True)
@@ -1177,6 +1187,10 @@ class PortfolioBook:
             if holding.symbol == normalized_symbol and holding.state == "active":
                 return holding.average_cost
         return None
+
+    def active_symbols(self, actor: PersonalActor) -> tuple[str, ...]:
+        state = self._store.load(actor_id=actor.actor_id)
+        return _active_holding_symbols(state.holdings.values())
 
     def equity_history(
         self, actor: PersonalActor, *, limit: int = 120

@@ -45,14 +45,12 @@ body {
   background-size: 24px 24px;
 }
 
-.instrument-workspace,
-.rules-workspace {
+.instrument-workspace {
   display: grid;
   gap: 16px;
 }
 
-.instrument-head,
-.rules-summary {
+.instrument-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -62,15 +60,13 @@ body {
   padding: 18px 20px;
 }
 
-.instrument-head span,
-.rules-summary span {
+.instrument-head span {
   color: var(--cyan);
   font: 700 10px/1.4 Consolas, monospace;
   letter-spacing: .12em;
 }
 
-.instrument-head h2,
-.rules-summary h2 {
+.instrument-head h2 {
   margin-top: 4px;
   font: 700 24px/1.1 Bahnschrift, "Arial Narrow", sans-serif;
 }
@@ -242,129 +238,13 @@ body {
   color: #8d5510;
 }
 
-.rules-summary p {
-  margin-top: 6px;
-  color: var(--ink-soft);
-}
-
-.rules-summary > strong {
-  border: 1px solid var(--cyan);
-  color: var(--cyan);
-  padding: 10px 14px;
-}
-
-.rule-create {
-  display: grid;
-  grid-template-columns: minmax(160px, .7fr) minmax(200px, 1fr) auto minmax(220px, 1fr);
-  align-items: end;
-  gap: 10px;
-  border: 1px solid var(--line);
-  background: var(--surface-strong);
-  padding: 14px;
-}
-
-.rule-create label {
-  display: grid;
-  gap: 5px;
-  color: var(--ink-soft);
-  font-size: 11px;
-}
-
-.rule-create input,
-.rule-create select {
-  min-height: 36px;
-  border: 1px solid var(--line);
-  color: var(--ink);
-  background: var(--surface);
-  padding: 6px 9px;
-}
-
-.rule-create small {
-  align-self: center;
-  color: var(--ink-soft);
-}
-
-.template-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.template-strip article,
-.rule-register article {
-  border: 1px solid var(--line);
-  background: var(--surface-strong);
-  padding: 14px;
-}
-
-.template-strip article {
-  display: grid;
-  gap: 6px;
-}
-
-.template-strip small,
-.template-strip em,
-.rule-register small,
-.rule-register code {
-  color: var(--ink-soft);
-  font: 10px Consolas, monospace;
-}
-
-.template-strip p {
-  min-height: 34px;
-  color: var(--ink-soft);
-  font-size: 12px;
-}
-
-.rule-register {
-  display: grid;
-  gap: 8px;
-}
-
-.rule-register article {
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto minmax(120px, auto) auto;
-  align-items: center;
-  gap: 16px;
-}
-
-.rule-register h3 {
-  margin: 3px 0;
-}
-
-.rule-result {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.rule-result small { color: var(--ink-faint); font: 8px Consolas, monospace; }
-.rule-evaluation { display: grid; gap: 3px; min-width: 170px; }
-.rule-evaluation > span { color: var(--ink); font: 10px Consolas, monospace; }
-.rule-evaluation > small { color: var(--ink-faint); font: 8px Consolas, monospace; }
-.rule-explainer { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--line); background: var(--surface-strong); }
-.rule-explainer > div { min-height: 82px; border-right: 1px solid var(--line); padding: 13px 15px; }
-.rule-explainer > div:last-child { border-right: 0; }
-.rule-explainer strong { color: var(--nav-soft); font-size: 10px; }
-.rule-explainer p { margin-top: 5px; color: var(--ink-soft); font-size: 10px; line-height: 1.6; }
-.template-strip article > span { color: var(--ink-faint); font: 8px Consolas, monospace; }
-
-.rule-actions {
-  display: flex;
-  gap: 6px;
-}
-
 @media (max-width: 800px) {
-  .instrument-lower-grid,
-  .template-strip,
-  .rule-create {
+  .instrument-lower-grid {
     grid-template-columns: 1fr;
   }
 
   .instrument-head,
-  .rules-summary,
-  .cost-reference,
-  .rule-register article {
+  .cost-reference {
     align-items: flex-start;
     grid-template-columns: 1fr;
     flex-direction: column;
@@ -372,8 +252,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .instrument-workspace,
-  .rules-workspace {
+  .instrument-workspace {
     animation: none !important;
     transition: none !important;
   }
@@ -3909,8 +3788,7 @@ button:disabled {
   .analysis-preview-meta,
   .analysis-preview .preview-columns,
   .claim-ledger,
-  .analysis-history > div,
-  .rule-explainer { grid-template-columns: 1fr; }
+  .analysis-history > div { grid-template-columns: 1fr; }
   .analysis-preview-meta span,
   .analysis-claim { border-right: 0; border-bottom: 1px solid var(--line-soft); }
   .analysis-question-panel button,
