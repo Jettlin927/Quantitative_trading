@@ -351,6 +351,7 @@ export function PortfolioView({ client, chartAdapter = lightweightEquityChartAda
             <label>平均买入价<input required inputMode="decimal" value={form.averageCost} onChange={(event) => setForm({ ...form, averageCost: event.target.value })} placeholder="USD" /></label>
           </div>
           <div className="portfolio-derived-lock"><ShieldAlert size={15} /><span>成本金额、快照市值、盈亏与权重由服务端 Decimal 计算。</span></div>
+          {editingId ? null : <AddCashHint portfolio={portfolio} form={form} />}
           <div className="portfolio-editor-actions">
             {editingId ? <button type="button" onClick={() => { setEditingId(null); setForm(EMPTY_FORM) }}>取消</button> : null}
             <button className="primary-action" disabled={submitting}><Plus size={15} />{editingId ? '保存修订' : '添加持仓'}</button>
@@ -382,6 +383,23 @@ function ObservedValue({ observed, kind, compact = false, signed = false }) {
   if (kind === 'ratio') value = `${(Number(value) * 100).toFixed(2)}%`
   if (signed && Number(observed.value) > 0) value = `+${value}`
   return <strong className={Number(observed.value) < 0 ? 'negative' : ''}>{value}</strong>
+}
+
+function AddCashHint({ portfolio, form }) {
+  const quantityText = String(form.quantity || '').trim()
+  const averageText = String(form.averageCost || '').trim()
+  if (!quantityText || !averageText) return null
+  const quantity = Number(quantityText)
+  const averageCost = Number(averageText)
+  if (!Number.isFinite(quantity) || !Number.isFinite(averageCost) || quantity <= 0 || averageCost < 0) return null
+  const cost = quantity * averageCost
+  const cash = Number(portfolio?.usd_cash || 0)
+  return (
+    <div className="portfolio-add-cash-hint">
+      <CircleDollarSign size={14} />
+      <span>新增持仓将按 数量×均价 占用现金 ≈ <strong>${formatMoney(cost)}</strong>，添加后现金 ≈ <strong>${formatMoney(cash - cost)}</strong>。</span>
+    </div>
+  )
 }
 
 function sourceLabel(observed) {

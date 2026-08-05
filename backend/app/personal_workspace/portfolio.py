@@ -1082,6 +1082,9 @@ class PortfolioBook:
                 quantity=command.quantity,
                 average_cost=command.average_cost,
             )
+            # 新增持仓视为用现金买入：占用现金 = 数量 × 均价。
+            # 编辑/移出/恢复不动现金（编辑可能是修正录入，移出不是卖出）。
+            state.usd_cash -= command.quantity * command.average_cost
             return
         if isinstance(command, SetUsdCashCommand):
             state.usd_cash = command.usd_cash
