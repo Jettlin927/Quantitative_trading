@@ -27,7 +27,9 @@ from .market_runtime import load_personal_market_readers
 from .persistence import PostgresPersonalJourneyStore
 from .portfolio import (
     PortfolioBook,
+    PostgresEquitySnapshotStore,
     PostgresPortfolioStore,
+    PostgresPriceObservationStore,
 )
 from .router import PersonalRuntime
 from .rules import (
@@ -72,6 +74,8 @@ def get_personal_runtime() -> PersonalRuntime:
     portfolio = PortfolioBook(
         store=PostgresPortfolioStore(session_factory, cipher=cipher),
         market=market_readers.portfolio,
+        prices=PostgresPriceObservationStore(session_factory, cipher=cipher),
+        snapshots=PostgresEquitySnapshotStore(session_factory, cipher=cipher),
         challenge_key=sha256(
             f"personal-purge|{gateway_token}".encode("utf-8")
         ).digest(),

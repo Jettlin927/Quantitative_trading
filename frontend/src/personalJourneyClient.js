@@ -22,6 +22,11 @@ export class PersonalJourneyClient {
     return this.#request('/api/personal/portfolio', { signal })
   }
 
+  /** @param {{ limit?: number, signal?: AbortSignal }} [options] */
+  openEquityHistory({ limit = 180, signal } = {}) {
+    return this.#request(`/api/personal/portfolio/equity-history?limit=${limit}`, { signal })
+  }
+
   /** @param {string} symbol @param {{ signal?: AbortSignal }} [options] */
   openInstrument(symbol, { signal } = {}) {
     return this.#request(`/api/personal/instruments/${encodeURIComponent(symbol)}`, { signal })

@@ -3782,6 +3782,20 @@ button:disabled {
 .portfolio-error { border-color: #e1a5a0; color: #7f302c; background: #fff1ef; }
 .portfolio-delete-receipt { border-color: #93c6b7; color: #215e4a; background: #edf9f5; }
 
+.portfolio-cache-warning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  border: 1px solid #b9d3dc;
+  color: #2d5c6c;
+  background: #eef7f9;
+  padding: 9px 13px;
+  font-size: 10px;
+}
+.portfolio-cache-warning span { display: grid; gap: 2px; }
+.portfolio-cache-warning svg { color: #338098; }
+
 .portfolio-summary-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 0.8fr 1.4fr;
@@ -3924,6 +3938,119 @@ button:disabled {
 .portfolio-derived-lock svg { flex: 0 0 auto; color: var(--cyan); }
 .portfolio-editor-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .portfolio-editor .primary-action { border-color: #056e91; color: #fff; background: #087ea4; }
+
+/* ---- 权益日线与概览 ---- */
+.portfolio-equity {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+}
+
+.portfolio-equity-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding: 13px 15px;
+}
+
+.portfolio-equity-header > div:first-child { display: grid; gap: 3px; }
+.portfolio-equity-header > div:first-child > span { color: #56c5df; font-family: Consolas, monospace; font-size: 9px; letter-spacing: 0.15em; }
+.portfolio-equity-header h2 { margin-top: 3px; font-family: Bahnschrift, "Arial Narrow", "Microsoft YaHei UI", sans-serif; font-size: 17px; }
+.portfolio-equity-header p { margin-top: 4px; color: var(--ink-soft); font-size: 9px; line-height: 1.55; }
+
+.portfolio-equity-kpis {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(108px, 1fr));
+  margin: 0;
+  border: 1px solid var(--line-soft);
+}
+.portfolio-equity-kpis > div {
+  display: grid;
+  gap: 4px;
+  border-right: 1px solid var(--line-soft);
+  padding: 9px 11px;
+}
+.portfolio-equity-kpis > div:last-child { border-right: 0; }
+.portfolio-equity-kpis dt { color: var(--ink-faint); font-size: 9px; }
+.portfolio-equity-kpis dd { display: grid; gap: 2px; margin: 0; font-family: Consolas, monospace; font-size: 15px; }
+.portfolio-equity-kpis dd strong { color: #0c3446; }
+.portfolio-equity-kpis dd small { color: #4d7d8e; font-size: 9px; }
+.portfolio-equity-kpis dd.negative strong,
+.portfolio-equity-kpis dd.negative small { color: var(--red); }
+
+.portfolio-equity-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: 10px;
+  padding: 0 15px 12px;
+}
+
+.portfolio-equity-chart-card {
+  border: 1px solid var(--line-soft);
+  background: #f8fafb;
+  padding: 11px;
+}
+.portfolio-equity-chart-head { display: flex; align-items: center; gap: 7px; color: #3b6879; font-size: 10px; font-weight: 700; }
+.portfolio-equity-chart-head svg { color: var(--cyan); }
+.portfolio-equity-chart-head small { margin-left: auto; color: var(--ink-faint); font-family: Consolas, monospace; font-size: 9px; }
+.equity-chart-pane { width: 100%; height: 300px; margin-top: 8px; }
+
+.portfolio-equity-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  min-height: 240px;
+  align-content: center;
+  color: var(--ink-soft);
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.portfolio-equity-empty svg { color: var(--cyan); }
+.portfolio-equity-error { margin-top: 6px; color: #a33a33; font-size: 10px; }
+
+.portfolio-equity-bars { display: grid; align-content: start; gap: 10px; }
+.portfolio-bar-block {
+  border: 1px solid var(--line-soft);
+  background: #f8fafb;
+  padding: 11px 13px;
+}
+.portfolio-bar-block h3 { margin-bottom: 9px; color: #3b6879; font-size: 10px; }
+.portfolio-bar-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) 72px; align-items: center; gap: 8px; padding: 3px 0; }
+.portfolio-bar-label { overflow: hidden; color: #0c3446; font-family: Consolas, monospace; font-size: 10px; font-weight: 700; text-overflow: ellipsis; }
+.portfolio-bar-track { height: 9px; background: #e4ebee; overflow: hidden; }
+.portfolio-bar-track i { display: block; height: 100%; background: linear-gradient(90deg, #0e7490, #2aa0b8); }
+.portfolio-bar-track.negative i { background: linear-gradient(90deg, #c23a34, #e2635c); }
+.portfolio-bar-value { color: #253b47; font-family: Consolas, monospace; font-size: 10px; text-align: right; }
+.portfolio-bar-value.negative { color: var(--red); }
+.portfolio-bar-empty { border: 1px dashed var(--line-soft); color: var(--ink-soft); background: #f8fafb; padding: 14px; font-size: 9px; line-height: 1.6; }
+
+.equity-accessible-table { margin: 0 15px 14px; border: 1px solid var(--line-soft); }
+.equity-accessible-table summary { color: #3b6879; background: #eef4f6; padding: 8px 12px; cursor: pointer; font-size: 9px; }
+.equity-accessible-table .table-scroll { max-height: 260px; }
+.equity-accessible-table .data-table td,
+.equity-accessible-table .data-table th { padding: 7px 9px; }
+.equity-accessible-table .mono.strong { color: #0c3446; }
+.equity-accessible-table .mono.negative { color: var(--red); }
+.badge-close,
+.badge-intraday { border-radius: 0; padding: 2px 5px; font-size: 8px; font-weight: 700; }
+.badge-close { color: #215e4a; background: #e2f2ec; }
+.badge-intraday { color: #8a5c18; background: #f7ecd2; }
+
+@media (max-width: 1120px) {
+  .portfolio-equity-grid { grid-template-columns: 1fr; }
+  .portfolio-equity-kpis { grid-template-columns: repeat(3, minmax(108px, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .portfolio-equity-kpis { grid-template-columns: repeat(2, minmax(108px, 1fr)); }
+  .portfolio-equity-header { flex-direction: column; }
+}
+
 
 .portfolio-loading {
   display: flex;

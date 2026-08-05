@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   ArchiveRestore,
@@ -7,12 +7,14 @@ import {
   Plus,
   RefreshCw,
   ShieldAlert,
+  TrendingUp,
   Trash2,
 } from 'lucide-react'
+import { lightweightEquityChartAdapter } from './equityChartAdapter.js'
 
 const EMPTY_FORM = { symbol: '', name: '', quantity: '', averageCost: '' }
 
-export function PortfolioView({ client }) {
+export function PortfolioView({ client, chartAdapter = lightweightEquityChartAdapter }) {
   const [portfolio, setPortfolio] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -22,6 +24,8 @@ export function PortfolioView({ client }) {
   const [cash, setCash] = useState('')
   const [purge, setPurge] = useState(null)
   const [deletionReceipt, setDeletionReceipt] = useState(null)
+  const [equityHistory, setEquityHistory] = useState([])
+  const [equityError, setEquityError] = useState(null)
 
   async function refresh({ signal } = { signal: undefined }) {
     const next = await client.openPortfolio({ signal })
@@ -44,10 +48,71 @@ export function PortfolioView({ client }) {
     return () => controller.abort()
   }, [client])
 
+  useEffect(() => {
+    if (typeof client.openEquityHistory !== 'function') return undefined
+    const controller = new AbortController()
+    client.openEquityHistory({ signal: controller.signal })
+      .then((next) => setEquityHistory(Array.isArray(next?.snapshots) ? next.snapshots : []))
+      .catch((reason) => {
+        if (reason?.name !== 'AbortError') setEquityError(reason)
+      })
+    return () => controller.abort()
+  }, [client])
+
   const activeCount = useMemo(
     () => portfolio?.holdings?.filter((holding) => holding.state === 'active').length || 0,
     [portfolio],
   )
+
+  const cachedCount = useMemo(
+    () => portfolio?.holdings?.filter((holding) => holding.market_price?.cached).length || 0,
+    [portfolio],
+  )
+
+  const equityStats = useMemo(() => {
+    if (!portfolio) return null
+    const holdings = portfolio.holdings.filter((holding) => holding.state === 'active')
+    const available = (observed) => observed?.availability === 'available' && observed.value != null
+    const priced = holdings.filter((holding) => available(holding.unrealized_profit_loss))
+    const sumMoney = (list, pick) => list.reduce((total, item) => total + Number(pick(item)), 0)
+    const totalCost = sumMoney(holdings, (holding) => holding.cost_amount || 0)
+    const pricedCost = sumMoney(priced, (holding) => holding.cost_amount || 0)
+    const totalProfitLoss = sumMoney(priced, (holding) => holding.unrealized_profit_loss.value)
+    const totalEquity = portfolio.total_equity?.availability === 'available'
+      ? Number(portfolio.total_equity.value)
+      : null
+    const cash = Number(portfolio.usd_cash)
+    const weighted = holdings.filter((holding) => available(holding.weight))
+    const largest = weighted.reduce(
+      (current, holding) => (!current || Number(holding.weight.value) > Number(current.weight.value) ? holding : current),
+      null,
+    )
+    const snapshots = equityHistory
+    const latest = snapshots[snapshots.length - 1]
+    const previous = snapshots[snapshots.length - 2]
+    const dayChange = latest && previous
+      ? Number(latest.total_equity) - Number(previous.total_equity)
+      : null
+    const dayChangePercent = latest && previous && Number(previous.total_equity)
+      ? dayChange / Number(previous.total_equity)
+      : null
+    return {
+      pricedCount: priced.length,
+      holdingCount: holdings.length,
+      totalCost,
+      pricedCost,
+      totalProfitLoss,
+      returnRate: pricedCost ? totalProfitLoss / pricedCost : null,
+      cashRatio: totalEquity ? cash / totalEquity : null,
+      largest,
+      topWeight: largest ? Number(largest.weight.value) : null,
+      dayChange,
+      dayChangePercent,
+      latestSnapshot: latest || null,
+      previousSnapshot: previous || null,
+      equityAvailable: totalEquity != null,
+    }
+  }, [portfolio, equityHistory])
 
   async function execute(command) {
     setSubmitting(true)
@@ -203,6 +268,13 @@ export function PortfolioView({ client }) {
         </div>
       ) : null}
 
+      {cachedCount > 0 && !sourceUnavailable ? (
+        <div className="portfolio-cache-warning" role="status">
+          <RefreshCw size={16} />
+          <span><strong>{cachedCount} 个标的使用上次落盘行情。</strong>实时行情获取失败，已回退到最近一次成功落盘的价格（带时间标注），超过有效期后恢复不可用。</span>
+        </div>
+      ) : null}
+
       {error ? (
         <div className="portfolio-error" role="alert">
           <AlertTriangle size={16} />
@@ -226,6 +298,14 @@ export function PortfolioView({ client }) {
           <div><input id="portfolio-cash" inputMode="decimal" value={cash} onChange={(event) => setCash(event.target.value)} /><button disabled={submitting}><CircleDollarSign size={15} />保存</button></div>
         </form>
       </section>
+
+      <EquityOverview
+        history={equityHistory}
+        stats={equityStats}
+        holdings={portfolio.holdings.filter((holding) => holding.state === 'active')}
+        error={equityError}
+        chartAdapter={chartAdapter}
+      />
 
       <div className="portfolio-layout">
         <section className="portfolio-ledger" aria-labelledby="portfolio-ledger-heading">
@@ -306,9 +386,170 @@ function ObservedValue({ observed, kind, compact = false, signed = false }) {
 
 function sourceLabel(observed) {
   if (!observed || observed.availability !== 'available') return '行情不可用'
+  if (observed.cached) return `上次落盘 · ${formatTime(observed.as_of)}`
   if (observed.feed === 'sip' || observed.feed === 'delayed_sip') return `延迟 SIP · ${Math.round((observed.delay_seconds || 0) / 60)} 分钟`
   if (observed.feed === 'eod') return `EOD 回退 · ${formatTime(observed.as_of)}`
   return observed.source_health || '来源未知'
+}
+
+function EquityOverview({ history, stats, holdings, error, chartAdapter }) {
+  const points = history.map((item) => ({ time: item.market_day, value: Number(item.total_equity), afterClose: item.after_close }))
+  return (
+    <section className="portfolio-equity" aria-label="权益日线与概览">
+      <header className="portfolio-equity-header">
+        <div>
+          <span>03 / EQUITY</span>
+          <h2>权益日线与概览</h2>
+          <p>每个美股交易日（ET）写入当日权益快照；实时行情失败自动回退到最近落盘价格。</p>
+        </div>
+        {stats ? <EquityKpis stats={stats} /> : null}
+      </header>
+      <div className="portfolio-equity-grid">
+        <div className="portfolio-equity-chart-card">
+          <div className="portfolio-equity-chart-head"><TrendingUp size={15} /><span>组合权益日线</span><small>USD</small></div>
+          {history.length ? <EquityChart points={points} chartAdapter={chartAdapter} /> : (
+            <div className="portfolio-equity-empty">
+              <TrendingUp size={20} />
+              <span>暂无权益历史。每个美股工作日打开本页后自动记录当日快照；盘中和收盘后打开都会刷新当天值。</span>
+            </div>
+          )}
+          {error ? <p className="portfolio-equity-error">权益历史暂不可用：{error.message}</p> : null}
+        </div>
+        <div className="portfolio-equity-bars">
+          <PositionBars holdings={holdings} />
+          <ProfitLossBars holdings={holdings} />
+        </div>
+      </div>
+      {history.length ? <EquityTable history={history} /> : null}
+    </section>
+  )
+}
+
+function EquityKpis({ stats }) {
+  const items = [
+    { label: '今日变动', value: stats.dayChange == null ? '—' : formatSignedMoney(stats.dayChange), sub: stats.dayChangePercent == null ? '' : `${(stats.dayChangePercent * 100).toFixed(2)}%`, negative: (stats.dayChange || 0) < 0 },
+    { label: '总成本', value: formatMoney(stats.totalCost) },
+    { label: '总未实现盈亏', value: stats.totalProfitLoss == null ? '—' : formatSignedMoney(stats.totalProfitLoss), sub: stats.pricedCount < stats.holdingCount ? `已覆盖 ${stats.pricedCount}/${stats.holdingCount}` : '', negative: (stats.totalProfitLoss || 0) < 0 },
+    { label: '盈亏率', value: stats.returnRate == null ? '—' : `${(stats.returnRate * 100).toFixed(2)}%` },
+    { label: '现金占比', value: stats.cashRatio == null ? '—' : `${(stats.cashRatio * 100).toFixed(2)}%` },
+    { label: '最大持仓', value: stats.largest ? stats.largest.symbol : '—', sub: stats.topWeight == null ? '' : `${(stats.topWeight * 100).toFixed(2)}%` },
+  ]
+  return (
+    <dl className="portfolio-equity-kpis">
+      {items.map((item) => (
+        <div key={item.label}>
+          <dt>{item.label}</dt>
+          <dd className={item.negative ? 'negative' : ''}>
+            <strong>{item.value}</strong>
+            {item.sub ? <small>{item.sub}</small> : null}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+function EquityChart({ points, chartAdapter = lightweightEquityChartAdapter }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!points.length || !ref.current) return undefined
+    const chart = chartAdapter.create({ element: ref.current })
+    chart.setData(points)
+    const resize = () => chart.resize()
+    window.addEventListener('resize', resize)
+    return () => {
+      window.removeEventListener('resize', resize)
+      chart.dispose()
+    }
+  }, [chartAdapter, points])
+  return <div className="equity-chart-pane" ref={ref} role="img" aria-label={`组合权益日线，共 ${points.length} 个观测点`} />
+}
+
+const observedValue = (observed) => observed?.availability === 'available' && observed.value != null
+
+function PositionBars({ holdings }) {
+  const weighted = holdings.filter((holding) => observedValue(holding.weight))
+  const maxWeight = weighted.reduce((max, holding) => Math.max(max, Number(holding.weight.value)), 0)
+  if (!weighted.length) return <div className="portfolio-bar-empty">仓位分布不可用：行情缺失时不计算权重。</div>
+  return (
+    <div className="portfolio-bar-block">
+      <h3>仓位分布</h3>
+      {weighted.map((holding) => {
+        const weight = Number(holding.weight.value)
+        return (
+          <div className="portfolio-bar-row" key={holding.holding_id}>
+            <span className="portfolio-bar-label">{holding.symbol}</span>
+            <span className="portfolio-bar-track"><i style={{ width: maxWeight ? `${(weight / maxWeight) * 100}%` : '0%' }} /></span>
+            <span className="portfolio-bar-value">{(weight * 100).toFixed(2)}%</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function ProfitLossBars({ holdings }) {
+  const priced = holdings.filter((holding) => observedValue(holding.unrealized_profit_loss))
+  const maxAbs = priced.reduce((max, holding) => Math.max(max, Math.abs(Number(holding.unrealized_profit_loss.value))), 0)
+  if (!priced.length) return <div className="portfolio-bar-empty">盈亏分解不可用：行情缺失时不展示。</div>
+  return (
+    <div className="portfolio-bar-block">
+      <h3>未实现盈亏分解</h3>
+      {priced.map((holding) => {
+        const profitLoss = Number(holding.unrealized_profit_loss.value)
+        return (
+          <div className="portfolio-bar-row" key={holding.holding_id}>
+            <span className="portfolio-bar-label">{holding.symbol}</span>
+            <span className={`portfolio-bar-track ${profitLoss < 0 ? 'negative' : ''}`}><i style={{ width: maxAbs ? `${(Math.abs(profitLoss) / maxAbs) * 100}%` : '0%' }} /></span>
+            <span className={`portfolio-bar-value ${profitLoss < 0 ? 'negative' : ''}`}>{formatSignedMoney(profitLoss)}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function EquityTable({ history }) {
+  const rows = history.map((item, index) => {
+    const previous = index > 0 ? history[index - 1] : null
+    const change = previous ? Number(item.total_equity) - Number(previous.total_equity) : null
+    const percent = previous && Number(previous.total_equity) ? change / Number(previous.total_equity) : null
+    return { ...item, change, percent }
+  }).toReversed()
+  return (
+    <details className="equity-accessible-table">
+      <summary>查看权益日线数据表（{history.length} 个交易日）</summary>
+      <div className="table-scroll compact-history">
+        <table className="data-table">
+          <caption className="sr-only">组合权益日线，最新在前。</caption>
+          <thead><tr><th>交易日</th><th>权益</th><th>持仓市值</th><th>现金</th><th>日变动</th><th>变动率</th><th>覆盖</th><th>观测</th></tr></thead>
+          <tbody>
+            {rows.map((item) => (
+              <tr key={item.market_day}>
+                <td>{item.market_day}</td>
+                <td className="mono strong">{formatMoney(Number(item.total_equity))}</td>
+                <td className="mono">{formatMoney(Number(item.total_market_value))}</td>
+                <td className="mono">{formatMoney(Number(item.usd_cash))}</td>
+                <td className={`mono ${(item.change || 0) < 0 ? 'negative' : ''}`}>{item.change == null ? '—' : formatSignedMoney(item.change)}</td>
+                <td className={`mono ${(item.percent || 0) < 0 ? 'negative' : ''}`}>{item.percent == null ? '—' : `${(item.percent * 100).toFixed(2)}%`}</td>
+                <td>{item.priced_count}/{item.holdings_count}</td>
+                <td>{item.after_close ? <b className="badge-close">收盘</b> : <b className="badge-intraday">盘中</b>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  )
+}
+
+function formatMoney(value) {
+  return Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function formatSignedMoney(value) {
+  const sign = Number(value) > 0 ? '+' : ''
+  return `${sign}${formatMoney(value)}`
 }
 
 function formatTime(value) {

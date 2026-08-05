@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index as SqlIndex,
+    Integer,
     JSON,
     LargeBinary,
     Numeric,
@@ -306,6 +307,56 @@ class PersonalAuditEvent(PrivateBase):
     portfolio_revision: Mapped[int] = mapped_column(nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     backup_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PersonalPriceObservation(PrivateBase):
+    """最近一次成功行情落盘：workspace + symbol_hmac 唯一，观察数据整体加密。"""
+
+    __tablename__ = "personal_price_observations"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "symbol_hmac", name="uq_personal_price_observation_symbol"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    symbol_hmac: Mapped[str] = mapped_column(String(64), nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class PersonalEquitySnapshot(PrivateBase):
+    """每日权益快照：workspace + 美股交易日唯一，持仓/价格快照加密落盘。"""
+
+    __tablename__ = "personal_equity_snapshots"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "market_day", name="uq_personal_equity_snapshot_day"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    market_day: Mapped[date] = mapped_column(Date, nullable=False)
+    total_equity: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
+    total_market_value: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
+    usd_cash: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
+    holdings_count: Mapped[int] = mapped_column(nullable=False)
+    priced_count: Mapped[int] = mapped_column(nullable=False)
+    after_close: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class PersonalRuleInstance(PrivateBase):

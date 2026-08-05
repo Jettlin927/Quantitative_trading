@@ -69,7 +69,8 @@ describe('手工美股持仓工作台', () => {
         expected_portfolio_revision: 0,
       },
     })))
-    const row = (await screen.findByText('ACME')).closest('tr')
+    const table = await screen.findByRole('table')
+    const row = within(table).getByText('ACME').closest('tr')
     for (const value of ['2.0000', '100.2500', '200.5000', '241.0000', '+40.5000', '20.20%', '100.00%']) {
       expect(within(row).getByText(value)).toBeInTheDocument()
     }
@@ -160,5 +161,70 @@ describe('手工美股持仓工作台', () => {
     expect(screen.getByRole('status')).toHaveTextContent('行情覆盖 1 / 2')
     expect(screen.getByRole('status')).toHaveTextContent('其余标的保持不可用')
     expect(screen.getAllByText('241.0000')).toHaveLength(3)
+  })
+
+  it('权益日线与概览：折线、KPI、仓位分布、盈亏分解与日表', async () => {
+    const history = {
+      currency: 'USD',
+      snapshots: [
+        { market_day: '2026-08-03', total_equity: '200.0000', total_market_value: '180.0000', usd_cash: '20.0000', holdings_count: 1, priced_count: 1, after_close: true, observed_at: '2026-08-03T20:05:00Z' },
+        { market_day: '2026-08-04', total_equity: '250.0000', total_market_value: '230.0000', usd_cash: '20.0000', holdings_count: 1, priced_count: 1, after_close: false, observed_at: '2026-08-04T15:00:00Z' },
+      ],
+    }
+    const fakeAdapter = {
+      create: vi.fn(() => ({ setData: vi.fn(), setRange: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
+    }
+    const client = {
+      openPortfolio: vi.fn(() => Promise.resolve(activePortfolio)),
+      openEquityHistory: vi.fn(() => Promise.resolve(history)),
+    }
+
+    render(<PortfolioView client={client} chartAdapter={fakeAdapter} />)
+
+    expect(await screen.findByText('权益日线与概览')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /组合权益日线，共 2 个观测点/ })).toBeInTheDocument()
+    expect(fakeAdapter.create).toHaveBeenCalledTimes(1)
+    // 今日变动 = 250 - 200 = +50.00 / 25.00%（KPI 与日表各出现一次）
+    expect(screen.getAllByText('+50.00').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('25.00%').length).toBeGreaterThanOrEqual(1)
+    // KPI：总成本、未实现盈亏、盈亏率、现金占比、最大持仓
+    expect(screen.getByText('总成本')).toBeInTheDocument()
+    expect(screen.getByText('200.50')).toBeInTheDocument()
+    expect(screen.getAllByText('+40.50').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('20.20%').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('0.00%')).toBeInTheDocument()
+    expect(screen.getByText('最大持仓')).toBeInTheDocument()
+    // 仓位分布与盈亏分解
+    expect(screen.getByText('仓位分布')).toBeInTheDocument()
+    expect(screen.getByText('未实现盈亏分解')).toBeInTheDocument()
+    expect(screen.getAllByText('100.00%').length).toBeGreaterThanOrEqual(1)
+    // 日表：最新在前，含收盘/盘中标记
+    const table = await screen.findByRole('table', { name: /组合权益日线/ })
+    const rows = within(table).getAllByRole('row')
+    expect(rows[1]).toHaveTextContent('2026-08-04')
+    expect(within(rows[1]).getByText('盘中')).toBeInTheDocument()
+    expect(rows[2]).toHaveTextContent('2026-08-03')
+    expect(within(rows[2]).getByText('收盘')).toBeInTheDocument()
+  })
+
+  it('实时行情失败时标记上次落盘并显示回退提示', async () => {
+    const cachedPortfolio = {
+      ...activePortfolio,
+      holdings: [{
+        ...activePortfolio.holdings[0],
+        market_price: available('120.5000', { cached: true, source_health: 'stale' }),
+        market_value: available('241.0000', { cached: true, source_health: 'stale' }),
+        unrealized_profit_loss: available('40.5000', { cached: true, source_health: 'stale' }),
+        unrealized_return: available('0.201995', { cached: true, source_health: 'stale' }),
+        weight: available('1.000000', { cached: true, source_health: 'stale' }),
+      }],
+    }
+    const client = { openPortfolio: vi.fn(() => Promise.resolve(cachedPortfolio)) }
+
+    render(<PortfolioView client={client} />)
+
+    expect((await screen.findAllByText(/上次落盘/)).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('1 个标的使用上次落盘行情。')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('实时行情获取失败，已回退到最近一次成功落盘的价格')
   })
 })

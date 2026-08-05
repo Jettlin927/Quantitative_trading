@@ -113,6 +113,18 @@ def create_personal_router(
         except SQLAlchemyError as exc:
             _raise_store_error(exc)
 
+    @router.get("/portfolio/equity-history")
+    def open_equity_history(
+        limit: int = 120,
+        runtime: PersonalRuntime = Depends(require_read),
+    ) -> dict:
+        actor, portfolio = _configured_portfolio(runtime)
+        try:
+            snapshots = portfolio.equity_history(actor, limit=limit)
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        return {"currency": "USD", "snapshots": [asdict(item) for item in snapshots]}
+
     @router.get("/instruments/{asset_id}")
     def open_instrument(
         asset_id: str,
