@@ -10,11 +10,13 @@ from pydantic import ValidationError
 
 from backend.app.personal_workspace.contracts import (
     AddHoldingCommand,
+    BuyHoldingCommand,
     EditHoldingCommand,
     PersonalActor,
     PurgeHoldingCommand,
     RemoveHoldingCommand,
     RestoreHoldingCommand,
+    SellHoldingCommand,
     SetUsdCashCommand,
 )
 from backend.app.personal_workspace.portfolio import (
@@ -187,6 +189,162 @@ class PersonalPortfolioTest(unittest.TestCase):
             idempotency_key="override-cash",
         )
         self.assertEqual(override.usd_cash, "59.0000")
+
+    def test_buy_holding_debits_cash_and_weights_average_cost(self) -> None:
+        added = self.add_acme()
+        holding_id = added.holdings[0].holding_id
+        # 加仓 3 股 @ 90：现金 -3×90；加权均价 = (2×100.25 + 3×90) / 5 = 94.10
+        bought = self.book.revise(
+            self.actor,
+            BuyHoldingCommand(
+                type="buy_holding",
+                holding_id=holding_id,
+                quantity="3",
+                price="90",
+                expected_portfolio_revision=1,
+            ),
+            idempotency_key="buy-acme-001",
+        )
+        holding = bought.holdings[0]
+        self.assertEqual(holding.quantity, "5.0000")
+        self.assertEqual(holding.average_cost, "94.1000")
+        # 现金：-200.50（首笔） - 270（加仓） = -470.50
+        self.assertEqual(bought.usd_cash, "-470.5000")
+        # 加仓不产生已实现交易
+        self.assertEqual(bought.realized_trades, ())
+        self.assertEqual(bought.realized_pnl_total.availability, "not_applicable")
+
+        # 幂等重复不重复扣现金
+        repeated = self.book.revise(
+            self.actor,
+            BuyHoldingCommand(
+                type="buy_holding",
+                holding_id=holding_id,
+                quantity="3",
+                price="90",
+                expected_portfolio_revision=1,
+            ),
+            idempotency_key="buy-acme-001",
+        )
+        self.assertEqual(repeated.holdings[0].quantity, "5.0000")
+        self.assertEqual(repeated.usd_cash, "-470.5000")
+
+    def test_sell_holding_credits_cash_and_records_realized_pnl(self) -> None:
+        added = self.add_acme()
+        holding_id = added.holdings[0].holding_id
+        # 卖出 1.5 股 @ 120：现金 +180；已实现盈亏 = (120-100.25)×1.5 = 29.625
+        sold = self.book.revise(
+            self.actor,
+            SellHoldingCommand(
+                type="sell_holding",
+                holding_id=holding_id,
+                quantity="1.5",
+                price="120",
+                expected_portfolio_revision=1,
+            ),
+            idempotency_key="sell-acme-001",
+        )
+        holding = sold.holdings[0]
+        self.assertEqual(holding.quantity, "0.5000")
+        self.assertEqual(holding.state, "active")
+        self.assertEqual(holding.average_cost, "100.2500")  # 均价不变（平均成本法）
+        self.assertEqual(sold.usd_cash, "-20.5000")  # -200.50 + 180
+        self.assertEqual(sold.realized_pnl_total.value, "29.6250")
+        self.assertEqual(len(sold.realized_trades), 1)
+        trade = sold.realized_trades[0]
+        self.assertEqual(trade.symbol, "ACME")
+        self.assertEqual(trade.shares, "1.500000")
+        self.assertEqual(trade.price, "120.0000")
+        self.assertEqual(trade.proceeds, "180.0000")
+        self.assertEqual(trade.cost_basis, "150.3750")
+        self.assertEqual(trade.realized_pnl, "29.6250")
+        self.assertEqual(trade.portfolio_revision, 2)
+
+        # 幂等重放不重复记录交易
+        self.book.revise(
+            self.actor,
+            SellHoldingCommand(
+                type="sell_holding",
+                holding_id=holding_id,
+                quantity="1.5",
+                price="120",
+                expected_portfolio_revision=2,
+            ),
+            idempotency_key="sell-acme-001",
+        )
+        reopened = self.book.open(self.actor)
+        self.assertEqual(len(reopened.realized_trades), 1)
+        self.assertEqual(reopened.realized_pnl_total.value, "29.6250")
+
+    def test_sell_all_marks_holding_sold_and_rejects_restore_and_over_sell(self) -> None:
+        added = self.add_acme()
+        holding_id = added.holdings[0].holding_id
+        closed = self.book.revise(
+            self.actor,
+            SellHoldingCommand(
+                type="sell_holding",
+                holding_id=holding_id,
+                quantity="2",
+                price="110",
+                expected_portfolio_revision=1,
+            ),
+            idempotency_key="sell-all-acme-001",
+        )
+        holding = closed.holdings[0]
+        self.assertEqual(holding.state, "sold")
+        self.assertEqual(holding.quantity, "0.0000")
+        self.assertEqual(closed.usd_cash, "19.5000")  # -200.50 + 220
+        self.assertEqual(closed.realized_pnl_total.value, "19.5000")
+
+        # 已清仓：不可恢复、不可再卖
+        with self.assertRaises(ValueError):
+            self.book.revise(
+                self.actor,
+                RestoreHoldingCommand(
+                    type="restore_holding",
+                    holding_id=holding_id,
+                    expected_portfolio_revision=2,
+                ),
+                idempotency_key="restore-sold-acme",
+            )
+        with self.assertRaises(ValueError):
+            self.book.revise(
+                self.actor,
+                SellHoldingCommand(
+                    type="sell_holding",
+                    holding_id=holding_id,
+                    quantity="1",
+                    price="110",
+                    expected_portfolio_revision=2,
+                ),
+                idempotency_key="sell-sold-acme",
+            )
+        # 卖出数量超过持仓 → 拒绝
+        with self.assertRaises(ValueError):
+            self.book.revise(
+                self.actor,
+                SellHoldingCommand(
+                    type="sell_holding",
+                    holding_id=holding_id,
+                    quantity="3",
+                    price="110",
+                    expected_portfolio_revision=1,
+                ),
+                idempotency_key="sell-over-acme",
+            )
+        # 对已清仓持仓加仓 → 拒绝
+        with self.assertRaises(ValueError):
+            self.book.revise(
+                self.actor,
+                BuyHoldingCommand(
+                    type="buy_holding",
+                    holding_id=holding_id,
+                    quantity="1",
+                    price="110",
+                    expected_portfolio_revision=2,
+                ),
+                idempotency_key="buy-sold-acme",
+            )
 
     def test_open_observes_active_holdings_concurrently(self) -> None:
         class ConcurrentMarket:

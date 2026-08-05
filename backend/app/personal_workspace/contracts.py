@@ -153,6 +153,20 @@ class RestoreHoldingCommand(PortfolioCommand):
     holding_id: str = Field(min_length=1, max_length=64)
 
 
+class BuyHoldingCommand(PortfolioCommand):
+    type: Literal["buy_holding"]
+    holding_id: str = Field(min_length=1, max_length=64)
+    quantity: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
+    price: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
+
+
+class SellHoldingCommand(PortfolioCommand):
+    type: Literal["sell_holding"]
+    holding_id: str = Field(min_length=1, max_length=64)
+    quantity: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
+    price: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
+
+
 class SetUsdCashCommand(PortfolioCommand):
     type: Literal["set_usd_cash"]
     usd_cash: Decimal = Field(ge=0, max_digits=24, decimal_places=8)

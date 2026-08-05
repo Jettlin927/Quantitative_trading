@@ -7,6 +7,7 @@ import {
   Plus,
   RefreshCw,
   ShieldAlert,
+  TrendingDown,
   TrendingUp,
   Trash2,
 } from 'lucide-react'
@@ -23,6 +24,8 @@ export function PortfolioView({ client, chartAdapter = lightweightEquityChartAda
   const [editingId, setEditingId] = useState(null)
   const [cash, setCash] = useState('')
   const [purge, setPurge] = useState(null)
+  const [trade, setTrade] = useState(null)
+  const [tradeForm, setTradeForm] = useState({ quantity: '', price: '' })
   const [deletionReceipt, setDeletionReceipt] = useState(null)
   const [equityHistory, setEquityHistory] = useState([])
   const [equityError, setEquityError] = useState(null)
@@ -82,6 +85,9 @@ export function PortfolioView({ client, chartAdapter = lightweightEquityChartAda
       ? Number(portfolio.total_equity.value)
       : null
     const cash = Number(portfolio.usd_cash)
+    const realizedPnlTotal = portfolio.realized_pnl_total?.availability === 'available'
+      ? Number(portfolio.realized_pnl_total.value)
+      : null
     const weighted = holdings.filter((holding) => available(holding.weight))
     const largest = weighted.reduce(
       (current, holding) => (!current || Number(holding.weight.value) > Number(current.weight.value) ? holding : current),
@@ -111,6 +117,7 @@ export function PortfolioView({ client, chartAdapter = lightweightEquityChartAda
       latestSnapshot: latest || null,
       previousSnapshot: previous || null,
       equityAvailable: totalEquity != null,
+      realizedPnlTotal,
     }
   }, [portfolio, equityHistory])
 
@@ -184,6 +191,31 @@ export function PortfolioView({ client, chartAdapter = lightweightEquityChartAda
     } catch {
       // execute 已记录稳定错误码。
     }
+  }
+
+  async function submitTrade(event) {
+    event.preventDefault()
+    if (!trade) return
+    const holding = trade.holding
+    const command = {
+      type: trade.side === 'buy' ? 'buy_holding' : 'sell_holding',
+      holding_id: holding.holding_id,
+      quantity: tradeForm.quantity,
+      price: tradeForm.price,
+      expected_portfolio_revision: portfolio.portfolio_revision,
+    }
+    try {
+      await execute(command)
+      setTrade(null)
+      setTradeForm({ quantity: '', price: '' })
+    } catch {
+      // execute 已记录稳定错误码，并在 revision conflict 时刷新投影。
+    }
+  }
+
+  function beginTrade(holding, side) {
+    setTrade({ holding, side })
+    setTradeForm({ quantity: '', price: '' })
   }
 
   async function setUsdCash(event) {
@@ -303,6 +335,7 @@ export function PortfolioView({ client, chartAdapter = lightweightEquityChartAda
         history={equityHistory}
         stats={equityStats}
         holdings={portfolio.holdings.filter((holding) => holding.state === 'active')}
+        realizedTrades={portfolio.realized_trades || []}
         error={equityError}
         chartAdapter={chartAdapter}
       />
@@ -319,7 +352,7 @@ export function PortfolioView({ client, chartAdapter = lightweightEquityChartAda
                 <tbody>
                   {portfolio.holdings.map((holding) => (
                     <tr key={holding.holding_id} className={holding.state === 'removed' ? 'removed' : ''}>
-                      <th scope="row"><strong>{holding.symbol}</strong><span>{holding.name}</span><small>{holding.state === 'removed' ? '已移出 / 可恢复' : sourceLabel(holding.market_price)}</small></th>
+                      <th scope="row"><strong>{holding.symbol}</strong><span>{holding.name}</span><small>{holding.state === 'removed' ? '已移出 / 可恢复' : holding.state === 'sold' ? '已卖出 · 已清仓' : sourceLabel(holding.market_price)}</small></th>
                       <td>{holding.quantity}</td>
                       <td>{holding.average_cost}</td>
                       <td>{holding.cost_amount}</td>
@@ -330,8 +363,10 @@ export function PortfolioView({ client, chartAdapter = lightweightEquityChartAda
                       <td><div className="portfolio-row-actions">
                         {holding.state === 'active' ? <>
                           <button aria-label={`编辑 ${holding.symbol}`} onClick={() => beginEdit(holding)}><Pencil size={14} /></button>
+                          <button aria-label={`买入 ${holding.symbol}`} onClick={() => beginTrade(holding, 'buy')}><Plus size={14} /></button>
+                          <button aria-label={`卖出 ${holding.symbol}`} onClick={() => beginTrade(holding, 'sell')}><TrendingDown size={14} /></button>
                           <button aria-label={`移出 ${holding.symbol}`} onClick={() => updateState(holding, 'remove_holding')}><ArchiveRestore size={14} /></button>
-                        </> : <button aria-label={`恢复 ${holding.symbol}`} onClick={() => updateState(holding, 'restore_holding')}><RefreshCw size={14} /></button>}
+                        </> : holding.state === 'removed' ? <button aria-label={`恢复 ${holding.symbol}`} onClick={() => updateState(holding, 'restore_holding')}><RefreshCw size={14} /></button> : null}
                         <button className="danger" aria-label={`永久删除 ${holding.symbol}`} onClick={() => requestPurge(holding)}><Trash2 size={14} /></button>
                       </div></td>
                     </tr>
@@ -371,6 +406,76 @@ export function PortfolioView({ client, chartAdapter = lightweightEquityChartAda
           </section>
         </div>
       ) : null}
+
+      {trade ? <TradeDialog
+        portfolio={portfolio}
+        trade={trade}
+        form={tradeForm}
+        setForm={setTradeForm}
+        submitting={submitting}
+        onCancel={() => { setTrade(null); setTradeForm({ quantity: '', price: '' }) }}
+        onSubmit={submitTrade}
+      /> : null}
+    </div>
+  )
+}
+
+function TradeDialog({ portfolio, trade, form, setForm, submitting, onCancel, onSubmit }) {
+  const holding = trade.holding
+  const selling = trade.side === 'sell'
+  const quantityText = String(form.quantity || '').trim()
+  const priceText = String(form.price || '').trim()
+  const quantity = Number(quantityText)
+  const price = Number(priceText)
+  const valid = Number.isFinite(quantity) && Number.isFinite(price) && quantity > 0 && price >= 0
+    && (!selling || quantity <= Number(holding.quantity))
+  let hint = null
+  if (valid) {
+    const cash = Number(portfolio.usd_cash)
+    const averageCost = Number(holding.average_cost)
+    if (selling) {
+      const proceeds = quantity * price
+      const realized = (price - averageCost) * quantity
+      hint = (
+        <>
+          <span>卖出 {quantity} 股后现金 ≈ <strong>${formatMoney(cash + proceeds)}</strong>；</span>
+          <span>已实现盈亏 ≈ <strong className={realized < 0 ? 'negative' : ''}>{formatSignedMoney(realized)}</strong>（卖出价 − 均价）× 股数。</span>
+        </>
+      )
+    } else {
+      const cost = quantity * price
+      const newAverage = (Number(holding.quantity) * averageCost + cost) / (Number(holding.quantity) + quantity)
+      hint = (
+        <>
+          <span>买入占用现金 ≈ <strong>${formatMoney(cost)}</strong>，添加后现金 ≈ <strong>${formatMoney(cash - cost)}</strong>；</span>
+          <span>加权新均价 ≈ <strong>${formatMoney(newAverage)}</strong>。</span>
+        </>
+      )
+    }
+  }
+  return (
+    <div className="portfolio-modal-backdrop">
+      <form className="portfolio-trade-dialog" role="dialog" aria-modal="true" aria-label={`${selling ? '卖出' : '买入'} ${holding.symbol}`} onSubmit={onSubmit}>
+        <header>
+          <span>{selling ? 'SELL' : 'BUY'}</span>
+          <h2>{selling ? '卖出' : '买入'} {holding.symbol}</h2>
+          <p>{selling
+            ? '卖出扣减数量、现金按 股数×成交价 入账，并记录已实现盈亏；全部卖完即标记为已清仓。'
+            : '加仓扣减现金（股数×成交价），并按加权平均更新持仓均价。'}</p>
+        </header>
+        <label>{selling ? '卖出数量' : '买入数量'}<input autoFocus inputMode="decimal" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} placeholder={`最多 ${holding.quantity}`} /></label>
+        <label>成交价（USD）<input inputMode="decimal" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="例如 120.00" /></label>
+        <div className={`portfolio-trade-hint ${valid && selling && quantity > Number(holding.quantity) ? 'invalid' : ''}`}>
+          <CircleDollarSign size={14} />
+          {valid ? hint : selling && quantity > Number(holding.quantity)
+            ? <span>卖出数量超过当前持仓 {holding.quantity} 股，无法提交。</span>
+            : <span>填写数量和成交价后显示现金与盈亏影响。</span>}
+        </div>
+        <div className="portfolio-editor-actions">
+          <button type="button" onClick={onCancel}>取消</button>
+          <button className={selling ? 'danger-action' : 'primary-action'} disabled={submitting || !valid}><TrendingDown size={15} />{selling ? '确认卖出' : '确认买入'}</button>
+        </div>
+      </form>
     </div>
   )
 }
@@ -410,7 +515,7 @@ function sourceLabel(observed) {
   return observed.source_health || '来源未知'
 }
 
-function EquityOverview({ history, stats, holdings, error, chartAdapter }) {
+function EquityOverview({ history, stats, holdings, realizedTrades, error, chartAdapter }) {
   const points = history.map((item) => ({ time: item.market_day, value: Number(item.total_equity), afterClose: item.after_close }))
   return (
     <section className="portfolio-equity" aria-label="权益日线与概览">
@@ -439,7 +544,37 @@ function EquityOverview({ history, stats, holdings, error, chartAdapter }) {
         </div>
       </div>
       {history.length ? <EquityTable history={history} /> : null}
+      <RealizedTrades trades={realizedTrades} />
     </section>
+  )
+}
+
+function RealizedTrades({ trades }) {
+  if (!trades.length) return null
+  return (
+    <details className="equity-accessible-table realized-trades">
+      <summary>查看已实现交易明细（{trades.length} 笔卖出）</summary>
+      <div className="table-scroll compact-history">
+        <table className="data-table">
+          <caption className="sr-only">已实现交易明细，最新在前。</caption>
+          <thead><tr><th>卖出时间</th><th>标的</th><th>股数</th><th>成交价</th><th>卖出所得</th><th>成本基础</th><th>已实现盈亏</th><th>修订</th></tr></thead>
+          <tbody>
+            {trades.map((trade) => (
+              <tr key={`${trade.portfolio_revision}-${trade.symbol}`}>
+                <td>{formatTime(trade.sold_at)}</td>
+                <td className="mono strong">{trade.symbol}</td>
+                <td className="mono">{trade.shares}</td>
+                <td className="mono">{formatMoney(Number(trade.price))}</td>
+                <td className="mono">{formatMoney(Number(trade.proceeds))}</td>
+                <td className="mono">{formatMoney(Number(trade.cost_basis))}</td>
+                <td className={`mono ${Number(trade.realized_pnl) < 0 ? 'negative' : ''}`}>{formatSignedMoney(Number(trade.realized_pnl))}</td>
+                <td>R{trade.portfolio_revision}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
   )
 }
 
@@ -449,6 +584,7 @@ function EquityKpis({ stats }) {
     { label: '总成本', value: formatMoney(stats.totalCost) },
     { label: '总未实现盈亏', value: stats.totalProfitLoss == null ? '—' : formatSignedMoney(stats.totalProfitLoss), sub: stats.pricedCount < stats.holdingCount ? `已覆盖 ${stats.pricedCount}/${stats.holdingCount}` : '', negative: (stats.totalProfitLoss || 0) < 0 },
     { label: '盈亏率', value: stats.returnRate == null ? '—' : `${(stats.returnRate * 100).toFixed(2)}%` },
+    { label: '累计已实现盈亏', value: stats.realizedPnlTotal == null ? '—' : formatSignedMoney(stats.realizedPnlTotal), negative: (stats.realizedPnlTotal || 0) < 0 },
     { label: '现金占比', value: stats.cashRatio == null ? '—' : `${(stats.cashRatio * 100).toFixed(2)}%` },
     { label: '最大持仓', value: stats.largest ? stats.largest.symbol : '—', sub: stats.topWeight == null ? '' : `${(stats.topWeight * 100).toFixed(2)}%` },
   ]

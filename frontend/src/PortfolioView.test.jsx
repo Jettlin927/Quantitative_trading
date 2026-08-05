@@ -230,4 +230,76 @@ describe('手工美股持仓工作台', () => {
     expect(screen.getByText('1 个标的使用上次落盘行情。')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('实时行情获取失败，已回退到最近一次成功落盘的价格')
   })
+
+  it('买入/卖出弹窗展示现金与盈亏影响并提交对应命令，权益区显示已实现盈亏', async () => {
+    const soldPortfolio = {
+      ...activePortfolio,
+      portfolio_revision: 3,
+      usd_cash: '-20.5000',
+      realized_pnl_total: available('29.6250'),
+      realized_trades: [{
+        portfolio_revision: 2, symbol: 'ACME', shares: '1.500000', price: '120.0000',
+        proceeds: '180.0000', cost_basis: '150.3750', realized_pnl: '29.6250',
+        sold_at: '2026-08-05T14:30:00Z',
+      }],
+    }
+    const client = {
+      openPortfolio: vi.fn(() => Promise.resolve(soldPortfolio)),
+      submitPortfolioCommand: vi.fn(() => Promise.resolve(soldPortfolio)),
+    }
+    render(<PortfolioView client={client} />)
+
+    // 权益区：累计已实现盈亏 KPI + 明细表
+    expect(await screen.findByText('累计已实现盈亏')).toBeInTheDocument()
+    expect(screen.getAllByText('+29.63').length).toBeGreaterThanOrEqual(1)
+    const tradeTable = await screen.findByRole('table', { name: /已实现交易明细/ })
+    const tradeRows = within(tradeTable).getAllByRole('row')
+    expect(tradeRows[1]).toHaveTextContent('ACME')
+    expect(tradeRows[1]).toHaveTextContent('1.500000')
+    expect(tradeRows[1]).toHaveTextContent('120.00')
+
+    // 卖出弹窗：数量+成交价 → 现金与已实现盈亏提示
+    fireEvent.click(screen.getByRole('button', { name: '卖出 ACME' }))
+    expect(await screen.findByRole('dialog', { name: '卖出 ACME' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('卖出数量'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText('成交价（USD）'), { target: { value: '130' } })
+    expect(screen.getByText(/卖出 1 股后现金/)).toBeInTheDocument()
+    expect(screen.getByText(/已实现盈亏 ≈/)).toBeInTheDocument()
+    expect(screen.getByText('$109.50')).toBeInTheDocument() // 现金 -20.50 + 130
+    expect(screen.getByText('+29.75')).toBeInTheDocument() // (130-100.25)×1
+    fireEvent.click(screen.getByRole('button', { name: '确认卖出' }))
+    await waitFor(() => expect(client.submitPortfolioCommand).toHaveBeenCalledWith(expect.objectContaining({
+      command: { type: 'sell_holding', holding_id: 'holding-001', quantity: '1', price: '130', expected_portfolio_revision: 3 },
+    })))
+    expect(await screen.findByRole('button', { name: '卖出 ACME' })).toBeInTheDocument()
+
+    // 买入弹窗：占用现金与加权新均价提示
+    fireEvent.click(screen.getByRole('button', { name: '买入 ACME' }))
+    expect(await screen.findByRole('dialog', { name: '买入 ACME' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('买入数量'), { target: { value: '3' } })
+    fireEvent.change(screen.getByLabelText('成交价（USD）'), { target: { value: '90' } })
+    expect(screen.getByText(/买入占用现金 ≈/)).toBeInTheDocument()
+    expect(screen.getByText(/加权新均价 ≈/)).toBeInTheDocument()
+    expect(screen.getByText('$270.00')).toBeInTheDocument() // 3×90
+    fireEvent.click(screen.getByRole('button', { name: '确认买入' }))
+    await waitFor(() => expect(client.submitPortfolioCommand).toHaveBeenCalledWith(expect.objectContaining({
+      command: { type: 'buy_holding', holding_id: 'holding-001', quantity: '3', price: '90', expected_portfolio_revision: 3 },
+    })))
+  })
+
+  it('卖出超过持仓数量时阻止提交', async () => {
+    const client = {
+      openPortfolio: vi.fn(() => Promise.resolve(activePortfolio)),
+      submitPortfolioCommand: vi.fn(() => Promise.resolve(activePortfolio)),
+    }
+    render(<PortfolioView client={client} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '卖出 ACME' }))
+    const dialog = await screen.findByRole('dialog', { name: '卖出 ACME' })
+    fireEvent.change(within(dialog).getByLabelText('卖出数量'), { target: { value: '9' } })
+    fireEvent.change(within(dialog).getByLabelText('成交价（USD）'), { target: { value: '100' } })
+    expect(within(dialog).getByText(/卖出数量超过当前持仓/)).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: '确认卖出' })).toBeDisabled()
+    expect(client.submitPortfolioCommand).not.toHaveBeenCalled()
+  })
 })
