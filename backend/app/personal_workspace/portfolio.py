@@ -16,6 +16,7 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.app.models import (
@@ -24,6 +25,7 @@ from backend.app.models import (
     PersonalHolding,
     PersonalPortfolioRevision,
     PersonalPriceObservation,
+    PersonalRealizedTrade,
     PersonalRecordPrivateFragment,
     PersonalRedactionEvent,
     PersonalWorkspace,
@@ -33,12 +35,14 @@ from backend.app.market_observation.contracts import AuthorizationDenied
 
 from .contracts import (
     AddHoldingCommand,
+    BuyHoldingCommand,
     EditHoldingCommand,
     PersonalActor,
     PortfolioCommand,
     PurgeHoldingCommand,
     RemoveHoldingCommand,
     RestoreHoldingCommand,
+    SellHoldingCommand,
     SetUsdCashCommand,
 )
 from .crypto import EncryptedEnvelope, PersonalDataCipher
@@ -151,6 +155,32 @@ class PortfolioView:
     active_holding_count: int
     priced_holding_count: int
     issues: tuple[str, ...]
+    realized_pnl_total: ObservedDecimalView
+    realized_trades: tuple[RealizedTradeView, ...] = ()
+
+
+@dataclass(frozen=True)
+class RealizedTrade:
+    portfolio_revision: int
+    symbol: str
+    shares: Decimal
+    price: Decimal
+    proceeds: Decimal
+    cost_basis: Decimal
+    realized_pnl: Decimal
+    sold_at: datetime
+
+
+@dataclass(frozen=True)
+class RealizedTradeView:
+    portfolio_revision: int
+    symbol: str
+    shares: str
+    price: str
+    proceeds: str
+    cost_basis: str
+    realized_pnl: str
+    sold_at: datetime
 
 
 @dataclass(frozen=True)
@@ -598,6 +628,177 @@ def _snapshot_view(snapshot: EquitySnapshot) -> EquitySnapshotView:
     )
 
 
+class RealizedTradeStore(Protocol):
+    def append(self, *, actor_id: str, trade: RealizedTrade) -> None: ...
+
+    def recent(
+        self, *, actor_id: str, limit: int
+    ) -> tuple[RealizedTrade, ...]: ...
+
+    def total(self, *, actor_id: str) -> Decimal: ...
+
+
+class InMemoryRealizedTradeStore:
+    def __init__(self) -> None:
+        self._trades: dict[str, list[RealizedTrade]] = {}
+
+    def append(self, *, actor_id: str, trade: RealizedTrade) -> None:
+        trades = self._trades.setdefault(actor_id, [])
+        if any(item.portfolio_revision == trade.portfolio_revision for item in trades):
+            return
+        trades.append(trade)
+
+    def recent(
+        self, *, actor_id: str, limit: int
+    ) -> tuple[RealizedTrade, ...]:
+        trades = sorted(
+            self._trades.get(actor_id, []),
+            key=lambda item: (item.sold_at, item.portfolio_revision),
+            reverse=True,
+        )
+        return tuple(trades[: max(1, limit)])
+
+    def total(self, *, actor_id: str) -> Decimal:
+        return sum(
+            (item.realized_pnl for item in self._trades.get(actor_id, [])),
+            Decimal("0"),
+        )
+
+
+class PostgresRealizedTradeStore:
+    def __init__(
+        self,
+        session_factory: Callable[[], Session],
+        *,
+        cipher: PersonalDataCipher,
+    ) -> None:
+        self._session_factory = session_factory
+        self._cipher = cipher
+
+    def append(self, *, actor_id: str, trade: RealizedTrade) -> None:
+        with self._session_factory() as session, session.begin():
+            workspace = self._workspace(session, actor_id, lock=True)
+            if workspace is None:
+                return
+            existing = session.scalar(
+                select(PersonalRealizedTrade).where(
+                    PersonalRealizedTrade.workspace_id == workspace.id,
+                    PersonalRealizedTrade.portfolio_revision
+                    == trade.portfolio_revision,
+                )
+            )
+            if existing is not None:
+                return
+            trade_id = str(uuid4())
+            envelope = self._cipher.encrypt_json(
+                _realized_trade_payload(trade),
+                aad=_portfolio_aad(
+                    "personal_realized_trades", f"{workspace.id}|{trade_id}"
+                ),
+            )
+            session.add(
+                PersonalRealizedTrade(
+                    id=trade_id,
+                    workspace_id=workspace.id,
+                    portfolio_revision=trade.portfolio_revision,
+                    symbol_hmac=self._cipher.symbol_lookup(
+                        workspace_id=workspace.id,
+                        normalized_symbol=trade.symbol,
+                    ),
+                    sold_at=trade.sold_at,
+                    ciphertext=envelope.ciphertext,
+                    nonce=envelope.nonce,
+                    key_id=envelope.key_id,
+                    payload_schema=envelope.payload_schema,
+                )
+            )
+
+    def recent(
+        self, *, actor_id: str, limit: int
+    ) -> tuple[RealizedTrade, ...]:
+        if limit <= 0:
+            return ()
+        with self._session_factory() as session:
+            workspace = self._workspace(session, actor_id, lock=False)
+            if workspace is None:
+                return ()
+            rows = session.scalars(
+                select(PersonalRealizedTrade)
+                .where(PersonalRealizedTrade.workspace_id == workspace.id)
+                .order_by(
+                    PersonalRealizedTrade.sold_at.desc(),
+                    PersonalRealizedTrade.portfolio_revision.desc(),
+                )
+                .limit(limit)
+            ).all()
+            return tuple(
+                self._decrypt_trade(row, workspace_id=workspace.id)
+                for row in rows
+            )
+
+    def total(self, *, actor_id: str) -> Decimal:
+        with self._session_factory() as session:
+            workspace = self._workspace(session, actor_id, lock=False)
+            if workspace is None:
+                return Decimal("0")
+            rows = session.scalars(
+                select(PersonalRealizedTrade).where(
+                    PersonalRealizedTrade.workspace_id == workspace.id
+                )
+            ).all()
+            return sum(
+                (
+                    self._decrypt_trade(row, workspace_id=workspace.id).realized_pnl
+                    for row in rows
+                ),
+                Decimal("0"),
+            )
+
+    def _decrypt_trade(
+        self, row: PersonalRealizedTrade, *, workspace_id: str
+    ) -> RealizedTrade:
+        payload = self._cipher.decrypt_json(
+            _portfolio_row_envelope(row),
+            aad=_portfolio_aad(
+                "personal_realized_trades", f"{workspace_id}|{row.id}"
+            ),
+        )
+        return RealizedTrade(
+            portfolio_revision=row.portfolio_revision,
+            symbol=str(payload["symbol"]),
+            shares=Decimal(str(payload["shares"])),
+            price=Decimal(str(payload["price"])),
+            proceeds=Decimal(str(payload["proceeds"])),
+            cost_basis=Decimal(str(payload["cost_basis"])),
+            realized_pnl=Decimal(str(payload["realized_pnl"])),
+            sold_at=_payload_datetime(payload.get("sold_at"))
+            or row.sold_at,
+        )
+
+    @staticmethod
+    def _workspace(
+        session: Session, actor_id: str, *, lock: bool
+    ) -> PersonalWorkspace | None:
+        statement = select(PersonalWorkspace).where(
+            PersonalWorkspace.actor_identity_hash == _portfolio_identity_hash(actor_id)
+        )
+        if lock:
+            statement = statement.with_for_update()
+        return session.scalar(statement)
+
+
+def _realized_trade_payload(trade: RealizedTrade) -> dict:
+    return {
+        "symbol": trade.symbol,
+        "shares": str(trade.shares),
+        "price": str(trade.price),
+        "proceeds": str(trade.proceeds),
+        "cost_basis": str(trade.cost_basis),
+        "realized_pnl": str(trade.realized_pnl),
+        "sold_at": trade.sold_at.isoformat(),
+    }
+
+
 class PostgresPortfolioStore:
     def __init__(
         self,
@@ -956,6 +1157,7 @@ class PortfolioBook:
         provider_wait_seconds: float = 1.8,
         prices: PriceObservationStore | None = None,
         snapshots: EquitySnapshotStore | None = None,
+        trades: RealizedTradeStore | None = None,
         cached_price_max_age_days: int = 7,
     ) -> None:
         if provider_wait_seconds <= 0:
@@ -969,6 +1171,7 @@ class PortfolioBook:
         self._provider_wait_seconds = provider_wait_seconds
         self._prices = prices or InMemoryPriceObservationStore()
         self._snapshots = snapshots or InMemoryEquitySnapshotStore()
+        self._trades = trades or InMemoryRealizedTradeStore()
         self._cached_price_max_age_days = cached_price_max_age_days
 
     def open(self, actor: PersonalActor) -> PortfolioView:
@@ -1005,7 +1208,35 @@ class PortfolioBook:
             action=command.type,
             mutate=lambda current: self._apply(current, command),
         )
+        if isinstance(command, SellHoldingCommand):
+            self._record_sold_trade(actor, state, command)
         return self._project(actor, state)
+
+    def _record_sold_trade(
+        self,
+        actor: PersonalActor,
+        state: PortfolioState,
+        command: SellHoldingCommand,
+    ) -> None:
+        holding = state.holdings.get(command.holding_id)
+        if holding is None:
+            return
+        sold_at = self._clock()
+        proceeds = command.quantity * command.price
+        cost_basis = command.quantity * holding.average_cost
+        self._trades.append(
+            actor_id=actor.actor_id,
+            trade=RealizedTrade(
+                portfolio_revision=state.revision,
+                symbol=holding.symbol,
+                shares=command.quantity,
+                price=command.price,
+                proceeds=proceeds,
+                cost_basis=cost_basis,
+                realized_pnl=proceeds - cost_basis,
+                sold_at=sold_at,
+            ),
+        )
 
     def request_purge(
         self,
@@ -1115,6 +1346,44 @@ class PortfolioBook:
             state.holdings[holding_id] = replace(
                 holding, state="active", revision=holding.revision + 1
             )
+        elif isinstance(command, BuyHoldingCommand):
+            # 加仓视为用现金买入：扣现金 = 数量 × 价格，加权更新均价。
+            if holding.state != "active":
+                raise ValueError("invalid_command")
+            new_quantity = holding.quantity + command.quantity
+            new_average = (
+                holding.quantity * holding.average_cost
+                + command.quantity * command.price
+            ) / new_quantity
+            state.holdings[holding_id] = replace(
+                holding,
+                quantity=new_quantity,
+                average_cost=new_average.quantize(Decimal("0.00000001")),
+                revision=holding.revision + 1,
+            )
+            state.usd_cash -= command.quantity * command.price
+        elif isinstance(command, SellHoldingCommand):
+            # 卖出：扣数量、现金入账（数量×成交价）；均价不变（平均成本法）。
+            # 全部卖完 → 状态 sold（已清仓），不可恢复。
+            if holding.state != "active":
+                raise ValueError("invalid_command")
+            if command.quantity > holding.quantity:
+                raise ValueError("invalid_command")
+            remaining = holding.quantity - command.quantity
+            if remaining == 0:
+                state.holdings[holding_id] = replace(
+                    holding,
+                    quantity=Decimal("0"),
+                    state="sold",
+                    revision=holding.revision + 1,
+                )
+            else:
+                state.holdings[holding_id] = replace(
+                    holding,
+                    quantity=remaining,
+                    revision=holding.revision + 1,
+                )
+            state.usd_cash += command.quantity * command.price
         else:
             raise ValueError("invalid_command")
 
@@ -1230,6 +1499,40 @@ class PortfolioBook:
             active_holding_count=len(active),
             priced_holding_count=len(available),
             issues=issues,
+            realized_pnl_total=self._realized_pnl_view(actor),
+            realized_trades=self._realized_trade_views(actor),
+        )
+
+    def _realized_pnl_view(self, actor: PersonalActor) -> ObservedDecimalView:
+        try:
+            total = self._trades.total(actor_id=actor.actor_id)
+        except (SQLAlchemyError, OSError, ValueError):
+            return _observed_unavailable(
+                "realized_trades_unavailable", source_health="degraded"
+            )
+        if total == 0 and not self._trades.recent(actor_id=actor.actor_id, limit=1):
+            return _observed_not_applicable("no_realized_trades")
+        return _observed_available(total, ())
+
+    def _realized_trade_views(
+        self, actor: PersonalActor
+    ) -> tuple[RealizedTradeView, ...]:
+        try:
+            trades = self._trades.recent(actor_id=actor.actor_id, limit=20)
+        except (SQLAlchemyError, OSError, ValueError):
+            return ()
+        return tuple(
+            RealizedTradeView(
+                portfolio_revision=trade.portfolio_revision,
+                symbol=trade.symbol,
+                shares=_ratio(trade.shares),
+                price=_money(trade.price),
+                proceeds=_money(trade.proceeds),
+                cost_basis=_money(trade.cost_basis),
+                realized_pnl=_money(trade.realized_pnl),
+                sold_at=trade.sold_at,
+            )
+            for trade in trades
         )
 
     def _persist_available_prices(

@@ -3949,6 +3949,32 @@ button:disabled {
 }
 .portfolio-add-cash-hint svg { flex: 0 0 auto; color: #338098; }
 .portfolio-add-cash-hint strong { color: #0c3446; font-family: Consolas, monospace; }
+.portfolio-trade-dialog {
+  width: min(430px, calc(100vw - 32px));
+  background: #f6fafb;
+  border: 1px solid #c3d9e0;
+  border-top: 3px solid #338098;
+  border-radius: 8px;
+  padding: 20px;
+  color: #27424f;
+  box-shadow: 0 16px 48px rgba(15, 45, 58, 0.25);
+}
+.portfolio-trade-dialog header { margin-bottom: 14px; }
+.portfolio-trade-dialog header > span { font-size: 9px; letter-spacing: 0.16em; color: #338098; font-weight: 700; }
+.portfolio-trade-dialog h2 { font-size: 15px; margin: 4px 0 6px; color: #0c3446; }
+.portfolio-trade-dialog header p { font-size: 10px; color: #55707d; line-height: 1.55; margin: 0; }
+.portfolio-trade-dialog label { display: block; font-size: 10px; color: #55707d; margin-bottom: 10px; }
+.portfolio-trade-dialog input { width: 100%; margin-top: 4px; }
+.portfolio-trade-hint {
+  display: flex; align-items: flex-start; gap: 8px;
+  border: 1px dashed #9fc3cf; background: #f0f8fa; color: #2d5c6c;
+  padding: 9px; font-size: 10px; line-height: 1.55; margin: 4px 0 12px;
+}
+.portfolio-trade-hint svg { flex: 0 0 auto; color: #338098; }
+.portfolio-trade-hint strong { color: #0c3446; font-family: Consolas, monospace; }
+.portfolio-trade-hint .negative { color: #a4453a; }
+.portfolio-trade-hint.invalid { border-color: #c98a7e; background: #fdf1ee; }
+.realized-trades { margin-top: 12px; }
 .portfolio-editor-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .portfolio-editor .primary-action { border-color: #056e91; color: #fff; background: #087ea4; }
 

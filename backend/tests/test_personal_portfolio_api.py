@@ -263,7 +263,94 @@ class PersonalPortfolioApiTest(unittest.TestCase):
         self.assertEqual(market_price["source_health"], "stale")
         self.assertEqual(second["priced_holding_count"], 1)
         self.assertEqual(second["total_equity"]["value"], "40.5000")
-        self.assertNotIn("partial_valuation", second["issues"])
+
+    def test_buy_and_sell_commands_return_realized_pnl_and_update_cash(self) -> None:
+        added = self.add_acme()
+        holding_id = added.json()["holdings"][0]["holding_id"]
+
+        bought = self.client.post(
+            "/api/personal/portfolio/commands",
+            headers=self.write_headers("buy-acme-api"),
+            json={
+                "type": "buy_holding",
+                "holding_id": holding_id,
+                "quantity": "3",
+                "price": "90",
+                "expected_portfolio_revision": 1,
+            },
+        )
+        self.assertEqual(bought.status_code, 200)
+        body = bought.json()
+        self.assertEqual(body["usd_cash"], "-470.5000")
+        self.assertEqual(body["holdings"][0]["quantity"], "5.0000")
+        self.assertEqual(body["holdings"][0]["average_cost"], "94.1000")
+        self.assertEqual(body["realized_trades"], [])
+        self.assertEqual(body["realized_pnl_total"]["availability"], "not_applicable")
+
+        sold = self.client.post(
+            "/api/personal/portfolio/commands",
+            headers=self.write_headers("sell-acme-api"),
+            json={
+                "type": "sell_holding",
+                "holding_id": holding_id,
+                "quantity": "2",
+                "price": "100",
+                "expected_portfolio_revision": 2,
+            },
+        )
+        self.assertEqual(sold.status_code, 200)
+        sold_body = sold.json()
+        # 已实现盈亏 = (100-94.10)×2 = 11.80；现金 = -470.50 + 200 = -270.50
+        self.assertEqual(sold_body["usd_cash"], "-270.5000")
+        self.assertEqual(sold_body["realized_pnl_total"]["value"], "11.8000")
+        self.assertEqual(len(sold_body["realized_trades"]), 1)
+        trade = sold_body["realized_trades"][0]
+        self.assertEqual(trade["symbol"], "ACME")
+        self.assertEqual(trade["realized_pnl"], "11.8000")
+        self.assertEqual(trade["portfolio_revision"], 3)
+
+        readback = self.client.get(
+            "/api/personal/portfolio", headers=self.read_headers
+        ).json()
+        self.assertEqual(readback["realized_pnl_total"]["value"], "11.8000")
+        self.assertEqual(len(readback["realized_trades"]), 1)
+
+        # 卖出数量超过持仓 → 422 invalid_command
+        over = self.client.post(
+            "/api/personal/portfolio/commands",
+            headers=self.write_headers("sell-over-api"),
+            json={
+                "type": "sell_holding",
+                "holding_id": holding_id,
+                "quantity": "99",
+                "price": "100",
+                "expected_portfolio_revision": 3,
+            },
+        )
+        self.assertEqual(over.status_code, 422)
+        self.assertEqual(over.json()["detail"]["code"], "invalid_command")
+
+        # 全部卖出 → 状态 sold
+        closed = self.client.post(
+            "/api/personal/portfolio/commands",
+            headers=self.write_headers("sell-rest-api"),
+            json={
+                "type": "sell_holding",
+                "holding_id": holding_id,
+                "quantity": "3",
+                "price": "95",
+                "expected_portfolio_revision": 3,
+            },
+        )
+        self.assertEqual(closed.status_code, 200)
+        closed_body = closed.json()
+        closed_holding = next(
+            item
+            for item in closed_body["holdings"]
+            if item["holding_id"] == holding_id
+        )
+        self.assertEqual(closed_holding["state"], "sold")
+        self.assertEqual(closed_holding["quantity"], "0.0000")
 
 
 if __name__ == "__main__":

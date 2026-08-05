@@ -359,6 +359,33 @@ class PersonalEquitySnapshot(PrivateBase):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class PersonalRealizedTrade(PrivateBase):
+    """已实现交易（卖出）：workspace + portfolio_revision 唯一；私有业务值整体加密。"""
+
+    __tablename__ = "personal_realized_trades"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "portfolio_revision",
+            name="uq_personal_realized_trade_revision",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    portfolio_revision: Mapped[int] = mapped_column(nullable=False)
+    symbol_hmac: Mapped[str] = mapped_column(String(64), nullable=False)
+    sold_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class PersonalRuleInstance(PrivateBase):
     __tablename__ = "personal_rule_instances"
 

@@ -14,6 +14,7 @@ from .contracts import (
     AddHoldingCommand,
     AppendRecordSupplementCommand,
     AppendVerificationObservationCommand,
+    BuyHoldingCommand,
     ChangeRecordStateCommand,
     ConfirmRecordPurgeCommand,
     CreateObservationRuleCommand,
@@ -27,6 +28,7 @@ from .contracts import (
     RequestPurgeHoldingCommand,
     RequestRecordPurgeCommand,
     RestoreHoldingCommand,
+    SellHoldingCommand,
     SaveSyntheticRecordCommand,
     SaveAnalysisRecordCommand,
     SetUsdCashCommand,
@@ -591,9 +593,11 @@ async def _parse_command(request: Request, command_type):
 
 _PORTFOLIO_COMMAND_TYPES = {
     "add_holding": AddHoldingCommand,
+    "buy_holding": BuyHoldingCommand,
     "edit_holding": EditHoldingCommand,
     "remove_holding": RemoveHoldingCommand,
     "restore_holding": RestoreHoldingCommand,
+    "sell_holding": SellHoldingCommand,
     "set_usd_cash": SetUsdCashCommand,
     "request_purge": RequestPurgeHoldingCommand,
     "confirm_purge": PurgeHoldingCommand,

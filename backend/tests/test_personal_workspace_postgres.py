@@ -21,8 +21,10 @@ from backend.app.database import (
 )
 from backend.app.personal_workspace.contracts import (
     AddHoldingCommand,
+    BuyHoldingCommand,
     PersonalActor,
     PurgeHoldingCommand,
+    SellHoldingCommand,
     SetUsdCashCommand,
 )
 from backend.app.personal_workspace.analysis import (
@@ -47,6 +49,7 @@ from backend.app.personal_workspace.portfolio import (
     PostgresEquitySnapshotStore,
     PostgresPortfolioStore,
     PostgresPriceObservationStore,
+    PostgresRealizedTradeStore,
     UnavailablePortfolioMarketReader,
 )
 from backend.app.personal_workspace.synthetic import SyntheticWorkspaceAdapters
@@ -76,6 +79,7 @@ PRIVATE_TABLES = {
     "personal_research_records",
     "personal_price_observations",
     "personal_equity_snapshots",
+    "personal_realized_trades",
 }
 ENCRYPTED_PRIVATE_TABLES = PRIVATE_TABLES - {
     "personal_audit_events",
@@ -85,7 +89,7 @@ ENCRYPTED_PRIVATE_TABLES = PRIVATE_TABLES - {
 
 class PersonalWorkspaceSchemaIdentityTest(unittest.TestCase):
     def test_private_orm_identity_is_separate_from_public_metadata(self) -> None:
-        self.assertEqual(expected_schema_heads(), ("0018_personal_equity_tracking",))
+        self.assertEqual(expected_schema_heads(), ("0019_personal_realized_trades",))
         self.assertEqual(
             set(PrivateBase.metadata.tables),
             {f"private_workbench.{table}" for table in PRIVATE_TABLES},
@@ -278,6 +282,7 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                             "personal_redaction_events",
                             "personal_price_observations",
                             "personal_equity_snapshots",
+                            "personal_realized_trades",
                         }
                         else 1
                     )
@@ -395,6 +400,138 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                 )
             self.assertNotIn("120.5000", projection)
             self.assertNotIn("delayed_sip", projection)
+        finally:
+            engine.dispose()
+
+    def test_realized_trade_round_trip_through_postgres(self) -> None:
+        engine = create_engine(os.environ["TEST_POSTGRES_URL"])
+        try:
+            with engine.connect() as connection:
+                command.upgrade(alembic_config(connection), "head")
+            with engine.begin() as connection:
+                for table in (
+                    "personal_holdings",
+                    "personal_workspaces",
+                    "personal_portfolio_revisions",
+                    "personal_realized_trades",
+                ):
+                    connection.execute(text(f"DELETE FROM private_workbench.{table}"))
+
+            cipher = PersonalDataCipher(
+                FixedKeyring(
+                    active_key_id="synthetic-key",
+                    data_keys={"synthetic-key": bytes(range(32))},
+                    lookup_key=b"synthetic-lookup-key-for-tests-only",
+                )
+            )
+            actor = PersonalActor(actor_id="local-owner")
+            session_factory = sessionmaker(
+                bind=engine, autoflush=False, expire_on_commit=False
+            )
+            portfolio = PortfolioBook(
+                store=PostgresPortfolioStore(session_factory, cipher=cipher),
+                market=UnavailablePortfolioMarketReader(),
+                trades=PostgresRealizedTradeStore(session_factory, cipher=cipher),
+                challenge_key=b"portfolio-challenge-key-for-tests" * 2,
+                clock=lambda: datetime(2026, 8, 5, 14, 30, tzinfo=timezone.utc),
+            )
+            portfolio.revise(
+                actor,
+                AddHoldingCommand(
+                    type="add_holding",
+                    symbol="ACME",
+                    name="Acme Holdings",
+                    quantity="4",
+                    average_cost="100.25",
+                    expected_portfolio_revision=0,
+                ),
+                idempotency_key="pg-add-acme",
+            )
+            sold = portfolio.revise(
+                actor,
+                SellHoldingCommand(
+                    type="sell_holding",
+                    holding_id=portfolio.open(actor).holdings[0].holding_id,
+                    quantity="1.5",
+                    price="120.00",
+                    expected_portfolio_revision=1,
+                ),
+                idempotency_key="pg-sell-acme",
+            )
+            self.assertEqual(sold.usd_cash, "-221.0000")  # 首笔 4×100.25=−401，卖出 +1.5×120=+180
+            self.assertEqual(sold.holdings[0].quantity, "2.5000")
+            self.assertEqual(sold.holdings[0].state, "active")
+            self.assertEqual(sold.realized_pnl_total.value, "29.6250")  # (120-100.25)×1.5
+            self.assertEqual(sold.realized_trades[0].symbol, "ACME")
+            self.assertEqual(sold.realized_trades[0].realized_pnl, "29.6250")
+
+            # 幂等重放不重复落盘
+            portfolio.revise(
+                actor,
+                SellHoldingCommand(
+                    type="sell_holding",
+                    holding_id=sold.holdings[0].holding_id,
+                    quantity="1.5",
+                    price="120.00",
+                    expected_portfolio_revision=2,
+                ),
+                idempotency_key="pg-sell-acme",
+            )
+
+            # 全新 store 实例读回，验证持久化与加密
+            trades = PostgresRealizedTradeStore(session_factory, cipher=cipher)
+            recent = trades.recent(actor_id=actor.actor_id, limit=10)
+            self.assertEqual(len(recent), 1)
+            self.assertEqual(recent[0].symbol, "ACME")
+            self.assertEqual(recent[0].shares, Decimal("1.5"))
+            self.assertEqual(recent[0].price, Decimal("120.00"))
+            self.assertEqual(recent[0].proceeds, Decimal("180.0000"))
+            self.assertEqual(recent[0].cost_basis, Decimal("150.3750"))
+            self.assertEqual(recent[0].realized_pnl, Decimal("29.6250"))
+            self.assertEqual(trades.total(actor_id=actor.actor_id), Decimal("29.6250"))
+
+            # 全量卖出 → 状态 sold，数量 0
+            holding_id = sold.holdings[0].holding_id
+            closed = portfolio.revise(
+                actor,
+                SellHoldingCommand(
+                    type="sell_holding",
+                    holding_id=holding_id,
+                    quantity="2.5",
+                    price="130",
+                    expected_portfolio_revision=2,
+                ),
+                idempotency_key="pg-sell-acme-rest",
+            )
+            closed_holding = next(
+                item for item in closed.holdings if item.holding_id == holding_id
+            )
+            self.assertEqual(closed_holding.state, "sold")
+            self.assertEqual(closed_holding.quantity, "0.0000")
+            # 累计已实现 = 29.6250 + (130−100.25)×2.5 = 104.0000
+            self.assertEqual(trades.total(actor_id=actor.actor_id), Decimal("104.0000"))
+
+            # 私有业务值不落明文：成交价/均价不在数据库投影中
+            with engine.connect() as connection:
+                projection = "|".join(
+                    connection.execute(
+                        text(
+                            "SELECT to_jsonb(row_value)::text FROM private_workbench."
+                            "personal_realized_trades AS row_value"
+                        )
+                    ).scalars().all()
+                )
+                hmacs = connection.execute(
+                    text(
+                        "SELECT symbol_hmac FROM private_workbench.personal_realized_trades"
+                    )
+                ).scalars().all()
+            self.assertEqual(len(hmacs), 2)
+            self.assertEqual(hmacs[0], cipher.symbol_lookup(workspace_id=portfolio.open(actor).workspace_id, normalized_symbol="ACME"))
+            self.assertNotIn("120.00", projection)
+            self.assertNotIn("29.6250", projection)
+            self.assertNotIn("130", projection)
+            self.assertNotIn("ACME", projection)
         finally:
             engine.dispose()
 

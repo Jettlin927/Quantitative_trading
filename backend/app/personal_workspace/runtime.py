@@ -30,6 +30,7 @@ from .portfolio import (
     PostgresEquitySnapshotStore,
     PostgresPortfolioStore,
     PostgresPriceObservationStore,
+    PostgresRealizedTradeStore,
 )
 from .router import PersonalRuntime
 from .rules import (
@@ -76,6 +77,7 @@ def get_personal_runtime() -> PersonalRuntime:
         market=market_readers.portfolio,
         prices=PostgresPriceObservationStore(session_factory, cipher=cipher),
         snapshots=PostgresEquitySnapshotStore(session_factory, cipher=cipher),
+        trades=PostgresRealizedTradeStore(session_factory, cipher=cipher),
         challenge_key=sha256(
             f"personal-purge|{gateway_token}".encode("utf-8")
         ).digest(),
