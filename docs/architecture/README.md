@@ -15,7 +15,8 @@ GitHub Issues 是计划、批准和用户可见结论的控制面；服务器是
 
 ## 入口
 
-- [代码地图](code-map.md)
+- [系统流程导航](system-flow.md)：拓扑、研究生命周期与数据流的每一步归属
+- [代码地图](code-map.md)：按领域分组的稳定模块职责
 - [统一领域语言](../../CONTEXT.md)
 - [架构决策](../adr/)
 - [研究合同](../research/contracts/)

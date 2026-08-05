@@ -5,6 +5,7 @@
 ## 产品、架构与数据
 
 - [产品范围](product/)
+- [系统流程导航](architecture/system-flow.md)：系统如何运转、接到任务去哪找
 - [架构与代码地图](architecture/)
 - [A 股实际市场数据](data/a-share/)
 - [美股数据边界](data/us/)
