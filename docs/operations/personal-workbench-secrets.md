@@ -29,7 +29,7 @@
 
 前端 Nginx 只额外接收同一个只读 gateway token 文件，用于同源反向代理注入
 `X-Personal-Gateway`；浏览器源码和响应中不得出现 token。前端不得接收 keyring、
-私库 URL 或个人 Origin。同步 Worker和研究 Worker不得接收任何个人 secret。容器内
+私库 URL 或个人 Origin。研究 Worker 不得接收任何个人 secret。容器内
 路径由覆盖固定，不能在 `.env` 中改写。宿主文件不存在时 `create_host_path: false`
 会拒绝启动，不能静默创建目录代替 secret。
 
@@ -39,7 +39,7 @@
 - DeepSeek 凭据：`/run/secrets/deepseek-credentials.json`；
 - 独立的 `PERSONAL_ANALYSIS_DATABASE_URL`。
 
-API、前端、同步 Worker、研究 Worker和数据库均不得接收 DeepSeek 凭据。历史
+API、前端、研究 Worker 和数据库均不得接收 DeepSeek 凭据。历史
 `DEEPSEEK_TOKEN`、`DEEPSEEK_MODEL`、`DEEPSEEK_API_BASE` 环境入口不属于个人分析合同，
 不得复用。模型固定为 `deepseek-v4-flash`，endpoint 固定为 DeepSeek 官方地址。
 API 只接收非 secret 的 `PERSONAL_ANALYSIS_PROVIDER` 状态；缺省或其他值均保持
@@ -144,7 +144,7 @@ Compose 文件渲染。默认留空时部署入口不加载该覆盖，既有部
 
 - API 看到固定的两个容器内路径，两个 mount 均为只读；
 - 前端只看到只读 gateway token 文件，浏览器看不到 token；
-- Worker和研究 Worker看不到个人 secret，前端看不到 keyring、私库 URL 或个人 Origin；
+- 研究 Worker 看不到个人 secret，前端看不到 keyring、私库 URL 或个人 Origin；
 - 缺少任一配置时个人路由继续 fail-closed；
 - 错误 gateway token、错误 Origin 和公共数据库角色访问私库均被拒绝；
 - 正确请求的最小成功路径只在 #162 目标镜像启动后验收。

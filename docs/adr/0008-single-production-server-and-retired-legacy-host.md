@@ -1,12 +1,16 @@
 # 单一生产服务器与旧服务器退役
 
+> 2026-08-05 更新：公共数据 Worker 已由
+> [ADR 0010](0010-us-first-workbench-and-retired-legacy-data-paths.md) 退出目标运行拓扑。
+> 本文关于单一生产服务器和旧服务器退役的决定继续有效。
+
 状态：已接受（2026-08-03）
 
 ## 决策
 
 - 原 `quant-trading-new` 服务器定义为唯一生产服务器，统一使用逻辑角色和 SSH
   别名 `quant-trading-prod`。
-- PostgreSQL、API、数据 Worker、研究 Worker、前端和 canonical 研究工件只在
+- PostgreSQL、API、研究 Worker、前端和 canonical 研究工件只在
   `quant-trading-prod` 运行，并以该服务器的现场读回为生产事实。
 - 原 `quant-trading-server` 服务器退出本系统，不再承担生产、前端、后端、同步、
   研究、灾备或回滚角色，也不得作为数据权威。

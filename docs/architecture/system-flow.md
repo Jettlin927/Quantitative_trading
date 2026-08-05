@@ -1,136 +1,73 @@
 # 系统流程导航
 
-本页说明系统"怎么运转"：容器拓扑、研究生命周期与市场数据同步的每一步由哪些
-模块负责、入口在哪、该读什么文档。它面向第一次接触仓库的智能体，把"这个系统
-怎么工作"和"接到任务该去哪里"串起来。稳定代码职责见 [代码地图](code-map.md)；
-不冻结易变化的生产事实。
+本页说明美股优先工作台的当前控制面、运行面和隔离边界。稳定代码职责见[代码地图](code-map.md)，退役决定见 [ADR 0010](../adr/0010-us-first-workbench-and-retired-legacy-data-paths.md)。
 
-## 一图总览：控制面与执行面
+## 当前拓扑
 
+```text
+浏览器 / SSH 隧道
+        │
+        ▼
+frontend ──同源 /api──► api ─────────► PostgreSQL
+                          │               ├─ public：研究与历史 schema
+                          │               └─ private_workbench：手工持仓/规则/分析
+                          ▼
+                 Alpaca 市场观察（显式授权）
+
+GitHub Issues ──► research-worker ──► quant_research ──► canonical 工件
+                           │                                   │
+                           └──── PostgreSQL 编排/评价 ◄────────┘
+
+personal-analysis-worker ──► DeepSeek + 受控工具
+        （只读私有 secret，与正式研究隔离）
 ```
-GitHub Issues（控制面）          PostgreSQL + 工件（执行面）
-─────────────────────           ─────────────────────────────
-研究提案 / 冻结计划 / 批准       db        artifacts
-      │                          │            │
-      │  轮询+标签收敛            ▼            │
-      └──────────────► research-worker ──► quant_research/runner（正式研究）
-                              │                │
-                              ▼                ▼
-                         research_orchestration  canonical 工件 + 账本
-                              │                │
-                              ▼                ▼
-                         research_publication ──► 评价 → 结论 → 发布读回
-```
 
-- **控制面 = GitHub Issues**：提案、冻结计划、批准、可读进度、最终结论。
-- **执行面 = 服务器**：队列、数据、计算、工件、评价与发布。
-- 数据库、工件、Issue、API 与前端读回同一评价版本与指纹后才算发布完成。
-- 运行成功 ≠ 研究通过；`status=ok` 只能表示源执行成功。
+`docker-compose.yml` 定义 `db`、`api`、`research-worker` 和 `frontend`；`research-worker` 默认不随普通启动运行。`docker-compose.personal.yml` 添加私有 API 配置与 `personal-analysis-worker`。
 
-## 容器拓扑
+公共数据同步 Worker 已退役。API 请求进程不承担 Tushare、AKShare 或 yfinance 的批量拉取。
 
-`docker-compose.yml` 定义五个服务（另见 [架构 README](README.md)）：
+## 个人工作台流程
 
-| 容器 | 入口 | 职责 |
-| --- | --- | --- |
-| `db` | postgres:16-alpine | 市场数据、任务与结构化研究事实 |
-| `api` | `backend/app/main.py` | 数据/研究/运维 API，入队持久任务，不在请求进程执行长同步 |
-| `worker` | `backend/app/sync_worker.py` | 持久化数据同步任务（租约、心跳、退避） |
-| `research-worker` | `backend/app/research_worker.py` | 正式研究队列，profile `research-automation`，需工程 Issue + 人工批准门 |
-| `frontend` | React + Vite 构建、Nginx | 只读研究驾驶舱与数据界面 |
+1. 用户通过 `/today`、`/portfolio`、`/markets/us` 和 `/rules` 查看或维护手工美股投研上下文。
+2. 私有写请求经过 gateway、Origin、Fetch Metadata、JSON、显式个人请求头和幂等校验；配置不完整时 fail-closed。
+3. `PortfolioBook` 保存手工持仓和权益事实；市场价格与 K 线通过 Alpaca adapter 按用途授权读取。
+4. 规则引擎生成确定性的 `triggered`、`not_triggered`、`unavailable` 或 `invalid` 结果，不把缺失数据伪造成零值。
+5. 个人 AI 分析先生成外发预览，再显式确认并进入独立 worker；工具证据必须带可校验 `evidence_id`。
+6. AI 输出、规则命中和 synthetic trace 都不是正式研究批准、运行、评价或结论。
+
+个人不可变记录版本链路已退役；正式研究发布的不可覆盖合同不受影响。
 
 ## 正式研究生命周期
 
-每步标注【负责模块】与【必读文档】。完整口径见
-[策略画像与评价规范](../research/contracts/strategy-evaluation-standard.md) 与
-[量化研究可信合同](../research/contracts/quant-foundation-trust-contract.md)。
+1. **提案与冻结计划**：`research_plan.py` 解析 `research-plan/v3`，冻结假设、范围、数据、基准、成本、门禁和试验预算。
+2. **人工批准**：只有授权用户对精确 `plan_sha256` 的批准评论有效；标签不是授权。
+3. **编排与队列**：`research_worker.py` 和 `research_orchestration.py` 校验 Issue、代码提交、资源与租约。
+4. **运行与证据**：`quant_research/` 只执行已合并、CI 通过且静态登记的策略，输出 canonical 工件和账本。
+5. **评价与结论**：结论只允许研究通过、有条件候选、证据不足、受阻或不通过；运行成功不等于研究通过。
+6. **发布与读回**：数据库、工件、Issue、API 和前端必须读回同一评价版本与指纹；更正创建前向替代版本。
+7. **监测与后续提案**：新增数据只形成观察；改变结论必须生成新提案并重新批准。
 
-1. **提案与冻结计划**
-   - 研究提案创建、排序，但不得据此启动正式研究。
-   - 冻结计划是 `research-plan/v3` 的不可变 JSON（`<!-- research-plan-json:start -->`
-     标记），含假设、规则、范围、基准、成本、门禁、试验预算、停止条件、参数邻域。
-   - 【`research_plan.py`：解析与校验；`configs/research/`：入口清单】
-   - 【文档：`../operations/research-orchestrator.md`、ADR 0001】
+完整合同见[策略评价规范](../research/contracts/strategy-evaluation-standard.md)、[研究编排器](../operations/research-orchestrator.md)和[一致发布](../operations/research-publication.md)。
 
-2. **人工批准**
-   - 只有 GitHub 用户 `Jettlin927` 对冻结计划发布 `批准研究 <plan_sha256>` 才有效；
-     标签不是授权来源。参数/门槛变化形成新哈希，必须重新批准。
-   - 【`research_orchestration.py` 的 `AUTHORIZED_RESEARCH_APPROVER` 与批准校验】
-   - 【ADR 0001：正式研究需要人工批准】
+## 市场数据与历史 schema
 
-3. **编排与队列**
-   - research-worker 轮询 GitHub Issue，把已批准计划放入租约队列；work item 状态机
-     为 排队/已租用/运行中/成功/失败/中断；编排状态独立（待批准→…→已发布）。
-   - 【`research_worker.py`（轮询、信号处理）；`research_orchestration.py`（队列、
-     状态机、批准校验）】
-   - 【文档：`../operations/research-orchestrator.md`；ADR 0002（运行≠评价）】
+- 当前在线市场观察：`market_observation/` 的 Alpaca adapter、来源授权和健康度。
+- 当前研究质量：`data_quality/` 的质量运行与 readiness；活动默认范围由美股/ETF 主线决定。
+- 已退役：A 股 Tushare 同步、免费美股实验、旧 sample/HSBC ledger 及其 API、cron 和页面。
+- 继续保留：Alembic 历史 revision、旧表身份、历史研究工件和 dated 审计证据。
 
-4. **运行与证据**
-   - 只执行已合并、CI 通过并静态登记的策略代码（`quant_research/strategy_registry.py`）；
-     自动优化限制在冻结搜索空间内。
-   - 运行产物为 canonical 工件与账本（`outputs/research-runs/`，被 Git 忽略）。
-   - 【`quant_research/`：`runner.py`（执行）、`snapshot.py`/`universe.py`/
-     `dataset.py`（point-in-time 输入）、`execution.py`/`portfolio.py`/
-     `metrics.py`/`risk.py`（下一交易日执行与统计）、`artifacts.py`/
-     `manifest.py`/`repository.py`（工件）】
-   - 【文档：`../operations/research-publication.md`；ADR 0004（发布不可变）】
-
-5. **评价与结论**
-   - 依据冻结计划的评价策略（DSR/PBO、walk-forward、成本压力）做结构化判断；
-     结论只允许 研究通过 / 有条件候选 / 证据不足 / 受阻 / 不通过。
-   - 【`quant_research/evaluation.py`、`research_evaluation.py`；`run_config.py`
-     （评价/通过策略）】
-   - 【ADR 0002；`../research/contracts/`】
-
-6. **发布与读回**
-   - 数据库、工件、Issue、API 与前端读回同一评价版本与指纹后才算发布完成；
-     已发布研究不可原地覆盖，修正必须创建替代版本。
-   - 【`research_publication.py`（可恢复发布步骤、前端同源读回验证）；
-     `research_catalog.py`（只读目录投影）；`research_analytics.py`（指标投影）】
-   - 【文档：`../operations/research-publication.md`；ADR 0004】
-
-7. **监测与后续提案**
-   - 新增数据只形成观察（`market_observation/`、`official_evidence/`），不自动改
-     结论；需要改变结论时必须产生新的研究提案。
-   - 历史迁移只映射已有运行/证据，不构成批准、不补跑（`research_history_migration.py`、
-     `historical_publication_issues.py`、`configs/research/`）。【ADR 0006】
-
-## 市场数据同步流
-
-```
-前端/API 入队 ──► worker 租约 ──► 摄取 ──► PostgreSQL ──► 质量门
-```
-
-- API 入队：`main.py` 的 `/api/sync-jobs`（202 异步）与 `/api/tushare/sync-*`。
-- worker 执行：`sync_worker.py`（租约、心跳、退避、恢复）。
-- 摄取实现：`market_data_ingestion.py`（A 股：行情/基本面/列表/交易日历/复权/
-  指数/基金/行业）与 `tushare_client.py`。
-- 质量门：`data_quality/`（研究范围质量、canonical 输入快照、质量运行），
-  API 暴露 `/api/data-quality/runs` 与 `/api/research/readiness`。
-- 美股实验（非正式研究资格）：`us_experiment.py` + 定时脚本
-  （`scripts/ops/`），`researchEligible=false` 固定。
-
-## 个人工作台与市场观察（与正式研究隔离）
-
-- 真实美股持仓、观察规则、AI 分析走 `personal_workspace/` +
-  `personal_analysis_worker.py`（唯一可读 DeepSeek secret 的进程，
-  `PERSONAL_ANALYSIS_MODE=agent` 启用 tool-use agent 运行时）。
-- 市场观察（Alpaca 来源、健康度、追加式授权）走 `market_observation/`；
-  官方证据资格走 `official_evidence/`。
-- 【ADR 0007（个人工作台私密隔离）、ADR 0009（个人 AI 分析 agent 工具）】
+本地或 CI 验证可执行 `alembic upgrade head` 建立完整 schema，再插入合成夹具。schema 中存在退役表不表示可以恢复数据拉取、生产写入或产品入口。
 
 ## 接到任务时去哪找
 
-| 任务类型 | 先读 | 主要代码入口 |
+| 任务类型 | 先读 | 主要入口 |
 | --- | --- | --- |
-| 策略研究/回测/评价 | [策略评价规范](../research/contracts/strategy-evaluation-standard.md) + 本页第 4-6 步 | `quant_research/`、`scripts/research/` |
-| 研究编排/Issue 自动化 | `../operations/research-orchestrator.md` + `../agents/issue-tracker.md` | `research_plan.py`、`research_orchestration.py`、`github_research.py`、`research_worker.py` |
-| 数据同步/质量 | [A 股数据](../data/a-share/)、[美股边界](../data/us/) | `market_data_ingestion.py`、`sync_worker.py`、`data_quality/` |
-| 发布/读回一致性 | `../operations/research-publication.md` | `research_publication.py`、`research_catalog.py`、`research_analytics.py` |
-| 前端页面/视觉 | `../../.codex/skills/frontend-design/SKILL.md` | `frontend/src/`（视图表见 code-map） |
-| 生产部署/迁移/凭据 | `../operations/production-deployment-and-home-access.md` | `scripts/ops/` |
-| schema/migration | `../../backend/migrations/` + 本仓库 AGENTS.md 生产门禁 | `models.py` + Alembic revision |
-| 验证 | `../agents/validation.md` | `../../backend/tests/`、`../../scripts/ops/test_*.sh` |
+| 个人工作台 | ADR 0007、0009、0010 | `personal_workspace/`、`personal_analysis_worker.py` |
+| 美股市场数据 | [美股数据边界](../data/us/) | `market_observation/` |
+| 策略研究/评价 | [策略评价规范](../research/contracts/strategy-evaluation-standard.md) | `quant_research/`、`scripts/research/` |
+| 编排/Issue 自动化 | [研究编排器](../operations/research-orchestrator.md) | `research_plan.py`、`research_orchestration.py`、`research_worker.py` |
+| 发布/读回 | [一致发布](../operations/research-publication.md) | `research_publication.py`、`research_catalog.py`、`research_analytics.py` |
+| schema/migration | `backend/migrations/` + 生产门禁 | `models.py`、Alembic revision、PostgreSQL 集成测试 |
+| 部署/凭据 | [生产部署合同](../operations/production-deployment-and-home-access.md) | `scripts/ops/`、Compose 覆盖 |
 
-易变化的事实（表行数、磁盘、部署状态、运行 ID、Issue 状态）必须现场核验，不能
-引用本文档或历史记录代替。
+表行数、提交、容器、数据新鲜度和部署状态必须现场核验，不能引用本文档或历史记录代替。

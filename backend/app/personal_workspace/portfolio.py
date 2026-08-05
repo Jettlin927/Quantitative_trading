@@ -26,7 +26,6 @@ from backend.app.models import (
     PersonalPortfolioRevision,
     PersonalPriceObservation,
     PersonalRealizedTrade,
-    PersonalRecordPrivateFragment,
     PersonalRedactionEvent,
     PersonalWorkspace,
 )
@@ -918,12 +917,6 @@ class PostgresPortfolioStore:
                 )
             )
             session.delete(holding)
-            session.execute(
-                delete(PersonalRecordPrivateFragment).where(
-                    PersonalRecordPrivateFragment.workspace_id == workspace.id,
-                    PersonalRecordPrivateFragment.holding_id == holding_id,
-                )
-            )
             workspace.revision += 1
             state = self._load_state(session, workspace)
             state.revision = workspace.revision

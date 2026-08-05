@@ -30,7 +30,6 @@ from backend.app.models import (
 )
 from backend.app.quant_research.universe import (
     build_explicit_universe,
-    build_industry_membership_universe,
 )
 
 
@@ -320,42 +319,6 @@ def seed_a_share_snapshot_database(db: Session) -> QualityCheckContract:
         universe_source="industry_members",
         universe_source_key="SYNIND.SI",
     )
-
-
-def a_share_snapshot_config(quality_run_id: str) -> dict[str, Any]:
-    return {
-        "strategyId": "a_share_price_baseline",
-        "strategyVersion": "1",
-        "scope": "a_share_cross_section",
-        "universe": build_industry_membership_universe("SYNIND.SI"),
-        "warmupStart": "2026-01-02",
-        "startDate": "2026-01-02",
-        "endDate": "2026-01-05",
-        "benchmark": "SYNIDX.SH",
-        "featureParameters": {
-            "momentumLongWindow": 120,
-            "momentumSkipWindow": 20,
-            "volatilityWindow": 60,
-        },
-        "targetWeightParameters": {
-            "rebalanceFrequency": "month_end",
-            "topN": 2,
-            "maxWeight": "0.5",
-        },
-        "executionPolicy": {
-            "signalPrice": "close",
-            "executionPrice": "next_trade_open",
-        },
-        "costModel": {
-            "buyRate": "0",
-            "sellRate": "0",
-            "slippageRate": "0",
-        },
-        "randomSeed": 7,
-        "timezone": "Asia/Shanghai",
-        "qualityRunId": quality_run_id,
-        "allowedWarnings": [],
-    }
 
 
 def _records(name: str) -> list[dict[str, Any]]:

@@ -180,35 +180,13 @@ describe('AI 影响分析工作台', () => {
     }
     render(<AnalysisWorkspaceView client={client} subjectId="ACME" initialRunId="run-1" />)
 
-    expect(await screen.findAllByText(/已确认事实/)).toHaveLength(2)
-    expect(screen.getAllByText(/◇ 推断/)).toHaveLength(2)
-    expect(screen.getAllByText(/条件情景/)).toHaveLength(2)
-    expect(screen.getAllByText(/未知项/)).toHaveLength(2)
+    expect(await screen.findAllByText(/已确认事实/)).toHaveLength(1)
+    expect(screen.getAllByText(/◇ 推断/)).toHaveLength(1)
+    expect(screen.getAllByText(/条件情景/)).toHaveLength(1)
+    expect(screen.getAllByText(/未知项/)).toHaveLength(1)
     expect(screen.getAllByText('未来两个季度')).toHaveLength(4)
     expect(screen.getByText('反对证据 macro-1')).toBeInTheDocument()
     expect(screen.getAllByText('失效：新增官方披露')).toHaveLength(4)
   })
 
-  it('完成分析后只按 run 与 claim ID 显式保存个人记录', async () => {
-    const completed = {
-      run_id: 'run-1', status: 'completed', stage: 'completed', events: [],
-      claims: [{ claim_id: 'claim-1', kind: 'confirmed_fact', statement: '事实', evidence_ids: ['sec-1'],
-        opposing_evidence_ids: [], assumptions: [], horizon: '当前', invalidation_conditions: ['更正'] }],
-    }
-    const client = {
-      prepareAnalysis: vi.fn(), startAnalysis: vi.fn(), cancelAnalysis: vi.fn(),
-      openAnalysis: vi.fn().mockResolvedValue(completed),
-      commitRecord: vi.fn().mockResolvedValue({ record_id: 'record-1', current_version: 1 }),
-    }
-    render(<AnalysisWorkspaceView client={client} subjectId="ACME" initialRunId="run-1" />)
-    const button = await screen.findByRole('button', { name: '保存所选主张为个人记录' })
-    fireEvent.click(button)
-
-    await waitFor(() => expect(client.commitRecord).toHaveBeenCalledWith(expect.objectContaining({
-      command: expect.objectContaining({
-        type: 'save_analysis', analysis_id: 'run-1', accepted_claim_ids: ['claim-1'],
-      }),
-    })))
-    expect(await screen.findByText(/已保存个人记录 v1/)).toBeInTheDocument()
-  })
 })

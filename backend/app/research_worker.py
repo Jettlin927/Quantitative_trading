@@ -24,7 +24,6 @@ from .github_research import (
 )
 from .models import (
     FormalResearch,
-    DataSyncJob,
     FrozenResearchPlan,
     ResearchOrchestration,
     ResearchRun,
@@ -105,11 +104,6 @@ def claim_next_research_work(
             .limit(1)
         )
         if live is not None:
-            return None
-        active_sync = db.scalar(
-            select(DataSyncJob.id).where(DataSyncJob.status == "running").limit(1)
-        )
-        if active_sync is not None:
             return None
         _block_exhausted_work(db, claimed_at)
         eligible = and_(

@@ -1,118 +1,88 @@
-# 量化研究系统
+# 美股个人投研工作台
 
-本仓库用于同步实际市场数据、执行可复现的离线量化研究，并把研究计划、运行事实、证据、评价和结论以只读方式提供给用户查看。
+本仓库以美股为主，提供手工持仓、观察规则、市场证据、个人 AI 分析和正式量化研究的只读工作台。市场观察主线使用 Alpaca；个人数据保存在隔离的私有 schema，正式研究继续遵守冻结计划、人工批准、可复现证据和一致发布合同。
 
-它不是交易系统：不连接券商或真实账户，不导入真实持仓与成交，不下单，也不把研究结果写成投资建议或收益承诺。
-
-## 工程概览
-
-| 能力 | 实现 |
-|---|---|
-| 数据与研究 | 实际市场数据同步、point-in-time 研究、冻结运行与证据化结论 |
-| 应用架构 | React 前端、FastAPI API、独立 Worker、PostgreSQL 16 |
-| 工程质量 | SQLAlchemy 2.0、Alembic、前后端测试、PostgreSQL 集成验证 |
-| 交付运维 | Docker Compose、生产镜像门禁、SSH 私有访问、可回读部署证据 |
-
-[架构文档](docs/architecture/) · [研究合同](docs/research/contracts/) · [开发验证](#开发验证) · [运维手册](docs/operations/)
+它不是交易系统：不连接真实券商或资金账户，不自动下单，不从券商同步持仓，也不把研究结果写成买卖评级或收益承诺。
 
 ## 产品边界
 
-系统允许：
+| 能力 | 实现 |
+| --- | --- |
+| 今日与持仓 | 手工美股持仓、每日权益、确定性规则与关注事项 |
+| 市场证据 | Alpaca 美股行情、来源授权、健康度与可追溯证据 |
+| 个人分析 | 与正式研究隔离的 tool-use AI 分析队列 |
+| 正式研究 | point-in-time 输入、冻结计划、人工批准、结构化评价和不可覆盖发布 |
+| 工程底座 | React、FastAPI、PostgreSQL 16、Alembic、Docker Compose |
 
-- 同步、持久化、质检和展示 A 股实际市场数据。
-- 明确隔离并展示美股 sample 与免费实际市场实验数据；实验数据固定 `researchEligible=false`，直到历史 universe、退市、许可和质量合同另行完成。
-- 使用 point-in-time、历史 universe、复权和下一交易日执行口径做离线研究。
-- 保存冻结研究计划、运行、证据、结构化评价、强制结论和后续研究提案。
-- 通过 GitHub Issues、API、研究驾驶舱和不可变工件发布研究过程与结果。
+[架构文档](docs/architecture/) · [美股数据边界](docs/data/us/) · [研究合同](docs/research/contracts/) · [运维手册](docs/operations/)
 
-系统禁止：
+## 已退役边界
 
-- 连接真实券商、交易账户或资金账户。
-- 自动下单、撤单、调仓、融资融券或执行其他真实资金动作。
-- 把运行成功等同于研究通过，或把研究结论转成买入、卖出、持有与收益承诺。
+- A 股产品入口、Tushare 拉取、公共数据同步 Worker 和相关策略执行入口已退役。
+- `us_experiment_*` 的 AKShare/yfinance 免费实验链路和旧 `my_quant` sample/HSBC ledger 已退役。
+- 个人工作台的不可变记录版本链路已退役；正式研究发布的不可覆盖合同不受影响。
+- 既有 Alembic revision、历史表定义、已发布研究证据和 dated 审计文档继续保留。测试可用合成数据验证这些 schema，但不得重新接入退役数据源或把历史表当作当前产品能力。
 
-统一术语见 [CONTEXT.md](CONTEXT.md)，稳定工程规则见 [AGENTS.md](AGENTS.md)。
+决策见 [ADR 0010](docs/adr/0010-us-first-workbench-and-retired-legacy-data-paths.md)，实施路线图见 [GitHub Issue #214](https://github.com/Jettlin927/Quantitative_trading/issues/214)。
 
 ## 系统组成
 
-- `frontend`：React + Vite 构建、Nginx 静态服务的只读研究与数据界面。
-- `api`：FastAPI + SQLAlchemy 2.0 的数据、研究和运维接口。
-- `worker`：执行持久化数据同步任务，与 API 请求进程分离。
-- `db`：PostgreSQL 16，保存市场数据、任务和结构化研究事实。
-- `backend/app/quant_research/`：无券商副作用的研究协议、模拟、指标和复现能力。
-- `outputs/research-runs/`：被 Git 忽略的 canonical 运行工件；可提交的报告投影继续位于 `docs/research/strategy-results/`。
+- `frontend`：今日、持仓、美股市场、规则、正式研究和系统健康的只读界面。
+- `api`：美股个人工作台、市场观察、研究目录、评价、发布和数据质量接口。
+- `db`：PostgreSQL 16，保存公开研究事实与隔离的私有工作台数据。
+- `personal-analysis-worker`：个人 AI 分析队列，只通过私有 Compose 覆盖启用。
+- `research-worker`：正式研究队列，只通过 `research-automation` profile 和人工门禁启用。
+- `outputs/research-runs/`：被 Git 忽略的 canonical 研究工件。
 
-模块职责和代码入口见 [架构文档](docs/architecture/)。
+模块职责见[代码地图](docs/architecture/code-map.md)，运行流程见[系统流程](docs/architecture/system-flow.md)。
 
 ## 快速开始
 
-复制环境变量模板，并只在本机填写真实值：
+复制环境变量模板，只在本机填写需要的值：
 
 ```powershell
 Copy-Item .env.example .env
 notepad .env
 ```
 
-新建空开发库时，先显式建立 schema；API 不会自动迁移数据库：
+新建空开发库时显式建立 schema；API 不会自动执行 migration：
 
 ```powershell
 docker compose up -d db
-docker compose build api worker
+docker compose build api frontend
 docker compose run --rm api alembic upgrade head
+docker compose up -d api frontend
 ```
 
-已有业务表但没有 `alembic_version` 时，不得直接执行 `upgrade head`。应先按 [运维文档](docs/operations/)核对 schema fingerprint 和人工门禁。
+这组命令只建立本地 schema，不拉取 A 股或旧美股实验数据。需要个人工作台写能力时，另按[个人工作台 secret 与 Compose 覆盖](docs/operations/personal-workbench-secrets.md)配置；缺少私有配置时相关路由应 fail-closed。
 
-日常启动、重建和停止：
-
-```powershell
-.\启动数据工作台.cmd
-.\重新构建并启动数据工作台.cmd
-.\停止数据工作台.cmd
-```
-
-默认本机入口为前端 `http://localhost:15173`、API 文档 `http://localhost:18000/docs` 和 PostgreSQL `localhost:5432`。生产监听与访问方式必须以现场配置为准，不能从 README 推断。
-
-当前远程访问只使用 SSH 隧道：通过本机 SSH 配置连接服务器，把远端 loopback 前端映射到本机后访问 `http://127.0.0.1:15173`。本项目不为此购买或申请域名，不部署 Cloudflare/Tailscale 入口，也不开放公网 IP 端口；完整决定见[远程访问决策](docs/operations/private-https-authentication-decision.md)。新电脑上的 Codex 在部署、迁移、切换或配置 Windows 常驻隧道前，必须遵守[生产部署与家庭电脑访问合同](docs/operations/production-deployment-and-home-access.md)。
+默认本机入口为前端 `http://localhost:15173`、API 文档 `http://localhost:18000/docs` 和 PostgreSQL `localhost:5432`。生产端口和版本必须现场核验。远程访问仅使用 SSH 隧道，见[生产部署与家庭电脑访问合同](docs/operations/production-deployment-and-home-access.md)。
 
 ## 开发验证
 
-后端快速门禁：
-
 ```bash
 DATABASE_URL=sqlite+pysqlite:///:memory: python -m unittest discover -s backend/tests -p 'test_*.py' -v
-```
-
-涉及 migration、数据质量、快照、runner 或 Worker 时，追加隔离 PostgreSQL 验证：
-
-```bash
 scripts/ops/test_postgres_integration.sh
-```
-
-前端与 Compose：
-
-```bash
 scripts/ops/test_frontend_production_image.sh
 docker compose config
 ```
 
-完整门禁和生产限制见 [AGENTS.md](AGENTS.md)。
+PostgreSQL 集成测试只建立 schema 并写入合成夹具，不需要任何市场数据 token。完整门禁与生产限制见 [AGENTS.md](AGENTS.md)。
 
 ## 文档导航
 
 - [文档总入口](docs/index.md)
 - [产品范围](docs/product/)
 - [架构与代码地图](docs/architecture/)
-- [A 股数据](docs/data/a-share/) / [美股数据边界](docs/data/us/)
+- [美股数据边界](docs/data/us/) / [A 股退役 schema 边界](docs/data/a-share/)
 - [研究合同](docs/research/contracts/) / [研究指南](docs/research/guides/)
-- [运维手册](docs/operations/) / [不可变验收证据](docs/acceptance/)
-- [当前与历史研究结果入口](docs/research/strategy-results/)
+- [运维手册](docs/operations/) / [历史验收证据](docs/acceptance/)
 - [历史归档](docs/archive/)
 
-活动路线图只存在于 GitHub Issues：[寻路地图](https://github.com/Jettlin927/Quantitative_trading/issues/3)与[第一阶段实施总览](https://github.com/Jettlin927/Quantitative_trading/issues/17)。README、dated 文档和 `操作日志.md` 不承担当前任务状态。
+活动路线图只存在于 [GitHub Issues](https://github.com/Jettlin927/Quantitative_trading/issues)。当前仓库整改由 [Issue #214](https://github.com/Jettlin927/Quantitative_trading/issues/214) 承接；README 和 dated 文档不承担当前任务状态。
 
 ## 安全提醒
 
-- 不提交 `.env`、Tushare token、数据库密码、SSH 私钥或其他凭据。
-- 不提交真实账户、持仓、成交或券商导出。
-- 未经用户明确批准，不执行生产 migration、生产切换、覆盖恢复、旧服务器清理或任何 volume 删除。
+- 不提交 `.env`、数据库密码、Alpaca/DeepSeek/GitHub token、SSH 私钥或其他凭据。
+- 不从券商同步真实账户、成交或订单；持仓只允许用户手工维护。
+- 未经明确批准，不执行生产 migration、部署、数据删除、volume 清理或凭据变更。

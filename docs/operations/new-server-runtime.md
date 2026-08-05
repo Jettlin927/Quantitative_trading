@@ -28,13 +28,12 @@ critical 数据使用显式 bind mount，并设置 `create_host_path: false`；�
 
 ## 资源合同
 
-服务器为 2 核、3.6GiB 内存和 2GiB swap。当前四个服务的上限合计为 1.8 CPU、2816MiB 内存，给宿主机和未来的单并发 `research-worker` 留出余量：
+服务器为 2 核、3.6GiB 内存和 2GiB swap。公共数据 Worker 已于 2026-08-05 退出目标拓扑；当前常驻资源应由 PostgreSQL、API 和前端合计，并给按门禁启用的单并发 `research-worker` 或私有 `personal-analysis-worker` 留出余量：
 
 | 服务 | CPU 上限 | 内存上限 | PID 上限 |
 | --- | ---: | ---: | ---: |
 | PostgreSQL | 0.75 | 1280MiB | 256 |
 | API | 0.45 | 640MiB | 256 |
-| 数据 Worker | 0.35 | 512MiB | 256 |
 | 前端 | 0.25 | 384MiB | 128 |
 
 镜像构建、数据恢复、migration 和正式研究不得并行。Compose 的 `cpus`、`mem_limit` 和 `pids_limit` 语义以 [Compose services 规范](https://docs.docker.com/reference/compose-file/services/)为准。容器与 daemon 日志均使用 `json-file`，单文件 10MiB、最多 3 份；配置依据 [Docker 日志轮转说明](https://docs.docker.com/engine/logging/drivers/json-file/)。
@@ -89,6 +88,6 @@ bash -n scripts/ops/bootstrap_new_server_runtime.sh
 - Docker 与 containerd 为 `active`，Docker 已设为开机启动；存储驱动为 `overlayfs`、cgroup driver 为 `systemd`、日志驱动为 `json-file`。`daemon.json` 已启用 live restore 与 `10m × 3` 日志轮转。
 - 新 SSH 会话中 `ubuntu` 已进入 `docker` 组。该组按 [Docker 官方说明](https://docs.docker.com/engine/install/linux-postinstall/)具有 root 级权限，只授予现有的密码外 sudo 运维身份，未新增用户。
 - 目录与权限逐项匹配上表；根盘约 492G、可用 466G，内存可用约 3.0GiB，2GiB swap 未使用。
-- 合并配置读回为 PostgreSQL `127.0.0.1:5432`、API `127.0.0.1:18000`、前端 `127.0.0.1:15173`；两处持久挂载分别指向显式 PostgreSQL 与研究工件目录，worker 和 frontend 没有主机源码挂载或隐式 volume。
+- 合并配置读回为 PostgreSQL `127.0.0.1:5432`、API `127.0.0.1:18000`、前端 `127.0.0.1:15173`；两处持久挂载分别指向显式 PostgreSQL 与研究工件目录。当时的数据 Worker 已由 ADR 0010 退役；该历史验收不代表当前 Compose 仍包含此服务。
 - 主机实际监听仍只有 SSH `22` 与本机 DNS；Docker 未监听 `2375/2376`。现场为 0 个容器、0 个 volume、0 个镜像，证明本阶段没有启动应用或初始化数据。
 - 用于传输安装文件的精确临时目录和脚本内部临时目录均已删除并确认不存在；保留 `/opt/quantitative-trading-bootstrap` 中两份无凭据 Compose 文件作为后续解析证据。

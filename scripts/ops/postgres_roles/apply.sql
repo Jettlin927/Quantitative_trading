@@ -8,7 +8,6 @@ DECLARE
 BEGIN
     FOREACH role_name IN ARRAY ARRAY[
         'quant_api_runtime',
-        'quant_sync_runtime',
         'quant_research_runtime',
         'quant_personal_api',
         'quant_personal_analysis'
@@ -35,7 +34,6 @@ DECLARE
 BEGIN
     FOREACH role_name IN ARRAY ARRAY[
         'quant_api_runtime',
-        'quant_sync_runtime',
         'quant_research_runtime',
         'quant_personal_api',
         'quant_personal_analysis'
@@ -52,11 +50,11 @@ REVOKE ALL ON SCHEMA private_workbench FROM PUBLIC;
 REVOKE ALL ON ALL TABLES IN SCHEMA private_workbench FROM PUBLIC;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA private_workbench FROM PUBLIC;
 
-GRANT USAGE ON SCHEMA public TO quant_api_runtime, quant_sync_runtime, quant_research_runtime;
+GRANT USAGE ON SCHEMA public TO quant_api_runtime, quant_research_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public
-    TO quant_api_runtime, quant_sync_runtime, quant_research_runtime;
+    TO quant_api_runtime, quant_research_runtime;
 GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public
-    TO quant_api_runtime, quant_sync_runtime, quant_research_runtime;
+    TO quant_api_runtime, quant_research_runtime;
 
 GRANT USAGE ON SCHEMA public TO quant_personal_analysis;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO quant_personal_analysis;
@@ -70,21 +68,17 @@ GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA private_workbench
 
 REVOKE CREATE ON SCHEMA public FROM
     quant_api_runtime,
-    quant_sync_runtime,
     quant_research_runtime,
     quant_personal_api,
     quant_personal_analysis;
 REVOKE ALL ON SCHEMA private_workbench FROM
     quant_api_runtime,
-    quant_sync_runtime,
     quant_research_runtime;
 REVOKE ALL ON ALL TABLES IN SCHEMA private_workbench FROM
     quant_api_runtime,
-    quant_sync_runtime,
     quant_research_runtime;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA private_workbench FROM
     quant_api_runtime,
-    quant_sync_runtime,
     quant_research_runtime;
 
 ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA public
@@ -93,10 +87,10 @@ ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA public
     REVOKE ALL ON SEQUENCES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA public
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES
-    TO quant_api_runtime, quant_sync_runtime, quant_research_runtime;
+    TO quant_api_runtime, quant_research_runtime;
 ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA public
     GRANT USAGE, SELECT, UPDATE ON SEQUENCES
-    TO quant_api_runtime, quant_sync_runtime, quant_research_runtime;
+    TO quant_api_runtime, quant_research_runtime;
 ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA public
     GRANT SELECT ON TABLES TO quant_personal_analysis;
 ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA public

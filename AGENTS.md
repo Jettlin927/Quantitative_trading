@@ -25,9 +25,9 @@
 
 ## 产品边界
 
-本仓库是离线量化研究与策略优化系统，不是真实交易系统。
+本仓库是以美股为主的个人投研工作台与离线量化研究系统，不是真实交易系统。
 
-允许同步、持久化、质检和展示实际市场数据，也允许使用 point-in-time、历史
+允许按显式来源授权同步、持久化、质检和展示美股实际市场数据，也允许使用 point-in-time、历史
 universe、复权和下一交易日执行口径开展离线研究。
 
 禁止：
@@ -100,7 +100,8 @@ universe、复权和下一交易日执行口径开展离线研究。
 - `backend/app/quant_research/` 负责研究协议、模拟、指标、复现和报告统计口径；
   渲染脚本只组装 canonical 工件，不得复制成交、成本或绩效公式。
 - `frontend/` 是只读产品界面，不承担研究计算或批准逻辑。
-- `my_quant/us_research/` 中的 sample 或实验夹具不得冒充研究级美股数据。
+- 已退役的 A 股、`us_experiment_*` 和 `my_quant` 路径不得恢复为运行时入口；其
+  Alembic 历史表和历史研究证据只用于迁移兼容、审计与 schema-only 测试。
 - 不得恢复 `strategy_research`、`backtest-reports`、`strategy-lab`、
   `research_engine` 等旧主线目录。
 
@@ -112,9 +113,10 @@ universe、复权和下一交易日执行口径开展离线研究。
 - 不得把 `.env`、Tushare token、数据库密码、SSH 私钥、GitHub token、真实账户
   数据或其他凭据写入源码、Issue、前端、日志、README、测试或工件。
 - API 数值必须 JSON-safe；`NaN`、`Infinity` 转为 `null` 或明确兜底。
-- A 股表保持既有自然键和幂等 upsert；调整键前必须检查模型、migration 和集成
-  测试。
-- 美股 sample 与未来实际市场数据必须在 schema、API、前端和研究门禁中明确隔离。
+- 退役市场表继续保持既有 migration 身份和自然键；不得为了清理运行时代码改写
+  Alembic 历史。调整 schema 前必须检查模型、migration 和 PostgreSQL 集成测试。
+- 美股实际市场数据、合成测试夹具、个人手工持仓和正式研究证据必须在 schema、
+  API、前端和研究门禁中明确隔离。
 
 ## 前端边界
 

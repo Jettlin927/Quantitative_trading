@@ -1,5 +1,9 @@
 # 美股研究与 HSBC 持仓账本迁移清单
 
+> 历史清单：`my_quant/us_holdings`、`my_quant/us_research`、HSBC ledger 和对应测试已于
+> 2026-08-05 按 [ADR 0010](../adr/0010-us-first-workbench-and-retired-legacy-data-paths.md)
+> 退役；下列路径和命令不再存在。当前持仓只走私有工作台的手工维护合同。
+
 日期：2026-07-22
 
 ## 背景

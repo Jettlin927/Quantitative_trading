@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
@@ -12,7 +11,6 @@ from .contracts import (
     SyntheticHoldingView,
     SyntheticMarketBar,
     SyntheticMarketView,
-    SyntheticRecordView,
     SyntheticRuleEvaluation,
     SyntheticTraceView,
     TodayWorkspace,
@@ -21,7 +19,6 @@ from .crypto import EncryptedEnvelope, PersonalDataCipher
 from .persistence import (
     InMemoryPersonalJourneyStore,
     StoredEncryptedRow,
-    StoredSyntheticRecord,
     StoredSyntheticTrace,
 )
 from .synthetic import SyntheticWorkspaceAdapters
@@ -116,59 +113,6 @@ class PersonalResearchJourney:
         )
         return self._decode_trace(stored)
 
-    def save_synthetic_record(
-        self,
-        actor: PersonalActor,
-        *,
-        analysis_id: str,
-        preview_sha256: str,
-        idempotency_key: str,
-    ) -> SyntheticRecordView:
-        existing = self._store.get_record_by_idempotency(
-            actor_id=actor.actor_id,
-            idempotency_key=idempotency_key,
-        )
-        if existing is not None:
-            return self._decode_record(existing)
-        trace = self._store.get_trace(actor_id=actor.actor_id, analysis_id=analysis_id)
-        if trace is None:
-            raise ValueError("private_object_not_found")
-        if trace.preview_sha256 != preview_sha256:
-            raise ValueError("preview_changed")
-
-        record_id = str(uuid4())
-        record = SyntheticRecordView(
-            record_id=record_id,
-            analysis_id=analysis_id,
-            version=1,
-            status="saved",
-            synthetic=True,
-            research_eligible=False,
-        )
-        trace_view = self._decode_trace(trace)
-        aad = _aad("personal_research_records", record_id)
-        stored = self._store.save_record(
-            StoredSyntheticRecord(
-                actor_id=actor.actor_id,
-                record_id=record_id,
-                analysis_id=analysis_id,
-                idempotency_key=idempotency_key,
-                envelope=self._cipher.encrypt_json(
-                    {
-                        "view": asdict(record),
-                        "content": {
-                            "title": "合成研究记录",
-                            "accepted_claim": asdict(trace_view.analysis_claim),
-                            "boundary": "SYNTHETIC；不用于正式研究",
-                        },
-                    },
-                    aad=aad,
-                ),
-                aad=aad,
-            )
-        )
-        return self._decode_record(stored)
-
     def open_today(
         self, actor: PersonalActor, *, include_synthetic: bool = False
     ) -> TodayWorkspace:
@@ -182,17 +126,11 @@ class PersonalResearchJourney:
         if trace is None:
             return TodayWorkspace(
                 trace=None,
-                record=None,
                 portfolio=portfolio,
                 attention_items=attention_items,
             )
-        record = self._store.record_for_analysis(
-            actor_id=actor.actor_id,
-            analysis_id=trace.analysis_id,
-        )
         return TodayWorkspace(
             trace=self._decode_trace(trace),
-            record=self._decode_record(record) if record is not None else None,
             portfolio=portfolio,
             attention_items=attention_items,
         )
@@ -236,11 +174,6 @@ class PersonalResearchJourney:
             ),
             issues=tuple(payload["issues"]),
         )
-
-    def _decode_record(self, stored: StoredSyntheticRecord) -> SyntheticRecordView:
-        payload = self._cipher.decrypt_json(stored.envelope, aad=stored.aad)
-        return SyntheticRecordView(**payload["view"])
-
 
 def _aad(table: str, row_id: str) -> str:
     return f"private_workbench|{table}|{row_id}|payload|1"

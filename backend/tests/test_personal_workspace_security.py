@@ -125,25 +125,16 @@ class PersonalWorkspaceSecurityTest(unittest.TestCase):
             headers=headers,
             json={"question": "合成问题"},
         )
-        saved = self.client.post(
-            "/api/personal/synthetic-records",
-            headers={**headers, "Idempotency-Key": "record-http-002"},
-            json={
-                "analysis_id": created.json()["analysis_id"],
-                "preview_sha256": created.json()["analysis_preview"]["preview_sha256"],
-            },
-        )
         read = self.client.get(
             "/api/personal/today",
             headers={"X-Personal-Gateway": self.gateway_token},
         )
 
         self.assertEqual(created.status_code, 201)
-        self.assertEqual(saved.status_code, 201)
         self.assertEqual(read.status_code, 200)
         self.assertEqual(created.json()["holding"]["symbol"], "SYNTH-001")
         self.assertIsNone(read.json()["trace"])
-        self.assertIsNone(read.json()["record"])
+        self.assertNotIn("record", read.json())
         self.assertNotIn(self.gateway_token, created.text)
         self.assertNotIn(self.gateway_token, read.text)
 

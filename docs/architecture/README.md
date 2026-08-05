@@ -4,14 +4,16 @@
 
 ## 默认拓扑
 
-- `frontend`：只读研究驾驶舱与数据界面。
-- `api`：数据、研究和运维 API，不在请求进程执行长同步。
-- `worker`：持久化数据同步任务。
-- `research-worker`：正式研究队列，与数据 Worker 分离；启用前必须完成相应工程 Issue 和人工批准门。
+- `frontend`：美股个人工作台与正式研究的只读界面。
+- `api`：个人工作台、市场观察、研究和健康 API，不在请求进程执行长任务。
+- `personal-analysis-worker`：私有 AI 分析队列，只通过个人 Compose 覆盖启用。
+- `research-worker`：正式研究队列；启用前必须完成相应工程 Issue 和人工批准门。
 - `db`：PostgreSQL 结构化事实。
 - `artifacts`：冻结输入、账本、复现证据和原始报告。
 
 GitHub Issues 是计划、批准和用户可见结论的控制面；服务器是队列、数据、计算和工件的执行面。结构化事实与冻结工件相互补充，任一单独存在都不代表发布完成。
+
+A 股、公共同步 Worker、免费美股实验和个人不可变记录已退役；Alembic 历史与研究证据继续保留。详见 [ADR 0010](../adr/0010-us-first-workbench-and-retired-legacy-data-paths.md)。
 
 ## 入口
 

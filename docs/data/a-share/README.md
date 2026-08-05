@@ -1,29 +1,17 @@
-# A 股实际市场数据
+# A 股退役 schema 边界
 
-本模块描述 A 股数据的稳定来源、schema 边界、同步和质量规则。实时覆盖、行数与最新交易日必须从 PostgreSQL/API 现场读取，不能引用 dated 文档当作当前事实。
+A 股不再是当前产品或运行时能力。2026-08-05 起，A 股页面、Tushare 拉取、公共同步 Worker、cron、回填脚本和活动策略入口均已退役；不得从本页恢复生产同步或把旧接口当作当前合同。
 
-## 数据范围
+## 为什么仍能看到 A 股表与文档
 
-- 股票与历史上市状态、交易日历、日线、复权因子、每日涨跌停和停复牌事件。
-- 每日估值与财务指标。
-- 指数、ETF/基金、申万行业分类和历史成员。
-- 自选数据池只表达研究范围，不是交易组合。
+- 既有 Alembic revision 是生产 schema 的迁移历史，不能通过删除旧 migration 改写。
+- 历史正式研究、发布评价和 canonical 工件需要保持来源身份与可读性。
+- PostgreSQL 集成测试可建立完整历史 schema，并用合成数据验证 migration、自然键和兼容约束。
 
-所有业务表继续使用既有自然键与幂等 upsert。具体研究还必须满足 point-in-time、历史 universe、可交易性、基准和冻结快照合同。
+这些保留项是迁移与审计资产，不是活动数据源。测试不得需要 Tushare token、真实 A 股数据或网络拉取；生产表的物理删除需要新的前向 revision、保留方案和单独生产授权。
 
-## 验证入口
+## 历史证据
 
-- 数据覆盖：`GET /api/db/overview`
-- 股票筛选与分页：`GET /api/stocks/screen`
-- 股票聚合详情：`GET /api/stocks/{ts_code}/detail`
-- 估值与财务历史：`GET /api/stocks/{ts_code}/valuation-history`、`GET /api/stocks/{ts_code}/financial-history`
-- 指数、ETF 与行业目录：`GET /api/indices`、`GET /api/funds`、`GET /api/industries`
-- 同步进度：`GET /api/tushare/sync-progress`
-- 研究 readiness：`GET /api/research/readiness`
-- 数据质量与研究合同：[量化研究可信合同](../../research/contracts/quant-foundation-trust-contract.md)
-
-## 历史审计
-
-- [数据源审计（2026-06-26）](../../archive/data/a-share/data-source-audit-2026-06-26.md)
-- [数据库覆盖审计（2026-06-26）](../../archive/data/a-share/db-coverage-audit-2026-06-26.md)
-- [旧覆盖入口快照（2026-06-26）](../../archive/data/a-share/coverage-overview-2026-06-26.md)
+- [A 股研究资料](../../research/)中的 dated 预登记和可行性报告按原事实保留。
+- [历史归档](../../archive/)保存旧数据源、覆盖与运维快照。
+- 当前方向与取代关系见 [ADR 0010](../../adr/0010-us-first-workbench-and-retired-legacy-data-paths.md)。

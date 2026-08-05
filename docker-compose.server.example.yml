@@ -48,18 +48,6 @@ services:
         max-size: 10m
         max-file: "3"
 
-  worker:
-    volumes: !override []
-    cpus: 0.35
-    mem_limit: 512m
-    mem_reservation: 192m
-    pids_limit: 256
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: "3"
-
   research-worker:
     volumes: !override
       - type: bind

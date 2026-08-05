@@ -54,26 +54,24 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
         self.assertTrue(any("入口 ID 重复" in error for error in errors), errors)
 
     def test_verifier_requires_each_expected_id_even_when_coverage_remains(self) -> None:
-        def remove_audit(inventory: dict[str, Any]) -> None:
+        def remove_research_cli(inventory: dict[str, Any]) -> None:
             inventory["entries"] = [
                 entry
                 for entry in inventory["entries"]
-                if entry["id"] != "candidate.audit_cli"
+                if entry["id"] != "active.research_cli"
             ]
 
-        errors = self._verify_with_change(remove_audit)
-        self.assertTrue(any("candidate.audit_cli" in error for error in errors), errors)
+        errors = self._verify_with_change(remove_research_cli)
+        self.assertTrue(any("active.research_cli" in error for error in errors), errors)
 
     def test_verifier_rejects_expected_id_at_another_path(self) -> None:
-        def move_audit(inventory: dict[str, Any]) -> None:
-            entry = next(
-                entry
-                for entry in inventory["entries"]
-                if entry["id"] == "candidate.audit_cli"
-            )
-            entry["path"] = "scripts/research/run_quant_research.py"
+        entry_id = "active.research_cli"
 
-        errors = self._verify_with_change(move_audit)
+        def move_research_cli(inventory: dict[str, Any]) -> None:
+            entry = next(entry for entry in inventory["entries"] if entry["id"] == entry_id)
+            entry["path"] = "scripts/research/check_data_quality.py"
+
+        errors = self._verify_with_change(move_research_cli)
         self.assertTrue(any("预期入口路径不匹配" in error for error in errors), errors)
 
     def test_verifier_rejects_misclassified_expected_entry(self) -> None:
@@ -190,18 +188,6 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
             errors,
         )
 
-    def test_verifier_requires_candidate_retirement_conditions(self) -> None:
-        def remove_conditions(inventory: dict[str, Any]) -> None:
-            candidate = next(
-                entry
-                for entry in inventory["entries"]
-                if entry["classification"] == "legacy_executable_candidate"
-            )
-            candidate["retirement_conditions"] = []
-
-        errors = self._verify_with_change(remove_conditions)
-        self.assertTrue(any("候选入口缺少退役条件" in error for error in errors), errors)
-
     def test_verifier_reports_broken_stable_reference(self) -> None:
         errors = self._verify_with_change(
             lambda inventory: inventory["entries"][0]["stable_references"].append(
@@ -215,7 +201,6 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
         expected = {
             "compat.render_etf_volatility_managed": "scripts/research/render_etf_volatility_managed_report.py",
             "compat.render_etf_trend_120d": "scripts/research/render_etf_trend_120d_report.py",
-            "compat.render_a_share_b1": "scripts/research/render_a_share_b1_report.py",
         }
         observed = {
             entry["id"]: entry
@@ -227,42 +212,6 @@ class ResearchEntrypointInventoryTest(unittest.TestCase):
             self.assertEqual(path, observed[entry_id]["path"])
             self.assertGreaterEqual(len(observed[entry_id]["retirement_conditions"]), 2)
             self.assertTrue(observed[entry_id]["artifact_identity"])
-
-    def test_active_b1_config_records_registry_runner_and_renderer_callers(self) -> None:
-        entry = next(
-            entry
-            for entry in self._load_inventory()["entries"]
-            if entry["id"] == "active.a_share_b1_long_history_config"
-        )
-        self.assertEqual("active_architecture", entry["classification"])
-        callers = " ".join(entry["callers"])
-        self.assertIn("strategy registry", callers)
-        self.assertIn("runner", callers)
-        self.assertIn("renderer", callers)
-        self.assertIn("backend/app/quant_research/strategy_registry.py", entry["stable_references"])
-        self.assertIn("scripts/research/render_a_share_b1_report.py", entry["stable_references"])
-
-    def test_b1_renderer_records_existing_compatibility_metrics(self) -> None:
-        entry = next(
-            entry
-            for entry in self._load_inventory()["entries"]
-            if entry["id"] == "compat.render_a_share_b1"
-        )
-        self.assertIn("绩效统计兼容口径", entry["stable_behavior"])
-        self.assertNotIn("不复制 runner 成交、成本或绩效公式", entry["stable_behavior"])
-
-    def test_audit_cli_records_archived_command_callers_instead_of_ci_claim(self) -> None:
-        entry = next(
-            entry
-            for entry in self._load_inventory()["entries"]
-            if entry["id"] == "candidate.audit_cli"
-        )
-        self.assertIn("归档 handoff", " ".join(entry["callers"]))
-        self.assertIn(
-            "docs/archive/handoffs/agent-handoff-2026-07-19.md",
-            entry["stable_references"],
-        )
-        self.assertNotIn(".github/workflows/ci.yml", entry["stable_references"])
 
     def test_cli_accepts_explicit_relative_inventory_path(self) -> None:
         result = subprocess.run(

@@ -81,6 +81,13 @@ PRIVATE_TABLES = {
     "personal_equity_snapshots",
     "personal_realized_trades",
 }
+RETIRED_RECORD_TABLES = {
+    "personal_record_versions",
+    "personal_record_private_fragments",
+    "personal_verification_items",
+    "personal_verification_observations",
+    "personal_research_records",
+}
 ENCRYPTED_PRIVATE_TABLES = PRIVATE_TABLES - {
     "personal_audit_events",
     "personal_redaction_events",
@@ -92,7 +99,10 @@ class PersonalWorkspaceSchemaIdentityTest(unittest.TestCase):
         self.assertEqual(expected_schema_heads(), ("0019_personal_realized_trades",))
         self.assertEqual(
             set(PrivateBase.metadata.tables),
-            {f"private_workbench.{table}" for table in PRIVATE_TABLES},
+            {
+                f"private_workbench.{table}"
+                for table in PRIVATE_TABLES - RETIRED_RECORD_TABLES
+            },
         )
         self.assertTrue(set(PrivateBase.metadata.tables).isdisjoint(models.Base.metadata.tables))
 
@@ -189,13 +199,6 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                 idempotency_key="pg-trace-001",
                 question="PostgreSQL 合成问题正文",
             )
-            record = journey.save_synthetic_record(
-                actor,
-                analysis_id=trace.analysis_id,
-                preview_sha256=trace.analysis_preview.preview_sha256,
-                idempotency_key="pg-record-001",
-            )
-
             analyses = AnalysisWorkspace(
                 store=PostgresAnalysisStore(
                     sessionmaker(bind=engine, autoflush=False, expire_on_commit=False),
@@ -236,7 +239,6 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
 
             today = journey.open_today(actor, include_synthetic=True)
             self.assertEqual(today.trace.analysis_id, trace.analysis_id)
-            self.assertEqual(today.record.record_id, record.record_id)
             self.assertEqual(portfolio.holdings, ())
             with engine.connect() as connection:
                 counts = {
@@ -284,6 +286,7 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                             "personal_equity_snapshots",
                             "personal_realized_trades",
                         }
+                        | RETIRED_RECORD_TABLES
                         else 1
                     )
                     for table in PRIVATE_TABLES

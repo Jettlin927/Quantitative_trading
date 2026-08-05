@@ -17,7 +17,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ROLE_SQL_DIR = REPO_ROOT / "scripts" / "ops" / "postgres_roles"
 ROLE_MATRIX = {
     "quant_api_runtime": (True, False),
-    "quant_sync_runtime": (True, False),
     "quant_research_runtime": (True, False),
     "quant_personal_api": (False, True),
     "quant_personal_analysis": (True, True),
@@ -51,7 +50,6 @@ class ProductionDatabaseRoleArtifactTest(unittest.TestCase):
 
         for variable in (
             "API_DATABASE_URL",
-            "SYNC_WORKER_DATABASE_URL",
             "RESEARCH_WORKER_DATABASE_URL",
             "PRIVATE_DATABASE_URL",
         ):

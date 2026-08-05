@@ -1,9 +1,8 @@
-"""get_news 工具：通过 investment-news 项目（本地子进程）检索产业新闻。
+"""get_news 工具：通过 investment-news 项目（本地子进程）检索美股产业新闻。
 
-investment-news（MIT，纯 Python 标准库）从 108 个 RSS 源抓取 12 个 A 股赛道最近
-N 天的新闻并写入其目录下的 data.js。本工具以子进程方式运行该项目的 scripts/
-fetch.py（argv 列表、无 shell），解析 data.js 后按 symbol/关键词/赛道做启发式
-检索。数据与项目完全解耦：不 vendor 代码，仅依赖配置的 checkout 目录。
+本工具以子进程方式运行外部项目的 ``scripts/fetch.py``（argv 列表、无 shell），
+解析 ``data.js`` 后按美股 symbol、关键词和产业主题做启发式检索。数据与本仓库
+完全解耦：不 vendor 代码，仅依赖显式配置的 checkout 目录。
 """
 
 from __future__ import annotations
