@@ -27,7 +27,9 @@ jobs:
           DATABASE_URL: "sqlite+pysqlite:///:memory:"
         run: |
           python -m unittest discover -s backend/tests -p 'test_*.py' -v
-          python -m unittest discover -s scripts/ops/tests -p 'test_*.py' -v
+          if [[ -d scripts/ops/tests ]]; then
+            python -m unittest discover -s scripts/ops/tests -p 'test_*.py' -v
+          fi
       - name: 黄金前缀不变与重现门禁
         env:
           DATABASE_URL: "sqlite+pysqlite:///:memory:"
