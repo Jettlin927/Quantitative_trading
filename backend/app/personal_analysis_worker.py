@@ -10,7 +10,6 @@ from pathlib import Path
 import signal
 from stat import S_IMODE
 from threading import Event
-import time
 from typing import Callable
 
 from sqlalchemy import create_engine
@@ -29,7 +28,10 @@ from .personal_workspace.portfolio import (
     PostgresPortfolioStore,
     UnavailablePortfolioMarketReader,
 )
-from .personal_workspace.rule_automation import HoldingRuleAutomation
+from .personal_workspace.rule_automation import (
+    HoldingRuleAutomation,
+    personal_rule_evaluation_slot,
+)
 from .personal_workspace.rules import (
     InstrumentRuleInputReader,
     ObservationRuleBook,
@@ -72,8 +74,8 @@ class PersonalAnalysisWorker:
     workspace: AnalysisWorkspace
     worker_id: str
     rule_automation: HoldingRuleAutomation | None = None
-    rule_interval_seconds: float = 900
     actor: PersonalActor = LOCAL_PERSONAL_ACTOR
+    rule_slot_reader: Callable[[datetime], str | None] = personal_rule_evaluation_slot
 
     def run_once(self):
         return self.workspace.run_next(worker_id=self.worker_id)
@@ -83,19 +85,27 @@ class PersonalAnalysisWorker:
         *,
         poll_seconds: float,
         stop_event: Event,
-        monotonic: Callable[[], float] = time.monotonic,
         clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
     ) -> None:
         if poll_seconds <= 0:
             raise ValueError("personal_analysis_worker_poll_invalid")
-        if self.rule_automation is not None and self.rule_interval_seconds <= 0:
-            raise ValueError("personal_rule_evaluation_interval_invalid")
-        next_rule_due = 0.0
+        last_rule_slot = None
         while not stop_event.is_set():
-            current = monotonic()
-            if self.rule_automation is not None and current >= next_rule_due:
+            as_of = None
+            rule_slot = None
+            if self.rule_automation is not None:
                 try:
-                    result = self.rule_automation.run_once(self.actor, as_of=clock())
+                    as_of = clock()
+                    rule_slot = self.rule_slot_reader(as_of)
+                except Exception:
+                    LOGGER.exception("personal_rule_schedule_failed")
+            if (
+                self.rule_automation is not None
+                and rule_slot is not None
+                and rule_slot != last_rule_slot
+            ):
+                try:
+                    result = self.rule_automation.run_once(self.actor, as_of=as_of)
                     failed_symbols = getattr(result, "failed_symbols", ())
                     if failed_symbols:
                         LOGGER.warning(
@@ -104,7 +114,7 @@ class PersonalAnalysisWorker:
                         )
                 except Exception:
                     LOGGER.exception("personal_rule_automation_failed")
-                next_rule_due = current + self.rule_interval_seconds
+                last_rule_slot = rule_slot
             if self.run_once() is None:
                 stop_event.wait(poll_seconds)
 
@@ -158,18 +168,10 @@ def build_personal_analysis_worker_from_environment() -> PersonalAnalysisWorker:
         store=PostgresObservationRuleStore(session_factory, cipher=cipher),
         inputs=InstrumentRuleInputReader(market_readers.instrument),
     )
-    rule_interval_seconds = float(
-        os.getenv("PERSONAL_RULE_EVALUATION_INTERVAL_SECONDS", "900")
-    )
     return PersonalAnalysisWorker(
         workspace=workspace,
         worker_id=os.getenv("PERSONAL_ANALYSIS_WORKER_ID", "personal-analysis-worker-1"),
-        rule_automation=HoldingRuleAutomation(
-            portfolio=portfolio,
-            rules=rules,
-            schedule_interval_seconds=rule_interval_seconds,
-        ),
-        rule_interval_seconds=rule_interval_seconds,
+        rule_automation=HoldingRuleAutomation(portfolio=portfolio, rules=rules),
     )
 
 

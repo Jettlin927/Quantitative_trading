@@ -30,7 +30,7 @@
 - `frontend`：今日、持仓、美股市场和系统健康的工作界面；规则异常汇入今日页，不再保留独立规则页。
 - `api`：美股个人工作台、市场观察、研究目录、评价、发布和数据质量接口。
 - `db`：PostgreSQL 16，保存公开研究事实与隔离的私有工作台数据。
-- `personal-analysis-worker`：个人 AI 分析队列与持仓规则周期评估，只通过私有 Compose 覆盖启用。
+- `personal-analysis-worker`：个人 AI 分析队列与美股交易日盘前、盘中、盘后持仓规则评估，只通过私有 Compose 覆盖启用。
 - `research-worker`：正式研究队列，只通过 `research-automation` profile 和人工门禁启用。
 - `outputs/research-runs/`：被 Git 忽略的 canonical 研究工件。
 

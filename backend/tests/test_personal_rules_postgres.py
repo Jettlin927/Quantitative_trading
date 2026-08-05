@@ -194,7 +194,7 @@ class PersonalRulesPostgresTest(unittest.TestCase):
                 idempotency_key="pg-add-automation-holding",
             )
             automation = HoldingRuleAutomation(portfolio=portfolio, rules=book)
-            automatic_as_of = datetime(2026, 8, 3, 3, 15, tzinfo=timezone.utc)
+            automatic_as_of = datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc)
             first_automatic = automation.run_once(actor, as_of=automatic_as_of)
             repeated_automatic = automation.run_once(actor, as_of=automatic_as_of)
             self.assertEqual(repeated_automatic, first_automatic)

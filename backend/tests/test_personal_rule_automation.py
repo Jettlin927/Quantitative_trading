@@ -55,7 +55,59 @@ class SymbolRuleInputs:
 
 
 class HoldingRuleAutomationTest(unittest.TestCase):
-    def test_configured_schedule_interval_defines_idempotency_bucket(self) -> None:
+    def test_market_holiday_does_not_read_private_workspace(self) -> None:
+        actor = PersonalActor(actor_id="local-owner")
+
+        class UnexpectedPortfolio:
+            def active_symbols(self, request_actor):
+                raise AssertionError("private workspace should not be read")
+
+        automation = HoldingRuleAutomation(
+            portfolio=UnexpectedPortfolio(), rules=SimpleNamespace()
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "personal_rule_evaluation_outside_market_sessions"
+        ):
+            automation.run_once(
+                actor, as_of=datetime(2026, 11, 26, 15, 0, tzinfo=timezone.utc)
+            )
+
+    def test_early_close_enters_post_market_at_actual_close(self) -> None:
+        actor = PersonalActor(actor_id="local-owner")
+
+        class ActivePortfolio:
+            def active_symbols(self, request_actor):
+                return ("ACME",)
+
+        class RecordingRules:
+            key = None
+
+            def open(self, request_actor):
+                return {
+                    "rules": (
+                        SimpleNamespace(
+                            rule_id="rule-acme",
+                            revision=1,
+                            state="enabled",
+                            symbol="ACME",
+                        ),
+                    )
+                }
+
+            def evaluate(self, request_actor, request, *, idempotency_key):
+                self.key = idempotency_key
+                return SimpleNamespace(evaluations=(object(),))
+
+        rules = RecordingRules()
+        HoldingRuleAutomation(portfolio=ActivePortfolio(), rules=rules).run_once(
+            actor,
+            as_of=datetime(2026, 11, 27, 18, 30, tzinfo=timezone.utc),
+        )
+
+        self.assertIn(":post_market:", rules.key)
+
+    def test_market_session_defines_idempotency_identity(self) -> None:
         actor = PersonalActor(actor_id="local-owner")
 
         class ActivePortfolio:
@@ -84,16 +136,23 @@ class HoldingRuleAutomationTest(unittest.TestCase):
                 return SimpleNamespace(evaluations=(object(),))
 
         rules = RecordingRules()
-        automation = HoldingRuleAutomation(
-            portfolio=ActivePortfolio(),
-            rules=rules,
-            schedule_interval_seconds=60,
+        automation = HoldingRuleAutomation(portfolio=ActivePortfolio(), rules=rules)
+
+        automation.run_once(
+            actor, as_of=datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc)
+        )
+        automation.run_once(
+            actor, as_of=datetime(2026, 8, 3, 12, 30, tzinfo=timezone.utc)
+        )
+        automation.run_once(
+            actor, as_of=datetime(2026, 8, 3, 14, 0, tzinfo=timezone.utc)
+        )
+        automation.run_once(
+            actor, as_of=datetime(2026, 8, 3, 20, 0, tzinfo=timezone.utc)
         )
 
-        automation.run_once(actor, as_of=NOW)
-        automation.run_once(actor, as_of=NOW + timedelta(seconds=60))
-
-        self.assertEqual(len(set(rules.keys)), 2)
+        self.assertEqual(rules.keys[0], rules.keys[1])
+        self.assertEqual(len(set(rules.keys)), 3)
 
     def test_one_symbol_failure_does_not_block_other_active_holdings(self) -> None:
         actor = PersonalActor(actor_id="local-owner")
@@ -135,7 +194,7 @@ class HoldingRuleAutomationTest(unittest.TestCase):
         self.assertEqual(result.evaluated_symbols, ("BETA",))
         self.assertEqual(result.failed_symbols, ("ACME",))
 
-    def test_next_schedule_bucket_appends_a_fresh_evaluation(self) -> None:
+    def test_three_market_sessions_append_three_evaluations(self) -> None:
         actor = PersonalActor(actor_id="local-owner")
         portfolio = PortfolioBook(
             store=InMemoryPortfolioStore(),
@@ -179,10 +238,17 @@ class HoldingRuleAutomationTest(unittest.TestCase):
         )
         automation = HoldingRuleAutomation(portfolio=portfolio, rules=rules)
 
-        automation.run_once(actor, as_of=NOW)
-        automation.run_once(actor, as_of=NOW + timedelta(minutes=15))
+        automation.run_once(
+            actor, as_of=datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc)
+        )
+        automation.run_once(
+            actor, as_of=datetime(2026, 8, 3, 14, 0, tzinfo=timezone.utc)
+        )
+        automation.run_once(
+            actor, as_of=datetime(2026, 8, 3, 20, 0, tzinfo=timezone.utc)
+        )
 
-        self.assertEqual(len(rules.open(actor)["evaluations"]), 2)
+        self.assertEqual(len(rules.open(actor)["evaluations"]), 3)
 
     def test_only_enabled_rules_for_active_holdings_are_evaluated(self) -> None:
         actor = PersonalActor(actor_id="local-owner")

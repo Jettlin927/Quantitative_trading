@@ -1,12 +1,49 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, time, timezone
+from functools import lru_cache
 from hashlib import sha256
+from zoneinfo import ZoneInfo
+
+import exchange_calendars as xcals
 
 from .contracts import PersonalActor
 from .portfolio import PortfolioBook
 from .rules import ObservationRuleBook, RuleEvaluationRequest
+
+
+_US_MARKET_TZ = ZoneInfo("America/New_York")
+_PRE_MARKET_START = time(4, 0)
+_POST_MARKET_END = time(20, 0)
+
+
+@lru_cache(maxsize=1)
+def _xnys_calendar():
+    return xcals.get_calendar("XNYS")
+
+
+def personal_rule_evaluation_slot(as_of: datetime) -> str | None:
+    if as_of.tzinfo is None:
+        raise ValueError("as_of_requires_timezone")
+    market_time = as_of.astimezone(_US_MARKET_TZ)
+    session_date = market_time.date()
+    calendar = _xnys_calendar()
+    if not calendar.is_session(session_date):
+        return None
+    local_time = market_time.time().replace(tzinfo=None)
+    market_open = calendar.session_open(session_date).to_pydatetime()
+    market_close = calendar.session_close(session_date).to_pydatetime()
+    observed_at = as_of.astimezone(timezone.utc)
+    if _PRE_MARKET_START <= local_time and observed_at < market_open:
+        session = "pre_market"
+    elif market_open <= observed_at < market_close:
+        session = "regular_market"
+    elif market_close <= observed_at and local_time < _POST_MARKET_END:
+        session = "post_market"
+    else:
+        return None
+    return f"{session_date.isoformat()}:{session}"
 
 
 @dataclass(frozen=True)
@@ -23,19 +60,16 @@ class HoldingRuleAutomation:
         *,
         portfolio: PortfolioBook,
         rules: ObservationRuleBook,
-        schedule_interval_seconds: float = 900,
     ) -> None:
-        if schedule_interval_seconds <= 0:
-            raise ValueError("personal_rule_evaluation_interval_invalid")
         self._portfolio = portfolio
         self._rules = rules
-        self._schedule_interval_seconds = schedule_interval_seconds
 
     def run_once(
         self, actor: PersonalActor, *, as_of: datetime
     ) -> HoldingRuleAutomationResult:
-        if as_of.tzinfo is None:
-            raise ValueError("as_of_requires_timezone")
+        schedule_slot = personal_rule_evaluation_slot(as_of)
+        if schedule_slot is None:
+            raise ValueError("personal_rule_evaluation_outside_market_sessions")
         active_symbols = set(self._portfolio.active_symbols(actor))
         enabled = tuple(
             rule
@@ -46,7 +80,6 @@ class HoldingRuleAutomation:
         evaluation_count = 0
         evaluated_symbols = []
         failed_symbols = []
-        schedule_bucket = int(as_of.timestamp() // self._schedule_interval_seconds)
         for symbol in symbols:
             identity = "|".join(
                 f"{rule.rule_id}:{rule.revision}"
@@ -59,7 +92,7 @@ class HoldingRuleAutomation:
                     actor,
                     RuleEvaluationRequest(symbol=symbol, as_of=as_of),
                     idempotency_key=(
-                        f"holding-rule-auto:{schedule_bucket}:{symbol}:{revision_fingerprint}"
+                        f"holding-rule-auto:{schedule_slot}:{symbol}:{revision_fingerprint}"
                     ),
                 )
             except Exception:

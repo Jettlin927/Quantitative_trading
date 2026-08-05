@@ -136,10 +136,6 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
             "/run/config/alpaca-authorization.json",
         )
         self.assertIn("PERSONAL_ANALYSIS_MODE", worker["environment"])
-        self.assertEqual(
-            worker["environment"]["PERSONAL_RULE_EVALUATION_INTERVAL_SECONDS"],
-            "${PERSONAL_RULE_EVALUATION_INTERVAL_SECONDS:-900}",
-        )
         mounts = {mount["target"]: mount for mount in worker["volumes"]}
         self.assertEqual(
             set(mounts),

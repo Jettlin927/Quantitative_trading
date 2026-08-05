@@ -17,6 +17,40 @@ from backend.app.personal_workspace.contracts import PersonalActor
 
 
 class PersonalAnalysisWorkerConfigurationTest(unittest.TestCase):
+    def test_rule_schedule_failure_does_not_stop_analysis_queue(self) -> None:
+        stop_event = Event()
+
+        class OneJobWorkspace:
+            calls = 0
+
+            def run_next(self, *, worker_id):
+                self.calls += 1
+                stop_event.set()
+                return object()
+
+        def failing_schedule(as_of):
+            raise RuntimeError("synthetic_calendar_failure")
+
+        workspace = OneJobWorkspace()
+        worker = PersonalAnalysisWorker(
+            workspace=workspace,
+            worker_id="personal-analysis-worker-test",
+            rule_automation=SimpleNamespace(),
+            rule_slot_reader=failing_schedule,
+        )
+
+        with patch(
+            "backend.app.personal_analysis_worker.LOGGER.exception"
+        ) as log_exception:
+            worker.run_forever(
+                poll_seconds=5,
+                stop_event=stop_event,
+                clock=lambda: datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc),
+            )
+
+        self.assertEqual(workspace.calls, 1)
+        log_exception.assert_called_once_with("personal_rule_schedule_failed")
+
     def test_partial_rule_failure_log_does_not_expose_private_symbols(self) -> None:
         stop_event = Event()
 
@@ -41,7 +75,7 @@ class PersonalAnalysisWorkerConfigurationTest(unittest.TestCase):
             worker.run_forever(
                 poll_seconds=5,
                 stop_event=stop_event,
-                monotonic=lambda: 0.0,
+                clock=lambda: datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc),
             )
 
         log_warning.assert_called_once_with(
@@ -49,7 +83,7 @@ class PersonalAnalysisWorkerConfigurationTest(unittest.TestCase):
         )
         self.assertNotIn("PRIVATE", repr(log_warning.call_args))
 
-    def test_rule_automation_runs_on_schedule_even_while_analysis_queue_is_busy(self) -> None:
+    def test_rule_automation_runs_once_in_pre_regular_and_post_market_only(self) -> None:
         stop_event = Event()
 
         class BusyWorkspace:
@@ -57,7 +91,7 @@ class PersonalAnalysisWorkerConfigurationTest(unittest.TestCase):
 
             def run_next(self, *, worker_id):
                 self.calls += 1
-                if self.calls == 2:
+                if self.calls == 9:
                     stop_event.set()
                 return object()
 
@@ -69,25 +103,41 @@ class PersonalAnalysisWorkerConfigurationTest(unittest.TestCase):
 
         workspace = BusyWorkspace()
         automation = RecordingAutomation()
-        moments = iter((0.0, 901.0))
-        now = datetime(2026, 8, 5, 22, 0, tzinfo=timezone.utc)
+        moments = iter(
+            (
+                datetime(2026, 8, 3, 7, 59, tzinfo=timezone.utc),
+                datetime(2026, 8, 3, 8, 0, tzinfo=timezone.utc),
+                datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc),
+                datetime(2026, 8, 3, 14, 0, tzinfo=timezone.utc),
+                datetime(2026, 8, 3, 17, 0, tzinfo=timezone.utc),
+                datetime(2026, 8, 3, 20, 0, tzinfo=timezone.utc),
+                datetime(2026, 8, 3, 23, 59, tzinfo=timezone.utc),
+                datetime(2026, 8, 4, 0, 0, tzinfo=timezone.utc),
+                datetime(2026, 8, 8, 12, 0, tzinfo=timezone.utc),
+            )
+        )
         worker = PersonalAnalysisWorker(
             workspace=workspace,
             worker_id="personal-analysis-worker-test",
             rule_automation=automation,
-            rule_interval_seconds=900,
             actor=PersonalActor(actor_id="local-owner"),
         )
 
         worker.run_forever(
             poll_seconds=5,
             stop_event=stop_event,
-            monotonic=lambda: next(moments),
-            clock=lambda: now,
+            clock=lambda: next(moments),
         )
 
-        self.assertEqual(workspace.calls, 2)
-        self.assertEqual(automation.calls, [(worker.actor, now), (worker.actor, now)])
+        self.assertEqual(workspace.calls, 9)
+        self.assertEqual(
+            tuple(moment for _actor, moment in automation.calls),
+            (
+                datetime(2026, 8, 3, 8, 0, tzinfo=timezone.utc),
+                datetime(2026, 8, 3, 14, 0, tzinfo=timezone.utc),
+                datetime(2026, 8, 3, 20, 0, tzinfo=timezone.utc),
+            ),
+        )
 
     def test_rule_automation_failure_does_not_stop_analysis_queue(self) -> None:
         stop_event = Event()
@@ -109,7 +159,6 @@ class PersonalAnalysisWorkerConfigurationTest(unittest.TestCase):
             workspace=workspace,
             worker_id="personal-analysis-worker-test",
             rule_automation=FailingAutomation(),
-            rule_interval_seconds=900,
         )
 
         with patch(
@@ -118,7 +167,7 @@ class PersonalAnalysisWorkerConfigurationTest(unittest.TestCase):
             worker.run_forever(
                 poll_seconds=5,
                 stop_event=stop_event,
-                monotonic=lambda: 0.0,
+                clock=lambda: datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc),
             )
 
         self.assertEqual(workspace.calls, 1)

@@ -30,8 +30,8 @@
 - `analysis.py` / `agent/`：个人分析草稿、运行及 tool-use agent。
 - `journey.py` / `persistence.py` / `synthetic.py`：今日旅程投影、私有持久化与不依赖真实数据的合成 tracer。
 - `security.py` / `crypto.py`：gateway、Origin、幂等与私有字段加密。
-- `personal_analysis_worker.py`：个人 AI 分析队列与持仓规则周期调度；只有私有覆盖中的该进程可读取 DeepSeek secret。
-- `rule_automation.py`：求取活跃持仓与已启用规则的标的交集，并按固定时间槽幂等评估。
+- `personal_analysis_worker.py`：个人 AI 分析队列与美东盘前、盘中、盘后规则调度；只有私有覆盖中的该进程可读取 DeepSeek secret。
+- `rule_automation.py`：使用 XNYS 日历识别休市与提前收盘，求取活跃持仓与已启用规则的标的交集，并按美东交易日与时段幂等评估。
 
 个人不可变记录版本链路已删除；`private_workbench` 中的历史表仍由 Alembic revision 保留。
 

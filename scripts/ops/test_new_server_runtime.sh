@@ -284,7 +284,6 @@ assert personal_worker["environment"]["DEEPSEEK_CREDENTIALS_FILE"] == (
 )
 assert personal_worker["environment"]["DEEPSEEK_MONTHLY_SOFT_BUDGET_USD"] == "5"
 assert personal_worker["environment"]["PERSONAL_ANALYSIS_MODE"] == "legacy"
-assert personal_worker["environment"]["PERSONAL_RULE_EVALUATION_INTERVAL_SECONDS"] == "900"
 assert personal_worker["environment"]["ALPACA_CREDENTIALS_FILE"] == (
     "/run/secrets/alpaca-credentials.json"
 )
