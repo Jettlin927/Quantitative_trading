@@ -92,14 +92,14 @@ describe('个人美股 synthetic tracer', () => {
     expect(await screen.findByRole('heading', { name: '手工美股持仓' })).toBeInTheDocument()
   })
 
-  it('标准 URL 六区路由以 /today 为根，只保留美股市场入口', () => {
+  it('标准 URL 五区路由以 /today 为根，只保留美股工作区入口', () => {
     const personalClient = { openToday: vi.fn(() => Promise.resolve({ trace })) }
     render(<App readAdapter={noOpReadAdapter} personalClient={personalClient} />)
 
-    for (const name of ['今日工作台', '我的持仓', '市场与标的', '规则与策略', '研究驾驶舱', '数据与系统']) {
+    for (const name of ['今日工作台', '我的持仓', '市场与标的', '规则与策略', '数据与系统']) {
       expect(screen.getByRole('button', { name: new RegExp(name) })).toBeInTheDocument()
     }
-    expect(screen.queryByRole('button', { name: /研究记录|A 股数据|美股数据/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /研究记录|研究驾驶舱|A 股数据|美股数据/ })).not.toBeInTheDocument()
   })
 
   it('个人首页不加载其他工作区的全局数据', async () => {

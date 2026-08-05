@@ -4,7 +4,7 @@
 
 ## 默认拓扑
 
-- `frontend`：美股个人工作台与正式研究的只读界面。
+- `frontend`：美股个人工作台的前端界面，不再暴露旧 A 股策略驾驶舱。
 - `api`：个人工作台、市场观察、研究和健康 API，不在请求进程执行长任务。
 - `personal-analysis-worker`：私有 AI 分析队列，只通过个人 Compose 覆盖启用。
 - `research-worker`：正式研究队列；启用前必须完成相应工程 Issue 和人工批准门。

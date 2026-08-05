@@ -77,11 +77,10 @@
 | `/portfolio` | `PortfolioView.jsx` | 私有手工持仓与每日权益 |
 | `/markets/us` | `InstrumentWorkspaceView.jsx` + `MarketChart.jsx` | 美股标的与证据 |
 | `/rules` | `RulesView.jsx` | 确定性观察规则 |
-| `/research` | `ResearchCockpitView.jsx` | 与个人工作台隔离的正式研究 |
 | `/system` | `OperationsView.jsx` | 来源授权、schema 与服务健康 |
 | 个人 AI 分析 | `AnalysisWorkspaceView.jsx` | 分析草稿、确认、运行与事件 |
 
-已无 `/markets/a-share`、`/records` 或旧美股实验页面。支撑模块包括 `readAdapter.js`、`personalJourneyClient.js`、图表 adapter、`viewSupport.jsx` 与 `styles.css`。
+已无 `/markets/a-share`、`/records`、`/research` 或旧美股实验页面。旧研究驾驶舱只展示 A 股历史策略，已从产品入口和前端代码退役；正式研究后端合同继续作为隔离的治理基础设施保留。支撑模块包括 `readAdapter.js`、`personalJourneyClient.js`、图表 adapter、`viewSupport.jsx` 与 `styles.css`。
 
 ## 脚本与配置
 
