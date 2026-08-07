@@ -28,7 +28,6 @@ grep -Fq 'listen 5173;' "$FRONTEND_NGINX_CONFIG"
 grep -Fq 'proxy_pass http://api:8000;' "$FRONTEND_NGINX_CONFIG"
 
 if POSTGRES_PASSWORD= docker compose \
-  --profile research-automation \
   --env-file /dev/null \
   --file "$REPO_ROOT/docker-compose.yml" \
   --file "$SERVER_COMPOSE_FILE" \
@@ -44,8 +43,7 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p \
-  "$TEST_ROOT/postgres" \
-  "$TEST_ROOT/research-artifacts"
+  "$TEST_ROOT/postgres"
 touch \
   "$TEST_ROOT/personal-gateway-token" \
   "$TEST_ROOT/personal-keyring.json" \
@@ -57,9 +55,7 @@ touch \
 
 POSTGRES_PASSWORD=compose-config-only \
 POSTGRES_DATA_DIR="$TEST_ROOT/postgres" \
-RESEARCH_ARTIFACTS_DIR="$TEST_ROOT/research-artifacts" \
 docker compose \
-  --profile research-automation \
   --env-file /dev/null \
   --file "$REPO_ROOT/docker-compose.yml" \
   --file "$SERVER_COMPOSE_FILE" \
@@ -79,7 +75,7 @@ server_compose_path = Path(sys.argv[3])
 config = json.loads(config_path.read_text(encoding="utf-8"))
 services = config["services"]
 server_compose = server_compose_path.read_text(encoding="utf-8")
-assert server_compose.count("create_host_path: false") == 3, server_compose_path
+assert server_compose.count("create_host_path: false") == 1, server_compose_path
 
 expected_ports = {
     "db": (5432, "5432"),
@@ -96,8 +92,6 @@ for service_name, (target, published) in expected_ports.items():
 
 expected_mounts = {
     "db": (test_root / "postgres", "/var/lib/postgresql/data"),
-    "api": (test_root / "research-artifacts", "/app/outputs/research-runs"),
-    "research-worker": (test_root / "research-artifacts", "/app/outputs/research-runs"),
 }
 for service_name, (source, target) in expected_mounts.items():
     mounts = services[service_name].get("volumes", [])
@@ -109,13 +103,8 @@ for service_name, (source, target) in expected_mounts.items():
     assert mount.get("bind", {}).get("create_host_path") in (None, False), (service_name, mount)
 
 assert services["frontend"].get("volumes", []) == [], services["frontend"].get("volumes")
+assert services["api"].get("volumes", []) == [], services["api"].get("volumes")
 assert not config.get("volumes"), config.get("volumes")
-research_worker = services["research-worker"]
-assert research_worker["profiles"] == ["research-automation"], research_worker["profiles"]
-assert float(research_worker["cpus"]) == 0.75, research_worker["cpus"]
-assert int(research_worker["mem_limit"]) == 768 * 1024**2, research_worker["mem_limit"]
-assert research_worker["environment"]["RESEARCH_MAX_CPU_CORES"] == "0.75"
-assert research_worker["environment"]["RESEARCH_MAX_MEMORY_MIB"] == "768"
 
 memory_total = 0
 cpu_total = 0.0
@@ -134,7 +123,6 @@ PY
 # 校验仍必须可执行；哨兵值只用于保持该 Worker 不可启动。
 POSTGRES_PASSWORD=compose-config-only \
 POSTGRES_DATA_DIR="$TEST_ROOT/postgres" \
-RESEARCH_ARTIFACTS_DIR="$TEST_ROOT/research-artifacts" \
 PRIVATE_DATABASE_URL='postgresql+psycopg://quant_personal_api:compose-only@db:5432/quant_trading' \
 PERSONAL_GATEWAY_TOKEN_HOST_FILE="$TEST_ROOT/personal-gateway-token" \
 PERSONAL_DATA_KEYRING_HOST_FILE="$TEST_ROOT/personal-keyring.json" \
@@ -153,7 +141,6 @@ docker compose \
 
 POSTGRES_PASSWORD=compose-config-only \
 POSTGRES_DATA_DIR="$TEST_ROOT/postgres" \
-RESEARCH_ARTIFACTS_DIR="$TEST_ROOT/research-artifacts" \
 PRIVATE_DATABASE_URL='postgresql+psycopg://quant_personal_api:compose-only@db:5432/quant_trading' \
 PERSONAL_ANALYSIS_DATABASE_URL='postgresql+psycopg://quant_personal_analysis:compose-only@db:5432/quant_trading' \
 PERSONAL_GATEWAY_TOKEN_HOST_FILE="$TEST_ROOT/personal-gateway-token" \
@@ -168,7 +155,6 @@ OFFICIAL_ANALYSIS_QUERY_HOST_FILE="$TEST_ROOT/official-analysis-queries.json" \
 OFFICIAL_ANALYSIS_AUTHORIZATION_HOST_FILE="$TEST_ROOT/official-analysis-authorization.json" \
 SEC_USER_AGENT='QuantitativeTrading compose@example.invalid' \
 docker compose \
-  --profile research-automation \
   --profile personal-ai \
   --env-file /dev/null \
   --file "$REPO_ROOT/docker-compose.yml" \
@@ -246,16 +232,6 @@ for service_name, service in services.items():
     assert targets.isdisjoint(alpaca_targets), (service_name, targets)
     assert official_environment.isdisjoint(environment), service_name
     assert targets.isdisjoint(official_targets), (service_name, targets)
-
-for service_name in ("research-worker",):
-    service = services[service_name]
-    environment = service.get("environment", {})
-    assert "PRIVATE_DATABASE_URL" not in environment, service_name
-    assert "PERSONAL_GATEWAY_TOKEN_FILE" not in environment, service_name
-    assert "PERSONAL_DATA_KEYRING_FILE" not in environment, service_name
-    assert "PERSONAL_ALLOWED_ORIGINS" not in environment, service_name
-    targets = {mount["target"] for mount in service.get("volumes", [])}
-    assert targets.isdisjoint(expected_secrets), (service_name, targets)
 
 frontend = services["frontend"]
 assert frontend["environment"]["PERSONAL_GATEWAY_TOKEN_FILE"] == (

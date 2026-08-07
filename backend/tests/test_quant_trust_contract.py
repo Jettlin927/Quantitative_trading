@@ -74,16 +74,16 @@ class QuantTrustContractDocumentationTest(unittest.TestCase):
         self.assertIn("A 股横截面研究", contract)
         self.assertIn("旧策略 archive 边界", contract)
 
-    def test_strategy_research_is_routed_to_complete_evaluation_standard(self):
+    def test_strategy_research_contract_is_marked_as_legacy(self):
         agents = AGENTS_PATH.read_text(encoding="utf-8")
         research_readme = RESEARCH_README_PATH.read_text(encoding="utf-8")
         standard = STRATEGY_STANDARD_PATH.read_text(encoding="utf-8")
 
-        standard_relative_path = "docs/research/contracts/strategy-evaluation-standard.md"
-        self.assertIn(standard_relative_path, agents)
+        self.assertIn("旧量化研究代码、配置、schema 和文档是遗留资产", agents)
+        self.assertIn("遗留研究文档", research_readme)
+        self.assertIn("不是任务、开发或运维入口", research_readme)
         self.assertIn("不得只展示累计收益、年化收益或 Sharpe", standard)
         self.assertIn("内部编号不能替代策略或变体名称", standard)
-        self.assertIn("strategy-evaluation-standard.md", research_readme)
 
         required_sections = (
             "## 强制结论状态",

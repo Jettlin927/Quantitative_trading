@@ -1,5 +1,8 @@
 # GitHub 研究计划与服务端编排器
 
+> 遗留操作合同：研究系统已退出当前产品，本页不得作为运行手册。保留内容只用于
+> 审计遗留代码与数据；见 [ADR 0011](../adr/0011-personal-investment-workbench-without-research.md)。
+
 本模块把 GitHub 研究 Issue 作为控制面，把 PostgreSQL 队列、研究运行与 canonical 工件作为执行面。它只覆盖计划冻结、授权校验、租约队列和单批次运行；不会自动合并代码、执行生产 migration、部署服务器或发布研究结论。
 
 ## 不混用的四类状态

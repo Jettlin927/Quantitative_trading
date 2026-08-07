@@ -101,7 +101,7 @@ class ResearchManifestTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "风险"):
             build_result_fingerprint(changed)
 
-    def test_deployment_injects_commit_and_uses_cross_release_artifact_volume(self):
+    def test_deployment_injects_commit_without_research_runtime(self):
         repo_root = Path(__file__).resolve().parents[2]
         dockerfile = (repo_root / "backend" / "Dockerfile").read_text(encoding="utf-8")
         compose = (repo_root / "docker-compose.yml").read_text(encoding="utf-8")
@@ -110,15 +110,14 @@ class ResearchManifestTest(unittest.TestCase):
         self.assertIn("ENV APP_GIT_COMMIT", dockerfile)
         self.assertIn("ARG APP_GIT_REF", dockerfile)
         self.assertIn("ENV APP_GIT_REF", dockerfile)
-        self.assertIn("research_artifacts:/app/outputs/research-runs", compose)
-        self.assertIn("RESEARCH_ARTIFACT_VOLUME:-quant_research_artifacts", compose)
+        self.assertNotIn("research-worker", compose)
+        self.assertNotIn("research_artifacts:/app/outputs/research-runs", compose)
+        self.assertNotIn("RESEARCH_ARTIFACT_VOLUME", compose)
         self.assertIn("set_deploy_identity", deploy)
         self.assertIn("git merge-base --is-ancestor", deploy)
         self.assertIn("git status --porcelain --untracked-files=all", deploy)
         self.assertIn('resolved_ref="refs/unverified"', deploy)
         self.assertNotIn('export APP_GIT_REF="refs/heads/$BRANCH"', deploy)
-        research_worker = compose.split("  research-worker:", 1)[1].split("\n  frontend:", 1)[0]
-        self.assertNotIn("- .:/app", research_worker)
 
 
 if __name__ == "__main__":

@@ -45,15 +45,15 @@ class ProductionDatabaseRoleArtifactTest(unittest.TestCase):
             expected,
         )
 
-    def test_compose_exposes_a_distinct_database_url_per_runtime(self) -> None:
+    def test_compose_exposes_current_runtime_database_urls(self) -> None:
         compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
 
         for variable in (
             "API_DATABASE_URL",
-            "RESEARCH_WORKER_DATABASE_URL",
             "PRIVATE_DATABASE_URL",
         ):
             self.assertIn(f"${{{variable}:-", compose)
+        self.assertNotIn("RESEARCH_WORKER_DATABASE_URL", compose)
 
 
 @unittest.skipUnless(os.getenv("TEST_POSTGRES_URL"), "TEST_POSTGRES_URL 未配置，跳过生产角色 PostgreSQL 集成测试")

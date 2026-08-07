@@ -32,37 +32,11 @@ services:
         published: "${API_PORT:-18000}"
         host_ip: 127.0.0.1
         protocol: tcp
-    volumes: !override
-      - type: bind
-        source: ${RESEARCH_ARTIFACTS_DIR:-/srv/quantitative-trading/research-artifacts}
-        target: /app/outputs/research-runs
-        bind:
-          create_host_path: false
+    volumes: !override []
     cpus: 0.45
     mem_limit: 640m
     mem_reservation: 256m
     pids_limit: 256
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: "3"
-
-  research-worker:
-    volumes: !override
-      - type: bind
-        source: ${RESEARCH_ARTIFACTS_DIR:-/srv/quantitative-trading/research-artifacts}
-        target: /app/outputs/research-runs
-        bind:
-          create_host_path: false
-    environment:
-      RESEARCH_MAX_CPU_CORES: ${RESEARCH_MAX_CPU_CORES:-0.75}
-      RESEARCH_MAX_MEMORY_MIB: ${RESEARCH_MAX_MEMORY_MIB:-768}
-    cpus: ${RESEARCH_MAX_CPU_CORES:-0.75}
-    mem_limit: ${RESEARCH_MAX_MEMORY_MIB:-768}m
-    mem_reservation: 384m
-    pids_limit: 256
-    stop_grace_period: 90s
     logging:
       driver: json-file
       options:
