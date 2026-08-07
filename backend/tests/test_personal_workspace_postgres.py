@@ -96,7 +96,7 @@ ENCRYPTED_PRIVATE_TABLES = PRIVATE_TABLES - {
 
 class PersonalWorkspaceSchemaIdentityTest(unittest.TestCase):
     def test_private_orm_identity_is_separate_from_public_metadata(self) -> None:
-        self.assertEqual(expected_schema_heads(), ("0019_personal_realized_trades",))
+        self.assertEqual(expected_schema_heads(), ("0020_drop_data_quality_registry",))
         self.assertEqual(
             set(PrivateBase.metadata.tables),
             {

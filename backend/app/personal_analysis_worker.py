@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
+from hashlib import sha256
 import json
 import logging
 import os
@@ -12,30 +13,16 @@ from stat import S_IMODE
 from threading import Event
 from typing import Callable
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from .personal_workspace.analysis import (
-    AnalysisWorkspace,
-    DeepSeekChatAdapter,
-    PostgresAnalysisStore,
+from .personal_workspace.analysis import AnalysisWorkspace
+from .personal_workspace.composition import (
+    build_analysis_workspace,
+    build_personal_services,
 )
-from .personal_workspace.crypto import PersonalDataCipher, load_keyring_file
 from .personal_workspace.contracts import LOCAL_PERSONAL_ACTOR, PersonalActor
-from .personal_workspace.market_runtime import load_personal_market_readers
-from .personal_workspace.portfolio import (
-    PortfolioBook,
-    PostgresPortfolioStore,
-    UnavailablePortfolioMarketReader,
-)
+from .personal_workspace.crypto import load_keyring_file
 from .personal_workspace.rule_automation import (
     HoldingRuleAutomation,
     personal_rule_evaluation_slot,
-)
-from .personal_workspace.rules import (
-    InstrumentRuleInputReader,
-    ObservationRuleBook,
-    PostgresObservationRuleStore,
 )
 
 
@@ -119,6 +106,10 @@ class PersonalAnalysisWorker:
                 stop_event.wait(poll_seconds)
 
 
+def _empty_evidence_reader(actor: PersonalActor, intent) -> tuple:
+    return ()
+
+
 def build_personal_analysis_worker_from_environment() -> PersonalAnalysisWorker:
     database_url = os.getenv("PERSONAL_ANALYSIS_DATABASE_URL", "").strip()
     keyring_path = os.getenv("PERSONAL_DATA_KEYRING_FILE", "").strip()
@@ -130,75 +121,39 @@ def build_personal_analysis_worker_from_environment() -> PersonalAnalysisWorker:
     monthly_budget = Decimal(os.getenv("DEEPSEEK_MONTHLY_SOFT_BUDGET_USD", "5"))
     if monthly_budget <= 0:
         raise RuntimeError("personal_analysis_worker_unconfigured")
-    engine = create_engine(database_url, pool_pre_ping=True)
-    session_factory = sessionmaker(
-        bind=engine,
-        autoflush=False,
-        expire_on_commit=False,
+
+    services = build_personal_services(
+        database_url=database_url,
+        keyring=keyring,
+        challenge_key=sha256(b"personal-analysis-worker|no-gateway").digest(),
     )
-    cipher = PersonalDataCipher(keyring)
     mode = os.getenv("PERSONAL_ANALYSIS_MODE", "legacy").strip().lower()
     if mode == "agent":
-        workspace = _build_agent_workspace(
-            session_factory=session_factory,
-            keyring=keyring,
-            api_key=credentials.api_key,
-            monthly_budget=monthly_budget,
-        )
+        from .personal_workspace.agent.deepseek_provider import DeepSeekAgentChatAdapter
+
+        provider = DeepSeekAgentChatAdapter(api_key=credentials.api_key)
+        evidence_reader = None
     else:
-        store = PostgresAnalysisStore(
-            session_factory,
-            cipher=cipher,
-        )
-        workspace = AnalysisWorkspace(
-            store=store,
-            evidence_reader=lambda actor, intent: (),
-            provider=DeepSeekChatAdapter(api_key=credentials.api_key),
-            monthly_soft_budget_usd=monthly_budget,
-        )
-    market_readers = load_personal_market_readers(
-        credentials_file=os.getenv("ALPACA_CREDENTIALS_FILE", "").strip(),
-        authorization_file=os.getenv("ALPACA_AUTHORIZATION_FILE", "").strip(),
-    )
-    portfolio = PortfolioBook(
-        store=PostgresPortfolioStore(session_factory, cipher=cipher),
-        market=UnavailablePortfolioMarketReader(),
-    )
-    rules = ObservationRuleBook(
-        store=PostgresObservationRuleStore(session_factory, cipher=cipher),
-        inputs=InstrumentRuleInputReader(market_readers.instrument),
+        from .personal_workspace.analysis import DeepSeekChatAdapter
+
+        provider = DeepSeekChatAdapter(api_key=credentials.api_key)
+        evidence_reader = _empty_evidence_reader
+    workspace = build_analysis_workspace(
+        services=services,
+        mode=mode,
+        provider=provider,
+        evidence_reader=evidence_reader,
+        monthly_soft_budget_usd=monthly_budget,
+        monthly_spend_reader=lambda actor, now: services.analysis_store.monthly_spend_usd(
+            actor.actor_id, now
+        ),
     )
     return PersonalAnalysisWorker(
         workspace=workspace,
         worker_id=os.getenv("PERSONAL_ANALYSIS_WORKER_ID", "personal-analysis-worker-1"),
-        rule_automation=HoldingRuleAutomation(portfolio=portfolio, rules=rules),
-    )
-
-
-def _build_agent_workspace(
-    *,
-    session_factory,
-    keyring,
-    api_key: str,
-    monthly_budget: Decimal,
-):
-    """agent 模式：tool-use 循环 + 持仓/K线/新闻工具（数据源缺失时工具降级）。"""
-    from .personal_workspace.agent.deepseek_provider import DeepSeekAgentChatAdapter
-    from .personal_workspace.agent.workspace import build_agent_workspace
-    from .personal_workspace.analysis import PostgresAnalysisStore
-
-    store = PostgresAnalysisStore(
-        session_factory,
-        cipher=PersonalDataCipher(keyring),
-    )
-    return build_agent_workspace(
-        store=store,
-        session_factory=session_factory,
-        cipher=PersonalDataCipher(keyring),
-        provider=DeepSeekAgentChatAdapter(api_key=api_key),
-        monthly_soft_budget_usd=monthly_budget,
-        monthly_spend_reader=lambda actor, now: store.monthly_spend_usd(
-            actor.actor_id, now
+        rule_automation=HoldingRuleAutomation(
+            portfolio=services.portfolio,
+            rules=services.rules,
         ),
     )
 

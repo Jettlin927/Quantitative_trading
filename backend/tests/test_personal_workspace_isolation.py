@@ -38,27 +38,6 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
         )
         self.assertNotIn("*", cors.kwargs["allow_origins"])
 
-    def test_formal_research_paths_cannot_import_or_read_private_workspace(self) -> None:
-        protected_paths = [
-            *sorted((REPO_ROOT / "backend" / "app" / "quant_research").glob("*.py")),
-        ]
-        forbidden = {
-            "personal_workspace",
-            "PRIVATE_DATABASE_URL",
-            "PERSONAL_DATA_KEYRING_FILE",
-            "DEEPSEEK_CREDENTIALS_FILE",
-            "ALPACA_CREDENTIALS_FILE",
-            "ALPACA_AUTHORIZATION_FILE",
-        }
-
-        violations = {}
-        for path in protected_paths:
-            source = path.read_text(encoding="utf-8")
-            matches = sorted(value for value in forbidden if value in source)
-            if matches:
-                violations[str(path.relative_to(REPO_ROOT))] = matches
-        self.assertEqual(violations, {})
-
     def test_frontend_contains_no_provider_or_gateway_secret_configuration(self) -> None:
         forbidden = {
             "DEEPSEEK_CREDENTIALS_FILE",

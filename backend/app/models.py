@@ -20,7 +20,7 @@ from sqlalchemy import (
     func,
     inspect as sa_inspect,
 )
-from sqlalchemy.orm import Mapped, mapped_column, validates
+from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base, PrivateBase
 
@@ -1048,53 +1048,6 @@ class DataOverviewSnapshot(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
-class DataQualityRun(Base):
-    __tablename__ = "data_quality_runs"
-    __table_args__ = (
-        CheckConstraint(
-            "status in ('running', 'ready', 'ready_with_warnings', 'blocked', 'failed')",
-            name="ck_data_quality_runs_status",
-        ),
-        SqlIndex("ix_data_quality_runs_scope_started", "scope", "started_at"),
-    )
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    scope: Mapped[str] = mapped_column(String(40))
-    start_date: Mapped[date] = mapped_column(Date)
-    end_date: Mapped[date] = mapped_column(Date)
-    universe_hash: Mapped[str] = mapped_column(String(64))
-    status: Mapped[str] = mapped_column(String(24), default="running")
-    config: Mapped[dict] = mapped_column(JSON, default=dict)
-    summary: Mapped[dict] = mapped_column(JSON, default=dict)
-    code_commit: Mapped[str | None] = mapped_column(String(64))
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
-class DataQualityResult(Base):
-    __tablename__ = "data_quality_results"
-    __table_args__ = (
-        UniqueConstraint("run_id", "rule_id", "table_name", name="uq_data_quality_result_run_rule_table"),
-        CheckConstraint("severity in ('blocker', 'warning', 'info')", name="ck_data_quality_results_severity"),
-        CheckConstraint("status in ('passed', 'warning', 'blocked', 'failed')", name="ck_data_quality_results_status"),
-        SqlIndex("ix_data_quality_results_run_status", "run_id", "status"),
-    )
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[str] = mapped_column(ForeignKey("data_quality_runs.id", ondelete="CASCADE"))
-    rule_id: Mapped[str] = mapped_column(String(80))
-    table_name: Mapped[str] = mapped_column(String(80))
-    severity: Mapped[str] = mapped_column(String(16))
-    status: Mapped[str] = mapped_column(String(16))
-    checked_rows: Mapped[int] = mapped_column(default=0)
-    failed_rows: Mapped[int] = mapped_column(default=0)
-    sample_issues: Mapped[list[dict]] = mapped_column(JSON, default=list)
-
-    @validates("sample_issues")
-    def validate_sample_issues(self, _key: str, value: list[dict] | None) -> list[dict]:
-        return list(value or [])[:20]
-
-
 class DataSnapshot(Base):
     __tablename__ = "data_snapshots"
     __table_args__ = (
@@ -1103,7 +1056,8 @@ class DataSnapshot(Base):
     )
 
     snapshot_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    quality_run_id: Mapped[str] = mapped_column(ForeignKey("data_quality_runs.id", ondelete="RESTRICT"))
+    # 数据质量注册表已退役；quality_run_id 仅保留为历史列，不再引用被删表。
+    quality_run_id: Mapped[str] = mapped_column(String(36))
     scope: Mapped[str] = mapped_column(String(40))
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
