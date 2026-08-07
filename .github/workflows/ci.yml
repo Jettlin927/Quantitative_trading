@@ -30,16 +30,6 @@ jobs:
           if [[ -d scripts/ops/tests ]]; then
             python -m unittest discover -s scripts/ops/tests -p 'test_*.py' -v
           fi
-      - name: 黄金前缀不变与重现门禁
-        env:
-          DATABASE_URL: "sqlite+pysqlite:///:memory:"
-        shell: bash
-        run: |
-          for pattern in test_quant_trust_contract.py test_research_reproduction.py test_sentinel_baseline.py; do
-            if [[ -f "backend/tests/$pattern" ]]; then
-              python -m unittest discover -s backend/tests -p "$pattern" -v
-            fi
-          done
 
   postgresql-integration:
     name: PostgreSQL 16 集成矩阵

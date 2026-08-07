@@ -10,8 +10,6 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-import os
-from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -221,8 +219,10 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
 def build_agent_workspace(
     *,
     store: AnalysisStore,
-    session_factory: Callable[[], Any],
-    cipher: Any,
+    portfolio_store: Any,
+    price_reader: Any | None,
+    market_adapter: Any | None,
+    news_reader: Any | None,
     provider: Any,
     monthly_soft_budget_usd: Decimal,
     monthly_spend_reader: Callable[[PersonalActor, datetime], Decimal],
@@ -230,28 +230,18 @@ def build_agent_workspace(
 ) -> AgentAnalysisWorkspace:
     """装配 agent 模式的完整工作区（worker/API runtime 共用）。
 
-    数据源均为可选：alpaca 未配置时 K 线/现价工具降级，INVESTMENT_NEWS_DIR 未配置
-    时新闻工具降级。provider 由调用方注入：worker 传 DeepSeekAgentChatAdapter，
-    API 进程传可用性 shim（不持有密钥）。
+    数据源由调用方注入（组合根已装配）：alpaca 未配置时 K 线/现价工具降级，
+    INVESTMENT_NEWS_DIR 未配置时新闻工具降级。provider 由调用方注入：worker 传
+    DeepSeekAgentChatAdapter，API 进程传可用性 shim（不持有密钥）。
     """
-    from ..market_runtime import load_personal_market_readers
-    from ..portfolio import PostgresPortfolioStore
     from .runtime import AgentRuntime
     from .skills import DEFAULT_ACTIVE_SKILLS
     from .tools import build_agent_tools
-    from .tools_impl.news import InvestmentNewsReader
 
-    market_readers = load_personal_market_readers(
-        credentials_file=os.getenv("ALPACA_CREDENTIALS_FILE", "").strip(),
-        authorization_file=os.getenv("ALPACA_AUTHORIZATION_FILE", "").strip(),
-    )
-    portfolio_store = PostgresPortfolioStore(session_factory, cipher=cipher)
-    news_dir = os.getenv("INVESTMENT_NEWS_DIR", "").strip()
-    news_reader = InvestmentNewsReader(Path(news_dir)) if news_dir else None
     tools = build_agent_tools(
         portfolio_store=portfolio_store,
-        price_reader=market_readers.portfolio,
-        market_adapter=market_readers.market,
+        price_reader=price_reader,
+        market_adapter=market_adapter,
         news_reader=news_reader,
     )
     runtime = AgentRuntime(

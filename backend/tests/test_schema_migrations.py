@@ -94,7 +94,7 @@ class SchemaMigrationTest(unittest.TestCase):
                 command.upgrade(alembic_config(connection), "head")
             expected_tables = set(Base.metadata.tables) | {"alembic_version"}
             self.assertEqual(set(inspect(engine).get_table_names()), expected_tables)
-            self.assertEqual(len(Base.metadata.tables), 46)
+            self.assertEqual(len(Base.metadata.tables), 44)
             self.assertIn("research_runs", Base.metadata.tables)
             self.assertIn("strategy_definitions", Base.metadata.tables)
             self.assertIn("research_publications", Base.metadata.tables)

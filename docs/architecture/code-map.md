@@ -61,8 +61,9 @@
 - `.env.example`：可发现的配置键；真实值只存在于受保护环境。
 - `docs/operations/`：部署、安全访问、secret 和数据库角色合同。
 
-研究 API、研究 Worker、`scripts/research/` 及其运行支持代码已经移除。仍保留的
-`configs/research*`、`backend/app/quant_research/`、历史模型、migration 和测试夹具是
+研究 API、研究 Worker、`scripts/research/`、`backend/app/data_quality/` 与
+`backend/app/quant_research/` 及其运行支持代码已物理删除。仍保留 `configs/research*`、
+历史模型（含 `data_snapshots` 等研究审计链表）、migration 与 `docs/research/` 文档作为
 遗留兼容或审计资产，不是当前入口；继续删除前仍须按 ADR 0011 审计现役复用、生产
 数据和外部依赖。
 

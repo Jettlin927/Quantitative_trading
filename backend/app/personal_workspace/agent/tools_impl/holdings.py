@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Protocol
 
-from ...portfolio import PortfolioMarketReader, PortfolioStore
+from ...portfolio import PortfolioMarketReader, PortfolioState
 from ..protocol import Tool, ToolContext, ToolResult
+
+
+class HoldingsReader(Protocol):
+    """只读持仓源：只暴露 load，不给工具写能力。"""
+
+    def load(self, *, actor_id: str) -> PortfolioState: ...
 
 
 class GetHoldingsTool:
@@ -21,7 +27,7 @@ class GetHoldingsTool:
     def __init__(
         self,
         *,
-        store: PortfolioStore,
+        store: HoldingsReader,
         price_reader: PortfolioMarketReader | None = None,
     ) -> None:
         self._store = store

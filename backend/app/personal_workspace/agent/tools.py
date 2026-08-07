@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 from ...market_observation.alpaca import AlpacaMarketObservationAdapter
-from ..portfolio import PortfolioMarketReader, PortfolioStore
+from ..portfolio import PortfolioMarketReader
 from .protocol import Tool
-from .tools_impl.holdings import GetHoldingsTool
+from .tools_impl.holdings import GetHoldingsTool, HoldingsReader
 from .tools_impl.kline import GetKlineTool
 from .tools_impl.news import GetNewsTool, InvestmentNewsReader
 
 
 def build_agent_tools(
     *,
-    portfolio_store: PortfolioStore,
+    portfolio_store: HoldingsReader,
     price_reader: PortfolioMarketReader | None = None,
     market_adapter: AlpacaMarketObservationAdapter | None = None,
     news_reader: InvestmentNewsReader | None = None,
