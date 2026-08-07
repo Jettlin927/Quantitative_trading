@@ -43,11 +43,6 @@ if [[ "$server_version" != 16.* ]]; then
   exit 1
 fi
 
-worker_database_exists="$("${COMPOSE[@]}" exec -T test-db psql -U quant_test -d quant_migration_test -Atqc "select 1 from pg_database where datname = 'quant_worker_test'")"
-if [[ "$worker_database_exists" != "1" ]]; then
-  "${COMPOSE[@]}" exec -T test-db createdb -U quant_test quant_worker_test
-fi
-
 published_endpoint="$("${COMPOSE[@]}" port test-db 5432)"
 test_port="${published_endpoint##*:}"
 if [[ ! "$test_port" =~ ^[0-9]+$ ]]; then
@@ -56,10 +51,9 @@ if [[ ! "$test_port" =~ ^[0-9]+$ ]]; then
 fi
 
 export TEST_POSTGRES_URL="postgresql+psycopg://quant_test:quant_test_password@127.0.0.1:${test_port}/quant_migration_test"
-export TEST_RESEARCH_WORKER_POSTGRES_URL="postgresql+psycopg://quant_test:quant_test_password@127.0.0.1:${test_port}/quant_worker_test"
 export DATABASE_URL="$TEST_POSTGRES_URL"
 export APP_GIT_COMMIT="${APP_GIT_COMMIT:-$(git rev-parse --verify HEAD)}"
 
 echo "PostgreSQL $server_version 已在隔离 tmpfs 测试容器中就绪。"
-echo "运行 backend/tests 自动发现矩阵（migration、quality、snapshot、runner、worker lease）。"
+echo "运行 backend/tests 自动发现矩阵（migration、quality、snapshot、个人工作台）。"
 "$PYTHON_BIN" -m unittest discover -s backend/tests -p 'test_*.py' -v

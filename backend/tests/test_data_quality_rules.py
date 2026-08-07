@@ -528,7 +528,7 @@ class DataQualityRulesTest(unittest.TestCase):
             report["config"]["universeClassificationSha256"],
         )
 
-    def test_api_runs_quality_and_research_readiness_requires_quality_run(self):
+    def test_api_runs_and_reads_quality_report(self):
         with Session(self.engine) as db:
             db.add(Fund(ts_code="510300.SH", name="合成 ETF", market="E", fund_type="ETF"))
             for trade_date, close in [(date(2026, 1, 2), 680), (date(2026, 1, 5), 682)]:
@@ -559,16 +559,12 @@ class DataQualityRulesTest(unittest.TestCase):
         with Session(self.engine) as db:
             report = main.create_data_quality_run(payload, db)
             fetched = main.get_data_quality_run(report["qualityRunId"], db)
-            readiness = main.get_research_readiness_by_quality_run(report["qualityRunId"], db)
 
         paths = {route.path for route in main.app.routes}
         self.assertIn("/api/data-quality/runs", paths)
         self.assertIn("/api/data-quality/runs/{quality_run_id}", paths)
-        self.assertIn("/api/research/readiness/{quality_run_id}", paths)
+        self.assertFalse(any(path.startswith("/api/research") for path in paths))
         self.assertEqual(fetched["qualityRunId"], report["qualityRunId"])
-        self.assertEqual(readiness["level"], "research")
-        self.assertEqual(readiness["status"], "ready")
-        self.assertTrue(readiness["researchReady"])
 
 class DataQualityRegistryAndReadinessTest(unittest.TestCase):
     def test_registry_constraints_and_migration_parent_are_explicit(self):

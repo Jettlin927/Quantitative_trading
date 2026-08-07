@@ -41,9 +41,6 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
     def test_formal_research_paths_cannot_import_or_read_private_workspace(self) -> None:
         protected_paths = [
             *sorted((REPO_ROOT / "backend" / "app" / "quant_research").glob("*.py")),
-            REPO_ROOT / "backend" / "app" / "research_worker.py",
-            REPO_ROOT / "backend" / "app" / "research_publication.py",
-            *sorted((REPO_ROOT / "scripts" / "research").glob("*.py")),
         ]
         forbidden = {
             "personal_workspace",
@@ -61,23 +58,6 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
             if matches:
                 violations[str(path.relative_to(REPO_ROOT))] = matches
         self.assertEqual(violations, {})
-
-    def test_worker_processes_do_not_receive_private_or_ai_configuration(self) -> None:
-        compose = yaml.safe_load((REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
-        forbidden = {
-            "PRIVATE_DATABASE_URL",
-            "PERSONAL_GATEWAY_TOKEN_FILE",
-            "PERSONAL_DATA_KEYRING_FILE",
-            "DEEPSEEK_CREDENTIALS_FILE",
-            "DEEPSEEK_TOKEN",
-            "DEEPSEEK_MODEL",
-            "DEEPSEEK_API_BASE",
-            "ALPACA_CREDENTIALS_FILE",
-            "ALPACA_AUTHORIZATION_FILE",
-        }
-        for service_name in ("research-worker",):
-            environment = compose["services"][service_name].get("environment", {})
-            self.assertTrue(forbidden.isdisjoint(environment), service_name)
 
     def test_frontend_contains_no_provider_or_gateway_secret_configuration(self) -> None:
         forbidden = {

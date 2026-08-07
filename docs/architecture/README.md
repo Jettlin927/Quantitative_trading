@@ -1,24 +1,23 @@
 # 架构
 
-本模块描述稳定的系统、领域、数据流和代码职责；易变化的容器实例、提交、端口占用和部署状态不在这里冻结。
+本模块描述个人投资工作台的稳定系统流和代码职责；容器实例、提交、端口占用和部署
+状态不在这里冻结。
 
-## 默认拓扑
+## 当前拓扑
 
-- `frontend`：美股个人工作台的前端界面，不再暴露旧 A 股策略驾驶舱。
-- `api`：个人工作台、市场观察、研究和健康 API，不在请求进程执行长任务。
-- `personal-analysis-worker`：私有 AI 分析队列，只通过个人 Compose 覆盖启用。
-- `research-worker`：正式研究队列；启用前必须完成相应工程 Issue 和人工批准门。
-- `db`：PostgreSQL 结构化事实。
-- `artifacts`：冻结输入、账本、复现证据和原始报告。
+- `frontend`：今日、持仓、美股标的和系统健康界面。
+- `api`：私有工作台、市场观察和健康 API；不在请求进程执行长任务。
+- `personal-analysis-worker`：AI 分析队列与持仓规则周期评估，只通过私有 Compose 覆盖启用。
+- `db`：PostgreSQL 公共 schema 与隔离的 `private_workbench` schema。
+- Alpaca：按用途授权的只读市场观察来源。
+- DeepSeek：仅由私有 Worker 调用的分析模型。
 
-GitHub Issues 是计划、批准和用户可见结论的控制面；服务器是队列、数据、计算和工件的执行面。结构化事实与冻结工件相互补充，任一单独存在都不代表发布完成。
-
-A 股、公共同步 Worker、免费美股实验和个人不可变记录已退役；Alembic 历史与研究证据继续保留。详见 [ADR 0010](../adr/0010-us-first-workbench-and-retired-legacy-data-paths.md)。
+旧研究服务、脚本、schema 和工件不属于当前拓扑；存在这些资产不表示仍受支持。详见
+[ADR 0011](../adr/0011-personal-investment-workbench-without-research.md)。
 
 ## 入口
 
-- [系统流程导航](system-flow.md)：拓扑、研究生命周期与数据流的每一步归属
-- [代码地图](code-map.md)：按领域分组的稳定模块职责
+- [系统流程](system-flow.md)：请求、持仓、规则和 AI 分析如何流转
+- [代码地图](code-map.md)：按职责分组的当前入口与遗留边界
 - [统一领域语言](../../CONTEXT.md)
 - [架构决策](../adr/)
-- [研究合同](../research/contracts/)

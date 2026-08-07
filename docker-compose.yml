@@ -41,55 +41,11 @@ services:
       - "${API_PORT:-18000}:8000"
     volumes:
       - .:/app
-      - research_artifacts:/app/outputs/research-runs
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).read()"]
       interval: 5s
       timeout: 5s
       retries: 12
-
-  research-worker:
-    profiles: ["research-automation"]
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-      args:
-        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
-        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
-        APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
-        APP_GIT_REF: ${APP_GIT_REF:-unknown}
-    container_name: quant_trading_research_worker
-    command: ["python", "-m", "backend.app.research_worker"]
-    restart: unless-stopped
-    cpus: ${RESEARCH_MAX_CPU_CORES:-1}
-    mem_limit: ${RESEARCH_MAX_MEMORY_MIB:-1536}m
-    pids_limit: 256
-    stop_grace_period: 90s
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: ${RESEARCH_WORKER_DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-quant}:${POSTGRES_PASSWORD:-quant_password}@db:5432/${POSTGRES_DB:-quant_trading}}
-      APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
-      APP_GIT_REF: ${APP_GIT_REF:-unknown}
-      GITHUB_REPOSITORY: ${GITHUB_REPOSITORY:-Jettlin927/Quantitative_trading}
-      RESEARCH_GITHUB_TOKEN: ${RESEARCH_GITHUB_TOKEN:-}
-      RESEARCH_ARTIFACT_ROOT: /app/outputs/research-runs
-      RESEARCH_PUBLIC_BASE_URL: ${RESEARCH_PUBLIC_BASE_URL:-http://127.0.0.1:15173}
-      RESEARCH_READBACK_BASE_URL: ${RESEARCH_READBACK_BASE_URL:-http://frontend:5173}
-      RESEARCH_WORKER_POLL_SECONDS: ${RESEARCH_WORKER_POLL_SECONDS:-30}
-      RESEARCH_WORKER_HEARTBEAT_SECONDS: ${RESEARCH_WORKER_HEARTBEAT_SECONDS:-20}
-      RESEARCH_WORKER_LEASE_SECONDS: ${RESEARCH_WORKER_LEASE_SECONDS:-120}
-      RESEARCH_PUBLICATION_RETRY_SECONDS: ${RESEARCH_PUBLICATION_RETRY_SECONDS:-300}
-      RESEARCH_WORKER_ID: ${RESEARCH_WORKER_ID:-}
-      RESEARCH_MAX_WALL_CLOCK_SECONDS: ${RESEARCH_MAX_WALL_CLOCK_SECONDS:-7200}
-      RESEARCH_MAX_TRIALS: ${RESEARCH_MAX_TRIALS:-1}
-      RESEARCH_MAX_CPU_CORES: ${RESEARCH_MAX_CPU_CORES:-1}
-      RESEARCH_MAX_MEMORY_MIB: ${RESEARCH_MAX_MEMORY_MIB:-1536}
-      RESEARCH_MAX_ARTIFACT_MIB: ${RESEARCH_MAX_ARTIFACT_MIB:-2048}
-      RESEARCH_MAX_RETRIES: ${RESEARCH_MAX_RETRIES:-2}
-    volumes:
-      - research_artifacts:/app/outputs/research-runs
 
   frontend:
     build:
@@ -107,5 +63,3 @@ services:
 
 volumes:
   postgres_data:
-  research_artifacts:
-    name: ${RESEARCH_ARTIFACT_VOLUME:-quant_research_artifacts}

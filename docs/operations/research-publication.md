@@ -1,5 +1,8 @@
 # 研究评价一致发布与恢复
 
+> 遗留操作合同：研究系统已退出当前产品，本页不得作为运行手册。保留内容只用于
+> 审计遗留代码与数据；见 [ADR 0011](../adr/0011-personal-investment-workbench-without-research.md)。
+
 研究发布只接受已经终态的研究运行和显式的五类中文结论。运行成功、Worker 成功或旧脚本 `status=ok` 都不能自行晋升为“研究通过”。发布服务复用既有评价、证据和发布表；唯一新增的 `0010_research_issue_mapping` schema 只保存历史导入研究与独立 GitHub Issue 的不可变一对一映射。
 
 ## 一致发布顺序

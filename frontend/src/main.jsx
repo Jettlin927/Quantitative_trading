@@ -90,7 +90,7 @@ function Sidebar({ activeView, onNavigate }) {
     <aside className="sidebar">
       <div className="brand-lockup">
         <span className="brand-mark"><Activity size={18} /></span>
-        <div><b>量化研究</b><small>量化研究工作台</small></div>
+        <div><b>个人投资</b><small>美股个人工作台</small></div>
       </div>
       <nav className="side-nav" aria-label="主导航">
         {NAV_ITEMS.map(({ id, path, label, eyebrow, icon: Icon }) => (
@@ -100,7 +100,7 @@ function Sidebar({ activeView, onNavigate }) {
         ))}
       </nav>
       <div className="sidebar-foot">
-        <p><i /> 仅限研究</p><small>无券商连接 · 无真实交易</small>
+        <p><i /> 个人只读分析</p><small>手工持仓 · 无券商连接 · 无下单</small>
       </div>
     </aside>
   )
@@ -177,7 +177,7 @@ function errorMessage(error) {
 
 const rootElement = document.getElementById('root')
 if (rootElement) {
-  const appRoot = Reflect.get(window, '__quantResearchRoot') || createRoot(rootElement)
-  Reflect.set(window, '__quantResearchRoot', appRoot)
+  const appRoot = Reflect.get(window, '__personalInvestmentRoot') || createRoot(rootElement)
+  Reflect.set(window, '__personalInvestmentRoot', appRoot)
   appRoot.render(<WorkspaceApp browserHistory />)
 }

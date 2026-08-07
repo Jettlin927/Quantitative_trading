@@ -62,9 +62,11 @@ class DocumentationContractTest(unittest.TestCase):
 
     def test_readme_is_a_stable_human_entry(self) -> None:
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("## 产品边界", readme)
+        self.assertIn("# 美股个人投资工作台", readme)
+        self.assertIn("## 当前能力", readme)
+        self.assertIn("## 遗留边界", readme)
         self.assertIn("## 快速开始", readme)
-        self.assertIn("## 文档导航", readme)
+        self.assertIn("[产品范围](docs/product/)", readme)
         self.assertNotIn("## 当前服务器部署", readme)
         self.assertNotIn("## 主要 API", readme)
         self.assertNotIn("## 数据表", readme)
@@ -78,8 +80,7 @@ class DocumentationContractTest(unittest.TestCase):
 
         self.assertIn("SSH 隧道是研究系统唯一的远程访问入口", decision)
         self.assertIn("不购买或申请域名", decision)
-        self.assertIn("不开放公网 IP 端口", agents)
-        self.assertIn("除非用户明确变更决定", agents)
+        self.assertIn("只通过 SSH 隧道访问 loopback", agents)
         self.assertNotIn("采用 **Cloudflare Tunnel + Cloudflare Access**", decision)
 
     def test_production_deployment_handoff_keeps_live_gates(self) -> None:
@@ -99,25 +100,23 @@ class DocumentationContractTest(unittest.TestCase):
         self.assertIn("127.0.0.1:25173", handoff)
         self.assertIn("SSH 隧道只提供连接", handoff)
         self.assertIn(str(handoff_path.relative_to(REPO_ROOT)), agents)
-        self.assertIn("`quant-trading-prod` 是唯一生产服务器和唯一数据权威", agents)
+        self.assertIn("`quant-trading-prod` 是唯一生产服务器和数据权威", agents)
 
     def test_document_index_routes_every_module(self) -> None:
         index = (DOCS_ROOT / "index.md").read_text(encoding="utf-8")
         for target in [
             "product/",
             "architecture/",
-            "data/a-share/",
             "data/us/",
-            "research/contracts/",
-            "research/guides/",
             "operations/",
-            "acceptance/",
             "adr/",
             "agents/",
             "archive/",
         ]:
             with self.subTest(target=target):
                 self.assertIn(f"]({target})", index)
+        self.assertIn("旧研究资料、A 股资料和不可变验收记录", index)
+        self.assertIn("ADR 0011", index)
 
     def test_historical_strategy_results_remain_archived(self) -> None:
         results_root = DOCS_ROOT / "research" / "strategy-results"

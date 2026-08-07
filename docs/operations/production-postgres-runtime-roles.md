@@ -8,15 +8,15 @@
 | 角色 | LOGIN | public | private_workbench | DDL/管理能力 | 连接用途 |
 | --- | --- | --- | --- | --- | --- |
 | `quant_api_runtime` | 是 | 表 CRUD、序列使用 | 无 | 无 | 公共 API 的 `API_DATABASE_URL` |
-| `quant_research_runtime` | 是 | 表 CRUD、序列使用 | 无 | 无 | 研究 Worker 的 `RESEARCH_WORKER_DATABASE_URL` |
+| `quant_research_runtime` | 是 | 表 CRUD、序列使用 | 无 | 无 | 遗留角色；确认无连接与依赖前不得复用或删除 |
 | `quant_personal_api` | 是 | 无表/序列权限 | 表 CRUD、序列使用 | 无 | 私有 API 的 `PRIVATE_DATABASE_URL` |
 | `quant_personal_analysis` | 是 | 只读 | 表 CRUD、序列使用 | 无 | 个人分析与持仓规则 Worker 的 `PERSONAL_ANALYSIS_DATABASE_URL` |
 
 四个定义角色固定为 `NOSUPERUSER`、`NOCREATEDB`、`NOCREATEROLE`、`NOREPLICATION`、
-`NOBYPASSRLS` 和 `NOINHERIT`，不能在 `public` 创建对象。公共 API 和研究 Worker 对
+`NOBYPASSRLS` 和 `NOINHERIT`，不能在 `public` 创建对象。公共 API 与遗留研究角色对
 `private_workbench` 没有 `USAGE`、表权限或序列权限。
 
-当前公共运行路径没有完成逐表 command/read model 分离，因此两个公共运行角色仍需
+当前公共运行路径没有完成逐表 command/read model 分离，因此 `quant_api_runtime` 仍需
 对 `public` 表执行 CRUD。这比超级用户收敛很多，但不是最终的逐表最小权限；不得把
 本票写成已经完成公共表级最小授权。个人角色与公开角色之间的私有 schema 隔离是本
 阶段必须满足的安全边界。
@@ -59,13 +59,13 @@ docker compose exec -T db sh -lc \
 - 所有角色的超级用户、建库、建角色、复制和 bypass-RLS 属性均为 false；
 - 新建测试表必须继承与现有表一致的 default privileges。
 
-当前连接切换由 Compose 的 `API_DATABASE_URL`、`RESEARCH_WORKER_DATABASE_URL` 和
-`PRIVATE_DATABASE_URL` 分别承载。留空时仍使用
-现有公共数据库身份，以保证本地开发兼容；生产不得把该兼容回退写成角色切换完成。
+当前连接切换由 Compose 的 `API_DATABASE_URL` 和 `PRIVATE_DATABASE_URL` 承载。
+`RESEARCH_WORKER_DATABASE_URL` 已随研究 Worker 从 Compose 与环境变量示例中移除；
+不得重新用于启动服务。生产不得把公共数据库身份的兼容回退写成角色切换完成。
 
 ## 回滚边界
 
 正常部署回滚优先恢复上一份受控 Compose/secret 配置，不自动删除角色。只有确认没有
 活动连接、依赖对象或待恢复配置，并取得精确角色删除授权后，才能执行
 `rollback.sql`。回滚后必须读回角色不存在、应用重新使用获批的旧连接身份，并验证
-API、已启用 Worker、队列和数据库健康。
+API、个人分析 Worker、队列和数据库健康。

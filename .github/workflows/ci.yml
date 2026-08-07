@@ -74,8 +74,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - name: 研究入口清单 schema、引用与分类
-        run: python scripts/research/verify_entrypoint_inventory.py
       - name: Docker Compose 配置
         run: |
           docker compose config >/dev/null
