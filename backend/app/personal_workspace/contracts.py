@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from .portfolio import PortfolioView
+    from .portfolio import EquitySnapshotView, PortfolioView
     from .rules import AttentionItem
 
 
@@ -95,10 +95,111 @@ class SyntheticTraceView:
 
 
 @dataclass(frozen=True)
+class InstrumentStateView:
+    symbol: str
+    is_holding: bool
+    is_followed: bool
+    follow_source: str
+    preset_reasons: tuple[str, ...]
+    custom_reason: str | None
+    candidate_status: str | None
+    relation_evidence_ids: tuple[str, ...]
+    fact_evidence_ids: tuple[str, ...]
+    candidate_refreshed_at: datetime | None
+    candidate_archived_at: datetime | None
+
+
+@dataclass(frozen=True)
+class InstrumentStatesView:
+    revision: int
+    items: tuple[InstrumentStateView, ...]
+    followed_items: tuple[InstrumentStateView, ...]
+    watch_observations: tuple[InstrumentStateView, ...]
+    active_candidates: tuple[InstrumentStateView, ...]
+    archived_candidates: tuple[InstrumentStateView, ...]
+
+
+@dataclass(frozen=True)
+class TodayFactEventView:
+    event_id: str
+    evidence_id: str
+    title: str
+    url: str
+    published_at: str
+    fetched_at: str
+    summary: str
+    content_sha256: str
+    source: str
+    source_type: str
+    sector: str
+    related_symbols: tuple[str, ...]
+    confirmation_state: str
+
+
+@dataclass(frozen=True)
+class TodayGapView:
+    code: str
+    subject: str
+
+
+@dataclass(frozen=True)
+class TodayEvidenceView:
+    evidence_id: str
+    source: str
+    as_of: datetime
+    content_sha256: str
+    authorized_fields: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class TodayContextView:
+    status: str
+    as_of: str | None
+    period: str | None
+    field_coverage: Decimal | None
+    freshness_seconds: int | None
+    fact_events: tuple[TodayFactEventView, ...]
+    evidence: tuple[TodayEvidenceView, ...]
+    gaps: tuple[TodayGapView, ...]
+    error_code: str | None
+
+
+@dataclass(frozen=True)
+class TodayPortfolioSummaryView:
+    portfolio_revision: int
+    total_equity_availability: str
+    total_equity_value: str | None
+    total_equity_as_of: datetime | None
+    active_holding_count: int
+    active_holding_symbols: tuple[str, ...]
+    priced_holding_count: int
+    issues: tuple[str, ...]
+    equity_snapshot_status: str
+    equity_snapshots: tuple["EquitySnapshotView", ...]
+
+
+@dataclass(frozen=True)
+class TodayReadModel:
+    status: str
+    as_of: str | None
+    period: str | None
+    portfolio: TodayPortfolioSummaryView
+    attention_items: tuple["AttentionItem", ...]
+    fact_events: tuple[TodayFactEventView, ...]
+    watch_observations: tuple[InstrumentStateView, ...]
+    active_candidates: tuple[InstrumentStateView, ...]
+    archived_candidates: tuple[InstrumentStateView, ...]
+    gaps: tuple[TodayGapView, ...]
+    field_coverage: Decimal | None
+    freshness_seconds: int | None
+
+
+@dataclass(frozen=True)
 class TodayWorkspace:
     trace: SyntheticTraceView | None
     portfolio: PortfolioView | None = None
     attention_items: tuple[AttentionItem, ...] = ()
+    read_model: TodayReadModel | None = None
 
     def __getattr__(self, name: str):
         if self.trace is None:

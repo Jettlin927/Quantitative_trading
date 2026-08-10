@@ -20,7 +20,11 @@ from backend.app.models import (
     PersonalWorkspace,
 )
 
-from .contracts import PersonalActor
+from .contracts import (
+    InstrumentStatesView,
+    InstrumentStateView,
+    PersonalActor,
+)
 from .crypto import PersonalDataCipher
 from .portfolio import (
     _portfolio_aad,
@@ -51,27 +55,6 @@ class CandidateEvidence:
     fact_evidence_ids: tuple[str, ...]
     observed_at: datetime
     expected_revision: int
-
-
-@dataclass(frozen=True)
-class InstrumentStateView:
-    symbol: str
-    is_holding: bool
-    is_followed: bool
-    follow_source: str
-    preset_reasons: tuple[str, ...]
-    custom_reason: str | None
-    candidate_status: str | None
-    relation_evidence_ids: tuple[str, ...]
-    fact_evidence_ids: tuple[str, ...]
-    candidate_refreshed_at: datetime | None
-    candidate_archived_at: datetime | None
-
-
-@dataclass(frozen=True)
-class InstrumentStatesView:
-    revision: int
-    items: tuple[InstrumentStateView, ...]
 
 
 @dataclass
@@ -549,7 +532,21 @@ class InstrumentStateBook:
                     candidate_archived_at=stored.candidate_archived_at,
                 )
             )
-        return InstrumentStatesView(revision=state.revision, items=tuple(items))
+        projected = tuple(items)
+        return InstrumentStatesView(
+            revision=state.revision,
+            items=projected,
+            followed_items=tuple(item for item in projected if item.is_followed),
+            watch_observations=tuple(
+                item for item in projected if item.is_followed and not item.is_holding
+            ),
+            active_candidates=tuple(
+                item for item in projected if item.candidate_status == "active"
+            ),
+            archived_candidates=tuple(
+                item for item in projected if item.candidate_status == "archived"
+            ),
+        )
 
 
 def _normalize_symbol(value: str) -> str:

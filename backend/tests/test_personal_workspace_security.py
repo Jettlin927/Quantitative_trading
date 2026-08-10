@@ -78,6 +78,49 @@ class PersonalWorkspaceSecurityTest(unittest.TestCase):
         self.assertEqual(wrong.status_code, 401)
         self.assertEqual(missing.json()["detail"]["code"], "personal_access_required")
 
+    def test_today_route_serializes_the_typed_read_model_contract(self) -> None:
+        response = self.client.get(
+            "/api/personal/today",
+            headers={"X-Personal-Gateway": self.gateway_token},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertNotIn("instrument_states", payload)
+        self.assertNotIn("today_context", payload)
+        self.assertEqual(
+            set(payload["read_model"]),
+            {
+                "status",
+                "as_of",
+                "period",
+                "portfolio",
+                "attention_items",
+                "fact_events",
+                "watch_observations",
+                "active_candidates",
+                "archived_candidates",
+                "gaps",
+                "field_coverage",
+                "freshness_seconds",
+            },
+        )
+        self.assertEqual(
+            set(payload["read_model"]["portfolio"]),
+            {
+                "portfolio_revision",
+                "total_equity_availability",
+                "total_equity_value",
+                "total_equity_as_of",
+                "active_holding_count",
+                "active_holding_symbols",
+                "priced_holding_count",
+                "issues",
+                "equity_snapshot_status",
+                "equity_snapshots",
+            },
+        )
+
     def test_private_write_rejects_each_missing_same_origin_proof(self) -> None:
         base_headers = {
             "X-Personal-Gateway": self.gateway_token,

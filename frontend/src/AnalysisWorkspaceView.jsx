@@ -40,8 +40,8 @@ const TOOL_LABELS = {
   get_news: { label: '查产业新闻', mark: '✦' },
 }
 
-export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) {
-  const [question, setQuestion] = useState('')
+export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '', initialQuestion = '', contextLabel = '' }) {
+  const [question, setQuestion] = useState(initialQuestion)
   const [preview, setPreview] = useState(null)
   const [confirmed, setConfirmed] = useState(false)
   const [run, setRun] = useState(null)
@@ -60,8 +60,10 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) 
       typeof client.listAnalyses === 'function' ? client.listAnalyses({ signal: controller.signal }) : Promise.resolve([]),
     ]).then(([portfolio, providerCapability, runs]) => {
       const active = (portfolio?.holdings || []).filter((holding) => holding.state === 'active')
+      if (subjectId && !subjectId.startsWith('SYNTH') && !active.some((holding) => holding.symbol === subjectId)) active.unshift({ holding_id: `context-${subjectId}`, symbol: subjectId, name: '上下文标的', state: 'context' })
       setSubjects(active)
-      if (active.length && (!subjectId || subjectId.startsWith('SYNTH'))) setSelectedSubject(active[0].symbol)
+      if (subjectId && !subjectId.startsWith('SYNTH')) setSelectedSubject(subjectId)
+      else if (active.length) setSelectedSubject(active[0].symbol)
       setCapability(providerCapability)
       setHistory(runs || [])
     }).catch((reason) => {
@@ -143,7 +145,7 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '' }) 
   return (
     <section className="analysis-workspace enter" aria-label="AI 影响分析">
       <header className="analysis-command-header">
-        <div><span>AI IMPACT / {agentMode ? 'TOOL-USE AGENT' : 'READ-ONLY EVIDENCE'}</span><h2>可审计影响分析</h2></div>
+        <div><span>AI IMPACT / {contextLabel || (agentMode ? 'TOOL-USE AGENT' : 'READ-ONLY EVIDENCE')}</span><h2>可审计影响分析</h2></div>
         <b><ShieldCheck size={15} /> 先预览，后外发</b>
       </header>
 

@@ -104,7 +104,31 @@ class PersonalWatchlistApiTest(unittest.TestCase):
 
         self.assertEqual(initial.status_code, 200)
         self.assertTrue(initial.json()["items"][0]["is_followed"])
+        self.assertEqual(
+            set(initial.json()),
+            {
+                "revision",
+                "items",
+                "followed_items",
+                "watch_observations",
+                "active_candidates",
+                "archived_candidates",
+            },
+        )
+        self.assertEqual(
+            [item["symbol"] for item in initial.json()["followed_items"]],
+            ["NVDA"],
+        )
+        self.assertEqual(initial.json()["watch_observations"], [])
         self.assertEqual(followed.status_code, 200)
+        self.assertEqual(
+            [item["symbol"] for item in followed.json()["followed_items"]],
+            ["MSFT", "NVDA"],
+        )
+        self.assertEqual(
+            [item["symbol"] for item in followed.json()["watch_observations"]],
+            ["MSFT"],
+        )
         self.assertEqual(repeated.json(), followed.json())
         self.assertEqual(followed.json()["revision"], 1)
         self.assertEqual(

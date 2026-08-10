@@ -7,9 +7,12 @@ import unittest
 from backend.app.personal_workspace.contracts import (
     AddHoldingCommand,
     CreateObservationRuleCommand,
+    InstrumentStatesView,
     PersonalActor,
     RemoveHoldingCommand,
     SetObservationRuleStateCommand,
+    TodayContextView,
+    TodayGapView,
 )
 from backend.app.personal_workspace.crypto import FixedKeyring, PersonalDataCipher
 from backend.app.personal_workspace.journey import PersonalResearchJourney
@@ -142,6 +145,39 @@ class PersonalResearchJourneyTest(unittest.TestCase):
 
         self.assertEqual(today.portfolio, portfolio.open(self.actor))
         self.assertEqual(today.portfolio.holdings[0].market_value.value, "241.0000")
+
+    def test_today_projection_includes_server_owned_instrument_and_fact_context(self) -> None:
+        states = InstrumentStatesView(
+            revision=3,
+            items=(),
+            followed_items=(),
+            watch_observations=(),
+            active_candidates=(),
+            archived_candidates=(),
+        )
+        context = TodayContextView(
+            status="partial",
+            as_of="2026-08-10T04:00:00+00:00",
+            period="pre_market",
+            field_coverage=Decimal("0.67"),
+            freshness_seconds=900,
+            fact_events=(),
+            evidence=(),
+            gaps=(TodayGapView("structured_news_stale", "structured_news"),),
+            error_code=None,
+        )
+        journey = PersonalResearchJourney(
+            store=self.store,
+            cipher=self.cipher,
+            adapters=self.adapters,
+            instrument_states_reader=lambda actor: states,
+            today_context_reader=lambda actor: context,
+        )
+
+        today = journey.open_today(self.actor)
+
+        self.assertEqual(today.read_model.status, "partial")
+        self.assertEqual(today.read_model.gaps[0].code, "structured_news_stale")
 
     def test_today_default_does_not_return_synthetic_trace(self) -> None:
         self.journey.create_synthetic_trace(
