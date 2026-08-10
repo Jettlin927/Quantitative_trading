@@ -6,9 +6,11 @@ handler adapter 接入；来源 SDK 或供应商原始响应不得进入这些�
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import deque
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
+from threading import Lock
 from typing import Any, Callable, Mapping
 
 
@@ -122,6 +124,7 @@ class DomainToolContext:
     actor_id: str
     granted_permissions: frozenset[str]
     clock: Callable[[], datetime]
+    requested_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -133,6 +136,83 @@ class ToolObservation:
     field_coverage: Decimal | None
     freshness_seconds: int | None
     cost_usd: Decimal
+    gap_codes: tuple[str, ...]
+
+
+class DomainToolMetrics:
+    """进程内基础工具观测；只记录聚合口径，不记录私有参数或结果。"""
+
+    def __init__(self, *, maximum_observations: int = 10_000) -> None:
+        if maximum_observations <= 0:
+            raise ValueError("maximum_observations_must_be_positive")
+        self._lock = Lock()
+        self._observations: deque[ToolObservation] = deque(
+            maxlen=maximum_observations
+        )
+
+    def record(self, observation: ToolObservation) -> None:
+        with self._lock:
+            self._observations.append(observation)
+
+    def snapshot(self) -> Mapping[str, Any]:
+        with self._lock:
+            observations = tuple(self._observations)
+        summary = _observation_summary(observations)
+        summary["by_tool"] = {
+            tool_name: _observation_summary(
+                tuple(
+                    item
+                    for item in observations
+                    if item.tool_name == tool_name
+                )
+            )
+            for tool_name in sorted({item.tool_name for item in observations})
+        }
+        return summary
+
+
+def _observation_summary(
+    observations: tuple[ToolObservation, ...],
+) -> dict[str, Any]:
+    calls = len(observations)
+    successful = sum(item.status == "success" for item in observations)
+    coverage = tuple(
+        item.field_coverage
+        for item in observations
+        if item.field_coverage is not None
+    )
+    freshness = tuple(
+        item.freshness_seconds
+        for item in observations
+        if item.freshness_seconds is not None
+    )
+    return {
+        "calls": calls,
+        "successful": successful,
+        "partial": sum(item.status == "partial" for item in observations),
+        "stale": sum(item.status == "stale" for item in observations),
+        "unavailable": sum(
+            item.status == "unavailable" for item in observations
+        ),
+        "success_rate": (
+            Decimal(successful) / Decimal(calls) if calls else Decimal("0")
+        ),
+        "average_field_coverage": (
+            sum(coverage, Decimal("0")) / Decimal(len(coverage))
+            if coverage
+            else None
+        ),
+        "maximum_freshness_seconds": max(freshness, default=None),
+        "gap_reasons": tuple(
+            sorted(
+                {
+                    gap
+                    for item in observations
+                    for gap in item.gap_codes
+                }
+            )
+        ),
+    }
 
 
 DomainToolHandler = Callable[[DomainToolContext, dict[str, Any]], DomainToolResult]
@@ -299,11 +379,15 @@ class DomainToolRegistry:
                 DomainToolResult.unavailable("tool_unavailable", canonical_name),
             )
         try:
-            result = handler(context, normalized_arguments)
+            result = handler(
+                replace(context, requested_name=requested_name),
+                normalized_arguments,
+            )
         except Exception:
             result = DomainToolResult.unavailable("tool_failed", canonical_name)
         if not _valid_result(result):
             result = DomainToolResult.unavailable("tool_contract_invalid", canonical_name)
+        result = _normalize_legacy_result(requested_name, result)
         return self._finish(requested_name, canonical_name, result)
 
     def _finish(
@@ -318,6 +402,7 @@ class DomainToolRegistry:
                 field_coverage=result.field_coverage,
                 freshness_seconds=result.freshness_seconds,
                 cost_usd=result.cost_usd,
+                gap_codes=tuple(gap.code for gap in result.gaps),
             )
         )
         return result
@@ -350,6 +435,17 @@ def _normalize_legacy_arguments(
             normalized["query"] = keyword
         return normalized
     return dict(arguments)
+
+
+def _normalize_legacy_result(
+    requested_name: str, result: DomainToolResult
+) -> DomainToolResult:
+    if requested_name != "get_kline" or result.status == "unavailable":
+        return result
+    market = result.data.get("market")
+    if not isinstance(market, Mapping):
+        return result
+    return replace(result, data=dict(market))
 
 
 def _value_matches(schema: Mapping[str, Any], value: Any) -> bool:
