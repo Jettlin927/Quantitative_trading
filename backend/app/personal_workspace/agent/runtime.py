@@ -85,12 +85,14 @@ class AgentRuntime:
     def tool_schemas(self) -> tuple[dict[str, Any], ...]:
         return tuple(tool.function_schema() for tool in self._tools.values())
 
-    def maximum_cost_usd(self, intent: AnalysisIntent) -> Decimal:
-        """以字节数代替 token 数，给完整多轮 transcript 一个确定性上界。"""
-
-        base_request = {
-            "model": self._model,
-            "messages": [
+    def _request(
+        self,
+        intent: AnalysisIntent,
+        *,
+        messages: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        if messages is None:
+            messages = [
                 {"role": "system", "content": self._system_prompt()},
                 {
                     "role": "user",
@@ -103,12 +105,20 @@ class AgentRuntime:
                         sort_keys=True,
                     ),
                 },
-            ],
+            ]
+        return {
+            "model": self._model,
+            "messages": list(messages),
             "tools": list(self.tool_schemas()),
             "max_tokens": DEEPSEEK_MAX_OUTPUT_TOKENS,
             "stream": False,
             "thinking": {"type": "disabled"},
         }
+
+    def maximum_cost_usd(self, intent: AnalysisIntent) -> Decimal:
+        """以字节数代替 token 数，给完整多轮 transcript 一个确定性上界。"""
+
+        base_request = self._request(intent)
         base_bytes = len(
             json.dumps(base_request, ensure_ascii=False, sort_keys=True).encode(
                 "utf-8"
@@ -128,33 +138,13 @@ class AgentRuntime:
             ) / million
         return total.quantize(Decimal("0.0000001"))
 
-    def validate(self, intent: AnalysisIntent) -> None:
+    def validate(self, *, intent: AnalysisIntent, spend_before: Decimal) -> None:
+        if spend_before + self.maximum_cost_usd(intent) > self._monthly_soft_budget_usd:
+            raise ProviderFailure("budget_blocked", retryable=False)
         validator = getattr(self._provider, "validate_request", None)
         if validator is None:
             return
-        validator(
-            {
-                "model": self._model,
-                "messages": [
-                    {"role": "system", "content": self._system_prompt()},
-                    {
-                        "role": "user",
-                        "content": json.dumps(
-                            {
-                                "question": intent.question,
-                                "subject_ids": list(intent.subject_ids),
-                            },
-                            ensure_ascii=False,
-                            sort_keys=True,
-                        ),
-                    },
-                ],
-                "tools": list(self.tool_schemas()),
-                "max_tokens": DEEPSEEK_MAX_OUTPUT_TOKENS,
-                "stream": False,
-                "thinking": {"type": "disabled"},
-            }
-        )
+        validator(self._request(intent))
 
     def run(
         self,
@@ -168,21 +158,7 @@ class AgentRuntime:
     ) -> AgentTurnResult:
         heartbeat = heartbeat or (lambda: None)
         audit = audit or (lambda _event, _evidence: None)
-        messages: list[dict[str, Any]] = [
-            {"role": "system", "content": self._system_prompt()},
-            {
-                "role": "user",
-                "content": json.dumps(
-                    {
-                        "question": intent.question,
-                        "subject_ids": list(intent.subject_ids),
-                    },
-                    ensure_ascii=False,
-                    sort_keys=True,
-                ),
-            },
-        ]
-        schemas = self.tool_schemas()
+        messages = self._request(intent)["messages"]
         total_cost = Decimal("0")
         usage_accumulated: AnalysisUsage | None = None
         tool_evidence: list[FrozenEvidence] = []
@@ -191,16 +167,11 @@ class AgentRuntime:
             heartbeat()
             projected = spend_before + total_cost
             if projected > self._monthly_soft_budget_usd:
-                raise ValueError("budget_blocked")
+                raise _known_failure(
+                    "budget_blocked", usage_accumulated, total_cost
+                )
             response = self._provider.create_response(
-                {
-                    "model": self._model,
-                    "messages": list(messages),
-                    "tools": list(schemas),
-                    "max_tokens": DEEPSEEK_MAX_OUTPUT_TOKENS,
-                    "stream": False,
-                    "thinking": {"type": "disabled"},
-                }
+                self._request(intent, messages=messages)
             )
             heartbeat()
             if response.get("status") == "refusal":
@@ -213,7 +184,15 @@ class AgentRuntime:
             message = response.get("message") or {}
             tool_calls = message.get("tool_calls") or ()
             if not tool_calls:
-                claims = _finalize_claims(message.get("content"), tuple(tool_evidence))
+                try:
+                    claims = _finalize_claims(
+                        message.get("content"), tuple(tool_evidence)
+                    )
+                except (ProviderFailure, ValueError) as exc:
+                    code = exc.code if isinstance(exc, ProviderFailure) else str(exc)
+                    raise _known_failure(
+                        code, usage_accumulated, total_cost
+                    ) from None
                 return AgentTurnResult(
                     claims=claims,
                     usage=usage_accumulated,
@@ -223,7 +202,9 @@ class AgentRuntime:
                     tool_events=tuple(tool_events),
                 )
             if len(tool_calls) > AGENT_MAX_TOOL_CALLS_PER_ROUND:
-                raise ProviderFailure("provider_tool_calls_invalid", retryable=False)
+                raise _known_failure(
+                    "provider_tool_calls_invalid", usage_accumulated, total_cost
+                )
             if any(
                 not isinstance(call.get("id"), str)
                 or not call["id"]
@@ -231,7 +212,9 @@ class AgentRuntime:
                 > AGENT_MAX_TOOL_CALL_ID_BYTES
                 for call in tool_calls
             ):
-                raise ProviderFailure("provider_tool_calls_invalid", retryable=False)
+                raise _known_failure(
+                    "provider_tool_calls_invalid", usage_accumulated, total_cost
+                )
             assistant_message = {
                 "role": "assistant",
                 "content": message.get("content"),
@@ -252,7 +235,9 @@ class AgentRuntime:
             if len(
                 json.dumps(assistant_message, ensure_ascii=False).encode("utf-8")
             ) > AGENT_MAX_ASSISTANT_BYTES:
-                raise ProviderFailure("provider_tool_calls_invalid", retryable=False)
+                raise _known_failure(
+                    "provider_tool_calls_invalid", usage_accumulated, total_cost
+                )
             messages.append(
                 assistant_message
             )
@@ -325,7 +310,9 @@ class AgentRuntime:
                         "content": payload,
                     }
                 )
-        raise ProviderFailure("agent_tool_rounds_exceeded", retryable=False)
+        raise _known_failure(
+            "agent_tool_rounds_exceeded", usage_accumulated, total_cost
+        )
 
     def _system_prompt(self) -> str:
         parts = [AGENT_BASE_SYSTEM_PROMPT]
@@ -346,6 +333,18 @@ def _merge_usage(
         output_tokens=accumulated.output_tokens + current.output_tokens,
         cache_hit_tokens=accumulated.cache_hit_tokens + current.cache_hit_tokens,
         cache_miss_tokens=accumulated.cache_miss_tokens + current.cache_miss_tokens,
+    )
+
+
+def _known_failure(
+    code: str, usage: AnalysisUsage | None, cost_usd: Decimal
+) -> ProviderFailure:
+    return ProviderFailure(
+        code,
+        retryable=False,
+        usage=usage,
+        cost_usd=format(cost_usd, "f"),
+        response_completed=True,
     )
 
 

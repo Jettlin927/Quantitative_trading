@@ -146,6 +146,18 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '', in
     }
   }
 
+  async function openHistoryRun(runId) {
+    setBusy(true)
+    setError(null)
+    try {
+      setRun(await client.openAnalysis(runId))
+    } catch (reason) {
+      setError(reason)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const providerUnavailable = error?.code === 'provider_unavailable'
   const dispatchEnabled = capability?.dispatch_enabled !== false
   const disabledByConfig = capability?.reason_code === 'provider_disabled'
@@ -174,7 +186,7 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '', in
         <div><small>{agentMode ? `上下文标的 ${selectedSubject} · 分析在服务端执行，agent 按需调用持仓/K线/新闻工具，浏览器不上传私有字段` : `上下文标的 ${selectedSubject} · 浏览器不上传行情、组合权重或规则结果`}</small><button className="primary-action" disabled={busy || !question.trim() || !dispatchEnabled} onClick={prepare}><Send size={15} />生成外发预览</button></div>
       </div> : null}
 
-      {history.length ? <section className="analysis-history" aria-label="个人分析运行历史"><header><span>RUN HISTORY</span><h3>最近个人分析</h3></header><div>{history.map((item) => <button key={item.run_id} onClick={() => setRun(item)}><strong>{RUN_IDENTITIES[item.status] || item.status}</strong><code>{item.run_id}</code>{item.question ? <span>{(item.subject_ids || []).join(' · ')} · {item.question}</span> : null}<small>{item.model} · {item.actual_cost_usd ? `$${item.actual_cost_usd}` : item.provider_call_state === 'not_started' ? '未外发、未计费' : '费用未知'}{item.failure_code ? ` · ${FAILURE_IDENTITIES[item.failure_code] || item.failure_code}` : ''}</small></button>)}</div></section> : null}
+      {history.length ? <section className="analysis-history" aria-label="个人分析运行历史"><header><span>RUN HISTORY</span><h3>最近个人分析</h3></header><div>{history.map((item) => <button key={item.run_id} disabled={busy} onClick={() => openHistoryRun(item.run_id)}><strong>{RUN_IDENTITIES[item.status] || item.status}</strong><code>{item.run_id}</code>{item.question ? <span>{(item.subject_ids || []).join(' · ')} · {item.question}</span> : null}<small>{item.model} · {item.actual_cost_usd ? `$${item.actual_cost_usd}` : item.provider_call_state === 'not_started' ? '未外发、未计费' : '费用未知'}{item.failure_code ? ` · ${FAILURE_IDENTITIES[item.failure_code] || item.failure_code}` : ''}</small></button>)}</div></section> : null}
 
       {preview ? <section className="analysis-preview" aria-label="外发预览">
         <header><div><span>PREVIEW HASH</span><code>{preview.preview_sha256.slice(0, 16)}…</code></div><strong>{PROVIDER_LABELS[preview.provider] || preview.provider} / {preview.model}</strong></header>

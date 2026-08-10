@@ -1243,10 +1243,21 @@ def _deepseek_cost_usd(usage: dict[str, int]) -> str:
 
 
 class ProviderFailure(RuntimeError):
-    def __init__(self, code: str, *, retryable: bool) -> None:
+    def __init__(
+        self,
+        code: str,
+        *,
+        retryable: bool,
+        usage: AnalysisUsage | None = None,
+        cost_usd: str | None = None,
+        response_completed: bool = False,
+    ) -> None:
         super().__init__(code)
         self.code = code
         self.retryable = retryable
+        self.usage = usage
+        self.cost_usd = cost_usd
+        self.response_completed = response_completed
 
 
 class AnalysisWorkspace:
@@ -1446,7 +1457,10 @@ class AnalysisWorkspace:
         return run.view
 
     def history(self, actor: PersonalActor, *, limit: int = 20) -> tuple[AnalysisRunView, ...]:
-        return tuple(run.view for run in self._store.list_runs(actor.actor_id, limit=limit))
+        return tuple(
+            replace(run.view, tool_evidence=())
+            for run in self._store.list_runs(actor.actor_id, limit=limit)
+        )
 
     def cancel(self, actor: PersonalActor, run_id: str) -> AnalysisRunView:
         cancel = getattr(self._store, "cancel", None)

@@ -215,4 +215,27 @@ describe('AI 影响分析工作台', () => {
     expect(screen.getByText(/账本 \$0.00012/)).toBeInTheDocument()
   })
 
+  it('点击历史摘要后按 run id 读取完整详情', async () => {
+    const detail = {
+      run_id: 'run-detail', status: 'completed', stage: 'completed',
+      question: '完整问题', subject_ids: ['GOOGL'], planned_tools: [],
+      provider_call_state: 'completed', estimated_cost_usd: '0.1',
+      actual_cost_usd: '0.001', accounted_cost_usd: '0.001',
+      claims: [], events: [], tool_events: [], tool_evidence: [],
+    }
+    const client = {
+      openPortfolio: vi.fn().mockResolvedValue({ holdings: [] }),
+      listAnalysisCapabilities: vi.fn().mockResolvedValue({ dispatch_enabled: true, model: 'deepseek-v4-flash', analysis_mode: 'agent' }),
+      listAnalyses: vi.fn().mockResolvedValue([{ run_id: 'run-detail', status: 'completed', model: 'deepseek-v4-flash', claims: [], events: [], actual_cost_usd: '0.001' }]),
+      openAnalysis: vi.fn().mockResolvedValue(detail),
+      prepareAnalysis: vi.fn(), startAnalysis: vi.fn(), cancelAnalysis: vi.fn(),
+    }
+    render(<AnalysisWorkspaceView client={client} subjectId="GOOGL" />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /run-detail/ }))
+
+    expect(client.openAnalysis).toHaveBeenCalledWith('run-detail')
+    expect(await screen.findByText('完整问题')).toBeInTheDocument()
+  })
+
 })

@@ -237,17 +237,48 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
                 audit=audit,
             )
         except ProviderFailure as exc:
-            if budget_reservation is not None:
-                self._daily_budget_guard.mark_outcome_unknown(
-                    budget_reservation,
-                    run_id=run.view.run_id,
-                    failure_code=exc.code,
-                    now=self._clock(),
+            if exc.response_completed and exc.cost_usd is not None:
+                if budget_reservation is not None:
+                    from ..automatic_briefing_store import BriefingCost
+
+                    usage = exc.usage
+                    self._daily_budget_guard.complete_call(
+                        budget_reservation,
+                        run_id=run.view.run_id,
+                        cost=BriefingCost(
+                            input_tokens=usage.input_tokens if usage else 0,
+                            output_tokens=usage.output_tokens if usage else 0,
+                            cache_hit_tokens=usage.cache_hit_tokens if usage else 0,
+                            cache_miss_tokens=usage.cache_miss_tokens if usage else 0,
+                            cost_usd=Decimal(exc.cost_usd),
+                        ),
+                        failure_code=exc.code,
+                        now=self._clock(),
+                    )
+                failed = replace(
+                    current_run,
+                    view=replace(
+                        current_run.view,
+                        provider_call_state="completed",
+                        actual_cost_usd=exc.cost_usd,
+                        accounted_cost_usd=exc.cost_usd,
+                        usage=exc.usage,
+                    ),
                 )
-            failed = replace(
-                current_run,
-                view=replace(current_run.view, provider_call_state="outcome_unknown"),
-            )
+            else:
+                if budget_reservation is not None:
+                    self._daily_budget_guard.mark_outcome_unknown(
+                        budget_reservation,
+                        run_id=run.view.run_id,
+                        failure_code=exc.code,
+                        now=self._clock(),
+                    )
+                failed = replace(
+                    current_run,
+                    view=replace(
+                        current_run.view, provider_call_state="outcome_unknown"
+                    ),
+                )
             return self._fail_run(failed, exc.code)
         except ValueError as exc:
             if budget_reservation is not None:
@@ -300,7 +331,12 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
     def _preflight_provider(
         self, draft: StoredAnalysisDraft, run: StoredAnalysisRun
     ) -> None:
-        self._runtime.validate(draft.intent)
+        self._runtime.validate(
+            intent=draft.intent,
+            spend_before=self._monthly_spend_reader(
+                PersonalActor(actor_id=draft.actor_id), self._clock()
+            ),
+        )
 
 
 def build_agent_workspace(

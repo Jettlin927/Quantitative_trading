@@ -233,7 +233,7 @@ class AgentRuntimeTest(unittest.TestCase):
             (make_tool("get_holdings"),),
             budget="0.0002",
         )
-        with self.assertRaisesRegex(ValueError, "budget_blocked"):
+        with self.assertRaisesRegex(ProviderFailure, "budget_blocked"):
             runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0.0001"))
 
     def test_invalid_final_json_fails(self) -> None:
@@ -268,7 +268,7 @@ class AgentRuntimeTest(unittest.TestCase):
             ]
         )
         runtime = make_runtime(provider, (make_tool("get_holdings"),))
-        with self.assertRaisesRegex(ValueError, "claim_evidence_invalid"):
+        with self.assertRaisesRegex(ProviderFailure, "claim_evidence_invalid"):
             runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0"))
 
     def test_skill_prompt_is_injected(self) -> None:
