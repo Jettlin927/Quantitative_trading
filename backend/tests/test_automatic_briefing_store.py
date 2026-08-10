@@ -29,6 +29,34 @@ class InMemoryAutomaticBriefingStoreTest(unittest.TestCase):
     def setUp(self) -> None:
         self.store = InMemoryAutomaticBriefingStore()
 
+    def test_scheduled_trigger_is_listed_while_planned(self) -> None:
+        now = datetime(2026, 8, 3, 12, tzinfo=timezone.utc)
+        self.store.claim(
+            actor_id="owner-a",
+            trigger_key="recipe:2026-08-03:premarket",
+            market_date=date(2026, 8, 3),
+            trigger_kind="premarket",
+            lease_owner="worker-1",
+            lease_expires_at=now,
+            now=now,
+        )
+        self.store.claim(
+            actor_id="owner-a",
+            trigger_key="recipe:event:event-1",
+            market_date=date(2026, 8, 3),
+            trigger_kind="intraday_event",
+            lease_owner="worker-1",
+            lease_expires_at=now,
+            now=now,
+        )
+
+        pending = self.store.pending_scheduled(actor_id="owner-a")
+
+        self.assertEqual(
+            tuple(item.trigger_kind for item in pending),
+            ("premarket",),
+        )
+
     def _claim(self, trigger_key: str = "premarket:2026-08-10"):
         return self.store.claim(
             actor_id="owner",

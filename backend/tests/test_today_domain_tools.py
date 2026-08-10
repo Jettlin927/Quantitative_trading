@@ -34,6 +34,7 @@ from backend.app.personal_workspace.portfolio import (
     InMemoryPortfolioStore,
     PortfolioState,
 )
+from backend.app.personal_workspace.rules import AttentionItem
 from backend.app.personal_workspace.watchlist import (
     HoldingWatchState,
     InMemoryInstrumentStateStore,
@@ -280,6 +281,67 @@ class TodayDomainToolsTest(unittest.TestCase):
         self.assertEqual(
             snapshot["by_tool"]["search_web_evidence"]["unavailable"], 1
         )
+
+    def test_today_context_uses_current_snapshot_time_and_active_rule_attention(self) -> None:
+        attention = (
+            AttentionItem(
+                attention_id="evaluation-1",
+                kind="rule_hit",
+                symbol="NVDA",
+                label="规则命中",
+                result="hit",
+                as_of=NOW,
+                reason_code="threshold_crossed",
+                priority=0,
+            ),
+            AttentionItem(
+                attention_id="evaluation-2",
+                kind="data_gap",
+                symbol="AMD",
+                label="规则数据不足",
+                result="insufficient_data",
+                as_of=NOW,
+                reason_code="bars_insufficient",
+                priority=1,
+            ),
+        )
+        registry = TodayDomainTools(
+            portfolio_store=self.portfolio,
+            watchlist=self.tools.watchlist,
+            news_source=self.source,
+            rule_attention_reader=lambda _actor: attention,
+        ).registry()
+        result = registry.invoke(
+            "get_today_context",
+            context=self.context,
+            arguments={"as_of": "2020-01-01T00:00:00+00:00"},
+        )
+        portfolio_evidence = next(
+            item for item in result.evidence if item.source == "personal_portfolio"
+        )
+
+        self.assertEqual(result.data["as_of"], NOW.isoformat())
+        self.assertEqual(portfolio_evidence.as_of, NOW)
+        self.assertEqual(
+            [item["attention_id"] for item in result.data["attention_items"]],
+            ["evaluation-1"],
+        )
+        self.assertTrue(
+            any(item.source == "observation_rule_attention" for item in result.evidence)
+        )
+
+    def test_today_period_uses_xnys_holiday_calendar(self) -> None:
+        holiday = datetime(2026, 9, 7, 15, 0, tzinfo=timezone.utc)
+        result = self.registry.invoke(
+            "get_today_context",
+            context=DomainToolContext(
+                actor_id="actor-1",
+                granted_permissions=self.context.granted_permissions,
+                clock=lambda: holiday,
+            ),
+            arguments={},
+        )
+        self.assertEqual(result.data["period"], "market_closed")
 
     def test_refetch_updates_metadata_without_changing_content_evidence_id(self) -> None:
         first = self.invoke(
@@ -529,13 +591,13 @@ class TodayDomainToolsTest(unittest.TestCase):
             root / "data.js",
             (fetched_at.timestamp(), fetched_at.timestamp()),
         )
-        source = InvestmentNewsStructuredSource(
-            InvestmentNewsReader(
-                root,
-                runner=lambda _argv, _cwd: 0,
-                cache_ttl_seconds=3600,
-            )
+        refresh_calls = []
+        reader = InvestmentNewsReader(
+            root,
+            runner=lambda argv, cwd: refresh_calls.append((argv, cwd)) or 0,
+            cache_ttl_seconds=3600,
         )
+        source = InvestmentNewsStructuredSource(reader)
 
         snapshot = source.read(now=NOW)
 
@@ -543,6 +605,13 @@ class TodayDomainToolsTest(unittest.TestCase):
         self.assertEqual(snapshot.items[0].related_symbols, ("NVDA",))
         self.assertEqual(snapshot.items[0].source_type, "structured_news")
         self.assertEqual(snapshot.items[0].fetched_at, fetched_at)
+
+        refresh_calls.clear()
+        cached = InvestmentNewsStructuredSource(
+            reader, refresh_before_read=False
+        ).read(now=NOW)
+        self.assertEqual(cached.items[0].related_symbols, ("NVDA",))
+        self.assertEqual(refresh_calls, [])
 
     def test_market_dossier_uses_ai_context_authorization_and_bounds(self) -> None:
         adapter = FakeAiContextMarketAdapter()

@@ -17,6 +17,11 @@ from .personal_workspace.runtime import get_personal_runtime
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     assert_schema_revision_at_head(engine)
+    personal_runtime = get_personal_runtime()
+    if personal_runtime.access.configured:
+        personal_runtime.watchlist.bind_legacy_holding_lifecycles(
+            personal_runtime.actor
+        )
     yield
 
 

@@ -26,6 +26,7 @@ from .personal_workspace.composition import (
     build_analysis_workspace,
     build_personal_services,
 )
+from .personal_workspace.candidate_automation import CandidateLifecycleAutomation
 from .personal_workspace.contracts import LOCAL_PERSONAL_ACTOR, PersonalActor
 from .personal_workspace.crypto import load_keyring_file
 from .personal_workspace.rule_automation import (
@@ -70,6 +71,7 @@ class PersonalAnalysisWorker:
     worker_id: str
     rule_automation: HoldingRuleAutomation | None = None
     briefing_automation: object | None = None
+    candidate_automation: object | None = None
     actor: PersonalActor = LOCAL_PERSONAL_ACTOR
     rule_slot_reader: Callable[[datetime], str | None] = personal_rule_evaluation_slot
 
@@ -110,8 +112,43 @@ class PersonalAnalysisWorker:
                 except Exception:
                     LOGGER.exception("personal_rule_automation_failed")
                 last_rule_slot = rule_slot
+            if self.run_once() is not None:
+                persist_scheduled = getattr(
+                    self.briefing_automation, "persist_scheduled_trigger", None
+                )
+                if persist_scheduled is not None:
+                    try:
+                        persist_scheduled(
+                            self.actor,
+                            as_of=as_of,
+                            worker_id=self.worker_id,
+                        )
+                    except Exception:
+                        LOGGER.exception("personal_briefing_schedule_failed")
+                continue
+            if self.candidate_automation is not None:
+                try:
+                    candidate_result = self.candidate_automation.run_once(
+                        self.actor, as_of=as_of
+                    )
+                    if getattr(candidate_result, "failed_count", 0):
+                        LOGGER.warning(
+                            "personal_candidate_automation_partial_failure count=%s",
+                            candidate_result.failed_count,
+                        )
+                except Exception:
+                    LOGGER.exception("personal_candidate_automation_failed")
             if self.briefing_automation is not None and as_of is not None:
                 try:
+                    run_pending = getattr(
+                        self.briefing_automation, "run_pending_scheduled", None
+                    )
+                    if run_pending is not None:
+                        run_pending(
+                            self.actor,
+                            as_of=as_of,
+                            worker_id=self.worker_id,
+                        )
                     briefing_result = self.briefing_automation.run_once(
                         self.actor,
                         as_of=as_of,
@@ -125,8 +162,7 @@ class PersonalAnalysisWorker:
                         )
                 except Exception:
                     LOGGER.exception("personal_briefing_automation_failed")
-            if self.run_once() is None:
-                stop_event.wait(poll_seconds)
+            stop_event.wait(poll_seconds)
 
 
 def _empty_evidence_reader(actor: PersonalActor, intent) -> tuple:
@@ -149,7 +185,9 @@ def build_personal_analysis_worker_from_environment() -> PersonalAnalysisWorker:
         database_url=database_url,
         keyring=keyring,
         challenge_key=sha256(b"personal-analysis-worker|no-gateway").digest(),
+        refresh_news_before_read=True,
     )
+    services.watchlist.bind_legacy_holding_lifecycles(LOCAL_PERSONAL_ACTOR)
     mode = os.getenv("PERSONAL_ANALYSIS_MODE", "legacy").strip().lower()
     briefing_policy = BriefingBudgetPolicy(
         usd_to_cny=Decimal(os.getenv("PERSONAL_AI_USD_TO_CNY", "7.20")),
@@ -210,6 +248,10 @@ def build_personal_analysis_worker_from_environment() -> PersonalAnalysisWorker:
         ),
         briefing_automation=AutomaticBriefingAutomation(
             coordinator=briefing_coordinator,
+            tools=services.domain_tools,
+        ),
+        candidate_automation=CandidateLifecycleAutomation(
+            watchlist=services.watchlist,
             tools=services.domain_tools,
         ),
     )

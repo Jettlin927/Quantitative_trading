@@ -131,6 +131,41 @@ class AutomaticBriefingAutomation:
         self._tools = tools
         self._last_event_poll_minute: tuple[date, int, int] | None = None
 
+    def persist_scheduled_trigger(
+        self,
+        actor: PersonalActor,
+        *,
+        as_of: datetime,
+        worker_id: str,
+    ) -> None:
+        slot = personal_rule_evaluation_slot(as_of)
+        if slot is None:
+            return
+        session_date_text, session = slot.split(":", 1)
+        kind = {"pre_market": "premarket", "post_market": "postmarket"}.get(
+            session
+        )
+        if kind is None:
+            return
+        self._coordinator.schedule(
+            actor,
+            BriefingTrigger(kind, date.fromisoformat(session_date_text), as_of),
+            worker_id=worker_id,
+        )
+
+    def run_pending_scheduled(
+        self,
+        actor: PersonalActor,
+        *,
+        as_of: datetime,
+        worker_id: str,
+    ) -> None:
+        self._coordinator.run_pending_scheduled(
+            actor,
+            as_of=as_of,
+            worker_id=worker_id,
+        )
+
     def run_once(
         self,
         actor: PersonalActor,
@@ -229,6 +264,45 @@ class AutomaticBriefingCoordinator:
             now=as_of,
         )
 
+    def schedule(
+        self,
+        actor: PersonalActor,
+        trigger: BriefingTrigger,
+        *,
+        worker_id: str,
+    ) -> Any:
+        now = self._clock()
+        self._store.claim(
+            actor_id=actor.actor_id,
+            trigger_key=trigger.trigger_key,
+            market_date=trigger.market_date,
+            trigger_kind=trigger.kind,
+            lease_owner=worker_id,
+            lease_expires_at=now,
+            now=now,
+        )
+        return self._store.get(
+            actor_id=actor.actor_id, trigger_key=trigger.trigger_key
+        )
+
+    def run_pending_scheduled(
+        self,
+        actor: PersonalActor,
+        *,
+        as_of: datetime,
+        worker_id: str,
+    ) -> None:
+        for item in self._store.pending_scheduled(actor_id=actor.actor_id):
+            self.run(
+                actor,
+                BriefingTrigger(
+                    item.trigger_kind,
+                    item.market_date,
+                    as_of,
+                ),
+                worker_id=worker_id,
+            )
+
     def run(
         self,
         actor: PersonalActor,
@@ -302,6 +376,17 @@ class AutomaticBriefingCoordinator:
                 if runtime_result.failure is not None
                 else "runtime_failed"
             )
+            if runtime_result.usage is not None:
+                return self._store.complete(
+                    briefing_id=claim.briefing_id,
+                    reservation_id=reservation.reservation_id,
+                    cost=_briefing_cost(runtime_result.usage),
+                    failure_code=failure_code,
+                    private_payload=_private_payload(
+                        trigger, tool_events, evidence, gaps, (), failure_code
+                    ),
+                    now=self._clock(),
+                )
             return self._store.mark_outcome_unknown(
                 briefing_id=claim.briefing_id,
                 reservation_id=reservation.reservation_id,

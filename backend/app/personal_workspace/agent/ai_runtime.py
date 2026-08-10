@@ -208,15 +208,24 @@ def run_runtime(runtime: AIRuntime, request: RuntimeRequest) -> RuntimeResult:
         if code not in RUNTIME_FAILURE_CODES:
             code = "runtime_failed"
         return RuntimeResult.failed(code, retryable=retryable)
-    if not _valid_result(result, capabilities):
+    if not _valid_result(result, capabilities, request):
         return RuntimeResult.failed("runtime_contract_invalid")
     if result.usage is not None and result.usage.cost_usd > request.budget.remaining_usd:
-        return RuntimeResult.failed("budget_exceeded")
+        return RuntimeResult(
+            status="failed",
+            events=(*result.events, RuntimeEvent(type="run_failed")),
+            usage=result.usage,
+            failure=RuntimeFailure(code="budget_exceeded", retryable=False),
+            evidence=result.evidence,
+            citations=result.citations,
+        )
     return result
 
 
 def _valid_result(
-    result: Any, capabilities: AIRuntimeCapabilities
+    result: Any,
+    capabilities: AIRuntimeCapabilities,
+    request: RuntimeRequest,
 ) -> bool:
     if not isinstance(result, RuntimeResult):
         return False
@@ -249,8 +258,8 @@ def _valid_result(
     ):
         return False
     return (
-        _tool_events_pair(result.events)
-        and _hosted_tool_events_pair(result.events)
+        _tool_events_pair(result.events, request.tools)
+        and _hosted_tool_events_pair(result.events, request.hosted_tools)
         and _hosted_usage_matches(result.events, result.usage)
         and _valid_hosted_evidence_contract(result)
     )
@@ -312,13 +321,17 @@ def _hosted_query_count(events: tuple[RuntimeEvent, ...]) -> int | None:
     return count
 
 
-def _tool_events_pair(events: tuple[RuntimeEvent, ...]) -> bool:
+def _tool_events_pair(
+    events: tuple[RuntimeEvent, ...], allowed_tools: tuple[str, ...]
+) -> bool:
     tool_events = tuple(
         event
         for event in events
         if event.type in {"tool_requested", "tool_completed", "tool_failed"}
     )
     if any(not event.tool_name or not event.tool_call_id for event in tool_events):
+        return False
+    if any(event.tool_name not in allowed_tools for event in tool_events):
         return False
     if any(
         event.type == "tool_requested" and not isinstance(event.arguments, dict)
@@ -330,24 +343,38 @@ def _tool_events_pair(events: tuple[RuntimeEvent, ...]) -> bool:
         for event in tool_events
     ):
         return False
-    requested = [
-        event.tool_call_id for event in tool_events if event.type == "tool_requested"
-    ]
-    finished = [
-        event.tool_call_id
+    requested_events = tuple(
+        event for event in tool_events if event.type == "tool_requested"
+    )
+    requested = {event.tool_call_id: event.tool_name for event in requested_events}
+    finished = {
+        event.tool_call_id: event.tool_name
         for event in tool_events
         if event.type in {"tool_completed", "tool_failed"}
-    ]
-    return len(requested) == len(set(requested)) and sorted(requested) == sorted(finished)
+    }
+    finished_events = tuple(
+        event
+        for event in tool_events
+        if event.type in {"tool_completed", "tool_failed"}
+    )
+    return (
+        len(requested) == len(requested_events)
+        and len(finished) == len(finished_events)
+        and requested == finished
+    )
 
 
-def _hosted_tool_events_pair(events: tuple[RuntimeEvent, ...]) -> bool:
+def _hosted_tool_events_pair(
+    events: tuple[RuntimeEvent, ...], allowed_tools: tuple[str, ...]
+) -> bool:
     hosted_events = tuple(
         event
         for event in events
         if event.type in {"hosted_tool_started", "hosted_tool_completed"}
     )
     if any(not event.tool_name or not event.tool_call_id for event in hosted_events):
+        return False
+    if any(event.tool_name not in allowed_tools for event in hosted_events):
         return False
     if any(
         event.type == "hosted_tool_started" and not isinstance(event.arguments, dict)
@@ -359,17 +386,23 @@ def _hosted_tool_events_pair(events: tuple[RuntimeEvent, ...]) -> bool:
         for event in hosted_events
     ):
         return False
-    started = [
-        event.tool_call_id
-        for event in hosted_events
-        if event.type == "hosted_tool_started"
-    ]
-    completed = [
-        event.tool_call_id
+    started_events = tuple(
+        event for event in hosted_events if event.type == "hosted_tool_started"
+    )
+    started = {event.tool_call_id: event.tool_name for event in started_events}
+    completed = {
+        event.tool_call_id: event.tool_name
         for event in hosted_events
         if event.type == "hosted_tool_completed"
-    ]
-    return len(started) == len(set(started)) and sorted(started) == sorted(completed)
+    }
+    completed_events = tuple(
+        event for event in hosted_events if event.type == "hosted_tool_completed"
+    )
+    return (
+        len(started) == len(started_events)
+        and len(completed) == len(completed_events)
+        and started == completed
+    )
 
 
 def _valid_hosted_evidence_contract(result: RuntimeResult) -> bool:

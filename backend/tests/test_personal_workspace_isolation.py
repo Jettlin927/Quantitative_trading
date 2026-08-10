@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch, sentinel
 
 import yaml
 
@@ -37,6 +38,24 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
             if middleware.cls.__name__ == "CORSMiddleware"
         )
         self.assertNotIn("*", cors.kwargs["allow_origins"])
+
+    def test_api_startup_binds_legacy_lifecycles_before_serving(self) -> None:
+        watchlist = Mock()
+        runtime = Mock()
+        runtime.access.configured = True
+        runtime.watchlist = watchlist
+        runtime.actor = sentinel.actor
+
+        async def exercise() -> None:
+            async with main.lifespan(main.app):
+                watchlist.bind_legacy_holding_lifecycles.assert_called_once_with(
+                    runtime.actor
+                )
+
+        with patch.object(main, "assert_schema_revision_at_head"), patch.object(
+            main, "get_personal_runtime", return_value=runtime
+        ):
+            asyncio.run(exercise())
 
     def test_frontend_contains_no_provider_or_gateway_secret_configuration(self) -> None:
         forbidden = {

@@ -12,11 +12,11 @@ import re
 from threading import Lock
 from typing import Any, Callable, Mapping, Protocol
 from urllib.parse import urlsplit, urlunsplit
-from zoneinfo import ZoneInfo
 
 from backend.app.market_observation.alpaca import AlpacaMarketObservationAdapter
 
 from ..contracts import PersonalActor
+from ..rule_automation import personal_rule_evaluation_slot
 from .domain_tools import (
     DomainToolContext,
     DomainToolRegistry,
@@ -53,12 +53,16 @@ class StructuredNewsSource(Protocol):
 class InvestmentNewsStructuredSource:
     """将受控 investment-news 快照转换为稳定的结构化新闻来源合同。"""
 
-    def __init__(self, reader: InvestmentNewsReader) -> None:
+    def __init__(
+        self, reader: InvestmentNewsReader, *, refresh_before_read: bool = True
+    ) -> None:
         self._reader = reader
+        self._refresh_before_read = refresh_before_read
 
     def read(self, *, now: datetime) -> NewsSourceSnapshot:
         try:
-            self._reader.refresh(now=now)
+            if self._refresh_before_read:
+                self._reader.refresh(now=now)
             payload = self._reader.load()
             fetched_at = datetime.fromtimestamp(
                 (self._reader.checkout_dir / "data.js").stat().st_mtime,
@@ -251,6 +255,8 @@ class TodayDomainTools:
             [PersonalActor, str, datetime, int, int], Any
         ]
         | None = None,
+        rule_attention_reader: Callable[[PersonalActor], tuple[Any, ...]]
+        | None = None,
         allowed_news_source_types: frozenset[str] = frozenset(
             {"structured_news"}
         ),
@@ -265,6 +271,7 @@ class TodayDomainTools:
             for symbol, related in (relation_map or _default_relation_map()).items()
         }
         self._dossier_reader = dossier_reader
+        self._rule_attention_reader = rule_attention_reader or (lambda _actor: ())
         self._allowed_news_source_types = allowed_news_source_types
         self._maximum_event_age = maximum_event_age
         self._maximum_fetch_age = maximum_fetch_age
@@ -290,7 +297,7 @@ class TodayDomainTools:
     def get_today_context(
         self, context: DomainToolContext, arguments: dict[str, Any]
     ) -> DomainToolResult:
-        now = _argument_as_of(arguments, context.clock())
+        now = context.clock()
         portfolio = self._portfolio_store.load(actor_id=context.actor_id)
         if context.requested_name == "get_holdings":
             return self._legacy_holdings(context, portfolio, now)
@@ -304,6 +311,11 @@ class TodayDomainTools:
         )
         followed = tuple(
             item.symbol for item in watchlist.items if item.is_followed
+        )
+        attention_items = tuple(
+            item
+            for item in self._rule_attention_reader(PersonalActor(context.actor_id))
+            if item.symbol in active_holdings
         )
         if "news:read" in context.granted_permissions:
             news_events, news_gaps = self._read_news(now=now)
@@ -333,7 +345,28 @@ class TodayDomainTools:
             owner_actor_id=context.actor_id,
             required_permissions=frozenset({"portfolio:read"}),
         )
-        evidence = (portfolio_record.envelope,) + tuple(
+        attention_evidence = tuple(
+            self._record_evidence(
+                source="observation_rule_attention",
+                as_of=item.as_of,
+                data=_attention_data(item),
+                authorized_fields=(
+                    "attention_id",
+                    "kind",
+                    "symbol",
+                    "label",
+                    "result",
+                    "as_of",
+                    "reason_code",
+                    "priority",
+                ),
+                prefix="rule-attention",
+                owner_actor_id=context.actor_id,
+                required_permissions=frozenset({"portfolio:read"}),
+            ).envelope
+            for item in attention_items
+        )
+        evidence = (portfolio_record.envelope,) + attention_evidence + tuple(
             self._event_evidence(event).envelope for event in relevant
         )
         data = {
@@ -344,6 +377,7 @@ class TodayDomainTools:
             "active_holding_count": len(active_holdings),
             "active_holding_symbols": list(active_holdings),
             "followed_symbols": list(followed),
+            "attention_items": [_attention_data(item) for item in attention_items],
             "fact_events": [event.data() for event in relevant],
         }
         if news_gaps:
@@ -419,7 +453,9 @@ class TodayDomainTools:
         else:
             holding = None
             instrument_state = None
-        if "news:read" in context.granted_permissions:
+        if context.requested_name == "get_kline":
+            news_events, news_gaps = (), ()
+        elif "news:read" in context.granted_permissions:
             news_events, news_gaps = self._read_news(
                 now=now, symbols=(symbol,)
             )
@@ -1009,32 +1045,35 @@ def _freshness_seconds(
     return max(0, int((now - max(item.fetched_at for item in events)).total_seconds()))
 
 
-def _argument_as_of(arguments: Mapping[str, Any], default: datetime) -> datetime:
-    value = arguments.get("as_of")
-    if value is None:
-        return default
-    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    if parsed.tzinfo is None:
-        raise ValueError("as_of_requires_timezone")
-    return parsed
-
-
 def _market_period(now: datetime) -> str:
-    eastern = now.astimezone(ZoneInfo("America/New_York"))
-    if eastern.weekday() >= 5:
+    slot = personal_rule_evaluation_slot(now)
+    if slot is None:
         return "market_closed"
-    minutes = eastern.hour * 60 + eastern.minute
-    if minutes < 9 * 60 + 30:
-        return "pre_market"
-    if minutes < 16 * 60:
-        return "market_hours"
-    return "after_market"
+    session = slot.split(":", 1)[1]
+    return {
+        "pre_market": "pre_market",
+        "regular_market": "market_hours",
+        "post_market": "after_market",
+    }[session]
 
 
 def _plain_data(value: Any) -> Any:
     if hasattr(value, "__dataclass_fields__"):
         return asdict(value)
     return value
+
+
+def _attention_data(item: Any) -> dict[str, Any]:
+    return {
+        "attention_id": item.attention_id,
+        "kind": item.kind,
+        "symbol": item.symbol,
+        "label": item.label,
+        "result": item.result,
+        "as_of": item.as_of.isoformat(),
+        "reason_code": item.reason_code,
+        "priority": item.priority,
+    }
 
 
 def _default_relation_map() -> Mapping[str, tuple[str, ...]]:

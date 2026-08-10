@@ -490,7 +490,7 @@ class AIRuntimeContractTest(unittest.TestCase):
             self.assertEqual(result.failure.code, "runtime_contract_invalid")
 
     def test_hosted_tool_events_must_pair_and_return_verified_evidence(self) -> None:
-        invalid = RuntimeResult.completed(
+        missing_terminal = RuntimeResult.completed(
             events=(
                 RuntimeEvent(type="run_started"),
                 RuntimeEvent(
@@ -503,13 +503,112 @@ class AIRuntimeContractTest(unittest.TestCase):
             ),
             usage=RuntimeUsage(1, 1, 0, 0, Decimal("0")),
         )
+        completed = RuntimeEvent(
+            type="hosted_tool_completed",
+            tool_name="web_search",
+            tool_call_id="hosted-1",
+            evidence_ids=("web:1",),
+        )
+        duplicate_terminal = RuntimeResult.completed(
+            events=(
+                missing_terminal.events[0],
+                missing_terminal.events[1],
+                completed,
+                completed,
+                missing_terminal.events[-1],
+            ),
+            usage=RuntimeUsage(1, 1, 0, 0, Decimal("0"), 1, 1),
+            evidence=(
+                RuntimeEvidence(
+                    evidence_id="web:1",
+                    url="https://example.com/source",
+                    title="Source",
+                    verified_excerpt="done",
+                    body_sha256="a" * 64,
+                    verified_at=datetime(2026, 8, 10, tzinfo=timezone.utc),
+                ),
+            ),
+            citations=(
+                RuntimeCitation(
+                    evidence_id="web:1",
+                    output_block_index=0,
+                    start_char=0,
+                    end_char=4,
+                    cited_text_sha256=sha256(b"done").hexdigest(),
+                ),
+            ),
+        )
+        for invalid in (missing_terminal, duplicate_terminal):
+            result = run_runtime(
+                ScriptedHostedRuntime(invalid),
+                RuntimeRequest(
+                    model="model-under-test",
+                    instructions="test",
+                    input_text="test",
+                    hosted_tools=("web_search",),
+                    budget=RuntimeBudget(remaining_usd=Decimal("1")),
+                ),
+            )
+            self.assertEqual(result.failure.code, "runtime_contract_invalid")
+
+    def test_actual_usage_is_preserved_when_provider_exceeds_budget(self) -> None:
         result = run_runtime(
-            ScriptedHostedRuntime(invalid),
+            ScriptedCompletionRuntime(completed_result()),
             RuntimeRequest(
                 model="model-under-test",
                 instructions="test",
                 input_text="test",
-                hosted_tools=("web_search",),
+                tools=("get_today_context",),
+                budget=RuntimeBudget(remaining_usd=Decimal("0.0001")),
+            ),
+        )
+        self.assertEqual(result.failure.code, "budget_exceeded")
+        self.assertEqual(result.usage.cost_usd, Decimal("0.0002"))
+        self.assertEqual(result.events[-1].type, "run_failed")
+
+    def test_tool_events_must_use_allowed_and_matching_names(self) -> None:
+        for terminal_name, allowed in (
+            ("get_today_context", ("get_symbol_dossier",)),
+            ("get_symbol_dossier", ("get_today_context",)),
+        ):
+            with self.subTest(terminal_name=terminal_name, allowed=allowed):
+                events = list(completed_result().events)
+                events[2] = replace(events[2], tool_name=terminal_name)
+                result = run_runtime(
+                    ScriptedCompletionRuntime(
+                        RuntimeResult.completed(
+                            events=tuple(events), usage=completed_result().usage
+                        )
+                    ),
+                    RuntimeRequest(
+                        model="model-under-test",
+                        instructions="test",
+                        input_text="test",
+                        tools=allowed,
+                        budget=RuntimeBudget(remaining_usd=Decimal("1")),
+                    ),
+                )
+                self.assertEqual(result.failure.code, "runtime_contract_invalid")
+
+    def test_tool_events_reject_duplicate_terminal_events(self) -> None:
+        normal = completed_result()
+        duplicate_tool = RuntimeResult.completed(
+            events=(
+                normal.events[0],
+                normal.events[1],
+                normal.events[2],
+                normal.events[2],
+                normal.events[3],
+            ),
+            usage=normal.usage,
+        )
+        result = run_runtime(
+            ScriptedCompletionRuntime(duplicate_tool),
+            RuntimeRequest(
+                model="model-under-test",
+                instructions="test",
+                input_text="test",
+                tools=("get_today_context",),
                 budget=RuntimeBudget(remaining_usd=Decimal("1")),
             ),
         )

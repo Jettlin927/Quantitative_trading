@@ -9,6 +9,7 @@ from hashlib import sha256
 import re
 from typing import Callable, Protocol
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -62,6 +63,7 @@ class StoredInstrumentState:
     symbol: str
     manual_following: bool | None = None
     manual_unfollow_holding_revision: int | None = None
+    manual_unfollow_holding_id: str | None = None
     preset_reasons: tuple[str, ...] = ()
     custom_reason: str | None = None
     candidate_status: str | None = None
@@ -81,6 +83,7 @@ class InstrumentStateSnapshot:
 class HoldingWatchState:
     state: str
     revision: int
+    holding_id: str | None = None
 
 
 class InstrumentStateStore(Protocol):
@@ -338,13 +341,61 @@ class InstrumentStateBook:
         self._store = store
         self._holding_states_reader = holding_states_reader
         self._clock = clock
-        self._trading_days_elapsed = trading_days_elapsed or _xnys_trading_days_elapsed
+        self._trading_days_elapsed = trading_days_elapsed or xnys_trading_days_elapsed
 
     def open(self, actor: PersonalActor) -> InstrumentStatesView:
         return self._project(
             actor.actor_id,
             self._store.load(actor_id=actor.actor_id),
         )
+
+    def bind_legacy_holding_lifecycles(
+        self, actor: PersonalActor
+    ) -> InstrumentStatesView:
+        actor_id = actor.actor_id
+        state = self._store.load(actor_id=actor_id)
+        holdings = self._holding_states_reader(actor_id)
+        bindings = {
+            symbol: holding.holding_id
+            for symbol, holding in holdings.items()
+            if holding.holding_id is not None
+            and holding.state != "active"
+            and (stored := state.items.get(symbol)) is not None
+            and stored.manual_following is False
+            and stored.manual_unfollow_holding_id is None
+            and stored.manual_unfollow_holding_revision == holding.revision
+        }
+        if not bindings:
+            return self._project(actor_id, state)
+
+        def mutate(current: InstrumentStateSnapshot) -> None:
+            for symbol, holding_id in bindings.items():
+                stored = current.items.get(symbol)
+                if (
+                    stored is not None
+                    and stored.manual_following is False
+                    and stored.manual_unfollow_holding_id is None
+                ):
+                    current.items[symbol] = replace(
+                        stored, manual_unfollow_holding_id=holding_id
+                    )
+
+        identity = sha256(
+            repr(tuple(sorted(bindings.items()))).encode("utf-8")
+        ).hexdigest()
+        try:
+            state = self._store.revise(
+                actor_id=actor_id,
+                expected_revision=state.revision,
+                idempotency_key=f"bind-holding-lifecycle:{identity}",
+                action="bind_holding_lifecycle",
+                mutate=mutate,
+            )
+        except ValueError as exc:
+            if str(exc) != "revision_conflict":
+                raise
+            state = self._store.load(actor_id=actor_id)
+        return self._project(actor_id, state)
 
     def revise(
         self,
@@ -373,6 +424,7 @@ class InstrumentStateBook:
                     current,
                     manual_following=True,
                     manual_unfollow_holding_revision=None,
+                    manual_unfollow_holding_id=None,
                     preset_reasons=reasons,
                     custom_reason=custom_reason,
                 )
@@ -385,6 +437,9 @@ class InstrumentStateBook:
                 manual_following=False,
                 manual_unfollow_holding_revision=(
                     holding.revision if holding is not None else None
+                ),
+                manual_unfollow_holding_id=(
+                    holding.holding_id if holding is not None else None
                 ),
                 preset_reasons=(),
                 custom_reason=None,
@@ -509,7 +564,14 @@ class InstrumentStateBook:
                 stored.manual_following is False
                 and (
                     holding is None
-                    or stored.manual_unfollow_holding_revision == holding.revision
+                    or (
+                        stored.manual_unfollow_holding_id is not None
+                        and stored.manual_unfollow_holding_id == holding.holding_id
+                    )
+                    or (
+                        stored.manual_unfollow_holding_id is None
+                        and stored.manual_unfollow_holding_revision == holding.revision
+                    )
                 )
             ):
                 is_followed, follow_source = False, "none"
@@ -594,6 +656,7 @@ def _stored_instrument_payload(item: StoredInstrumentState) -> dict:
         "symbol": item.symbol,
         "manual_following": item.manual_following,
         "manual_unfollow_holding_revision": item.manual_unfollow_holding_revision,
+        "manual_unfollow_holding_id": item.manual_unfollow_holding_id,
         "preset_reasons": list(item.preset_reasons),
         "custom_reason": item.custom_reason,
         "candidate_status": item.candidate_status,
@@ -615,6 +678,7 @@ def _stored_instrument_state(payload: dict) -> StoredInstrumentState:
         manual_unfollow_holding_revision=payload.get(
             "manual_unfollow_holding_revision"
         ),
+        manual_unfollow_holding_id=payload.get("manual_unfollow_holding_id"),
         preset_reasons=tuple(str(item) for item in payload.get("preset_reasons", ())),
         custom_reason=payload.get("custom_reason"),
         candidate_status=payload.get("candidate_status"),
@@ -656,14 +720,17 @@ def _optional_datetime(value: object) -> datetime | None:
     return parsed
 
 
-def _xnys_trading_days_elapsed(start: datetime, end: datetime) -> int:
+def xnys_trading_days_elapsed(start: datetime, end: datetime) -> int:
     if end <= start:
         return 0
     import exchange_calendars as xcals
     import pandas as pd
 
     calendar = xcals.get_calendar("XNYS")
+    eastern = ZoneInfo("America/New_York")
+    start_date = start.astimezone(eastern).date()
+    end_date = end.astimezone(eastern).date()
     sessions = calendar.sessions_in_range(
-        pd.Timestamp(start.date()), pd.Timestamp(end.date())
+        pd.Timestamp(start_date), pd.Timestamp(end_date)
     )
-    return sum(session.date() > start.date() for session in sessions)
+    return sum(session.date() > start_date for session in sessions)

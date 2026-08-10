@@ -18,10 +18,12 @@ from backend.app.personal_workspace.agent.domain_tools import (
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc)
 
 
-def evidence(evidence_id: str = "evidence:test:1") -> EvidenceEnvelope:
+def evidence(
+    evidence_id: str = "evidence:test:1", *, source: str = "synthetic"
+) -> EvidenceEnvelope:
     return EvidenceEnvelope(
         evidence_id=evidence_id,
-        source="synthetic",
+        source=source,
         as_of=NOW,
         content_sha256="a" * 64,
         authorized_fields=("symbol",),
@@ -190,6 +192,30 @@ class DomainToolContractTest(unittest.TestCase):
         self.assertEqual(result.status, "unavailable")
         self.assertEqual(result.error_code, "tool_contract_invalid")
 
+    def test_non_finite_nested_data_is_rejected_at_the_registry_seam(self) -> None:
+        for value in (float("nan"), float("inf"), Decimal("-Infinity")):
+            with self.subTest(value=value):
+                registry = DomainToolRegistry(
+                    handlers={
+                        "get_today_context": lambda _context, _arguments: DomainToolResult.success(
+                            data={"nested": [value]},
+                            evidence=(evidence(),),
+                        )
+                    }
+                )
+                result = registry.invoke(
+                    "get_today_context",
+                    context=DomainToolContext(
+                        actor_id="actor-1",
+                        granted_permissions=frozenset(
+                            {"portfolio:read", "market:read"}
+                        ),
+                        clock=lambda: NOW,
+                    ),
+                    arguments={},
+                )
+                self.assertEqual(result.error_code, "tool_contract_invalid")
+
     def test_each_canonical_tool_executes_its_input_and_permission_contract(self) -> None:
         registry = DomainToolRegistry(
             handlers={
@@ -229,9 +255,23 @@ class DomainToolContractTest(unittest.TestCase):
     def test_legacy_aliases_accept_legacy_arguments_and_permissions(self) -> None:
         captured = []
 
-        def handler(_context: DomainToolContext, arguments: dict) -> DomainToolResult:
+        responses = iter(
+            (
+                {"holdings": [], "count": 0, "usd_cash": "0"},
+                {"market": {"symbol": "NVDA", "bars": []}},
+                {"items": [], "count": 0},
+            )
+        )
+
+        def handler(context: DomainToolContext, arguments: dict) -> DomainToolResult:
             captured.append(arguments)
-            return DomainToolResult.success(data={"ok": True}, evidence=(evidence(),))
+            source = {
+                "get_holdings": "personal_portfolio",
+                "get_kline": "market_dossier",
+            }.get(context.requested_name, "synthetic")
+            return DomainToolResult.success(
+                data=next(responses), evidence=(evidence(source=source),)
+            )
 
         registry = DomainToolRegistry(
             handlers={
@@ -266,6 +306,30 @@ class DomainToolContractTest(unittest.TestCase):
             captured[2],
             {"symbols": ["NVDA"], "query": "earnings", "sector": "semi", "limit": 5},
         )
+
+    def test_legacy_alias_rejects_canonical_private_field_leak(self) -> None:
+        registry = DomainToolRegistry(
+            handlers={
+                "get_symbol_dossier": lambda _context, _arguments: DomainToolResult.success(
+                    data={
+                        "market": {"symbol": "NVDA", "bars": []},
+                        "states": {"holding": True},
+                    },
+                    evidence=(evidence(),),
+                )
+            }
+        )
+        result = registry.invoke(
+            "get_kline",
+            context=DomainToolContext(
+                actor_id="actor-1",
+                granted_permissions=frozenset({"market:read"}),
+                clock=lambda: NOW,
+            ),
+            arguments={"symbol": "NVDA"},
+        )
+        self.assertEqual(result.status, "unavailable")
+        self.assertEqual(result.error_code, "tool_contract_invalid")
 
 
 if __name__ == "__main__":

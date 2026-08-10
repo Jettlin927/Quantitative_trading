@@ -296,6 +296,10 @@ class AutomaticBriefingStore(Protocol):
         self, *, actor_id: str, trigger_key: str
     ) -> StoredAutomaticBriefing | None: ...
 
+    def pending_scheduled(
+        self, *, actor_id: str
+    ) -> tuple[StoredAutomaticBriefing, ...]: ...
+
 
 @dataclass
 class _MemoryBriefing:
@@ -555,6 +559,22 @@ class InMemoryAutomaticBriefingStore:
         with self._lock:
             item = self._items.get((actor_id, trigger_key))
             return None if item is None else self._stored(item)
+
+    def pending_scheduled(
+        self, *, actor_id: str
+    ) -> tuple[StoredAutomaticBriefing, ...]:
+        with self._lock:
+            items = sorted(
+                (
+                    item
+                    for item in self._items.values()
+                    if item.actor_id == actor_id
+                    and item.provider_state == BriefingProviderState.PLANNED
+                    and item.trigger_kind in {"premarket", "postmarket"}
+                ),
+                key=lambda item: (item.market_date, item.trigger_kind),
+            )
+            return tuple(self._stored(item) for item in items)
 
     def _owned_claim(self, claim: BriefingClaim) -> _MemoryBriefing:
         item = self._ids.get(claim.briefing_id)
@@ -892,6 +912,30 @@ class PostgresAutomaticBriefingStore:
                 )
             )
             return None if row is None else self._decode_stored(session, row, actor_id)
+
+    def pending_scheduled(
+        self, *, actor_id: str
+    ) -> tuple[StoredAutomaticBriefing, ...]:
+        with self._session_factory() as session:
+            workspace = self._workspace(session, actor_id, lock=False)
+            if workspace is None:
+                return ()
+            rows = session.scalars(
+                select(PersonalAutomaticBriefing)
+                .where(
+                    PersonalAutomaticBriefing.workspace_id == workspace.id,
+                    PersonalAutomaticBriefing.provider_state
+                    == BriefingProviderState.PLANNED.value,
+                    PersonalAutomaticBriefing.trigger_kind.in_(
+                        ("premarket", "postmarket")
+                    ),
+                )
+                .order_by(
+                    PersonalAutomaticBriefing.market_date,
+                    PersonalAutomaticBriefing.trigger_kind,
+                )
+            ).all()
+            return tuple(self._decode_stored(session, row, actor_id) for row in rows)
 
     def _owned_row(
         self, session: Session, claim: BriefingClaim
