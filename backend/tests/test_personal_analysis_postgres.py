@@ -13,8 +13,10 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.app.personal_workspace.analysis import (
     AnalysisIntent,
+    AnalysisToolEvent,
     AnalysisWorkspace,
     EvidenceCandidate,
+    FrozenEvidence,
     PostgresAnalysisStore,
     ScriptedResponsesAdapter,
 )
@@ -104,7 +106,12 @@ class PersonalAnalysisPostgresTest(unittest.TestCase):
         self.assertEqual(sum(item is not None for item in results), 1)
         self.assertEqual(completed.status, "completed")
         self.assertEqual(completed.run_id, queued.run_id)
-        self.assertEqual(workspace.observe(actor, queued.run_id).claims[0].kind, "inference")
+        observed = workspace.observe(actor, queued.run_id)
+        self.assertEqual(observed.claims[0].kind, "inference")
+        self.assertEqual(observed.question, "私有问题：现金流影响？")
+        self.assertEqual(observed.subject_ids, ("ACME",))
+        self.assertEqual(observed.provider_call_state, "completed")
+        self.assertEqual(observed.accounted_cost_usd, observed.actual_cost_usd)
 
         with self.engine.connect() as connection:
             table_names = set(
@@ -210,17 +217,49 @@ class PersonalAnalysisPostgresTest(unittest.TestCase):
             lease_seconds=30,
         )
         self.assertEqual(second.view.run_id, queued.run_id)
+        audited = replace(
+            second,
+            view=replace(
+                second.view,
+                planned_tools=("get_news",),
+                provider_call_state="completed",
+                accounted_cost_usd="0.0001",
+                tool_events=(
+                    AnalysisToolEvent(
+                        sequence=1,
+                        tool_name="get_news",
+                        tool_call_id="call-pg-1",
+                        status="completed",
+                        evidence_ids=("tool:get_news:0",),
+                    ),
+                ),
+                tool_evidence=(
+                    FrozenEvidence(
+                        evidence_id="tool:get_news:0",
+                        kind="tool_output",
+                        source="tool:get_news",
+                        field="get_news",
+                        excerpt="公开新闻证据",
+                        content_sha256="c" * 64,
+                        as_of=NOW,
+                    ),
+                ),
+            ),
+        )
         store.save_run(
             replace(
-                second,
+                audited,
                 lease_owner=None,
                 lease_expires_at=None,
-                view=replace(second.view, status="completed", stage="completed"),
+                view=replace(audited.view, status="completed", stage="completed"),
             )
         )
         with self.assertRaisesRegex(ValueError, "analysis_lease_lost"):
             store.save_run(renewed)
-        self.assertEqual(store.get_run(actor.actor_id, queued.run_id).view.status, "completed")
+        readback = store.get_run(actor.actor_id, queued.run_id).view
+        self.assertEqual(readback.status, "completed")
+        self.assertEqual(readback.tool_events[0].tool_name, "get_news")
+        self.assertEqual(readback.tool_evidence[0].excerpt, "公开新闻证据")
 
 
 if __name__ == "__main__":

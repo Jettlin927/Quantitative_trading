@@ -9,7 +9,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable, Protocol
 
-from ..analysis import AnalysisClaim, AnalysisIntent, AnalysisUsage, FrozenEvidence
+from ..analysis import (
+    AnalysisClaim,
+    AnalysisIntent,
+    AnalysisToolEvent,
+    AnalysisUsage,
+    FrozenEvidence,
+)
 
 
 @dataclass(frozen=True)
@@ -90,3 +96,4 @@ class AgentTurnResult:
     cost_usd: str
     rounds: int
     tool_evidence: tuple[FrozenEvidence, ...]
+    tool_events: tuple[AnalysisToolEvent, ...]

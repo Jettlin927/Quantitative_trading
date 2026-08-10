@@ -186,6 +186,16 @@ class AnalysisUsage:
 
 
 @dataclass(frozen=True)
+class AnalysisToolEvent:
+    sequence: int
+    tool_name: str
+    tool_call_id: str
+    status: str
+    evidence_ids: tuple[str, ...] = ()
+    error_code: str | None = None
+
+
+@dataclass(frozen=True)
 class AnalysisRunView:
     run_id: str
     draft_id: str
@@ -201,6 +211,26 @@ class AnalysisRunView:
     claims: tuple[AnalysisClaim, ...]
     events: tuple[AnalysisEvent, ...]
     cancellable: bool
+    question: str | None = None
+    subject_ids: tuple[str, ...] = ()
+    planned_tools: tuple[str, ...] = ()
+    provider_call_state: str = "legacy_unknown"
+    accounted_cost_usd: str | None = None
+    tool_events: tuple[AnalysisToolEvent, ...] = ()
+    tool_evidence: tuple[FrozenEvidence, ...] = ()
+
+
+@dataclass(frozen=True)
+class AnalysisRunSummary:
+    run_id: str
+    status: str
+    provider: str
+    model: str
+    actual_cost_usd: str | None
+    failure_code: str | None
+    question: str | None
+    subject_ids: tuple[str, ...]
+    provider_call_state: str
 
 
 @dataclass(frozen=True)
@@ -323,6 +353,19 @@ class InMemoryAnalysisStore:
                     claims=(),
                     events=(event,),
                     cancellable=True,
+                    question=draft.intent.question,
+                    subject_ids=draft.intent.subject_ids,
+                    planned_tools=(
+                        tuple(
+                            field
+                            for field in draft.receipt.included_fields
+                            if field != "user_question"
+                        )
+                        if draft.receipt.provider == "deepseek-agent"
+                        else ()
+                    ),
+                    provider_call_state="not_started",
+                    accounted_cost_usd="0",
                 ),
             )
             self._run_keys[(actor_id, idempotency_key)] = run_id
@@ -625,6 +668,19 @@ class PostgresAnalysisStore:
                     claims=(),
                     events=(event,),
                     cancellable=True,
+                    question=draft.intent.question,
+                    subject_ids=draft.intent.subject_ids,
+                    planned_tools=(
+                        tuple(
+                            field
+                            for field in draft.receipt.included_fields
+                            if field != "user_question"
+                        )
+                        if draft.receipt.provider == "deepseek-agent"
+                        else ()
+                    ),
+                    provider_call_state="not_started",
+                    accounted_cost_usd="0",
                 ),
             )
             envelope = self._cipher.encrypt_json(
@@ -1056,22 +1112,7 @@ class DeepSeekChatAdapter:
 
     def create_response(self, request: dict[str, Any]) -> dict[str, Any]:
         body = {key: value for key, value in request.items() if key != "url"}
-        if body.get("model") != DEEPSEEK_MODEL:
-            raise ProviderFailure("provider_request_unsafe", retryable=False)
-        if body.get("response_format") != {"type": "json_object"}:
-            raise ProviderFailure("provider_request_unsafe", retryable=False)
-        if body.get("max_tokens") != DEEPSEEK_MAX_OUTPUT_TOKENS:
-            raise ProviderFailure("provider_request_unsafe", retryable=False)
-        if body.get("thinking") != {"type": "disabled"}:
-            raise ProviderFailure("provider_request_unsafe", retryable=False)
-        if body.get("stream") is not False or "tools" in body:
-            raise ProviderFailure("provider_request_unsafe", retryable=False)
-        messages = body.get("messages")
-        if not isinstance(messages, list) or [item.get("role") for item in messages] != [
-            "system",
-            "user",
-        ]:
-            raise ProviderFailure("provider_request_unsafe", retryable=False)
+        self.validate_request(body)
         try:
             raw = self._transport(
                 url=DEEPSEEK_CHAT_URL,
@@ -1101,6 +1142,24 @@ class DeepSeekChatAdapter:
         except (TimeoutError, URLError):
             raise ProviderFailure("provider_timeout", retryable=False) from None
         return _normalize_deepseek_response(raw)
+
+    def validate_request(self, body: dict[str, Any]) -> None:
+        if body.get("model") != DEEPSEEK_MODEL:
+            raise ProviderFailure("provider_request_unsafe", retryable=False)
+        if body.get("response_format") != {"type": "json_object"}:
+            raise ProviderFailure("provider_request_unsafe", retryable=False)
+        if body.get("max_tokens") != DEEPSEEK_MAX_OUTPUT_TOKENS:
+            raise ProviderFailure("provider_request_unsafe", retryable=False)
+        if body.get("thinking") != {"type": "disabled"}:
+            raise ProviderFailure("provider_request_unsafe", retryable=False)
+        if body.get("stream") is not False or "tools" in body:
+            raise ProviderFailure("provider_request_unsafe", retryable=False)
+        messages = body.get("messages")
+        if not isinstance(messages, list) or [item.get("role") for item in messages] != [
+            "system",
+            "user",
+        ]:
+            raise ProviderFailure("provider_request_unsafe", retryable=False)
 
 
 def _deepseek_http_transport(
@@ -1197,10 +1256,21 @@ def _deepseek_cost_usd(usage: dict[str, int]) -> str:
 
 
 class ProviderFailure(RuntimeError):
-    def __init__(self, code: str, *, retryable: bool) -> None:
+    def __init__(
+        self,
+        code: str,
+        *,
+        retryable: bool,
+        usage: AnalysisUsage | None = None,
+        cost_usd: str | None = None,
+        response_completed: bool = False,
+    ) -> None:
         super().__init__(code)
         self.code = code
         self.retryable = retryable
+        self.usage = usage
+        self.cost_usd = cost_usd
+        self.response_completed = response_completed
 
 
 class AnalysisWorkspace:
@@ -1399,8 +1469,23 @@ class AnalysisWorkspace:
             raise ValueError("private_object_not_found")
         return run.view
 
-    def history(self, actor: PersonalActor, *, limit: int = 20) -> tuple[AnalysisRunView, ...]:
-        return tuple(run.view for run in self._store.list_runs(actor.actor_id, limit=limit))
+    def history(
+        self, actor: PersonalActor, *, limit: int = 20
+    ) -> tuple[AnalysisRunSummary, ...]:
+        return tuple(
+            AnalysisRunSummary(
+                run_id=run.view.run_id,
+                status=run.view.status,
+                provider=run.view.provider,
+                model=run.view.model,
+                actual_cost_usd=run.view.actual_cost_usd,
+                failure_code=run.view.failure_code,
+                question=run.view.question,
+                subject_ids=run.view.subject_ids,
+                provider_call_state=run.view.provider_call_state,
+            )
+            for run in self._store.list_runs(actor.actor_id, limit=limit)
+        )
 
     def cancel(self, actor: PersonalActor, run_id: str) -> AnalysisRunView:
         cancel = getattr(self._store, "cancel", None)
@@ -1419,6 +1504,10 @@ class AnalysisWorkspace:
         draft, run = leased
         validating = _append_event(run, "validating", "running", self._clock())
         self._store.save_run(validating)
+        try:
+            self._preflight_provider(draft, run)
+        except ProviderFailure as exc:
+            return self._fail_run(validating, exc.code)
         budget_reservation = None
         if self._daily_budget_guard is not None:
             try:
@@ -1438,6 +1527,20 @@ class AnalysisWorkspace:
             budget_reservation=budget_reservation,
         )
 
+    def _preflight_provider(
+        self, draft: StoredAnalysisDraft, run: StoredAnalysisRun
+    ) -> None:
+        validator = getattr(self._provider, "validate_request", None)
+        if validator is None:
+            return
+        validator(
+            _responses_request(
+                model=run.view.model,
+                question=draft.intent.question,
+                evidence=draft.evidence,
+            )
+        )
+
     def _execute_provider(
         self,
         validating: StoredAnalysisRun,
@@ -1452,6 +1555,19 @@ class AnalysisWorkspace:
             question=draft.intent.question,
             evidence=draft.evidence,
         )
+        validating = replace(
+            validating,
+            view=replace(
+                validating.view,
+                provider_call_state="started",
+                accounted_cost_usd=(
+                    validating.view.estimated_cost_usd
+                    if budget_reservation is not None
+                    else None
+                ),
+            ),
+        )
+        self._store.save_run(validating)
         response: dict[str, Any] | None = None
         maximum_attempts = 1 if budget_reservation is not None else 2
         for attempt in range(1, maximum_attempts + 1):
@@ -1467,7 +1583,14 @@ class AnalysisWorkspace:
                             failure_code=exc.code,
                             now=self._clock(),
                         )
-                    return self._fail_run(validating, exc.code)
+                    unknown = replace(
+                        validating,
+                        view=replace(
+                            validating.view,
+                            provider_call_state="outcome_unknown",
+                        ),
+                    )
+                    return self._fail_run(unknown, exc.code)
                 validating = _append_event(
                     validating,
                     "retrying",
@@ -1492,7 +1615,24 @@ class AnalysisWorkspace:
                     response=response,
                     failure_code=str(exc),
                 )
-            return self._fail_run(validating, str(exc))
+            completed_response = replace(
+                validating,
+                view=replace(
+                    validating.view,
+                    provider_call_state="completed",
+                    actual_cost_usd=(
+                        str(response["cost_usd"])
+                        if response.get("cost_usd") is not None
+                        else None
+                    ),
+                    accounted_cost_usd=(
+                        str(response["cost_usd"])
+                        if response.get("cost_usd") is not None
+                        else validating.view.accounted_cost_usd
+                    ),
+                ),
+            )
+            return self._fail_run(completed_response, str(exc))
         if budget_reservation is not None:
             self._settle_daily_budget(
                 budget_reservation,
@@ -1515,6 +1655,12 @@ class AnalysisWorkspace:
                 usage=usage,
                 failure_code=None,
                 cancellable=False,
+                provider_call_state="completed",
+                accounted_cost_usd=(
+                    str(response["cost_usd"])
+                    if response.get("cost_usd") is not None
+                    else completed.view.accounted_cost_usd
+                ),
             ),
         )
         return self._store.save_run(completed).view
@@ -1857,6 +2003,10 @@ def _stored_run_payload(run: StoredAnalysisRun) -> dict[str, Any]:
                 {**asdict(item), "occurred_at": item.occurred_at.isoformat()}
                 for item in run.view.events
             ],
+            "tool_evidence": [
+                {**asdict(item), "as_of": item.as_of.isoformat()}
+                for item in run.view.tool_evidence
+            ],
         },
     }
 
@@ -1917,6 +2067,34 @@ def _stored_run_from_payload(
                 for item in view["events"]
             ),
             cancellable=view["cancellable"],
+            question=view.get("question"),
+            subject_ids=tuple(view.get("subject_ids") or ()),
+            planned_tools=tuple(view.get("planned_tools") or ()),
+            provider_call_state=view.get("provider_call_state", "legacy_unknown"),
+            accounted_cost_usd=view.get("accounted_cost_usd"),
+            tool_events=tuple(
+                AnalysisToolEvent(
+                    sequence=item["sequence"],
+                    tool_name=item["tool_name"],
+                    tool_call_id=item["tool_call_id"],
+                    status=item["status"],
+                    evidence_ids=tuple(item.get("evidence_ids") or ()),
+                    error_code=item.get("error_code"),
+                )
+                for item in view.get("tool_events") or ()
+            ),
+            tool_evidence=tuple(
+                FrozenEvidence(
+                    evidence_id=item["evidence_id"],
+                    kind=item["kind"],
+                    source=item["source"],
+                    field=item["field"],
+                    excerpt=item["excerpt"],
+                    content_sha256=item["content_sha256"],
+                    as_of=datetime.fromisoformat(item["as_of"]),
+                )
+                for item in view.get("tool_evidence") or ()
+            ),
         ),
     )
 

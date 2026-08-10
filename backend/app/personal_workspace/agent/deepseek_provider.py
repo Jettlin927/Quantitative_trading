@@ -46,7 +46,7 @@ class DeepSeekAgentChatAdapter:
 
     def create_response(self, request: dict[str, Any]) -> dict[str, Any]:
         body = {key: value for key, value in request.items() if key != "url"}
-        self._require_safe_request(body)
+        self.validate_request(body)
         try:
             raw = self._transport(
                 url=DEEPSEEK_CHAT_URL,
@@ -77,7 +77,7 @@ class DeepSeekAgentChatAdapter:
             raise ProviderFailure("provider_timeout", retryable=False) from None
         return _normalize_agent_response(raw)
 
-    def _require_safe_request(self, body: dict[str, Any]) -> None:
+    def validate_request(self, body: dict[str, Any]) -> None:
         if body.get("model") != DEEPSEEK_MODEL:
             raise ProviderFailure("provider_request_unsafe", retryable=False)
         if body.get("stream") is not False:

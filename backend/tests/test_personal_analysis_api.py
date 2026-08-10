@@ -137,6 +137,13 @@ class PersonalAnalysisApiTest(unittest.TestCase):
         self.assertEqual(started.status_code, 202)
         self.assertEqual(observed.json()["status"], "completed")
         self.assertEqual(observed.json()["claims"][0]["kind"], "confirmed_fact")
+        self.assertEqual(observed.json()["question"], "官方事实可能如何影响公司？")
+        self.assertEqual(observed.json()["subject_ids"], ["ACME"])
+        self.assertEqual(observed.json()["provider_call_state"], "completed")
+        self.assertEqual(
+            observed.json()["accounted_cost_usd"],
+            observed.json()["actual_cost_usd"],
+        )
         self.assertEqual(events.headers["content-type"], "text/event-stream; charset=utf-8")
         self.assertIn("event: analysis_stage", events.text)
         self.assertIn('"stage":"completed"', events.text)
@@ -146,6 +153,21 @@ class PersonalAnalysisApiTest(unittest.TestCase):
         self.assertEqual(history.status_code, 200)
         self.assertEqual(history.json()[0]["run_id"], run_id)
         self.assertEqual(history.json()[0]["status"], "completed")
+        self.assertEqual(history.json()[0]["question"], "官方事实可能如何影响公司？")
+        self.assertEqual(
+            set(history.json()[0]),
+            {
+                "run_id",
+                "status",
+                "provider",
+                "model",
+                "actual_cost_usd",
+                "failure_code",
+                "question",
+                "subject_ids",
+                "provider_call_state",
+            },
+        )
 
     def test_cancel_and_stable_preview_error_mapping(self) -> None:
         prepared = self.client.post(
