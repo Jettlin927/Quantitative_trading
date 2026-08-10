@@ -1,15 +1,18 @@
 """Provider-neutral AI Runtime interface 与执行门禁。
 
 Completion 或未来 Hosted Tool adapter 只能返回这里定义的事件和 usage；供应商原始
-JSON 留在 adapter implementation 内。本阶段不提供 Hosted Tool adapter。
+JSON 留在 adapter implementation 内。Hosted Tool 目前仅用于隔离合同实验，不接生产路径。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
+from hashlib import sha256
 import json
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 
 
 @dataclass(frozen=True)
@@ -44,6 +47,28 @@ class RuntimeUsage:
     cache_hit_tokens: int
     cache_miss_tokens: int
     cost_usd: Decimal
+    hosted_tool_calls: int = 0
+    web_search_queries: int = 0
+    hosted_cost_usd: Decimal = Decimal("0")
+
+
+@dataclass(frozen=True)
+class RuntimeEvidence:
+    evidence_id: str
+    url: str
+    title: str
+    verified_excerpt: str
+    body_sha256: str
+    verified_at: datetime
+
+
+@dataclass(frozen=True)
+class RuntimeCitation:
+    evidence_id: str
+    output_block_index: int
+    cited_text_sha256: str
+    start_char: int | None = None
+    end_char: int | None = None
 
 
 @dataclass(frozen=True)
@@ -68,12 +93,26 @@ class RuntimeResult:
     events: tuple[RuntimeEvent, ...]
     usage: RuntimeUsage | None
     failure: RuntimeFailure | None
+    evidence: tuple[RuntimeEvidence, ...] = ()
+    citations: tuple[RuntimeCitation, ...] = ()
 
     @classmethod
     def completed(
-        cls, *, events: tuple[RuntimeEvent, ...], usage: RuntimeUsage
+        cls,
+        *,
+        events: tuple[RuntimeEvent, ...],
+        usage: RuntimeUsage,
+        evidence: tuple[RuntimeEvidence, ...] = (),
+        citations: tuple[RuntimeCitation, ...] = (),
     ) -> "RuntimeResult":
-        return cls(status="completed", events=events, usage=usage, failure=None)
+        return cls(
+            status="completed",
+            events=events,
+            usage=usage,
+            failure=None,
+            evidence=evidence,
+            citations=citations,
+        )
 
     @classmethod
     def failed(cls, code: str, *, retryable: bool = False) -> "RuntimeResult":
@@ -209,7 +248,12 @@ def _valid_result(
         for event in result.events
     ):
         return False
-    return _tool_events_pair(result.events) and _hosted_tool_events_pair(result.events)
+    return (
+        _tool_events_pair(result.events)
+        and _hosted_tool_events_pair(result.events)
+        and _hosted_usage_matches(result.events, result.usage)
+        and _valid_hosted_evidence_contract(result)
+    )
 
 
 def _valid_usage(usage: RuntimeUsage) -> bool:
@@ -218,11 +262,54 @@ def _valid_usage(usage: RuntimeUsage) -> bool:
         usage.output_tokens,
         usage.cache_hit_tokens,
         usage.cache_miss_tokens,
+        usage.hosted_tool_calls,
+        usage.web_search_queries,
     )
     return all(
         isinstance(value, int) and not isinstance(value, bool) and value >= 0
         for value in token_values
-    ) and usage.cost_usd >= Decimal("0")
+    ) and (
+        isinstance(usage.cost_usd, Decimal)
+        and isinstance(usage.hosted_cost_usd, Decimal)
+        and usage.cost_usd >= Decimal("0")
+        and Decimal("0") <= usage.hosted_cost_usd <= usage.cost_usd
+    )
+
+
+def _hosted_usage_matches(
+    events: tuple[RuntimeEvent, ...], usage: RuntimeUsage | None
+) -> bool:
+    if usage is None:
+        return not any(event.type.startswith("hosted_tool_") for event in events)
+    started = tuple(event for event in events if event.type == "hosted_tool_started")
+    query_count = _hosted_query_count(started)
+    return query_count is not None and (
+        usage.hosted_tool_calls == len(started)
+        and usage.web_search_queries == query_count
+    )
+
+
+def _hosted_query_count(events: tuple[RuntimeEvent, ...]) -> int | None:
+    count = 0
+    for event in events:
+        if event.tool_name != "web_search":
+            continue
+        arguments = event.arguments or {}
+        query = arguments.get("query")
+        queries = arguments.get("queries")
+        if isinstance(query, str) and query.strip() and queries is None:
+            count += 1
+            continue
+        if (
+            query is None
+            and isinstance(queries, (list, tuple))
+            and queries
+            and all(isinstance(item, str) and item.strip() for item in queries)
+        ):
+            count += len(queries)
+            continue
+        return None
+    return count
 
 
 def _tool_events_pair(events: tuple[RuntimeEvent, ...]) -> bool:
@@ -285,6 +372,105 @@ def _hosted_tool_events_pair(events: tuple[RuntimeEvent, ...]) -> bool:
     return len(started) == len(set(started)) and sorted(started) == sorted(completed)
 
 
+def _valid_hosted_evidence_contract(result: RuntimeResult) -> bool:
+    completed = tuple(
+        event for event in result.events if event.type == "hosted_tool_completed"
+    )
+    if not completed:
+        return not result.evidence and not result.citations
+    if not result.evidence or not result.citations:
+        return False
+    if not all(isinstance(item, RuntimeEvidence) for item in result.evidence):
+        return False
+    if not all(isinstance(item, RuntimeCitation) for item in result.citations):
+        return False
+    evidence_ids = [item.evidence_id for item in result.evidence]
+    event_evidence_ids = {
+        evidence_id for event in completed for evidence_id in event.evidence_ids
+    }
+    if len(evidence_ids) != len(set(evidence_ids)) or set(evidence_ids) != event_evidence_ids:
+        return False
+    if not all(_valid_evidence(item) for item in result.evidence):
+        return False
+    outputs = tuple(
+        event.text for event in result.events if event.type == "output_completed"
+    )
+    return all(
+        _valid_citation(item, allowed_ids=set(evidence_ids), outputs=outputs)
+        for item in result.citations
+    )
+
+
+def _valid_evidence(evidence: RuntimeEvidence) -> bool:
+    if (
+        not isinstance(evidence.evidence_id, str)
+        or not isinstance(evidence.url, str)
+        or not isinstance(evidence.title, str)
+        or not isinstance(evidence.verified_excerpt, str)
+        or not isinstance(evidence.body_sha256, str)
+        or not isinstance(evidence.verified_at, datetime)
+    ):
+        return False
+    parsed = urlsplit(evidence.url)
+    return (
+        bool(evidence.evidence_id.strip())
+        and parsed.scheme in {"http", "https"}
+        and bool(parsed.netloc)
+        and bool(evidence.title.strip())
+        and bool(evidence.verified_excerpt.strip())
+        and _valid_sha256(evidence.body_sha256)
+        and evidence.verified_at.tzinfo is not None
+        and evidence.verified_at.utcoffset() is not None
+        and not any(
+            _contains_provider_envelope(value)
+            for value in (
+                evidence.evidence_id,
+                evidence.url,
+                evidence.title,
+                evidence.verified_excerpt,
+            )
+        )
+    )
+
+
+def _valid_citation(
+    citation: RuntimeCitation,
+    *,
+    allowed_ids: set[str],
+    outputs: tuple[str | None, ...],
+) -> bool:
+    if (
+        citation.evidence_id not in allowed_ids
+        or not isinstance(citation.output_block_index, int)
+        or isinstance(citation.output_block_index, bool)
+        or not 0 <= citation.output_block_index < len(outputs)
+        or not _valid_sha256(citation.cited_text_sha256)
+    ):
+        return False
+    output = outputs[citation.output_block_index]
+    if not isinstance(output, str):
+        return False
+    if citation.start_char is None and citation.end_char is None:
+        cited_text = output
+    elif (
+        isinstance(citation.start_char, int)
+        and not isinstance(citation.start_char, bool)
+        and isinstance(citation.end_char, int)
+        and not isinstance(citation.end_char, bool)
+        and 0 <= citation.start_char < citation.end_char <= len(output)
+    ):
+        cited_text = output[citation.start_char:citation.end_char]
+    else:
+        return False
+    return sha256(cited_text.encode("utf-8")).hexdigest() == citation.cited_text_sha256
+
+
+def _valid_sha256(value: object) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(
+        character in "0123456789abcdef" for character in value
+    )
+
+
 def _contains_provider_envelope(value: Any) -> bool:
     if isinstance(value, str):
         try:
@@ -293,13 +479,24 @@ def _contains_provider_envelope(value: Any) -> bool:
             return False
     forbidden = {
         "choices",
+        "encrypted_content",
+        "encrypted_index",
         "provider_raw_response",
         "provider_response",
         "raw_response",
     }
     if isinstance(value, dict):
-        return bool(set(value) & forbidden) or any(
-            _contains_provider_envelope(item) for item in value.values()
+        raw_block_types = {
+            "server_tool_use",
+            "web_search_tool_result",
+            "web_search_result",
+        }
+        return (
+            bool(set(value) & forbidden)
+            or value.get("type") in raw_block_types
+            or any(
+                _contains_provider_envelope(item) for item in value.values()
+            )
         )
     if isinstance(value, (list, tuple)):
         return any(_contains_provider_envelope(item) for item in value)
