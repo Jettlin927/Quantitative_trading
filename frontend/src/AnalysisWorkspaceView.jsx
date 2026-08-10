@@ -25,8 +25,17 @@ const FAILURE_IDENTITIES = {
   provider_rate_limited: '官方接口限流',
   provider_upstream_error: '官方接口 5xx',
   provider_timeout: '官方接口超时',
+  provider_request_unsafe: '本地请求安全校验失败',
   provider_claims_invalid_schema: '官方响应结构不合格',
   provider_response_invalid_json: '官方响应不是合法 JSON',
+}
+
+const PROVIDER_CALL_LABELS = {
+  not_started: '未外发',
+  started: '已外发，等待结果',
+  completed: '已外发并完成',
+  outcome_unknown: '已外发，结果未知',
+  legacy_unknown: '旧记录未保存外发状态',
 }
 
 const PROVIDER_LABELS = {
@@ -165,7 +174,7 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '', in
         <div><small>{agentMode ? `上下文标的 ${selectedSubject} · 分析在服务端执行，agent 按需调用持仓/K线/新闻工具，浏览器不上传私有字段` : `上下文标的 ${selectedSubject} · 浏览器不上传行情、组合权重或规则结果`}</small><button className="primary-action" disabled={busy || !question.trim() || !dispatchEnabled} onClick={prepare}><Send size={15} />生成外发预览</button></div>
       </div> : null}
 
-      {history.length ? <section className="analysis-history" aria-label="个人分析运行历史"><header><span>RUN HISTORY</span><h3>最近个人分析</h3></header><div>{history.map((item) => <button key={item.run_id} onClick={() => setRun(item)}><strong>{RUN_IDENTITIES[item.status] || item.status}</strong><code>{item.run_id}</code><small>{item.model} · {item.actual_cost_usd ? `$${item.actual_cost_usd}` : '未产生费用'}{item.failure_code ? ` · ${FAILURE_IDENTITIES[item.failure_code] || item.failure_code}` : ''}</small></button>)}</div></section> : null}
+      {history.length ? <section className="analysis-history" aria-label="个人分析运行历史"><header><span>RUN HISTORY</span><h3>最近个人分析</h3></header><div>{history.map((item) => <button key={item.run_id} onClick={() => setRun(item)}><strong>{RUN_IDENTITIES[item.status] || item.status}</strong><code>{item.run_id}</code>{item.question ? <span>{(item.subject_ids || []).join(' · ')} · {item.question}</span> : null}<small>{item.model} · {item.actual_cost_usd ? `$${item.actual_cost_usd}` : item.provider_call_state === 'not_started' ? '未外发、未计费' : '费用未知'}{item.failure_code ? ` · ${FAILURE_IDENTITIES[item.failure_code] || item.failure_code}` : ''}</small></button>)}</div></section> : null}
 
       {preview ? <section className="analysis-preview" aria-label="外发预览">
         <header><div><span>PREVIEW HASH</span><code>{preview.preview_sha256.slice(0, 16)}…</code></div><strong>{PROVIDER_LABELS[preview.provider] || preview.provider} / {preview.model}</strong></header>
@@ -200,6 +209,17 @@ export function AnalysisWorkspaceView({ client, subjectId, initialRunId = '', in
 
       {run ? <section className="analysis-run" aria-label="分析运行">
         <header><div><span>RUN {run.run_id?.slice(0, 8)}</span><h3>{RUN_IDENTITIES[run.status] || run.status}</h3></div>{run.cancellable ? <button disabled={busy} onClick={cancel}><Square size={14} />取消</button> : null}</header>
+        <div className="analysis-run-audit">
+          <p><b>分析问题</b>{run.question || '旧记录未保存问题文本'}</p>
+          <p><b>分析标的</b>{(run.subject_ids || []).join(' · ') || '旧记录未保存标的'}</p>
+          <p><b>外发状态</b>{PROVIDER_CALL_LABELS[run.provider_call_state] || run.provider_call_state || '旧记录未知'}</p>
+          <p><b>费用口径</b>预留上界 ${run.estimated_cost_usd || '未知'} · 实际 {run.actual_cost_usd == null ? '未知' : `$${run.actual_cost_usd}`} · 账本 {run.accounted_cost_usd == null ? '未知' : `$${run.accounted_cost_usd}`}</p>
+        </div>
+        {(run.planned_tools || []).length ? <div className="analysis-tool-audit"><h4>工具与证据链</h4><ul>{run.planned_tools.map((tool) => {
+          const identity = TOOL_LABELS[tool] || { label: tool, mark: '⚙' }
+          const executions = (run.tool_events || []).filter((event) => event.tool_name === tool)
+          return <li key={tool}><b>{identity.mark} {identity.label}</b>{executions.length ? executions.map((event) => <span key={`${event.sequence}-${event.tool_call_id}`}>{event.status === 'completed' ? '已完成' : `失败：${event.error_code || 'unknown'}`} · {(event.evidence_ids || []).join(' · ') || '无证据'}</span>) : <span>本次未调用</span>}</li>
+        })}</ul>{(run.tool_evidence || []).length ? <details><summary>查看冻结工具证据</summary>{run.tool_evidence.map((item) => <article key={item.evidence_id}><code>{item.evidence_id}</code><small>{item.source} · {item.field}</small><p>{item.excerpt}</p></article>)}</details> : null}</div> : null}
         <ol className="analysis-stage-line">{(run.events || []).map((event) => <li key={event.sequence}><CircleDot size={13} /><span>{event.stage}</span></li>)}</ol>
         {run.failure_code ? <p className="analysis-failure"><AlertTriangle size={15} />{FAILURE_IDENTITIES[run.failure_code] || run.failure_code} · 失败输出不能保存</p> : null}
         {run.claims?.length ? <div className="claim-ledger">{run.claims.map((claim) => {

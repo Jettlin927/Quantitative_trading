@@ -12,6 +12,7 @@ from backend.app.personal_workspace.agent.protocol import (
     ToolResult,
 )
 from backend.app.personal_workspace.agent.runtime import AgentRuntime
+from backend.app.personal_workspace.agent.deepseek_provider import DeepSeekAgentChatAdapter
 from backend.app.personal_workspace.analysis import (
     AnalysisIntent,
     DEEPSEEK_MODEL,
@@ -52,6 +53,71 @@ def make_intent() -> AnalysisIntent:
 
 
 class AgentRuntimeTest(unittest.TestCase):
+    def test_runtime_request_reaches_deepseek_adapter_with_json_array_tools(self) -> None:
+        captured: list[dict] = []
+
+        def transport(*, body: dict, **_kwargs) -> dict:
+            captured.append(body)
+            if len(captured) == 1:
+                return {
+                    "choices": [{
+                        "finish_reason": "tool_calls",
+                        "message": {
+                            "content": None,
+                            "tool_calls": [{
+                                "id": "call-1",
+                                "type": "function",
+                                "function": {
+                                    "name": "get_holdings",
+                                    "arguments": "{}",
+                                },
+                            }],
+                        },
+                    }],
+                    "usage": {
+                        "prompt_tokens": 100,
+                        "completion_tokens": 20,
+                        "prompt_cache_hit_tokens": 0,
+                        "prompt_cache_miss_tokens": 100,
+                    },
+                }
+            return {
+                "choices": [{
+                    "finish_reason": "stop",
+                    "message": {"content": claims_content()},
+                }],
+                "usage": {
+                    "prompt_tokens": 200,
+                    "completion_tokens": 80,
+                    "prompt_cache_hit_tokens": 0,
+                    "prompt_cache_miss_tokens": 200,
+                },
+            }
+
+        runtime = AgentRuntime(
+            provider=DeepSeekAgentChatAdapter(
+                api_key="synthetic-key",
+                transport=transport,
+            ),
+            tools=(make_tool("get_holdings"),),
+            model=DEEPSEEK_MODEL,
+            clock=lambda: NOW,
+        )
+
+        result = runtime.run(
+            actor_id="actor-1",
+            intent=make_intent(),
+            spend_before=Decimal("0"),
+        )
+
+        self.assertEqual(len(result.claims), 4)
+        self.assertEqual(len(captured), 2)
+        self.assertIsInstance(captured[0]["tools"], list)
+        self.assertEqual(
+            captured[0]["tools"][0]["function"]["name"],
+            "get_holdings",
+        )
+
     def test_single_tool_round_then_final_claims(self) -> None:
         provider = ScriptedAgentProvider(
             [

@@ -14,6 +14,11 @@ from backend.app.personal_workspace.analysis import (
     InMemoryAnalysisStore,
     ProviderFailure,
 )
+from backend.app.personal_workspace.automatic_briefing import BriefingBudgetPolicy
+from backend.app.personal_workspace.automatic_briefing_store import (
+    ActiveAnalysisBudgetGuard,
+    InMemoryAutomaticBriefingStore,
+)
 from backend.app.personal_workspace.contracts import PersonalActor
 from backend.app.personal_workspace.portfolio import InMemoryPortfolioStore
 
@@ -35,6 +40,7 @@ def make_workspace(
     budget: str = "25",
     spend: str = "0",
     tools=None,
+    daily_budget_guard=None,
 ) -> AgentAnalysisWorkspace:
     store = InMemoryAnalysisStore()
     portfolio_store = InMemoryPortfolioStore()
@@ -57,6 +63,7 @@ def make_workspace(
         clock=lambda: NOW,
         monthly_soft_budget_usd=Decimal(budget),
         monthly_spend_reader=lambda actor, now: Decimal(spend),
+        daily_budget_guard=daily_budget_guard,
     )
 
 
@@ -135,6 +142,64 @@ class AgentAnalysisWorkspaceTest(unittest.TestCase):
         self.assertEqual(len(view.claims), 4)
         self.assertEqual(view.actual_cost_usd, "0.0004")
         self.assertEqual(view.failure_code, None)
+        self.assertEqual(view.question, "NVDA 怎么看？")
+        self.assertEqual(view.subject_ids, ("NVDA",))
+        self.assertEqual(view.planned_tools, ("get_holdings", "get_kline", "get_news"))
+        self.assertEqual(view.provider_call_state, "completed")
+        self.assertEqual(len(view.tool_events), 1)
+        self.assertEqual(view.tool_events[0].tool_name, "get_holdings")
+        self.assertEqual(view.tool_events[0].status, "completed")
+        self.assertEqual(view.tool_events[0].evidence_ids, ("tool:get_holdings:0",))
+        self.assertEqual(len(view.tool_evidence), 1)
+        self.assertEqual(view.accounted_cost_usd, "0.0004")
+
+    def test_preflight_failure_never_starts_provider_or_charges_budget(self) -> None:
+        class UnsafeProvider:
+            available = True
+
+            def validate_request(self, _request: dict) -> None:
+                raise ProviderFailure("provider_request_unsafe", retryable=False)
+
+            def create_response(self, _request: dict) -> dict:
+                raise AssertionError("provider transport must not be reached")
+
+        budget_store = InMemoryAutomaticBriefingStore()
+        policy = BriefingBudgetPolicy(
+            usd_to_cny=Decimal("7.20"),
+            fx_snapshot="test",
+            target_cny=Decimal("0.50"),
+            soft_limit_cny=Decimal("1.00"),
+            hard_limit_cny=Decimal("5.00"),
+        ).store_policy()
+        guard = ActiveAnalysisBudgetGuard(store=budget_store, policy=policy)
+        workspace = make_workspace(
+            UnsafeProvider(),
+            daily_budget_guard=guard,
+        )
+        receipt = workspace.prepare(
+            ACTOR,
+            AnalysisIntent(question="NVDA 怎么看？", subject_ids=("NVDA",)),
+            idempotency_key="idem-preflight-1",
+        )
+        queued = workspace.start(
+            ACTOR,
+            draft_id=receipt.draft_id,
+            preview_sha256=receipt.preview_sha256,
+            idempotency_key="idem-preflight-2",
+        )
+
+        view = workspace.run_next(worker_id="worker-1")
+
+        self.assertEqual(view.status, "failed")
+        self.assertEqual(view.failure_code, "provider_request_unsafe")
+        self.assertEqual(view.provider_call_state, "not_started")
+        self.assertEqual(view.accounted_cost_usd, "0")
+        self.assertIsNone(
+            budget_store.get(
+                actor_id=ACTOR.actor_id,
+                trigger_key=f"active-analysis:{queued.run_id}",
+            )
+        )
 
     def test_run_next_provider_failure_records_code(self) -> None:
         provider = ScriptedAgentProvider(
@@ -176,6 +241,9 @@ class AgentAnalysisWorkspaceTest(unittest.TestCase):
         view = workspace.run_next(worker_id="worker-1")
         self.assertEqual(view.status, "failed")
         self.assertEqual(view.failure_code, "agent_tool_rounds_exceeded")
+        self.assertEqual(view.provider_call_state, "outcome_unknown")
+        self.assertEqual(len(view.tool_events), 5)
+        self.assertEqual(len(view.tool_evidence), 5)
 
 
 if __name__ == "__main__":

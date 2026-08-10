@@ -18,6 +18,7 @@ from typing import Any, Callable
 from ..analysis import (
     AnalysisClaim,
     AnalysisIntent,
+    AnalysisToolEvent,
     AnalysisUsage,
     DEEPSEEK_CACHE_MISS_USD_PER_MILLION,
     DEEPSEEK_MAX_OUTPUT_TOKENS,
@@ -103,7 +104,7 @@ class AgentRuntime:
                     ),
                 },
             ],
-            "tools": self.tool_schemas(),
+            "tools": list(self.tool_schemas()),
             "max_tokens": DEEPSEEK_MAX_OUTPUT_TOKENS,
             "stream": False,
             "thinking": {"type": "disabled"},
@@ -127,6 +128,34 @@ class AgentRuntime:
             ) / million
         return total.quantize(Decimal("0.0000001"))
 
+    def validate(self, intent: AnalysisIntent) -> None:
+        validator = getattr(self._provider, "validate_request", None)
+        if validator is None:
+            return
+        validator(
+            {
+                "model": self._model,
+                "messages": [
+                    {"role": "system", "content": self._system_prompt()},
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "question": intent.question,
+                                "subject_ids": list(intent.subject_ids),
+                            },
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        ),
+                    },
+                ],
+                "tools": list(self.tool_schemas()),
+                "max_tokens": DEEPSEEK_MAX_OUTPUT_TOKENS,
+                "stream": False,
+                "thinking": {"type": "disabled"},
+            }
+        )
+
     def run(
         self,
         *,
@@ -134,8 +163,11 @@ class AgentRuntime:
         intent: AnalysisIntent,
         spend_before: Decimal,
         heartbeat: Callable[[], None] | None = None,
+        audit: Callable[[AnalysisToolEvent, tuple[FrozenEvidence, ...]], None]
+        | None = None,
     ) -> AgentTurnResult:
         heartbeat = heartbeat or (lambda: None)
+        audit = audit or (lambda _event, _evidence: None)
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": self._system_prompt()},
             {
@@ -154,6 +186,7 @@ class AgentRuntime:
         total_cost = Decimal("0")
         usage_accumulated: AnalysisUsage | None = None
         tool_evidence: list[FrozenEvidence] = []
+        tool_events: list[AnalysisToolEvent] = []
         for round_index in range(1, self._max_tool_rounds + 1):
             heartbeat()
             projected = spend_before + total_cost
@@ -163,7 +196,7 @@ class AgentRuntime:
                 {
                     "model": self._model,
                     "messages": list(messages),
-                    "tools": schemas,
+                    "tools": list(schemas),
                     "max_tokens": DEEPSEEK_MAX_OUTPUT_TOKENS,
                     "stream": False,
                     "thinking": {"type": "disabled"},
@@ -187,6 +220,7 @@ class AgentRuntime:
                     cost_usd=format(total_cost, "f"),
                     rounds=round_index,
                     tool_evidence=tuple(tool_evidence),
+                    tool_events=tuple(tool_events),
                 )
             if len(tool_calls) > AGENT_MAX_TOOL_CALLS_PER_ROUND:
                 raise ProviderFailure("provider_tool_calls_invalid", retryable=False)
@@ -259,10 +293,30 @@ class AgentRuntime:
                         ),
                     )
                     tool_evidence.extend(evidence)
+                    tool_events.append(
+                        AnalysisToolEvent(
+                            sequence=len(tool_events) + 1,
+                            tool_name=call["name"],
+                            tool_call_id=call["id"],
+                            status="completed",
+                            evidence_ids=tuple(item.evidence_id for item in evidence),
+                        )
+                    )
+                    audit(tool_events[-1], tuple(evidence))
                 else:
                     payload = json.dumps(
                         {"ok": False, "error": result.error}, ensure_ascii=False
                     )
+                    tool_events.append(
+                        AnalysisToolEvent(
+                            sequence=len(tool_events) + 1,
+                            tool_name=call["name"],
+                            tool_call_id=call["id"],
+                            status="failed",
+                            error_code=result.error,
+                        )
+                    )
+                    audit(tool_events[-1], ())
                 heartbeat()
                 messages.append(
                     {

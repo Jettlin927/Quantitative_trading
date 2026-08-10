@@ -22,6 +22,8 @@ from ..analysis import (
     AnalysisIntent,
     AnalysisRunView,
     AnalysisStore,
+    AnalysisToolEvent,
+    FrozenEvidence,
     AnalysisWorkspace,
     ProviderFailure,
     StoredAnalysisDraft,
@@ -184,7 +186,19 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
         spend_before = self._monthly_spend_reader(
             PersonalActor(actor_id=draft.actor_id), self._clock()
         )
-        current_run = validating
+        current_run = replace(
+            validating,
+            view=replace(
+                validating.view,
+                provider_call_state="started",
+                accounted_cost_usd=(
+                    validating.view.estimated_cost_usd
+                    if budget_reservation is not None
+                    else None
+                ),
+            ),
+        )
+        self._store.save_run(current_run)
 
         def heartbeat() -> None:
             nonlocal current_run
@@ -200,12 +214,27 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
                     now=now,
                 )
 
+        def audit(
+            event: AnalysisToolEvent, evidence: tuple[FrozenEvidence, ...]
+        ) -> None:
+            nonlocal current_run
+            current_run = replace(
+                current_run,
+                view=replace(
+                    current_run.view,
+                    tool_events=(*current_run.view.tool_events, event),
+                    tool_evidence=(*current_run.view.tool_evidence, *evidence),
+                ),
+            )
+            self._store.save_run(current_run)
+
         try:
             result = self._runtime.run(
                 actor_id=draft.actor_id,
                 intent=draft.intent,
                 spend_before=spend_before,
                 heartbeat=heartbeat,
+                audit=audit,
             )
         except ProviderFailure as exc:
             if budget_reservation is not None:
@@ -215,7 +244,11 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
                     failure_code=exc.code,
                     now=self._clock(),
                 )
-            return self._fail_run(validating, exc.code)
+            failed = replace(
+                current_run,
+                view=replace(current_run.view, provider_call_state="outcome_unknown"),
+            )
+            return self._fail_run(failed, exc.code)
         except ValueError as exc:
             if budget_reservation is not None:
                 self._daily_budget_guard.mark_outcome_unknown(
@@ -224,7 +257,11 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
                     failure_code=str(exc),
                     now=self._clock(),
                 )
-            return self._fail_run(validating, str(exc))
+            failed = replace(
+                current_run,
+                view=replace(current_run.view, provider_call_state="outcome_unknown"),
+            )
+            return self._fail_run(failed, str(exc))
         if budget_reservation is not None:
             from ..automatic_briefing_store import BriefingCost
 
@@ -240,7 +277,7 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
                 ),
                 now=self._clock(),
             )
-        completed = _append_event(validating, "completed", "completed", self._clock())
+        completed = _append_event(current_run, "completed", "completed", self._clock())
         completed = replace(
             completed,
             lease_owner=None,
@@ -252,9 +289,18 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
                 usage=result.usage,
                 failure_code=None,
                 cancellable=False,
+                provider_call_state="completed",
+                accounted_cost_usd=result.cost_usd,
+                tool_events=result.tool_events,
+                tool_evidence=result.tool_evidence,
             ),
         )
         return self._store.save_run(completed).view
+
+    def _preflight_provider(
+        self, draft: StoredAnalysisDraft, run: StoredAnalysisRun
+    ) -> None:
+        self._runtime.validate(draft.intent)
 
 
 def build_agent_workspace(

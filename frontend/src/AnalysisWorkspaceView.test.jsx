@@ -189,4 +189,30 @@ describe('AI 影响分析工作台', () => {
     expect(screen.getAllByText('失效：新增官方披露')).toHaveLength(4)
   })
 
+  it('运行详情展示问题、外发状态、工具证据与三种费用口径', async () => {
+    const client = {
+      prepareAnalysis: vi.fn(), startAnalysis: vi.fn(), cancelAnalysis: vi.fn(),
+      openAnalysis: vi.fn().mockResolvedValue({
+        run_id: 'run-audit', status: 'completed', stage: 'completed',
+        question: 'GOOGL 当前事实如何影响公司？', subject_ids: ['GOOGL'],
+        planned_tools: ['get_holdings', 'get_kline', 'get_news'],
+        provider_call_state: 'completed', estimated_cost_usd: '0.5661411',
+        actual_cost_usd: '0.00012', accounted_cost_usd: '0.00012',
+        claims: [], events: [],
+        tool_events: [{ sequence: 1, tool_name: 'get_news', tool_call_id: 'call-1', status: 'completed', evidence_ids: ['tool:get_news:0'], error_code: null }],
+        tool_evidence: [{ evidence_id: 'tool:get_news:0', kind: 'tool_output', source: 'agent_tool:get_news', field: 'tool_result', excerpt: '{"headline":"公开事实"}', content_sha256: 'abc', as_of: '2026-08-10T13:14:54Z' }],
+      }),
+    }
+    render(<AnalysisWorkspaceView client={client} subjectId="GOOGL" initialRunId="run-audit" />)
+
+    expect(await screen.findByText('GOOGL 当前事实如何影响公司？')).toBeInTheDocument()
+    expect(screen.getByText('GOOGL')).toBeInTheDocument()
+    expect(screen.getByText(/已外发并完成/)).toBeInTheDocument()
+    expect(screen.getByText(/查产业新闻/)).toBeInTheDocument()
+    expect(screen.getAllByText(/tool:get_news:0/)).toHaveLength(2)
+    expect(screen.getByText(/预留上界 \$0.5661411/)).toBeInTheDocument()
+    expect(screen.getByText(/实际 \$0.00012/)).toBeInTheDocument()
+    expect(screen.getByText(/账本 \$0.00012/)).toBeInTheDocument()
+  })
+
 })
