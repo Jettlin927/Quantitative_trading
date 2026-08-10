@@ -221,6 +221,19 @@ class AnalysisRunView:
 
 
 @dataclass(frozen=True)
+class AnalysisRunSummary:
+    run_id: str
+    status: str
+    provider: str
+    model: str
+    actual_cost_usd: str | None
+    failure_code: str | None
+    question: str | None
+    subject_ids: tuple[str, ...]
+    provider_call_state: str
+
+
+@dataclass(frozen=True)
 class StoredAnalysisDraft:
     actor_id: str
     idempotency_key: str
@@ -1456,9 +1469,21 @@ class AnalysisWorkspace:
             raise ValueError("private_object_not_found")
         return run.view
 
-    def history(self, actor: PersonalActor, *, limit: int = 20) -> tuple[AnalysisRunView, ...]:
+    def history(
+        self, actor: PersonalActor, *, limit: int = 20
+    ) -> tuple[AnalysisRunSummary, ...]:
         return tuple(
-            replace(run.view, tool_evidence=())
+            AnalysisRunSummary(
+                run_id=run.view.run_id,
+                status=run.view.status,
+                provider=run.view.provider,
+                model=run.view.model,
+                actual_cost_usd=run.view.actual_cost_usd,
+                failure_code=run.view.failure_code,
+                question=run.view.question,
+                subject_ids=run.view.subject_ids,
+                provider_call_state=run.view.provider_call_state,
+            )
             for run in self._store.list_runs(actor.actor_id, limit=limit)
         )
 

@@ -211,7 +211,12 @@ class AgentAnalysisWorkspaceTest(unittest.TestCase):
         )
 
     def test_monthly_budget_drift_is_blocked_before_daily_reservation(self) -> None:
-        spend = {"value": Decimal("0")}
+        spend = {"value": Decimal("0"), "reads": 0}
+
+        def read_spend(_actor, _now):
+            spend["reads"] += 1
+            return spend["value"]
+
         budget_store = InMemoryAutomaticBriefingStore()
         guard = ActiveAnalysisBudgetGuard(
             store=budget_store,
@@ -228,7 +233,7 @@ class AgentAnalysisWorkspaceTest(unittest.TestCase):
             provider,
             budget="25",
             daily_budget_guard=guard,
-            monthly_spend_reader=lambda _actor, _now: spend["value"],
+            monthly_spend_reader=read_spend,
         )
         receipt = workspace.prepare(
             ACTOR,
@@ -249,6 +254,7 @@ class AgentAnalysisWorkspaceTest(unittest.TestCase):
         self.assertEqual(view.provider_call_state, "not_started")
         self.assertEqual(view.accounted_cost_usd, "0")
         self.assertEqual(provider.captured_requests, [])
+        self.assertEqual(spend["reads"], 2)
         self.assertIsNone(
             budget_store.get(
                 actor_id=ACTOR.actor_id,

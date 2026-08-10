@@ -107,7 +107,6 @@ class AgentRuntimeTest(unittest.TestCase):
         result = runtime.run(
             actor_id="actor-1",
             intent=make_intent(),
-            spend_before=Decimal("0"),
         )
 
         self.assertEqual(len(result.claims), 4)
@@ -128,7 +127,7 @@ class AgentRuntimeTest(unittest.TestCase):
             ]
         )
         runtime = make_runtime(provider, (make_tool("get_holdings"),))
-        result = runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0"))
+        result = runtime.run(actor_id="actor-1", intent=make_intent())
         self.assertEqual(len(result.claims), 4)
         self.assertEqual(result.rounds, 2)
         self.assertEqual(result.cost_usd, "0.0004")
@@ -168,7 +167,7 @@ class AgentRuntimeTest(unittest.TestCase):
         runtime = make_runtime(
             provider, (make_tool("get_holdings"), make_tool("get_kline"))
         )
-        result = runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0"))
+        result = runtime.run(actor_id="actor-1", intent=make_intent())
         self.assertEqual(result.rounds, 2)
         self.assertEqual(
             [item.evidence_id for item in result.tool_evidence],
@@ -192,7 +191,7 @@ class AgentRuntimeTest(unittest.TestCase):
             provider,
             (make_tool("get_holdings", handler=failing), make_tool("get_news")),
         )
-        result = runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0"))
+        result = runtime.run(actor_id="actor-1", intent=make_intent())
         self.assertEqual(result.rounds, 3)
         failure_message = provider.captured_requests[1]["messages"][3]
         self.assertEqual(json.loads(failure_message["content"])["ok"], False)
@@ -209,7 +208,7 @@ class AgentRuntimeTest(unittest.TestCase):
             ]
         )
         runtime = make_runtime(provider, (make_tool("get_holdings"),))
-        result = runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0"))
+        result = runtime.run(actor_id="actor-1", intent=make_intent())
         self.assertEqual(result.rounds, 3)
         unknown_tool_message = provider.captured_requests[1]["messages"][3]
         self.assertEqual(
@@ -222,7 +221,7 @@ class AgentRuntimeTest(unittest.TestCase):
         )
         runtime = make_runtime(provider, (make_tool("get_holdings"),))
         with self.assertRaisesRegex(ProviderFailure, "agent_tool_rounds_exceeded"):
-            runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0"))
+            runtime.run(actor_id="actor-1", intent=make_intent())
 
     def test_budget_blocked_mid_loop(self) -> None:
         provider = ScriptedAgentProvider(
@@ -234,13 +233,13 @@ class AgentRuntimeTest(unittest.TestCase):
             budget="0.0002",
         )
         with self.assertRaisesRegex(ProviderFailure, "budget_blocked"):
-            runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0.0001"))
+            runtime.validate(intent=make_intent(), spend_before=Decimal("0.0001"))
 
     def test_invalid_final_json_fails(self) -> None:
         provider = ScriptedAgentProvider([completed_response(content="不是 JSON")])
         runtime = make_runtime(provider, (make_tool("get_holdings"),))
         with self.assertRaisesRegex(ProviderFailure, "provider_content_invalid_json"):
-            runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0"))
+            runtime.run(actor_id="actor-1", intent=make_intent())
 
     def test_fenced_json_is_accepted(self) -> None:
         provider = ScriptedAgentProvider(
@@ -250,14 +249,14 @@ class AgentRuntimeTest(unittest.TestCase):
             ]
         )
         runtime = make_runtime(provider, (make_tool("get_holdings"),))
-        result = runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0"))
+        result = runtime.run(actor_id="actor-1", intent=make_intent())
         self.assertEqual(len(result.claims), 4)
 
     def test_refusal_fails(self) -> None:
         provider = ScriptedAgentProvider([{"status": "refusal", "message": {"content": None, "tool_calls": ()}}])
         runtime = make_runtime(provider, (make_tool("get_holdings"),))
         with self.assertRaisesRegex(ProviderFailure, "provider_refusal"):
-            runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0"))
+            runtime.run(actor_id="actor-1", intent=make_intent())
 
     def test_claims_citing_unknown_evidence_are_rejected(self) -> None:
         content = claims_content(evidence_id="tool:get_holdings:9")  # 不存在该证据
@@ -269,7 +268,7 @@ class AgentRuntimeTest(unittest.TestCase):
         )
         runtime = make_runtime(provider, (make_tool("get_holdings"),))
         with self.assertRaisesRegex(ProviderFailure, "claim_evidence_invalid"):
-            runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0"))
+            runtime.run(actor_id="actor-1", intent=make_intent())
 
     def test_skill_prompt_is_injected(self) -> None:
         skill = Skill(
@@ -286,7 +285,7 @@ class AgentRuntimeTest(unittest.TestCase):
             ]
         )
         runtime = make_runtime(provider, (make_tool("get_holdings"),), skills=(skill,))
-        runtime.run(actor_id="actor-1", intent=make_intent(), spend_before=Decimal("0"))
+        runtime.run(actor_id="actor-1", intent=make_intent())
         system_prompt = provider.captured_requests[0]["messages"][0]["content"]
         self.assertIn("请先查看持仓。", system_prompt)
         self.assertIn("不得输出买卖评级", system_prompt)
@@ -314,7 +313,6 @@ class AgentRuntimeTest(unittest.TestCase):
         result = runtime.run(
             actor_id="actor-1",
             intent=make_intent(),
-            spend_before=Decimal("0"),
             heartbeat=heartbeat,
         )
 
@@ -343,7 +341,6 @@ class AgentRuntimeTest(unittest.TestCase):
             runtime.run(
                 actor_id="actor-1",
                 intent=make_intent(),
-                spend_before=Decimal("0"),
             )
 
 

@@ -154,7 +154,20 @@ class PersonalAnalysisApiTest(unittest.TestCase):
         self.assertEqual(history.json()[0]["run_id"], run_id)
         self.assertEqual(history.json()[0]["status"], "completed")
         self.assertEqual(history.json()[0]["question"], "官方事实可能如何影响公司？")
-        self.assertEqual(history.json()[0]["tool_evidence"], [])
+        self.assertEqual(
+            set(history.json()[0]),
+            {
+                "run_id",
+                "status",
+                "provider",
+                "model",
+                "actual_cost_usd",
+                "failure_code",
+                "question",
+                "subject_ids",
+                "provider_call_state",
+            },
+        )
 
     def test_cancel_and_stable_preview_error_mapping(self) -> None:
         prepared = self.client.post(

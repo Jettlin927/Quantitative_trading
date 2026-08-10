@@ -183,9 +183,6 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
         *,
         budget_reservation: Any | None = None,
     ) -> AnalysisRunView | None:
-        spend_before = self._monthly_spend_reader(
-            PersonalActor(actor_id=draft.actor_id), self._clock()
-        )
         current_run = replace(
             validating,
             view=replace(
@@ -232,7 +229,6 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
             result = self._runtime.run(
                 actor_id=draft.actor_id,
                 intent=draft.intent,
-                spend_before=spend_before,
                 heartbeat=heartbeat,
                 audit=audit,
             )

@@ -2,7 +2,7 @@
 
 循环语义：system + user → 模型可连续发起 tool_calls → 服务端带 actor 上下文执行
 工具 → 结果作为 tool 消息回灌 → 直到模型输出最终 JSON claims 或达到最大轮数。
-每轮都累计 usage/cost 并做月度软预算检查；工具结果包装为带 evidence_id 的可引用
+每轮都累计 usage/cost；月度软预算在外发前的 workspace preflight 冻结检查。工具结果包装为带 evidence_id 的可引用
 证据，最终 claims 校验复用单发路径的 _validate_response 契约。
 """
 
@@ -151,7 +151,6 @@ class AgentRuntime:
         *,
         actor_id: str,
         intent: AnalysisIntent,
-        spend_before: Decimal,
         heartbeat: Callable[[], None] | None = None,
         audit: Callable[[AnalysisToolEvent, tuple[FrozenEvidence, ...]], None]
         | None = None,
@@ -165,11 +164,6 @@ class AgentRuntime:
         tool_events: list[AnalysisToolEvent] = []
         for round_index in range(1, self._max_tool_rounds + 1):
             heartbeat()
-            projected = spend_before + total_cost
-            if projected > self._monthly_soft_budget_usd:
-                raise _known_failure(
-                    "budget_blocked", usage_accumulated, total_cost
-                )
             response = self._provider.create_response(
                 self._request(intent, messages=messages)
             )
