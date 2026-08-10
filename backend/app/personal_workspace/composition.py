@@ -46,6 +46,12 @@ from .watchlist import (
     InstrumentStateBook,
     PostgresInstrumentStateStore,
 )
+from .agent.domain_tools import DomainToolMetrics, DomainToolRegistry
+from .agent.today_tools import (
+    AiContextMarketDossierReader,
+    InvestmentNewsStructuredSource,
+    TodayDomainTools,
+)
 
 
 @dataclass(frozen=True)
@@ -62,6 +68,8 @@ class PersonalServices:
     instruments: InstrumentWorkbench
     analysis_store: PostgresAnalysisStore
     news_reader: Any | None
+    domain_tools: DomainToolRegistry
+    domain_tool_metrics: DomainToolMetrics
 
 
 def build_personal_services(
@@ -137,6 +145,17 @@ def build_personal_services(
         from .agent.tools_impl.news import InvestmentNewsReader
 
         news_reader = InvestmentNewsReader(Path(news_dir))
+    domain_tool_metrics = DomainToolMetrics()
+    today_domain_tools = TodayDomainTools(
+        portfolio_store=portfolio_store,
+        watchlist=watchlist,
+        news_source=(
+            InvestmentNewsStructuredSource(news_reader)
+            if news_reader is not None
+            else None
+        ),
+        dossier_reader=AiContextMarketDossierReader(market_readers.market),
+    )
     return PersonalServices(
         session_factory=session_factory,
         cipher=cipher,
@@ -148,6 +167,10 @@ def build_personal_services(
         instruments=instruments,
         analysis_store=PostgresAnalysisStore(session_factory, cipher=cipher),
         news_reader=news_reader,
+        domain_tools=today_domain_tools.registry(
+            observation_recorder=domain_tool_metrics.record
+        ),
+        domain_tool_metrics=domain_tool_metrics,
     )
 
 
