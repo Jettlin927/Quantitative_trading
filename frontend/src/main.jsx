@@ -6,16 +6,17 @@ import {
   ChevronRight,
   Clock3,
   Database,
+  Eye,
   Globe2,
   LayoutDashboard,
   RefreshCw,
   Server,
 } from 'lucide-react'
-import { AnalysisWorkspaceView } from './AnalysisWorkspaceView.jsx'
 import { OperationsView } from './OperationsView.jsx'
 import { InstrumentWorkspaceView } from './InstrumentWorkspaceView.jsx'
 import { PersonalTodayView } from './PersonalTodayView.jsx'
 import { PortfolioView } from './PortfolioView.jsx'
+import { WatchDiscoveryView } from './WatchDiscoveryView.jsx'
 import { browserPersonalJourneyClient } from './personalJourneyClient.js'
 import { browserReadAdapter, systemClock } from './readAdapter.js'
 import { Notice, translateStatus } from './viewSupport.jsx'
@@ -24,6 +25,7 @@ import './styles.css'
 const NAV_ITEMS = [
   { id: 'today', path: '/today', label: '今日工作台', eyebrow: '持仓事项优先', icon: LayoutDashboard },
   { id: 'portfolio', path: '/portfolio', label: '我的持仓', eyebrow: '私有手工账本', icon: BriefcaseBusiness },
+  { id: 'watch', path: '/watch', label: '关注与发现', eyebrow: '自选与证据候选', icon: Eye },
   { id: 'markets', path: '/markets/us', label: '市场与标的', eyebrow: '标的与证据', icon: Globe2 },
   { id: 'system', path: '/system', label: '数据与系统', eyebrow: '授权与健康', icon: Server },
 ]
@@ -75,8 +77,9 @@ function WorkspaceApp({ readAdapter = browserReadAdapter, personalClient = brows
         <Topbar activeView={activeView} health={health} loading={loading} lastUpdated={lastUpdated} onRefresh={() => refreshAll(true)} />
         <main className="workspace-main">
           {globalError ? <Notice tone="warning" title="部分数据暂不可用" text={globalError} /> : null}
-          {activeView === 'today' ? <div className="today-stack"><PersonalTodayView client={personalClient} chartAdapter={chartAdapter} onNavigate={navigate} /><AnalysisWorkspaceView client={personalClient} subjectId="" /></div> : null}
+          {activeView === 'today' ? <div className="today-stack"><PersonalTodayView client={personalClient} chartAdapter={chartAdapter} onNavigate={navigate} /></div> : null}
           {activeView === 'portfolio' ? <PortfolioView client={personalClient} /> : null}
+          {activeView === 'watch' ? <WatchDiscoveryView client={personalClient} onNavigate={navigate} /> : null}
           {activeView === 'markets' ? <div key={personalInstrumentSymbol(pathname)}><InstrumentWorkspaceView client={personalClient} symbol={personalInstrumentSymbol(pathname)} chartAdapter={chartAdapter} onNavigate={navigate} /></div> : null}
           {activeView === 'system' ? <OperationsView health={health} /> : null}
         </main>
@@ -125,6 +128,7 @@ function routeView(pathname) {
   if (pathname === '/') return 'today'
   if (pathname.startsWith('/today')) return 'today'
   if (pathname.startsWith('/portfolio')) return 'portfolio'
+  if (pathname.startsWith('/watch')) return 'watch'
   if (pathname.startsWith('/markets/a-share')) return 'today'
   if (pathname.startsWith('/markets/')) return 'markets'
   if (pathname.startsWith('/rules')) return 'today'

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, BriefcaseBusiness, Check, Circle, FlaskConical, ShieldX, Triangle, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Bot, BriefcaseBusiness, Check, Circle, Clock3, FlaskConical, ShieldX, Triangle, X } from 'lucide-react'
 
+import { AnalysisWorkspaceView } from './AnalysisWorkspaceView.jsx'
 import { MarketChart } from './MarketChart.jsx'
+import { StateMarks } from './WatchDiscoveryView.jsx'
 
 const RULE_STATES = {
   hit: { label: '命中 ◆', icon: Check },
@@ -10,10 +12,11 @@ const RULE_STATES = {
   calculation_failed: { label: '计算失败 ×', icon: X },
 }
 
-export function PersonalTodayView({ client, chartAdapter, onNavigate = () => {} }) {
+export function PersonalTodayView({ client, chartAdapter = undefined, onNavigate = (_path) => {} }) {
   const [workspace, setWorkspace] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [analysisContext, setAnalysisContext] = useState(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -55,7 +58,8 @@ export function PersonalTodayView({ client, chartAdapter, onNavigate = () => {} 
   }
 
   if (loading) return <section className="personal-empty"><FlaskConical size={22} /><h2>正在读取今日工作台</h2><p>汇总当前组合、行情覆盖和待验证事项。</p></section>
-  const overview = <TodayOverview workspace={workspace} error={error} onNavigate={onNavigate} />
+  if (error && !workspace) return <TodayLoadFailure error={error} />
+  const overview = <TodayDesk workspace={workspace} onNavigate={onNavigate} onAnalyze={setAnalysisContext} />
   if (!trace) return (
     <div className="personal-today enter">
       {overview}
@@ -64,6 +68,7 @@ export function PersonalTodayView({ client, chartAdapter, onNavigate = () => {} 
         <div><strong>合成验收旅程已与真实工作台分开</strong><p>它只验证隐私和降级边界，不再占据每日入口。</p></div>
         {!error && !workspace?.portfolio ? <button onClick={createTrace}>创建合成测试旅程</button> : null}
       </section>
+      {analysisContext ? <div key={analysisContext.contextId} className="context-analysis"><button className="context-close" onClick={() => setAnalysisContext(null)}><X size={14} />关闭上下文分析</button><AnalysisWorkspaceView client={client} subjectId={analysisContext.subjectId} initialQuestion={analysisContext.question} contextLabel={analysisContext.label} /></div> : null}
     </div>
   )
 
@@ -133,34 +138,99 @@ export function PersonalTodayView({ client, chartAdapter, onNavigate = () => {} 
   )
 }
 
-function TodayOverview({ workspace, error, onNavigate }) {
-  const portfolio = workspace?.portfolio
-  const active = portfolio?.holdings?.filter((holding) => holding.state === 'active') || []
-  const covered = active.filter((holding) => holding.market_value?.availability === 'available').length
-  const attention = workspace?.attention_items || []
-  const total = portfolio?.total_equity
+function TodayDesk({ workspace, onNavigate, onAnalyze }) {
+  const model = workspace?.read_model
+  const portfolio = model?.portfolio
+  const attention = model?.attention_items || []
+  const followed = model?.watch_observations || []
+  const candidates = model?.active_candidates || []
+  const facts = model?.fact_events || []
+  const gaps = model?.gaps || []
 
-  return <section className="today-overview" aria-label="今日组合总览">
-    <header className="today-overview-head">
-      <div><span>TODAY / PRIVATE RESEARCH DESK</span><h2>今天先看组合、数据缺口与待验证事项</h2><p>这里汇总需要你处理的事实；不会生成买卖评级或自动发起 AI。</p></div>
-      <div className="today-overview-actions">
-        <button className="primary-action" onClick={() => onNavigate('/portfolio')}><BriefcaseBusiness size={15} />查看全部持仓</button>
-      </div>
+  return <section className="today-desk" aria-label="今日组合总览">
+    <header className="today-masthead">
+      <div><span>TODAY / {periodLabel(model?.period)}</span><h2>今天先处理什么</h2><p>先读可核验事实与缺口，再决定是否需要 AI 解释；这里不生成买卖评级。</p></div>
+      <b>{model?.as_of ? `投影 ${new Date(model.as_of).toLocaleString('zh-CN')}` : '投影时点不可用'}</b>
     </header>
 
-    {error ? <div className="notice error"><AlertTriangle size={16} /><span><b>{error.code || 'personal_request_failed'}</b><small>{error.message}</small></span></div> : null}
+    <div className="today-layout">
+      <div className="today-reading-column">
+        <DeskSection index="01" title="需要处理" meta={`${attention.length} 项`}>
+          {attention.length ? <div className="today-action-list">{attention.map((item) => <article key={item.attention_id}><span className="action-priority">{RULE_STATES[item.result]?.label || item.result}</span><div><strong>{item.symbol} · {item.label}</strong><small>{item.reason_code}</small></div><button onClick={() => onAnalyze({ contextId: `attention-${item.attention_id}`, subjectId: item.symbol, label: `事项 / ${item.symbol}`, question: `${item.symbol} 的“${item.label}”事项有哪些可核验事实、传导机制和未知项？` })}><Bot size={14} />深度分析</button></article>)}</div> : <EmptyLine text="当前没有必须处理的规则命中或数据缺口" />}
+        </DeskSection>
 
-    <div className="today-metric-grid">
-      <article><span>组合总值</span><strong>{total?.availability === 'available' ? `${total.value} USD` : '待行情恢复'}</strong><small>{total?.as_of ? `as-of ${new Date(total.as_of).toLocaleString('zh-CN')}` : '手工事实仍可查看'}</small></article>
-      <article><span>持仓范围</span><strong>{active.length} 个活跃持仓</strong><small>组合修订 R{portfolio?.portfolio_revision ?? 0}</small></article>
-      <article><span>行情覆盖</span><strong>行情覆盖 {covered}/{active.length}</strong><small>{portfolio?.issues?.length ? portfolio.issues.join(' · ') : '当前无来源缺口'}</small></article>
-      <article><span>今日事项</span><strong>{attention.length} 项</strong><small>规则命中与数据缺口分列</small></article>
+        <DeskSection index="02" title="影响持仓的事实变化" meta={`${facts.length} 个去重事件`}>
+          {facts.length ? <div className="fact-ledger">{facts.map((event) => <article key={event.event_id}><header><span>■ 来源摘要 · 待核验</span><time>{formatTime(event.published_at)}</time></header><h3>{event.title}</h3><p>{event.summary}</p><div className="fact-scope"><span>{event.related_symbols?.join(' · ')}</span><small>{event.source} · 抓取 {formatTime(event.fetched_at)}</small></div><footer><a href={event.url} target="_blank" rel="noreferrer">查看来源</a><button onClick={() => onAnalyze({ contextId: `event-${event.event_id}`, subjectId: event.related_symbols?.[0] || portfolio?.active_holding_symbols?.[0] || '', label: '事件 / 待核验摘要', question: `请基于证据核验事件“${event.title}”，并区分确认事实、推断与未知项。` })}><Bot size={14} />分析此事件</button></footer></article>)}</div> : <EmptyLine text="当前没有通过结构化来源进入投影的事件" />}
+          <div className="inference-lane"><header><span>◇ AI 推断</span><b>与事实分栏</b></header><p>尚未生成上下文解释。只有从标的、事件或事项主动进入后，才展示带证据引用的推断。</p></div>
+        </DeskSection>
+
+        <div className="today-observation-grid">
+          <DeskSection index="03" title="自选观察" meta={`${followed.length} 个`}>
+            {followed.length ? <InstrumentRows items={followed} onNavigate={onNavigate} onAnalyze={onAnalyze} /> : <EmptyLine text="尚无非持仓自选" />}
+          </DeskSection>
+          <DeskSection index="04" title="AI 候选" meta={`${candidates.length} 个`}>
+            {candidates.length ? <InstrumentRows items={candidates} onNavigate={onNavigate} onAnalyze={onAnalyze} /> : <EmptyLine text="没有满足关系证据与近期事实门槛的候选" />}
+          </DeskSection>
+        </div>
+
+        <DeskSection index="05" title="数据状态" meta={statusLabel(model?.status)}>
+          <div className={`today-source-state ${model?.status || 'unavailable'}`}><Clock3 size={17} /><span><strong>{statusLabel(model?.status)}</strong><small>证据覆盖 {model?.field_coverage ?? '—'} · 新鲜度 {model?.freshness_seconds == null ? '—' : `${model.freshness_seconds}s`}</small></span></div>
+          {gaps.length ? <ul className="today-gaps">{gaps.map((gap) => <li key={`${gap.code}-${gap.subject}`}>{gap.code} · {gap.subject}</li>)}</ul> : null}
+        </DeskSection>
+      </div>
+
+      <PortfolioFloatCard portfolio={portfolio} onNavigate={onNavigate} />
     </div>
-
-    {active.length ? <div className="today-holding-strip" aria-label="活跃持仓快捷入口">{active.map((holding) => <button key={holding.holding_id} onClick={() => onNavigate(`/markets/us/${encodeURIComponent(holding.symbol)}`)}><span>{holding.symbol}</span><small>{holding.name}</small><ArrowRight size={14} /></button>)}</div> : <p className="today-empty-note">尚无活跃持仓；先在“我的持仓”维护手工事实。</p>}
-
-    {attention.length ? <section className="today-attention-ledger"><header><span>ATTENTION LEDGER</span><b>{attention.length}</b></header><div>{attention.map((item) => <article key={item.attention_id}><strong>{RULE_STATES[item.result]?.label || item.result}</strong><span>{item.symbol} · {item.label}</span><small>{item.reason_code}</small></article>)}</div></section> : null}
   </section>
+}
+
+function DeskSection({ index, title, meta, children }) {
+  return <section className="desk-section"><header><span>{index}</span><h3>{title}</h3><b>{meta}</b></header>{children}</section>
+}
+
+function InstrumentRows({ items, onNavigate, onAnalyze }) {
+  return <div className="instrument-rows">{items.map((item) => <article key={item.symbol}><div><strong>{item.symbol}</strong><StateMarks item={item} /></div><small>{item.preset_reasons?.join(' · ') || item.custom_reason || '证据关系观察'}</small><footer><button onClick={() => onNavigate(`/markets/us/${encodeURIComponent(item.symbol)}`)}>进入标的</button><button onClick={() => onAnalyze({ contextId: `instrument-${item.symbol}`, subjectId: item.symbol, label: `标的 / ${item.symbol}`, question: `${item.symbol} 当前有哪些可核验事实、影响机制与证据缺口？` })}><Bot size={13} />深度分析</button></footer></article>)}</div>
+}
+
+function PortfolioFloatCard({ portfolio, onNavigate }) {
+  const snapshots = portfolio?.equity_snapshots || []
+  return <aside className="portfolio-float" aria-label="悬浮组合卡">
+    <header><span>PORTFOLIO / PRIVATE</span><BriefcaseBusiness size={18} /></header>
+    <strong className="portfolio-total">{portfolio?.total_equity_availability === 'available' ? `$${portfolio.total_equity_value}` : '估值不可用'}</strong>
+    <small>{portfolio?.total_equity_as_of ? `as-of ${formatTime(portfolio.total_equity_as_of)}` : '缺少可用行情时点'}</small>
+    <div className="equity-window"><header><span>近期权益波动</span><b>最近 {snapshots.length} 个真实快照</b></header>{portfolio?.equity_snapshot_status === 'available' ? <EquitySparkline snapshots={snapshots} /> : <p>{portfolio?.equity_snapshot_status === 'failed' ? '权益快照读取失败，未伪装为空。' : '快照不足，不用现价拼接伪历史。'}</p>}</div>
+    <dl><div><dt>活跃持仓</dt><dd>{portfolio?.active_holding_count ?? 0}</dd></div><div><dt>行情覆盖</dt><dd>{portfolio?.priced_holding_count ?? 0}/{portfolio?.active_holding_count ?? 0}</dd></div><div><dt>组合修订</dt><dd>R{portfolio?.portfolio_revision ?? 0}</dd></div></dl>
+    <button className="primary-action" onClick={() => onNavigate('/portfolio')}>查看全部持仓<ArrowRight size={14} /></button>
+  </aside>
+}
+
+function EquitySparkline({ snapshots }) {
+  const values = snapshots.map((item) => Number(item.total_equity)).filter(Number.isFinite)
+  const minimum = Math.min(...values)
+  const maximum = Math.max(...values)
+  const spread = maximum - minimum || 1
+  const points = values.map((value, index) => `${(index / Math.max(values.length - 1, 1)) * 180},${54 - ((value - minimum) / spread) * 44}`).join(' ')
+  return <svg className="equity-sparkline" viewBox="0 0 180 64" role="img" aria-label={`最近 ${values.length} 个真实权益快照波动图`}><polyline points={points} /></svg>
+}
+
+function EmptyLine({ text }) {
+  return <div className="today-empty-line"><Circle size={15} /><span>{text}</span></div>
+}
+
+function TodayLoadFailure({ error }) {
+  return <section className="personal-empty today-load-failure" role="status"><AlertTriangle size={22} /><h2>{error.code === 'personal_access_denied' ? '来源未授权' : '今日投影读取失败'}</h2><p>{error.message || error.code}</p><small>未知状态不会显示为空工作台。</small></section>
+}
+
+function periodLabel(period) {
+  return ({ pre_market: '盘前', regular: '盘中', after_hours: '盘后', market_closed: '休市' })[period] || '当前时段'
+}
+
+function statusLabel(status) {
+  return ({ success: '正常', partial: '部分数据', stale: '来源过期', unavailable: '来源不可用', failed: '读取失败' })[status] || '来源不可用'
+}
+
+function formatTime(value) {
+  return value ? new Date(value).toLocaleString('zh-CN') : '时点不可用'
 }
 
 export function PersonalPlaceholder({ title, description }) {

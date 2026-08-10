@@ -75,6 +75,17 @@ describe('个人美股 synthetic tracer', () => {
         trace: null,
         portfolio,
         attention_items: [{ attention_id: 'attention-1', symbol: 'BETA', label: '行情待恢复', result: 'insufficient_data', reason_code: 'provider_unavailable' }],
+        read_model: {
+          status: 'unavailable', as_of: null, period: null,
+          attention_items: [{ attention_id: 'attention-1', symbol: 'BETA', label: '行情待恢复', result: 'insufficient_data', reason_code: 'provider_unavailable' }],
+          fact_events: [], watch_observations: [], active_candidates: [], archived_candidates: [],
+          gaps: [{ code: 'market_provider_unavailable', subject: 'portfolio' }], field_coverage: null, freshness_seconds: null,
+          portfolio: {
+            portfolio_revision: 7, total_equity_availability: 'not_available', total_equity_value: null, total_equity_as_of: null,
+            active_holding_count: 2, active_holding_symbols: ['ACME', 'BETA'], priced_holding_count: 1,
+            issues: ['provider_unavailable'], equity_snapshot_status: 'unavailable', equity_snapshots: [],
+          },
+        },
       })),
       openPortfolio: vi.fn(() => Promise.resolve(portfolio)),
     }
@@ -82,9 +93,9 @@ describe('个人美股 synthetic tracer', () => {
     render(<App initialPath="/today" readAdapter={noOpReadAdapter} personalClient={personalClient} />)
 
     expect(await screen.findByRole('heading', { name: '今日工作台' })).toBeInTheDocument()
-    expect(screen.getByText('今天先看组合、数据缺口与待验证事项')).toBeInTheDocument()
-    expect(screen.getByText('2 个活跃持仓')).toBeInTheDocument()
-    expect(screen.getByText('行情覆盖 1/2')).toBeInTheDocument()
+    expect(screen.getByText('今天先处理什么')).toBeInTheDocument()
+    expect(screen.getByLabelText('悬浮组合卡')).toHaveTextContent('活跃持仓2')
+    expect(screen.getByLabelText('悬浮组合卡')).toHaveTextContent('行情覆盖1/2')
     expect(screen.getByText('BETA · 行情待恢复')).toBeInTheDocument()
     expect(screen.queryByText('合成信任纵切尚未创建')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '查看观察规则' })).not.toBeInTheDocument()
@@ -93,11 +104,11 @@ describe('个人美股 synthetic tracer', () => {
     expect(await screen.findByRole('heading', { name: '手工美股持仓' })).toBeInTheDocument()
   })
 
-  it('标准 URL 四区路由以 /today 为根，只保留美股工作区入口', () => {
+  it('标准 URL 五区路由以 /today 为根，只保留美股工作区入口', () => {
     const personalClient = { openToday: vi.fn(() => Promise.resolve({ trace })) }
     render(<App readAdapter={noOpReadAdapter} personalClient={personalClient} />)
 
-    for (const name of ['今日工作台', '我的持仓', '市场与标的', '数据与系统']) {
+    for (const name of ['今日工作台', '我的持仓', '关注与发现', '市场与标的', '数据与系统']) {
       expect(screen.getByRole('button', { name: new RegExp(name) })).toBeInTheDocument()
     }
     expect(screen.queryByRole('button', { name: /规则与策略|研究记录|研究驾驶舱|A 股数据|美股数据/ })).not.toBeInTheDocument()

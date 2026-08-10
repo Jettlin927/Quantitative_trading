@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from decimal import Decimal
 from functools import lru_cache
 from hashlib import sha256
@@ -7,8 +8,15 @@ import os
 from pathlib import Path
 
 from .analysis import ScriptedResponsesAdapter
+from .agent.domain_tools import DomainToolContext
 from .composition import build_analysis_workspace, build_personal_services
-from .contracts import LOCAL_PERSONAL_ACTOR
+from .contracts import (
+    LOCAL_PERSONAL_ACTOR,
+    TodayContextView,
+    TodayEvidenceView,
+    TodayFactEventView,
+    TodayGapView,
+)
 from .crypto import load_keyring_file
 from .journey import PersonalResearchJourney
 from .official_evidence_runtime import load_official_analysis_evidence_reader
@@ -90,6 +98,23 @@ def get_personal_runtime() -> PersonalRuntime:
             adapters=SyntheticWorkspaceAdapters(provider_available=provider_available),
             portfolio=services.portfolio,
             rulebook=services.rules,
+            instrument_states_reader=services.watchlist.open,
+            today_context_reader=lambda request_actor: _today_context_view(
+                services.domain_tools.invoke(
+                    "get_today_context",
+                    context=DomainToolContext(
+                        actor_id=request_actor.actor_id,
+                        granted_permissions=frozenset(
+                            {"portfolio:read", "market:read", "news:read"}
+                        ),
+                        clock=lambda: datetime.now(timezone.utc),
+                    ),
+                    arguments={},
+                )
+            ),
+            equity_history_reader=lambda request_actor: services.portfolio.equity_history(
+                request_actor, limit=30
+            ),
         ),
         portfolio=services.portfolio,
         watchlist=services.watchlist,
@@ -99,4 +124,45 @@ def get_personal_runtime() -> PersonalRuntime:
         analysis_provider=personal_analysis_provider,
         analysis_dispatch_enabled=provider_available,
         analysis_disabled_reason=None if provider_available else "provider_disabled",
+    )
+
+
+def _today_context_view(result) -> TodayContextView:
+    data = result.data
+    return TodayContextView(
+        status=result.status,
+        as_of=data.get("as_of"),
+        period=data.get("period"),
+        field_coverage=result.field_coverage,
+        freshness_seconds=result.freshness_seconds,
+        fact_events=tuple(
+            TodayFactEventView(
+                event_id=str(item["event_id"]),
+                evidence_id=str(item["evidence_id"]),
+                title=str(item["title"]),
+                url=str(item["url"]),
+                published_at=str(item["published_at"]),
+                fetched_at=str(item["fetched_at"]),
+                summary=str(item["summary"]),
+                content_sha256=str(item["content_sha256"]),
+                source=str(item["source"]),
+                source_type=str(item["source_type"]),
+                sector=str(item["sector"]),
+                related_symbols=tuple(item["related_symbols"]),
+                confirmation_state=str(item["confirmation_state"]),
+            )
+            for item in data.get("fact_events", ())
+        ),
+        evidence=tuple(
+            TodayEvidenceView(
+                evidence_id=item.evidence_id,
+                source=item.source,
+                as_of=item.as_of,
+                content_sha256=item.content_sha256,
+                authorized_fields=item.authorized_fields,
+            )
+            for item in result.evidence
+        ),
+        gaps=tuple(TodayGapView(code=item.code, subject=item.subject) for item in result.gaps),
+        error_code=result.error_code,
     )

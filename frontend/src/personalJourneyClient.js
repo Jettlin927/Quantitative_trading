@@ -18,6 +18,16 @@ export class PersonalJourneyClient {
   }
 
   /** @param {{ signal?: AbortSignal }} [options] */
+  openWatchlist({ signal } = {}) {
+    return this.#request('/api/personal/watchlist', { signal })
+  }
+
+  /** @param {{ command: unknown, idempotencyKey: string, signal?: AbortSignal }} options */
+  submitWatchlistCommand({ command, idempotencyKey, signal }) {
+    return this.#command('/api/personal/watchlist/commands', command, { idempotencyKey, signal })
+  }
+
+  /** @param {{ signal?: AbortSignal }} [options] */
   openPortfolio({ signal } = {}) {
     return this.#request('/api/personal/portfolio', { signal })
   }
