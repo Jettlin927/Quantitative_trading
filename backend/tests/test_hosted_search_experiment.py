@@ -97,10 +97,9 @@ class HostedSearchExperimentTest(unittest.TestCase):
         )
         self.assertEqual(result.events[1].type, "hosted_tool_started")
         self.assertEqual(result.events[2].evidence_ids, ("web:sec:nvda-10k",))
-        self.assertEqual(result.events[-2].text, "I will search the SEC.")
         self.assertEqual(result.events[-1].text, "NVIDIA has a recent annual report.")
         self.assertEqual(result.citations[0].evidence_id, "web:sec:nvda-10k")
-        self.assertEqual(result.citations[0].output_block_index, 1)
+        self.assertEqual(result.citations[0].output_block_index, 0)
         self.assertEqual(result.evidence[0].evidence_id, "web:sec:nvda-10k")
         self.assertEqual(result.usage.input_tokens, 120)
         self.assertEqual(result.usage.cache_hit_tokens, 20)
@@ -220,8 +219,12 @@ class HostedSearchExperimentTest(unittest.TestCase):
         unknown_block["content"].insert(2, {"type": "thinking", "thinking": "raw"})
         no_citations = valid_provider_response()
         no_citations["content"][-1].pop("citations")
+        partially_uncited = valid_provider_response()
+        partially_uncited["content"].append(
+            {"type": "text", "text": "unsupported conclusion"}
+        )
 
-        for response in (unknown_block, no_citations):
+        for response in (unknown_block, no_citations, partially_uncited):
             with self.subTest(response=response):
                 result = run_runtime(runtime_for(response), public_request())
                 self.assertEqual(result.status, "failed")
@@ -355,10 +358,6 @@ def valid_provider_response() -> dict[str, object]:
                         "page_age": "2026-02-25",
                     }
                 ],
-            },
-            {
-                "type": "text",
-                "text": "I will search the SEC.",
             },
             {
                 "type": "text",

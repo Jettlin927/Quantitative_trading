@@ -81,6 +81,26 @@ class PostgresAutomaticBriefingStoreTest(unittest.TestCase):
         self.assertEqual(sum(item.created for item in claims), 1)
         self.assertEqual(len({item.briefing_id for item in claims}), 1)
 
+    def test_pending_scheduled_trigger_round_trips(self) -> None:
+        store = self._store()
+        store.claim(
+            actor_id=self.actor_id,
+            trigger_key="recipe:2026-08-10:premarket",
+            market_date=MARKET_DATE,
+            trigger_kind="premarket",
+            lease_owner="worker",
+            lease_expires_at=NOW,
+            now=NOW,
+        )
+        self._claim("event:not-scheduled")
+
+        pending = store.pending_scheduled(actor_id=self.actor_id)
+
+        self.assertEqual(
+            tuple(item.trigger_kind for item in pending),
+            ("premarket",),
+        )
+
     def test_concurrent_near_hard_limit_allows_only_one_reservation(self) -> None:
         first = self._claim("event:budget-1")
         second = self._claim("event:budget-2")

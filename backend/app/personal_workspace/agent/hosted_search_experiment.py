@@ -224,9 +224,7 @@ class DeepSeekHostedSearchExperiment:
                 text_blocks.append(_text(block.get("text")))
                 output_block_index = len(text_blocks) - 1
                 citations = block.get("citations")
-                if citations is None:
-                    continue
-                if not isinstance(citations, list) or any(
+                if not isinstance(citations, list) or not citations or any(
                     not isinstance(item, dict) for item in citations
                 ):
                     raise HostedSearchFailure("provider_response_envelope_invalid")

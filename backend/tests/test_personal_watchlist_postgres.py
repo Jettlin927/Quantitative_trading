@@ -76,10 +76,11 @@ class PersonalWatchlistPostgresTest(unittest.TestCase):
                 store=PostgresInstrumentStateStore(sessions, cipher=cipher),
                 holding_states_reader=lambda actor_id: {
                     holding.symbol: HoldingWatchState(
-                        holding.state, holding.revision
+                        holding.state, holding.revision, str(holding.holding_id)
                     )
                     for holding in portfolio.load(actor_id=actor_id).holdings.values()
                 },
+                clock=lambda: datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc),
             )
             actor = PersonalActor("watchlist-pg-owner")
 

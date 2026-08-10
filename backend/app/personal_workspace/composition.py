@@ -79,6 +79,7 @@ def build_personal_services(
     database_url: str,
     keyring: Any,
     challenge_key: bytes,
+    refresh_news_before_read: bool = False,
 ) -> PersonalServices:
     """从数据库 URL 与 keyring 装配服务骨架；Alpaca/新闻配置缺失时整体降级。
 
@@ -109,6 +110,7 @@ def build_personal_services(
             holding.symbol: HoldingWatchState(
                 state=holding.state,
                 revision=holding.revision,
+                holding_id=str(holding.holding_id),
             )
             for holding in portfolio_store.load(actor_id=actor_id).holdings.values()
         },
@@ -152,11 +154,14 @@ def build_personal_services(
         portfolio_store=portfolio_store,
         watchlist=watchlist,
         news_source=(
-            InvestmentNewsStructuredSource(news_reader)
+            InvestmentNewsStructuredSource(
+                news_reader, refresh_before_read=refresh_news_before_read
+            )
             if news_reader is not None
             else None
         ),
         dossier_reader=AiContextMarketDossierReader(market_readers.market),
+        rule_attention_reader=lambda actor: rules.attention(actor),
     )
     return PersonalServices(
         session_factory=session_factory,

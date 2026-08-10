@@ -25,6 +25,8 @@ class PersonalAnalysisWorkerConfigurationTest(unittest.TestCase):
 
             def run_next(self, *, worker_id):
                 self.calls += 1
+                if self.calls == 1:
+                    return None
                 stop_event.set()
                 return object()
 
@@ -56,6 +58,88 @@ class PersonalAnalysisWorkerConfigurationTest(unittest.TestCase):
 
         self.assertEqual(rules.calls, 1)
         logged.assert_called_once_with("personal_briefing_automation_failed")
+
+    def test_active_analysis_queue_drains_before_automatic_briefing(self) -> None:
+        stop_event = Event()
+        order = []
+
+        class Workspace:
+            calls = 0
+
+            def run_next(self, *, worker_id):
+                self.calls += 1
+                order.append(f"analysis-{self.calls}")
+                if self.calls < 3:
+                    return object()
+                stop_event.set()
+                return None
+
+        class Briefing:
+            def run_once(self, actor, *, as_of, worker_id):
+                order.append("briefing")
+
+        worker = PersonalAnalysisWorker(
+            workspace=Workspace(),
+            worker_id="personal-analysis-worker-test",
+            briefing_automation=Briefing(),
+        )
+        worker.run_forever(
+            poll_seconds=5,
+            stop_event=stop_event,
+            clock=lambda: datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(order, ["analysis-1", "analysis-2", "analysis-3", "briefing"])
+
+    def test_busy_analysis_persists_scheduled_briefing_before_session_ends(self) -> None:
+        stop_event = Event()
+        order = []
+        premarket = datetime(2026, 8, 3, 12, 59, tzinfo=timezone.utc)
+        regular = datetime(2026, 8, 3, 13, 31, tzinfo=timezone.utc)
+
+        class Workspace:
+            calls = 0
+
+            def run_next(self, *, worker_id):
+                self.calls += 1
+                order.append(f"analysis-{self.calls}")
+                if self.calls == 1:
+                    return object()
+                stop_event.set()
+                return None
+
+        class Briefing:
+            def persist_scheduled_trigger(self, actor, *, as_of, worker_id):
+                order.append(("persist", as_of))
+
+            def run_pending_scheduled(self, actor, *, as_of, worker_id):
+                order.append(("pending", as_of))
+
+            def run_once(self, actor, *, as_of, worker_id):
+                order.append(("briefing", as_of))
+
+        moments = iter((premarket, regular))
+        worker = PersonalAnalysisWorker(
+            workspace=Workspace(),
+            worker_id="personal-analysis-worker-test",
+            briefing_automation=Briefing(),
+        )
+
+        worker.run_forever(
+            poll_seconds=5,
+            stop_event=stop_event,
+            clock=lambda: next(moments),
+        )
+
+        self.assertEqual(
+            order,
+            [
+                "analysis-1",
+                ("persist", premarket),
+                "analysis-2",
+                ("pending", regular),
+                ("briefing", regular),
+            ],
+        )
 
     def test_rule_schedule_failure_does_not_stop_analysis_queue(self) -> None:
         stop_event = Event()

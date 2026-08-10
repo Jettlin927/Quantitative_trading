@@ -10,6 +10,7 @@ from collections import deque
 from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
+import math
 from threading import Lock
 from typing import Any, Callable, Mapping
 
@@ -387,6 +388,8 @@ class DomainToolRegistry:
             result = DomainToolResult.unavailable("tool_failed", canonical_name)
         if not _valid_result(result):
             result = DomainToolResult.unavailable("tool_contract_invalid", canonical_name)
+        elif not _valid_legacy_result(requested_name, result):
+            result = DomainToolResult.unavailable("tool_contract_invalid", requested_name)
         result = _normalize_legacy_result(requested_name, result)
         return self._finish(requested_name, canonical_name, result)
 
@@ -445,7 +448,26 @@ def _normalize_legacy_result(
     market = result.data.get("market")
     if not isinstance(market, Mapping):
         return result
-    return replace(result, data=dict(market))
+    evidence = tuple(
+        item for item in result.evidence if item.source == "market_dossier"
+    )
+    if not evidence:
+        return DomainToolResult.unavailable("tool_contract_invalid", requested_name)
+    return replace(result, data=dict(market), evidence=evidence)
+
+
+def _valid_legacy_result(
+    requested_name: str, result: DomainToolResult
+) -> bool:
+    if result.status == "unavailable" or requested_name not in LEGACY_TOOL_ALIASES:
+        return True
+    allowed_keys = {
+        "get_holdings": frozenset({"holdings", "count", "usd_cash"}),
+        "get_news": frozenset({"items", "count"}),
+    }
+    if requested_name == "get_kline":
+        return isinstance(result.data.get("market"), Mapping)
+    return set(result.data) <= allowed_keys[requested_name]
 
 
 def _value_matches(schema: Mapping[str, Any], value: Any) -> bool:
@@ -485,9 +507,28 @@ def _valid_result(result: Any) -> bool:
         return False
     if result.cost_usd < Decimal("0"):
         return False
+    if not _finite_json_value(result.data):
+        return False
     if _contains_provider_envelope(result.data):
         return False
     return all(_valid_evidence(item) for item in result.evidence)
+
+
+def _finite_json_value(value: Any) -> bool:
+    if value is None or isinstance(value, (bool, str, int)):
+        return True
+    if isinstance(value, float):
+        return math.isfinite(value)
+    if isinstance(value, Decimal):
+        return value.is_finite()
+    if isinstance(value, Mapping):
+        return all(
+            isinstance(key, str) and _finite_json_value(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, (list, tuple)):
+        return all(_finite_json_value(item) for item in value)
+    return False
 
 
 def _contains_provider_envelope(value: Any) -> bool:

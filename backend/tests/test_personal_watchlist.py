@@ -10,7 +10,10 @@ from backend.app.personal_workspace.watchlist import (
     HoldingWatchState,
     InMemoryInstrumentStateStore,
     InstrumentStateBook,
+    InstrumentStateSnapshot,
+    StoredInstrumentState,
     UnfollowSymbol,
+    xnys_trading_days_elapsed,
 )
 
 
@@ -73,6 +76,73 @@ class InstrumentStateBookTest(unittest.TestCase):
         exited_again = self.book.open(self.actor)
         self.assertTrue(exited_again.items[0].is_followed)
         self.assertEqual(exited_again.items[0].follow_source, "former_holding")
+
+    def test_manual_unfollow_is_bound_to_holding_lifecycle_not_revision(self) -> None:
+        self.holdings.states["NVDA"] = HoldingWatchState("removed", 2, "holding-1")
+        self.book.revise(
+            self.actor,
+            UnfollowSymbol(symbol="NVDA", expected_revision=0),
+            idempotency_key="unfollow-first-lifecycle",
+        )
+        self.holdings.states["NVDA"] = HoldingWatchState("removed", 2, "holding-2")
+        reopened = self.book.open(self.actor)
+        self.assertTrue(reopened.items[0].is_followed)
+        self.assertEqual(reopened.items[0].follow_source, "former_holding")
+
+    def test_candidate_age_uses_new_york_dates_not_caller_timezone_dates(self) -> None:
+        friday_late_et = datetime(2026, 8, 8, 3, 30, tzinfo=timezone.utc)
+        sunday_evening_et = datetime(2026, 8, 10, 0, 30, tzinfo=timezone.utc)
+        self.assertEqual(
+            xnys_trading_days_elapsed(friday_late_et, sunday_evening_et), 0
+        )
+
+    def test_legacy_manual_unfollow_binds_current_holding_before_new_lifecycle(self) -> None:
+        self.store._states[self.actor.actor_id] = InstrumentStateSnapshot(
+            revision=3,
+            items={
+                "NVDA": StoredInstrumentState(
+                    symbol="NVDA",
+                    manual_following=False,
+                    manual_unfollow_holding_revision=2,
+                )
+            },
+        )
+        self.holdings.states["NVDA"] = HoldingWatchState(
+            "removed", 2, "holding-old"
+        )
+        before = self.book.open(self.actor)
+        self.assertFalse(before.items[0].is_followed)
+        self.assertEqual(before.revision, 3)
+        migrated = self.book.bind_legacy_holding_lifecycles(self.actor)
+        self.assertEqual(migrated.revision, 4)
+
+        self.holdings.states["NVDA"] = HoldingWatchState(
+            "removed", 2, "holding-new"
+        )
+        reopened = self.book.open(self.actor)
+        self.assertTrue(reopened.items[0].is_followed)
+        self.assertEqual(reopened.items[0].follow_source, "former_holding")
+
+    def test_legacy_manual_unfollow_never_binds_a_new_active_holding(self) -> None:
+        self.store._states[self.actor.actor_id] = InstrumentStateSnapshot(
+            revision=3,
+            items={
+                "NVDA": StoredInstrumentState(
+                    symbol="NVDA",
+                    manual_following=False,
+                    manual_unfollow_holding_revision=2,
+                )
+            },
+        )
+        self.holdings.states["NVDA"] = HoldingWatchState(
+            "active", 2, "holding-new"
+        )
+
+        unchanged = self.book.bind_legacy_holding_lifecycles(self.actor)
+
+        self.assertEqual(unchanged.revision, 3)
+        self.assertTrue(unchanged.items[0].is_followed)
+        self.assertEqual(unchanged.items[0].follow_source, "holding")
 
     def test_manual_follow_reasons_are_idempotent_and_do_not_change_holdings(self) -> None:
         before = self.holdings.states.copy()

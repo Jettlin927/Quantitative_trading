@@ -70,8 +70,9 @@ class RecordingRuntime:
         usage=True,
     )
 
-    def __init__(self, output: str) -> None:
+    def __init__(self, output: str, *, cost_usd: Decimal = Decimal("0.001")) -> None:
         self.output = output
+        self.cost_usd = cost_usd
         self.requests = []
 
     def run(self, request):
@@ -81,7 +82,7 @@ class RecordingRuntime:
                 RuntimeEvent(type="run_started"),
                 RuntimeEvent(type="output_completed", text=self.output),
             ),
-            usage=RuntimeUsage(100, 50, 20, 0, Decimal("0.001")),
+            usage=RuntimeUsage(100, 50, 20, 0, self.cost_usd),
         )
 
 
@@ -246,6 +247,25 @@ class AutomaticBriefingTest(unittest.TestCase):
 
         self.assertEqual(result.provider_state, BriefingProviderState.COMPLETED)
         self.assertEqual(result.failure_code, "provider_claims_invalid_schema")
+
+    def test_actual_cost_is_settled_when_runtime_exceeds_reservation(self) -> None:
+        runtime = RecordingRuntime(claims_text("today:1"), cost_usd=Decimal("0.1"))
+        coordinator = AutomaticBriefingCoordinator(
+            tools=self.registry,
+            runtime=runtime,
+            store=self.store,
+            policy=self.coordinator.policy,
+            clock=lambda: NOW,
+        )
+        result = coordinator.run(
+            PersonalActor("local-owner"),
+            BriefingTrigger("premarket", date(2026, 8, 6), NOW),
+            worker_id="w1",
+        )
+
+        self.assertEqual(result.failure_code, "budget_exceeded")
+        self.assertEqual(result.actual_cost_usd, Decimal("0.1"))
+        self.assertEqual(result.accounted_cost_usd, Decimal("0.1"))
 
     def test_unconfirmed_news_cannot_be_promoted_to_confirmed_fact(self) -> None:
         self.runtime.output = claims_text("news:unconfirmed")
