@@ -225,6 +225,61 @@ class AgentRuntimeTest(unittest.TestCase):
         self.assertIn("请先查看持仓。", system_prompt)
         self.assertIn("不得输出买卖评级", system_prompt)
 
+    def test_maximum_cost_bounds_multi_round_transcript_and_tool_payload(self) -> None:
+        def large_tool(ctx: ToolContext, args: dict) -> ToolResult:
+            return ToolResult(ok=True, content='"\\\x00' * 100_000)
+
+        provider = ScriptedAgentProvider(
+            [
+                completed_response(tool_calls=(tool_call(name="get_holdings"),)),
+                completed_response(content=claims_content()),
+            ]
+        )
+        runtime = make_runtime(
+            provider, (make_tool("get_holdings", handler=large_tool),)
+        )
+        maximum = runtime.maximum_cost_usd(make_intent())
+        heartbeat_count = 0
+
+        def heartbeat() -> None:
+            nonlocal heartbeat_count
+            heartbeat_count += 1
+
+        result = runtime.run(
+            actor_id="actor-1",
+            intent=make_intent(),
+            spend_before=Decimal("0"),
+            heartbeat=heartbeat,
+        )
+
+        self.assertGreaterEqual(maximum, Decimal(result.cost_usd))
+        tool_payload = provider.captured_requests[1]["messages"][3]["content"]
+        self.assertLessEqual(len(tool_payload.encode("utf-8")), 16_000)
+        self.assertIn("[truncated]", tool_payload)
+        self.assertGreaterEqual(heartbeat_count, 6)
+
+    def test_tool_call_id_is_bounded_for_cost_estimate(self) -> None:
+        provider = ScriptedAgentProvider(
+            [
+                completed_response(
+                    tool_calls=(
+                        tool_call(
+                            name="get_holdings",
+                            call_id="x" * 257,
+                        ),
+                    )
+                )
+            ]
+        )
+        runtime = make_runtime(provider, (make_tool("get_holdings"),))
+
+        with self.assertRaisesRegex(ProviderFailure, "provider_tool_calls_invalid"):
+            runtime.run(
+                actor_id="actor-1",
+                intent=make_intent(),
+                spend_before=Decimal("0"),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -19,6 +19,7 @@ class ToolContext:
     actor_id: str
     intent: AnalysisIntent
     clock: Callable[[], datetime]
+    heartbeat: Callable[[], None] = lambda: None
 
 
 @dataclass(frozen=True)

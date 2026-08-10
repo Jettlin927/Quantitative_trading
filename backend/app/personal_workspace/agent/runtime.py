@@ -19,7 +19,9 @@ from ..analysis import (
     AnalysisClaim,
     AnalysisIntent,
     AnalysisUsage,
+    DEEPSEEK_CACHE_MISS_USD_PER_MILLION,
     DEEPSEEK_MAX_OUTPUT_TOKENS,
+    DEEPSEEK_OUTPUT_USD_PER_MILLION,
     FrozenEvidence,
     ProviderFailure,
     _analysis_usage,
@@ -28,6 +30,10 @@ from ..analysis import (
 from .protocol import AgentProvider, AgentTurnResult, Skill, Tool, ToolContext, ToolResult
 
 DEFAULT_MAX_TOOL_ROUNDS = 5
+AGENT_MAX_TOOL_CALLS_PER_ROUND = 8
+AGENT_MAX_TOOL_RESULT_BYTES = 16_000
+AGENT_MAX_ASSISTANT_BYTES = 262_144
+AGENT_MAX_TOOL_CALL_ID_BYTES = 256
 
 AGENT_BASE_SYSTEM_PROMPT = """你是个人美股 AI 投研工作台的分析助手，负责为持仓分析与研究记录生成结构化影响分析。
 
@@ -78,13 +84,58 @@ class AgentRuntime:
     def tool_schemas(self) -> tuple[dict[str, Any], ...]:
         return tuple(tool.function_schema() for tool in self._tools.values())
 
+    def maximum_cost_usd(self, intent: AnalysisIntent) -> Decimal:
+        """以字节数代替 token 数，给完整多轮 transcript 一个确定性上界。"""
+
+        base_request = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": self._system_prompt()},
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "question": intent.question,
+                            "subject_ids": list(intent.subject_ids),
+                        },
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                },
+            ],
+            "tools": self.tool_schemas(),
+            "max_tokens": DEEPSEEK_MAX_OUTPUT_TOKENS,
+            "stream": False,
+            "thinking": {"type": "disabled"},
+        }
+        base_bytes = len(
+            json.dumps(base_request, ensure_ascii=False, sort_keys=True).encode(
+                "utf-8"
+            )
+        )
+        per_round_growth = AGENT_MAX_ASSISTANT_BYTES + (
+            AGENT_MAX_TOOL_CALLS_PER_ROUND * (AGENT_MAX_TOOL_RESULT_BYTES + 1024)
+        )
+        million = Decimal("1000000")
+        total = Decimal("0")
+        for round_index in range(self._max_tool_rounds):
+            input_upper = base_bytes + round_index * per_round_growth
+            total += (
+                Decimal(input_upper) * DEEPSEEK_CACHE_MISS_USD_PER_MILLION
+                + Decimal(DEEPSEEK_MAX_OUTPUT_TOKENS)
+                * DEEPSEEK_OUTPUT_USD_PER_MILLION
+            ) / million
+        return total.quantize(Decimal("0.0000001"))
+
     def run(
         self,
         *,
         actor_id: str,
         intent: AnalysisIntent,
         spend_before: Decimal,
+        heartbeat: Callable[[], None] | None = None,
     ) -> AgentTurnResult:
+        heartbeat = heartbeat or (lambda: None)
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": self._system_prompt()},
             {
@@ -104,6 +155,7 @@ class AgentRuntime:
         usage_accumulated: AnalysisUsage | None = None
         tool_evidence: list[FrozenEvidence] = []
         for round_index in range(1, self._max_tool_rounds + 1):
+            heartbeat()
             projected = spend_before + total_cost
             if projected > self._monthly_soft_budget_usd:
                 raise ValueError("budget_blocked")
@@ -117,6 +169,7 @@ class AgentRuntime:
                     "thinking": {"type": "disabled"},
                 }
             )
+            heartbeat()
             if response.get("status") == "refusal":
                 raise ProviderFailure("provider_refusal", retryable=False)
             if response.get("status") != "completed":
@@ -135,26 +188,42 @@ class AgentRuntime:
                     rounds=round_index,
                     tool_evidence=tuple(tool_evidence),
                 )
+            if len(tool_calls) > AGENT_MAX_TOOL_CALLS_PER_ROUND:
+                raise ProviderFailure("provider_tool_calls_invalid", retryable=False)
+            if any(
+                not isinstance(call.get("id"), str)
+                or not call["id"]
+                or len(call["id"].encode("utf-8"))
+                > AGENT_MAX_TOOL_CALL_ID_BYTES
+                for call in tool_calls
+            ):
+                raise ProviderFailure("provider_tool_calls_invalid", retryable=False)
+            assistant_message = {
+                "role": "assistant",
+                "content": message.get("content"),
+                "tool_calls": [
+                    {
+                        "id": call["id"],
+                        "type": "function",
+                        "function": {
+                            "name": call["name"],
+                            "arguments": json.dumps(
+                                call["arguments"], ensure_ascii=False
+                            ),
+                        },
+                    }
+                    for call in tool_calls
+                ],
+            }
+            if len(
+                json.dumps(assistant_message, ensure_ascii=False).encode("utf-8")
+            ) > AGENT_MAX_ASSISTANT_BYTES:
+                raise ProviderFailure("provider_tool_calls_invalid", retryable=False)
             messages.append(
-                {
-                    "role": "assistant",
-                    "content": message.get("content"),
-                    "tool_calls": [
-                        {
-                            "id": call["id"],
-                            "type": "function",
-                            "function": {
-                                "name": call["name"],
-                                "arguments": json.dumps(
-                                    call["arguments"], ensure_ascii=False
-                                ),
-                            },
-                        }
-                        for call in tool_calls
-                    ],
-                }
+                assistant_message
             )
             for call in tool_calls:
+                heartbeat()
                 tool = self._tools.get(call["name"])
                 if tool is None:
                     result = ToolResult(ok=False, content="", error="agent_unknown_tool")
@@ -165,6 +234,7 @@ class AgentRuntime:
                                 actor_id=actor_id,
                                 intent=intent,
                                 clock=self._clock,
+                                heartbeat=heartbeat,
                             ),
                             call.get("arguments") or {},
                         )
@@ -172,20 +242,28 @@ class AgentRuntime:
                         result = ToolResult(ok=False, content="", error=_tool_failure_code(exc))
                 if result.ok:
                     assert tool is not None  # ok=True 只可能来自已注册工具
+                    evidence_id = (
+                        result.evidence[0].evidence_id
+                        if result.evidence
+                        else f"tool:{tool.name}:{len(tool_evidence)}"
+                    )
+                    bounded_content, payload = _bounded_evidence_payload(
+                        evidence_id, result.content
+                    )
                     evidence = result.evidence or (
                         _tool_evidence(
                             tool.name,
                             len(tool_evidence),
-                            result.content,
+                            bounded_content,
                             self._clock,
                         ),
                     )
                     tool_evidence.extend(evidence)
-                    payload = _wrap_evidence(evidence[0].evidence_id, result.content)
                 else:
                     payload = json.dumps(
                         {"ok": False, "error": result.error}, ensure_ascii=False
                     )
+                heartbeat()
                 messages.append(
                     {
                         "role": "tool",
@@ -240,6 +318,29 @@ def _wrap_evidence(evidence_id: str, content: str) -> str:
         {"evidence_id": evidence_id, "ok": True, "data": data},
         ensure_ascii=False,
     )
+
+
+def _bounded_evidence_payload(evidence_id: str, content: str) -> tuple[str, str]:
+    payload = _wrap_evidence(evidence_id, content)
+    if len(payload.encode("utf-8")) <= AGENT_MAX_TOOL_RESULT_BYTES:
+        return content, payload
+    encoded = content.encode("utf-8")
+    marker = "...[truncated]"
+    low = 0
+    high = len(encoded)
+    best_content = marker
+    best_payload = _wrap_evidence(evidence_id, best_content)
+    while low <= high:
+        middle = (low + high) // 2
+        candidate = encoded[:middle].decode("utf-8", errors="ignore") + marker
+        candidate_payload = _wrap_evidence(evidence_id, candidate)
+        if len(candidate_payload.encode("utf-8")) <= AGENT_MAX_TOOL_RESULT_BYTES:
+            best_content = candidate
+            best_payload = candidate_payload
+            low = middle + 1
+        else:
+            high = middle - 1
+    return best_content, best_payload
 
 
 def _finalize_claims(

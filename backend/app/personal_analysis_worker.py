@@ -14,6 +14,14 @@ from threading import Event
 from typing import Callable
 
 from .personal_workspace.analysis import AnalysisWorkspace
+from .personal_workspace.automatic_briefing import (
+    AutomaticBriefingAutomation,
+    AutomaticBriefingCoordinator,
+    BriefingBudgetPolicy,
+)
+from .personal_workspace.automatic_briefing_store import (
+    ActiveAnalysisBudgetGuard,
+)
 from .personal_workspace.composition import (
     build_analysis_workspace,
     build_personal_services,
@@ -61,6 +69,7 @@ class PersonalAnalysisWorker:
     workspace: AnalysisWorkspace
     worker_id: str
     rule_automation: HoldingRuleAutomation | None = None
+    briefing_automation: object | None = None
     actor: PersonalActor = LOCAL_PERSONAL_ACTOR
     rule_slot_reader: Callable[[datetime], str | None] = personal_rule_evaluation_slot
 
@@ -78,11 +87,10 @@ class PersonalAnalysisWorker:
             raise ValueError("personal_analysis_worker_poll_invalid")
         last_rule_slot = None
         while not stop_event.is_set():
-            as_of = None
+            as_of = clock()
             rule_slot = None
             if self.rule_automation is not None:
                 try:
-                    as_of = clock()
                     rule_slot = self.rule_slot_reader(as_of)
                 except Exception:
                     LOGGER.exception("personal_rule_schedule_failed")
@@ -102,6 +110,21 @@ class PersonalAnalysisWorker:
                 except Exception:
                     LOGGER.exception("personal_rule_automation_failed")
                 last_rule_slot = rule_slot
+            if self.briefing_automation is not None and as_of is not None:
+                try:
+                    briefing_result = self.briefing_automation.run_once(
+                        self.actor,
+                        as_of=as_of,
+                        worker_id=self.worker_id,
+                    )
+                    failed_count = getattr(briefing_result, "failed_count", 0)
+                    if failed_count:
+                        LOGGER.warning(
+                            "personal_briefing_automation_partial_failure count=%s",
+                            failed_count,
+                        )
+                except Exception:
+                    LOGGER.exception("personal_briefing_automation_failed")
             if self.run_once() is None:
                 stop_event.wait(poll_seconds)
 
@@ -128,6 +151,24 @@ def build_personal_analysis_worker_from_environment() -> PersonalAnalysisWorker:
         challenge_key=sha256(b"personal-analysis-worker|no-gateway").digest(),
     )
     mode = os.getenv("PERSONAL_ANALYSIS_MODE", "legacy").strip().lower()
+    briefing_policy = BriefingBudgetPolicy(
+        usd_to_cny=Decimal(os.getenv("PERSONAL_AI_USD_TO_CNY", "7.20")),
+        fx_snapshot=os.getenv(
+            "PERSONAL_AI_FX_SNAPSHOT", "static-2026-08-10"
+        ).strip(),
+        target_cny=Decimal(os.getenv("PERSONAL_AI_DAILY_TARGET_CNY", "0.50")),
+        soft_limit_cny=Decimal(
+            os.getenv("PERSONAL_AI_DAILY_SOFT_LIMIT_CNY", "1.00")
+        ),
+        hard_limit_cny=Decimal(
+            os.getenv("PERSONAL_AI_DAILY_HARD_LIMIT_CNY", "5.00")
+        ),
+    )
+    daily_budget_guard = ActiveAnalysisBudgetGuard(
+        store=services.automatic_briefing_store,
+        policy=briefing_policy.store_policy(),
+        lease_seconds=600 if mode == "agent" else 120,
+    )
     if mode == "agent":
         from .personal_workspace.agent.deepseek_provider import DeepSeekAgentChatAdapter
 
@@ -147,6 +188,18 @@ def build_personal_analysis_worker_from_environment() -> PersonalAnalysisWorker:
         monthly_spend_reader=lambda actor, now: services.analysis_store.monthly_spend_usd(
             actor.actor_id, now
         ),
+        daily_budget_guard=daily_budget_guard,
+    )
+    from .personal_workspace.agent.completion_runtime import (
+        DeepSeekCompletionRuntime,
+    )
+
+    briefing_coordinator = AutomaticBriefingCoordinator(
+        tools=services.domain_tools,
+        runtime=DeepSeekCompletionRuntime(api_key=credentials.api_key),
+        store=services.automatic_briefing_store,
+        policy=briefing_policy,
+        clock=lambda: datetime.now(timezone.utc),
     )
     return PersonalAnalysisWorker(
         workspace=workspace,
@@ -154,6 +207,10 @@ def build_personal_analysis_worker_from_environment() -> PersonalAnalysisWorker:
         rule_automation=HoldingRuleAutomation(
             portfolio=services.portfolio,
             rules=services.rules,
+        ),
+        briefing_automation=AutomaticBriefingAutomation(
+            coordinator=briefing_coordinator,
+            tools=services.domain_tools,
         ),
     )
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 import os
 import unittest
+from uuid import uuid4
 
 from alembic import command
 from sqlalchemy import create_engine, text
@@ -147,6 +149,78 @@ class PersonalAnalysisPostgresTest(unittest.TestCase):
             "其他条件不变",
         ):
             self.assertNotIn(private_value, projection)
+
+    def test_heartbeat_renews_postgres_lease_and_fences_stale_token(self) -> None:
+        actor = PersonalActor(actor_id=f"analysis-pg-heartbeat-owner-{uuid4()}")
+        cipher = PersonalDataCipher(
+            FixedKeyring(
+                active_key_id="analysis-key",
+                data_keys={"analysis-key": bytes(range(32))},
+                lookup_key=b"analysis-postgres-lookup-key-32-bytes-minimum",
+            )
+        )
+        store = PostgresAnalysisStore(self.Session, cipher=cipher)
+        workspace = AnalysisWorkspace(
+            store=store,
+            evidence_reader=lambda request_actor, intent: (
+                EvidenceCandidate(
+                    evidence_id="heartbeat-evidence",
+                    kind="official_filing",
+                    source="sec",
+                    field="official_facts",
+                    excerpt="租约证据",
+                    content_sha256="b" * 64,
+                    authorized_for_ai=True,
+                    as_of=NOW,
+                ),
+            ),
+            provider=ScriptedResponsesAdapter.completed(claims=()),
+            clock=lambda: NOW,
+        )
+        draft = workspace.prepare(
+            actor,
+            AnalysisIntent(question="租约测试", subject_ids=("ACME",)),
+            idempotency_key="pg-heartbeat-prepare",
+        )
+        queued = workspace.start(
+            actor,
+            draft_id=draft.draft_id,
+            preview_sha256=draft.preview_sha256,
+            idempotency_key="pg-heartbeat-start",
+        )
+        _draft, first = store.lease_next(
+            worker_id="worker-a", now=NOW, lease_seconds=30
+        )
+        renewed = store.heartbeat(
+            first,
+            now=NOW + timedelta(seconds=20),
+            lease_seconds=30,
+        )
+
+        self.assertIsNone(
+            store.lease_next(
+                worker_id="worker-b",
+                now=NOW + timedelta(seconds=40),
+                lease_seconds=30,
+            )
+        )
+        _draft, second = store.lease_next(
+            worker_id="worker-b",
+            now=NOW + timedelta(seconds=51),
+            lease_seconds=30,
+        )
+        self.assertEqual(second.view.run_id, queued.run_id)
+        store.save_run(
+            replace(
+                second,
+                lease_owner=None,
+                lease_expires_at=None,
+                view=replace(second.view, status="completed", stage="completed"),
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "analysis_lease_lost"):
+            store.save_run(renewed)
+        self.assertEqual(store.get_run(actor.actor_id, queued.run_id).view.status, "completed")
 
 
 if __name__ == "__main__":

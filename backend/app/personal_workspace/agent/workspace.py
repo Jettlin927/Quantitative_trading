@@ -27,16 +27,13 @@ from ..analysis import (
     StoredAnalysisDraft,
     StoredAnalysisRun,
     _append_event,
-    _estimate_deepseek_request_cost,
     _json_sha256,
-    _responses_request,
 )
 from ..contracts import PersonalActor
 from .protocol import Skill, Tool
 from .runtime import AgentRuntime
 
 AGENT_CONFIG_REVISION = "personal-agent-deepseek-v1"
-AGENT_MAX_ESTIMATE_ROUNDS = 5
 
 
 class _AgentProviderShim:
@@ -68,7 +65,7 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
         | None = None,
         clock: Callable[[], datetime] | None = None,
         lease_seconds: int = 600,
-        max_estimate_rounds: int = AGENT_MAX_ESTIMATE_ROUNDS,
+        daily_budget_guard: Any | None = None,
     ) -> None:
         if preview_ttl is None:
             preview_ttl = timedelta(minutes=30)
@@ -83,11 +80,11 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
             monthly_soft_budget_usd=monthly_soft_budget_usd,
             monthly_spend_reader=monthly_spend_reader,
             lease_seconds=lease_seconds,
+            daily_budget_guard=daily_budget_guard,
         )
         self._runtime = runtime
         self._tools = tuple(tools)
         self._skills = tuple(skills)
-        self._max_estimate_rounds = max_estimate_rounds
 
     def prepare(
         self,
@@ -103,12 +100,8 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
         draft_id = str(uuid4())
         tool_names = tuple(tool.name for tool in self._tools)
         skill_ids = tuple(skill.skill_id for skill in self._skills)
-        per_round_cost = Decimal(
-            _estimate_deepseek_request_cost(
-                _responses_request(model=self._model, question=question, evidence=())
-            )
-        )
-        estimated_cost = per_round_cost * self._max_estimate_rounds
+        normalized_intent = replace(intent, question=question)
+        estimated_cost = self._runtime.maximum_cost_usd(normalized_intent)
         included_fields = ("user_question", *tool_names)
         preview_payload = {
             "question": question,
@@ -146,7 +139,7 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
             StoredAnalysisDraft(
                 actor_id=actor.actor_id,
                 idempotency_key=idempotency_key,
-                intent=replace(intent, question=question),
+                intent=normalized_intent,
                 receipt=receipt,
                 evidence=(),
             )
@@ -185,20 +178,68 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
         validating: StoredAnalysisRun,
         draft: StoredAnalysisDraft,
         run: StoredAnalysisRun,
+        *,
+        budget_reservation: Any | None = None,
     ) -> AnalysisRunView | None:
         spend_before = self._monthly_spend_reader(
             PersonalActor(actor_id=draft.actor_id), self._clock()
         )
+        current_run = validating
+
+        def heartbeat() -> None:
+            nonlocal current_run
+            now = self._clock()
+            current_run = self._store.heartbeat(
+                current_run,
+                now=now,
+                lease_seconds=self._lease_seconds,
+            )
+            if budget_reservation is not None:
+                self._daily_budget_guard.heartbeat(
+                    budget_reservation,
+                    now=now,
+                )
+
         try:
             result = self._runtime.run(
                 actor_id=draft.actor_id,
                 intent=draft.intent,
                 spend_before=spend_before,
+                heartbeat=heartbeat,
             )
         except ProviderFailure as exc:
+            if budget_reservation is not None:
+                self._daily_budget_guard.mark_outcome_unknown(
+                    budget_reservation,
+                    run_id=run.view.run_id,
+                    failure_code=exc.code,
+                    now=self._clock(),
+                )
             return self._fail_run(validating, exc.code)
         except ValueError as exc:
+            if budget_reservation is not None:
+                self._daily_budget_guard.mark_outcome_unknown(
+                    budget_reservation,
+                    run_id=run.view.run_id,
+                    failure_code=str(exc),
+                    now=self._clock(),
+                )
             return self._fail_run(validating, str(exc))
+        if budget_reservation is not None:
+            from ..automatic_briefing_store import BriefingCost
+
+            self._daily_budget_guard.complete_call(
+                budget_reservation,
+                run_id=run.view.run_id,
+                cost=BriefingCost(
+                    input_tokens=result.usage.input_tokens,
+                    output_tokens=result.usage.output_tokens,
+                    cache_hit_tokens=result.usage.cache_hit_tokens,
+                    cache_miss_tokens=result.usage.cache_miss_tokens,
+                    cost_usd=Decimal(result.cost_usd),
+                ),
+                now=self._clock(),
+            )
         completed = _append_event(validating, "completed", "completed", self._clock())
         completed = replace(
             completed,
@@ -227,6 +268,7 @@ def build_agent_workspace(
     monthly_soft_budget_usd: Decimal,
     monthly_spend_reader: Callable[[PersonalActor, datetime], Decimal],
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+    daily_budget_guard: Any | None = None,
 ) -> AgentAnalysisWorkspace:
     """装配 agent 模式的完整工作区（worker/API runtime 共用）。
 
@@ -264,4 +306,5 @@ def build_agent_workspace(
         clock=clock,
         monthly_soft_budget_usd=monthly_soft_budget_usd,
         monthly_spend_reader=monthly_spend_reader,
+        daily_budget_guard=daily_budget_guard,
     )
