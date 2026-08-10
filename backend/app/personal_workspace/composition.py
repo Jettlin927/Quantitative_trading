@@ -41,6 +41,11 @@ from .rules import (
     ObservationRuleBook,
     PostgresObservationRuleStore,
 )
+from .watchlist import (
+    HoldingWatchState,
+    InstrumentStateBook,
+    PostgresInstrumentStateStore,
+)
 
 
 @dataclass(frozen=True)
@@ -52,6 +57,7 @@ class PersonalServices:
     market_readers: PersonalMarketReaders
     portfolio_store: PostgresPortfolioStore
     portfolio: PortfolioBook
+    watchlist: InstrumentStateBook
     rules: ObservationRuleBook
     instruments: InstrumentWorkbench
     analysis_store: PostgresAnalysisStore
@@ -86,6 +92,16 @@ def build_personal_services(
         snapshots=PostgresEquitySnapshotStore(session_factory, cipher=cipher),
         trades=PostgresRealizedTradeStore(session_factory, cipher=cipher),
         challenge_key=challenge_key,
+    )
+    watchlist = InstrumentStateBook(
+        store=PostgresInstrumentStateStore(session_factory, cipher=cipher),
+        holding_states_reader=lambda actor_id: {
+            holding.symbol: HoldingWatchState(
+                state=holding.state,
+                revision=holding.revision,
+            )
+            for holding in portfolio_store.load(actor_id=actor_id).holdings.values()
+        },
     )
     rules = ObservationRuleBook(
         store=PostgresObservationRuleStore(session_factory, cipher=cipher),
@@ -127,6 +143,7 @@ def build_personal_services(
         market_readers=market_readers,
         portfolio_store=portfolio_store,
         portfolio=portfolio,
+        watchlist=watchlist,
         rules=rules,
         instruments=instruments,
         analysis_store=PostgresAnalysisStore(session_factory, cipher=cipher),

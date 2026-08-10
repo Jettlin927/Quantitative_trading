@@ -58,6 +58,8 @@ from backend.app.personal_workspace.synthetic import SyntheticWorkspaceAdapters
 PRIVATE_TABLES = {
     "personal_workspaces",
     "personal_holdings",
+    "personal_instrument_states",
+    "personal_instrument_revisions",
     "personal_portfolio_revisions",
     "personal_audit_events",
     "personal_rule_evaluations",
@@ -96,7 +98,7 @@ ENCRYPTED_PRIVATE_TABLES = PRIVATE_TABLES - {
 
 class PersonalWorkspaceSchemaIdentityTest(unittest.TestCase):
     def test_private_orm_identity_is_separate_from_public_metadata(self) -> None:
-        self.assertEqual(expected_schema_heads(), ("0020_drop_data_quality_registry",))
+        self.assertEqual(expected_schema_heads(), ("0021_instrument_states",))
         self.assertEqual(
             set(PrivateBase.metadata.tables),
             {
@@ -285,6 +287,8 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                             "personal_price_observations",
                             "personal_equity_snapshots",
                             "personal_realized_trades",
+                            "personal_instrument_states",
+                            "personal_instrument_revisions",
                         }
                         | RETIRED_RECORD_TABLES
                         else 1

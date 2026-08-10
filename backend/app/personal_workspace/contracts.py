@@ -170,6 +170,22 @@ class PurgeHoldingCommand(PortfolioCommand):
     challenge: str = Field(min_length=1, max_length=2000)
 
 
+class InstrumentStateCommand(BaseModel):
+    expected_revision: int = Field(ge=0)
+
+
+class FollowInstrumentCommand(InstrumentStateCommand):
+    type: Literal["follow_symbol"]
+    symbol: str = Field(min_length=1, max_length=15)
+    preset_reasons: tuple[str, ...] = Field(default=(), max_length=20)
+    custom_reason: str | None = Field(default=None, max_length=500)
+
+
+class UnfollowInstrumentCommand(InstrumentStateCommand):
+    type: Literal["unfollow_symbol"]
+    symbol: str = Field(min_length=1, max_length=15)
+
+
 class CreateObservationRuleCommand(BaseModel):
     type: Literal["create_rule"]
     template_id: str = Field(min_length=1, max_length=64)

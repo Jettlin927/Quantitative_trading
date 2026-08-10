@@ -176,6 +176,30 @@ class SchemaMigrationTest(unittest.TestCase):
 
 @unittest.skipUnless(os.getenv("TEST_POSTGRES_URL"), "TEST_POSTGRES_URL 未配置，跳过真实 PostgreSQL migration 集成测试")
 class PostgresSchemaMigrationIntegrationTest(unittest.TestCase):
+    def test_instrument_state_rollback_fails_closed_without_schema_loss(self):
+        engine = create_engine(os.environ["TEST_POSTGRES_URL"])
+        try:
+            with engine.connect() as connection:
+                command.upgrade(alembic_config(connection), "head")
+            with self.assertRaisesRegex(RuntimeError, "禁止自动降级"):
+                with engine.connect() as connection:
+                    command.downgrade(
+                        alembic_config(connection),
+                        "0020_drop_data_quality_registry",
+                    )
+            with engine.connect() as connection:
+                self.assertEqual(current_schema_heads(connection), expected_schema_heads())
+            self.assertTrue(
+                {
+                    "personal_instrument_states",
+                    "personal_instrument_revisions",
+                }.issubset(
+                    set(inspect(engine).get_table_names(schema="private_workbench"))
+                )
+            )
+        finally:
+            engine.dispose()
+
     def test_empty_upgrade_and_existing_schema_stamp(self):
         database_url = os.environ["TEST_POSTGRES_URL"]
         parsed_url = make_url(database_url)
