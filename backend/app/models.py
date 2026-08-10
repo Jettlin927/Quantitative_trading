@@ -234,6 +234,9 @@ class PersonalWorkspace(PrivateBase):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     actor_identity_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     revision: Mapped[int] = mapped_column(default=1, nullable=False)
+    instrument_revision: Mapped[int] = mapped_column(
+        default=0, server_default="0", nullable=False
+    )
     ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     key_id: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -263,6 +266,67 @@ class PersonalHolding(PrivateBase):
     payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PersonalInstrumentState(PrivateBase):
+    __tablename__ = "personal_instrument_states"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "symbol_hmac",
+            name="uq_personal_instrument_state_symbol",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    symbol_hmac: Mapped[str] = mapped_column(String(64), nullable=False)
+    revision: Mapped[int] = mapped_column(nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PersonalInstrumentRevision(PrivateBase):
+    __tablename__ = "personal_instrument_revisions"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "instrument_revision",
+            name="uq_personal_instrument_revision",
+        ),
+        UniqueConstraint(
+            "workspace_id",
+            "idempotency_hash",
+            name="uq_personal_instrument_idempotency",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    instrument_revision: Mapped[int] = mapped_column(nullable=False)
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    idempotency_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class PersonalPortfolioRevision(PrivateBase):

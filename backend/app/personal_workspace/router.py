@@ -16,6 +16,7 @@ from .contracts import (
     CreateObservationRuleCommand,
     EditHoldingCommand,
     EvaluateObservationRulesCommand,
+    FollowInstrumentCommand,
     PersonalActor,
     PrepareAnalysisCommand,
     PurgeHoldingCommand,
@@ -27,6 +28,7 @@ from .contracts import (
     SetObservationRuleStateCommand,
     StartAnalysisCommand,
     SyntheticTraceCommand,
+    UnfollowInstrumentCommand,
 )
 from .analysis import DEEPSEEK_MODEL, AnalysisIntent, AnalysisWorkspace
 from .journey import PersonalResearchJourney
@@ -34,6 +36,7 @@ from .instrument import InstrumentQuery, InstrumentWorkbench
 from .portfolio import PortfolioBook
 from .rules import ObservationRuleBook, RuleEvaluationRequest
 from .security import PersonalAccessConfig, authorize_personal_request
+from .watchlist import FollowSymbol, InstrumentStateBook, UnfollowSymbol
 
 
 @dataclass(frozen=True)
@@ -45,6 +48,7 @@ class PersonalRuntime:
     instruments: InstrumentWorkbench | None = None
     rules: ObservationRuleBook | None = None
     analyses: AnalysisWorkspace | None = None
+    watchlist: InstrumentStateBook | None = None
     analysis_provider: str = "deepseek"
     analysis_model: str = DEEPSEEK_MODEL
     analysis_dispatch_enabled: bool = True
@@ -64,6 +68,7 @@ class PersonalRuntime:
             instruments=None,
             rules=None,
             analyses=None,
+            watchlist=None,
             analysis_provider="disabled",
             analysis_dispatch_enabled=False,
             analysis_disabled_reason="personal_access_unconfigured",
@@ -114,6 +119,46 @@ def create_personal_router(
         except SQLAlchemyError as exc:
             _raise_store_error(exc)
         return {"currency": "USD", "snapshots": [asdict(item) for item in snapshots]}
+
+    @router.get("/watchlist")
+    def open_watchlist(runtime: PersonalRuntime = Depends(require_read)) -> dict:
+        actor, watchlist = _configured_watchlist(runtime)
+        try:
+            return asdict(watchlist.open(actor))
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+
+    @router.post("/watchlist/commands")
+    async def revise_watchlist(
+        request: Request,
+        runtime: PersonalRuntime = Depends(require_write),
+    ) -> dict:
+        actor, watchlist = _configured_watchlist(runtime)
+        command = await _parse_watchlist_command(request)
+        if isinstance(command, FollowInstrumentCommand):
+            domain_command = FollowSymbol(
+                symbol=command.symbol,
+                preset_reasons=command.preset_reasons,
+                custom_reason=command.custom_reason,
+                expected_revision=command.expected_revision,
+            )
+        else:
+            domain_command = UnfollowSymbol(
+                symbol=command.symbol,
+                expected_revision=command.expected_revision,
+            )
+        try:
+            return asdict(
+                watchlist.revise(
+                    actor,
+                    domain_command,
+                    idempotency_key=request.headers["Idempotency-Key"].strip(),
+                )
+            )
+        except SQLAlchemyError as exc:
+            _raise_store_error(exc)
+        except ValueError as exc:
+            _raise_domain_error(exc)
 
     @router.get("/instruments/{asset_id}")
     def open_instrument(
@@ -407,6 +452,17 @@ def _configured_rules(runtime: PersonalRuntime) -> tuple[PersonalActor, Observat
     return runtime.actor, runtime.rules
 
 
+def _configured_watchlist(
+    runtime: PersonalRuntime,
+) -> tuple[PersonalActor, InstrumentStateBook]:
+    if runtime.actor is None or runtime.watchlist is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "personal_access_unconfigured", "message": "关注状态尚未配置。"},
+        )
+    return runtime.actor, runtime.watchlist
+
+
 def _configured_analyses(runtime: PersonalRuntime) -> tuple[PersonalActor, AnalysisWorkspace]:
     if runtime.actor is None or runtime.analyses is None:
         raise HTTPException(
@@ -428,6 +484,7 @@ def _raise_domain_error(error: ValueError) -> None:
         "purge_challenge_expired",
         "analysis_not_saveable",
         "evidence_insufficient",
+        "holding_watch_required",
     }:
         status_code = 409
     elif code in {"budget_blocked", "provider_rate_limited"}:
@@ -440,6 +497,8 @@ def _raise_domain_error(error: ValueError) -> None:
         "invalid_rule_parameters",
         "unsupported_instrument",
         "as_of_requires_timezone",
+        "watch_reason_required",
+        "candidate_evidence_insufficient",
     }:
         status_code = 422
     else:
@@ -485,6 +544,27 @@ _RULE_COMMAND_TYPES = {
     "set_rule_state": SetObservationRuleStateCommand,
     "evaluate_rules": EvaluateObservationRulesCommand,
 }
+
+_WATCHLIST_COMMAND_TYPES = {
+    "follow_symbol": FollowInstrumentCommand,
+    "unfollow_symbol": UnfollowInstrumentCommand,
+}
+
+
+async def _parse_watchlist_command(request: Request):
+    try:
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise ValueError("invalid_command")
+        command_type = _WATCHLIST_COMMAND_TYPES.get(payload.get("type"))
+        if command_type is None:
+            raise ValueError("invalid_command")
+        return command_type.model_validate(payload)
+    except (ValueError, TypeError, ValidationError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "invalid_command", "message": "关注状态命令格式无效。"},
+        ) from exc
 
 async def _parse_rule_command(request: Request):
     try:

@@ -92,6 +92,7 @@ def get_personal_runtime() -> PersonalRuntime:
             rulebook=services.rules,
         ),
         portfolio=services.portfolio,
+        watchlist=services.watchlist,
         instruments=services.instruments,
         rules=services.rules,
         analyses=analyses,
