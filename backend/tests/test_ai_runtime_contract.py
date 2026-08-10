@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from dataclasses import replace
+from datetime import datetime, timezone
 from decimal import Decimal
+from hashlib import sha256
 import unittest
 
 from backend.app.personal_workspace.agent.ai_runtime import (
     AIRuntimeCapabilities,
     RuntimeBudget,
+    RuntimeCitation,
+    RuntimeEvidence,
     RuntimeEvent,
     RuntimeRequest,
     RuntimeResult,
@@ -71,6 +76,213 @@ def completed_result() -> RuntimeResult:
 
 
 class AIRuntimeContractTest(unittest.TestCase):
+    def test_hosted_runtime_returns_verified_evidence_citations_and_usage(self) -> None:
+        output = "英伟达已发布最新公开文件。"
+        result = run_runtime(
+            ScriptedHostedRuntime(
+                RuntimeResult.completed(
+                    events=(
+                        RuntimeEvent(type="run_started"),
+                        RuntimeEvent(
+                            type="hosted_tool_started",
+                            tool_name="web_search",
+                            tool_call_id="hosted-1",
+                            arguments={"queries": ["NVDA latest filing", "NVDA IR"]},
+                        ),
+                        RuntimeEvent(
+                            type="hosted_tool_completed",
+                            tool_name="web_search",
+                            tool_call_id="hosted-1",
+                            evidence_ids=("web:1",),
+                        ),
+                        RuntimeEvent(type="output_completed", text=output),
+                    ),
+                    usage=RuntimeUsage(
+                        100,
+                        20,
+                        10,
+                        90,
+                        Decimal("0.003"),
+                        hosted_tool_calls=1,
+                        web_search_queries=2,
+                        hosted_cost_usd=Decimal("0.001"),
+                    ),
+                    evidence=(
+                        RuntimeEvidence(
+                            evidence_id="web:1",
+                            url="https://investor.example/nvda",
+                            title="NVDA Investor Relations",
+                            verified_excerpt="latest public filing",
+                            body_sha256="a" * 64,
+                            verified_at=datetime(2026, 8, 10, tzinfo=timezone.utc),
+                        ),
+                    ),
+                    citations=(
+                        RuntimeCitation(
+                            evidence_id="web:1",
+                            output_block_index=0,
+                            start_char=0,
+                            end_char=len(output),
+                            cited_text_sha256=sha256(output.encode("utf-8")).hexdigest(),
+                        ),
+                    ),
+                )
+            ),
+            RuntimeRequest(
+                model="model-under-test",
+                instructions="test",
+                input_text="test",
+                hosted_tools=("web_search",),
+                budget=RuntimeBudget(remaining_usd=Decimal("1")),
+            ),
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.evidence[0].evidence_id, "web:1")
+        self.assertEqual(result.citations[0].evidence_id, "web:1")
+        self.assertEqual(result.usage.web_search_queries, 2)
+
+    def test_hosted_usage_must_match_events_queries_and_total_cost(self) -> None:
+        events = (
+            RuntimeEvent(type="run_started"),
+            RuntimeEvent(
+                type="hosted_tool_started",
+                tool_name="web_search",
+                tool_call_id="hosted-1",
+                arguments={"queries": ["query one", "query two"]},
+            ),
+            RuntimeEvent(
+                type="hosted_tool_completed",
+                tool_name="web_search",
+                tool_call_id="hosted-1",
+                evidence_ids=("web:1",),
+            ),
+            RuntimeEvent(type="output_completed", text="verified output"),
+        )
+        evidence = (
+            RuntimeEvidence(
+                evidence_id="web:1",
+                url="https://example.com/source",
+                title="Source",
+                verified_excerpt="verified",
+                body_sha256="b" * 64,
+                verified_at=datetime(2026, 8, 10, tzinfo=timezone.utc),
+            ),
+        )
+        citation = (
+            RuntimeCitation(
+                evidence_id="web:1",
+                output_block_index=0,
+                cited_text_sha256=sha256(b"verified output").hexdigest(),
+            ),
+        )
+        invalid_usage = (
+            RuntimeUsage(10, 10, 0, 10, Decimal("0.003"), 0, 2, Decimal("0.001")),
+            RuntimeUsage(10, 10, 0, 10, Decimal("0.003"), 1, 1, Decimal("0.001")),
+            RuntimeUsage(10, 10, 0, 10, Decimal("0.003"), 1, 2, Decimal("0.004")),
+        )
+
+        for usage in invalid_usage:
+            with self.subTest(usage=usage):
+                result = run_runtime(
+                    ScriptedHostedRuntime(
+                        RuntimeResult.completed(
+                            events=events,
+                            usage=usage,
+                            evidence=evidence,
+                            citations=citation,
+                        )
+                    ),
+                    RuntimeRequest(
+                        model="model-under-test",
+                        instructions="test",
+                        input_text="test",
+                        hosted_tools=("web_search",),
+                        budget=RuntimeBudget(remaining_usd=Decimal("1")),
+                    ),
+                )
+                self.assertEqual(result.failure.code, "runtime_contract_invalid")
+
+    def test_hosted_evidence_and_citations_must_be_verified_and_consistent(self) -> None:
+        output = "verified output"
+        events = (
+            RuntimeEvent(type="run_started"),
+            RuntimeEvent(
+                type="hosted_tool_started",
+                tool_name="web_search",
+                tool_call_id="hosted-1",
+                arguments={"query": "public query"},
+            ),
+            RuntimeEvent(
+                type="hosted_tool_completed",
+                tool_name="web_search",
+                tool_call_id="hosted-1",
+                evidence_ids=("web:1",),
+            ),
+            RuntimeEvent(type="output_completed", text=output),
+        )
+        evidence = RuntimeEvidence(
+            evidence_id="web:1",
+            url="https://example.com/source",
+            title="Source",
+            verified_excerpt="verified",
+            body_sha256="c" * 64,
+            verified_at=datetime(2026, 8, 10, tzinfo=timezone.utc),
+        )
+        citation = RuntimeCitation(
+            evidence_id="web:1",
+            output_block_index=0,
+            start_char=0,
+            end_char=len(output),
+            cited_text_sha256=sha256(output.encode("utf-8")).hexdigest(),
+        )
+        invalid_contracts = (
+            ((), ()),
+            ((evidence,), ()),
+            (({"evidence_id": "web:1"},), (citation,)),
+            ((evidence,), ({"evidence_id": "web:1"},)),
+            ((evidence, evidence), (citation,)),
+            ((replace(evidence, url="file:///tmp/source"),), (citation,)),
+            ((replace(evidence, body_sha256="not-a-hash"),), (citation,)),
+            ((replace(evidence, verified_at=datetime(2026, 8, 10)),), (citation,)),
+            ((replace(evidence, verified_at="2026-08-10T00:00:00Z"),), (citation,)),
+            ((replace(evidence, verified_excerpt='{"choices": []}'),), (citation,)),
+            ((evidence,), (replace(citation, evidence_id="web:missing"),)),
+            ((evidence,), (replace(citation, output_block_index=1),)),
+            ((evidence,), (replace(citation, cited_text_sha256="d" * 64),)),
+            ((evidence,), (replace(citation, end_char=None),)),
+        )
+
+        for evidence_items, citations in invalid_contracts:
+            with self.subTest(evidence=evidence_items, citations=citations):
+                result = run_runtime(
+                    ScriptedHostedRuntime(
+                        RuntimeResult.completed(
+                            events=events,
+                            usage=RuntimeUsage(
+                                10,
+                                10,
+                                0,
+                                10,
+                                Decimal("0.003"),
+                                hosted_tool_calls=1,
+                                web_search_queries=1,
+                                hosted_cost_usd=Decimal("0.001"),
+                            ),
+                            evidence=evidence_items,
+                            citations=citations,
+                        )
+                    ),
+                    RuntimeRequest(
+                        model="model-under-test",
+                        instructions="test",
+                        input_text="test",
+                        hosted_tools=("web_search",),
+                        budget=RuntimeBudget(remaining_usd=Decimal("1")),
+                    ),
+                )
+                self.assertEqual(result.failure.code, "runtime_contract_invalid")
+
     def test_completion_runtime_returns_provider_neutral_events_and_usage(self) -> None:
         runtime = ScriptedCompletionRuntime(completed_result())
         request = RuntimeRequest(
@@ -229,6 +441,20 @@ class AIRuntimeContractTest(unittest.TestCase):
             (
                 RuntimeEvent(type="run_started"),
                 RuntimeEvent(type="output_completed", text='{"choices": []}'),
+            ),
+            (
+                RuntimeEvent(type="run_started"),
+                RuntimeEvent(
+                    type="output_completed",
+                    text='{"encrypted_content":"provider-opaque"}',
+                ),
+            ),
+            (
+                RuntimeEvent(type="run_started"),
+                RuntimeEvent(
+                    type="output_completed",
+                    text='{"type":"server_tool_use","id":"raw"}',
+                ),
             ),
             (
                 RuntimeEvent(type="run_started"),
