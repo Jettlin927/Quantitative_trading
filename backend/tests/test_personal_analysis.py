@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import json
@@ -8,6 +9,7 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 
 from backend.app.personal_workspace.analysis import (
+    ANALYSIS_LEASE_SECONDS,
     AnalysisIntent,
     AnalysisUsage,
     AnalysisWorkspace,
@@ -15,6 +17,7 @@ from backend.app.personal_workspace.analysis import (
     EvidenceReadResult,
     InMemoryAnalysisStore,
     DeepSeekChatAdapter,
+    DEEPSEEK_TIMEOUT_SECONDS,
     ProviderFailure,
     ScriptedResponsesAdapter,
     _deepseek_http_transport,
@@ -239,6 +242,60 @@ class PersonalAnalysisTest(unittest.TestCase):
         ):
             self.assertNotIn(denied, captured.lower())
 
+    def test_analysis_heartbeat_renews_lease_and_fences_stale_worker(self) -> None:
+        draft = self.workspace.prepare(
+            self.actor,
+            AnalysisIntent(question="租约测试", subject_ids=("ACME",)),
+            idempotency_key="heartbeat-prepare",
+        )
+        queued = self.workspace.start(
+            self.actor,
+            draft_id=draft.draft_id,
+            preview_sha256=draft.preview_sha256,
+            idempotency_key="heartbeat-start",
+        )
+        _draft, first = self.store.lease_next(
+            worker_id="worker-a", now=NOW, lease_seconds=30
+        )
+        renewed = self.store.heartbeat(
+            first,
+            now=NOW + timedelta(seconds=20),
+            lease_seconds=30,
+        )
+
+        self.assertIsNone(
+            self.store.lease_next(
+                worker_id="worker-b",
+                now=NOW + timedelta(seconds=40),
+                lease_seconds=30,
+            )
+        )
+        _draft, second = self.store.lease_next(
+            worker_id="worker-b",
+            now=NOW + timedelta(seconds=51),
+            lease_seconds=30,
+        )
+        self.assertEqual(second.view.run_id, queued.run_id)
+        self.assertNotEqual(second.lease_token, renewed.lease_token)
+        self.store.save_run(
+            replace(
+                second,
+                lease_owner=None,
+                lease_expires_at=None,
+                view=replace(second.view, status="completed", stage="completed"),
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "analysis_lease_lost"):
+            self.store.save_run(renewed)
+        self.assertEqual(
+            self.store.get_run(self.actor.actor_id, queued.run_id).view.status,
+            "completed",
+        )
+
+    def test_legacy_lease_outlives_single_provider_timeout(self) -> None:
+        self.assertGreater(ANALYSIS_LEASE_SECONDS, DEEPSEEK_TIMEOUT_SECONDS)
+        self.assertEqual(self.workspace._lease_seconds, ANALYSIS_LEASE_SECONDS)
+
     def test_evidence_gap_blocks_enqueue_and_provider_execution(self) -> None:
         provider = ScriptedResponsesAdapter.completed(claims=())
         workspace = AnalysisWorkspace(
@@ -406,6 +463,48 @@ class PersonalAnalysisTest(unittest.TestCase):
             {request["model"] for request in provider.captured_requests},
             {"deepseek-v4-flash"},
         )
+
+    def test_worker_reserves_and_settles_daily_budget_before_active_call(self) -> None:
+        calls = []
+
+        class Guard:
+            def start_call(self, **kwargs):
+                calls.append(("start", kwargs))
+                return "reservation"
+
+            def complete_call(self, reservation, **kwargs):
+                calls.append(("complete", {"reservation": reservation, **kwargs}))
+
+            def mark_outcome_unknown(self, reservation, **kwargs):
+                calls.append(("unknown", {"reservation": reservation, **kwargs}))
+
+        provider = ScriptedResponsesAdapter.completed(
+            claims=self.provider._script[0]["claims"]
+        )
+        workspace = AnalysisWorkspace(
+            store=InMemoryAnalysisStore(),
+            evidence_reader=lambda actor, intent: evidence_candidates(),
+            provider=provider,
+            clock=lambda: NOW,
+            daily_budget_guard=Guard(),
+        )
+        draft = workspace.prepare(
+            self.actor,
+            AnalysisIntent(question="主动分析硬预算", subject_ids=("ACME",)),
+            idempotency_key="active-budget-prepare",
+        )
+        workspace.start(
+            self.actor,
+            draft_id=draft.draft_id,
+            preview_sha256=draft.preview_sha256,
+            idempotency_key="active-budget-start",
+        )
+
+        result = workspace.run_next(worker_id="worker-budget")
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual([name for name, _payload in calls], ["start", "complete"])
+        self.assertEqual(len(provider.captured_requests), 1)
 
     def test_refusal_invalid_schema_and_advice_fail_without_savable_claims(self) -> None:
         scripts = {

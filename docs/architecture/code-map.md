@@ -29,14 +29,15 @@
 - `instrument.py`：美股标的工作区投影。
 - `rules.py` / `rule_automation.py`：确定性观察规则及 XNYS 交易时段自动评估。
 - `journey.py` / `persistence.py`：今日事项聚合与私有持久化。
-- `analysis.py` / `agent/`：AI 分析草稿、运行和受控工具调用。
+- `analysis.py` / `agent/`：AI 分析草稿、统一 Runtime 和受控工具调用。
+- `automatic_briefing.py` / `automatic_briefing_store.py`：固定证据配方、XNYS 自动简报触发、幂等调用与每日费用账本。
 - `market_runtime.py`：把获准的 Alpaca reader 注入私有领域服务。
 - `security.py` / `crypto.py`：gateway、Origin、幂等与私有字段加密。
 - `synthetic.py`：不依赖真实数据的合成 tracer。
 
 ### Worker 与市场观察
 
-- `personal_analysis_worker.py`：AI 分析队列，以及美东盘前、盘中、盘后持仓规则调度；
+- `personal_analysis_worker.py`：AI 分析队列，以及美东盘前、结构化事件盘中、盘后自动简报与持仓规则调度；
   只有私有覆盖中的该进程可读取模型 secret。
 - `market_observation/`：Alpaca adapter、用途授权、来源健康与追加式授权注册表。
 

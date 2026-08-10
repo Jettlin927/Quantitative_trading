@@ -17,6 +17,10 @@
 | `PERSONAL_ANALYSIS_DATABASE_URL` | `quant_personal_analysis` 的完整 PostgreSQL URL | 只供个人分析与持仓规则 Worker，不得与 API 连接复用 |
 | `DEEPSEEK_CREDENTIALS_HOST_FILE` | 仅含 DeepSeek API key 的 JSON 文件绝对路径 | 只读挂载给个人分析 Worker，必须为 owner-only 权限 |
 | `DEEPSEEK_MONTHLY_SOFT_BUDGET_USD` | DeepSeek 月度软预算 | 必须为正数，超预算 fail-closed |
+| `PERSONAL_AI_USD_TO_CNY` / `PERSONAL_AI_FX_SNAPSHOT` | 自动简报费用使用的固定汇率与快照身份 | 必须显式留痕；运行时不得联网临时换汇 |
+| `PERSONAL_AI_DAILY_TARGET_CNY` | XNYS 日费用观察目标 | 默认 `0.50`，只告警、不放宽门禁 |
+| `PERSONAL_AI_DAILY_SOFT_LIMIT_CNY` | 自动简报日软上限 | 默认 `1.00`；达到后停止新增自动调用 |
+| `PERSONAL_AI_DAILY_HARD_LIMIT_CNY` | 所有新增 AI 调用日硬上限 | 默认 `5.00`；预算预留在调用前原子执行 |
 | `PERSONAL_ANALYSIS_PROVIDER` | API 侧非 secret 能力开关 | 只有精确值 `deepseek` 才允许入队；默认 `disabled` |
 | `OFFICIAL_ANALYSIS_QUERY_HOST_FILE` | 官方证据查询清单的宿主绝对路径 | 只读挂载给 API；含标的、固定查询类型、来源授权身份、检查时间、过期时间和内容哈希 |
 | `OFFICIAL_ANALYSIS_AUTHORIZATION_HOST_FILE` | 官方证据用途授权快照的宿主绝对路径 | 只读挂载给 API；必须允许 display/internal_analysis/ai_context，禁止 redistribute/formal_research |

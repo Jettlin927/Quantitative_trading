@@ -19,6 +19,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from .analysis import AnalysisWorkspace, PostgresAnalysisStore
+from .automatic_briefing_store import PostgresAutomaticBriefingStore
 from .contracts import PersonalActor
 from .crypto import PersonalDataCipher
 from .instrument import (
@@ -67,6 +68,7 @@ class PersonalServices:
     rules: ObservationRuleBook
     instruments: InstrumentWorkbench
     analysis_store: PostgresAnalysisStore
+    automatic_briefing_store: PostgresAutomaticBriefingStore
     news_reader: Any | None
     domain_tools: DomainToolRegistry
     domain_tool_metrics: DomainToolMetrics
@@ -166,6 +168,9 @@ def build_personal_services(
         rules=rules,
         instruments=instruments,
         analysis_store=PostgresAnalysisStore(session_factory, cipher=cipher),
+        automatic_briefing_store=PostgresAutomaticBriefingStore(
+            session_factory, cipher=cipher
+        ),
         news_reader=news_reader,
         domain_tools=today_domain_tools.registry(
             observation_recorder=domain_tool_metrics.record
@@ -183,6 +188,7 @@ def build_analysis_workspace(
     monthly_soft_budget_usd: Decimal,
     monthly_spend_reader: Callable[[PersonalActor, Any], Decimal] | None = None,
     clock: Callable[[], Any] | None = None,
+    daily_budget_guard: Any | None = None,
 ) -> AnalysisWorkspace:
     """按 PERSONAL_ANALYSIS_MODE 选择 agent 或单发路径，一次实现、两进程共用。
 
@@ -202,6 +208,7 @@ def build_analysis_workspace(
             "monthly_soft_budget_usd": monthly_soft_budget_usd,
             "monthly_spend_reader": monthly_spend_reader
             or (lambda actor, now: Decimal("0")),
+            "daily_budget_guard": daily_budget_guard,
         }
         if clock is not None:
             kwargs["clock"] = clock
@@ -211,6 +218,7 @@ def build_analysis_workspace(
         "evidence_reader": evidence_reader or (lambda actor, intent: ()),
         "provider": provider,
         "monthly_soft_budget_usd": monthly_soft_budget_usd,
+        "daily_budget_guard": daily_budget_guard,
     }
     if monthly_spend_reader is not None:
         kwargs["monthly_spend_reader"] = monthly_spend_reader

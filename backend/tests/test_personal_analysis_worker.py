@@ -17,6 +17,46 @@ from backend.app.personal_workspace.contracts import PersonalActor
 
 
 class PersonalAnalysisWorkerConfigurationTest(unittest.TestCase):
+    def test_briefing_failure_does_not_stop_rules_or_analysis_queue(self) -> None:
+        stop_event = Event()
+
+        class OneJobWorkspace:
+            calls = 0
+
+            def run_next(self, *, worker_id):
+                self.calls += 1
+                stop_event.set()
+                return object()
+
+        class FailingBriefing:
+            def run_once(self, actor, *, as_of, worker_id):
+                raise RuntimeError("synthetic_briefing_failure")
+
+        class RecordingRule:
+            calls = 0
+
+            def run_once(self, actor, *, as_of):
+                self.calls += 1
+                return SimpleNamespace(failed_symbols=())
+
+        rules = RecordingRule()
+        worker = PersonalAnalysisWorker(
+            workspace=OneJobWorkspace(),
+            worker_id="personal-analysis-worker-test",
+            rule_automation=rules,
+            briefing_automation=FailingBriefing(),
+        )
+
+        with patch("backend.app.personal_analysis_worker.LOGGER.exception") as logged:
+            worker.run_forever(
+                poll_seconds=5,
+                stop_event=stop_event,
+                clock=lambda: datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc),
+            )
+
+        self.assertEqual(rules.calls, 1)
+        logged.assert_called_once_with("personal_briefing_automation_failed")
+
     def test_rule_schedule_failure_does_not_stop_analysis_queue(self) -> None:
         stop_event = Event()
 

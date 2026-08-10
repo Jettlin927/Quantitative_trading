@@ -48,6 +48,7 @@ class GetHoldingsTool:
             return ToolResult(ok=False, content="", error=_failure_code(exc))
         rows: list[dict[str, Any]] = []
         for holding in state.holdings.values():
+            ctx.heartbeat()
             row: dict[str, Any] = {
                 "symbol": holding.symbol,
                 "name": holding.name,
@@ -58,6 +59,7 @@ class GetHoldingsTool:
             }
             if self._price_reader is not None:
                 observation = self._price_reader.observe_price(holding.symbol)
+                ctx.heartbeat()
                 if (
                     observation.availability == "available"
                     and observation.price is not None

@@ -63,8 +63,8 @@ def completed_result() -> RuntimeResult:
         usage=RuntimeUsage(
             input_tokens=800,
             output_tokens=200,
-            cache_read_tokens=300,
-            cache_write_tokens=0,
+            cache_hit_tokens=300,
+            cache_miss_tokens=0,
             cost_usd=Decimal("0.0002"),
         ),
     )

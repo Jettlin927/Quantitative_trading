@@ -27,11 +27,14 @@ from backend.app.models import (
 
 from .contracts import ExcludedAnalysisField, PersonalActor
 from .crypto import EncryptedEnvelope, PersonalDataCipher
+from .automatic_briefing_store import BriefingCost
 
 
 DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
 DEEPSEEK_MODEL = "deepseek-v4-flash"
 DEEPSEEK_MAX_OUTPUT_TOKENS = 4096
+DEEPSEEK_TIMEOUT_SECONDS = 45
+ANALYSIS_LEASE_SECONDS = 120
 DEEPSEEK_CACHE_HIT_USD_PER_MILLION = Decimal("0.0028")
 DEEPSEEK_CACHE_MISS_USD_PER_MILLION = Decimal("0.14")
 DEEPSEEK_OUTPUT_USD_PER_MILLION = Decimal("0.28")
@@ -216,6 +219,7 @@ class StoredAnalysisRun:
     view: AnalysisRunView
     lease_owner: str | None = None
     lease_expires_at: datetime | None = None
+    lease_token: str | None = None
 
 
 class AnalysisStore(Protocol):
@@ -239,6 +243,10 @@ class AnalysisStore(Protocol):
     ) -> tuple[StoredAnalysisDraft, StoredAnalysisRun] | None: ...
 
     def save_run(self, run: StoredAnalysisRun) -> StoredAnalysisRun: ...
+
+    def heartbeat(
+        self, run: StoredAnalysisRun, *, now: datetime, lease_seconds: int
+    ) -> StoredAnalysisRun: ...
 
     def get_run(self, actor_id: str, run_id: str) -> StoredAnalysisRun | None: ...
 
@@ -331,7 +339,7 @@ class InMemoryAnalysisStore:
                     for run in self._runs.values()
                     if run.view.status == "queued"
                     or (
-                        run.view.status == "leased"
+                        run.view.status == "running"
                         and run.lease_expires_at is not None
                         and run.lease_expires_at <= now
                     )
@@ -348,6 +356,9 @@ class InMemoryAnalysisStore:
                 run,
                 lease_owner=worker_id,
                 lease_expires_at=now + timedelta(seconds=lease_seconds),
+                lease_token=_identity_hash(
+                    f"{worker_id}|{run.view.run_id}|{now.isoformat()}"
+                ),
                 view=replace(
                     run.view,
                     status="running",
@@ -363,8 +374,32 @@ class InMemoryAnalysisStore:
 
     def save_run(self, run: StoredAnalysisRun) -> StoredAnalysisRun:
         with self._lock:
-            self._runs[(run.actor_id, run.view.run_id)] = run
-            return run
+            key = (run.actor_id, run.view.run_id)
+            current = self._runs[key]
+            if run.lease_token != current.lease_token:
+                raise ValueError("analysis_lease_lost")
+            stored = replace(run, lease_token=None) if run.lease_owner is None else run
+            self._runs[key] = stored
+            return stored
+
+    def heartbeat(
+        self, run: StoredAnalysisRun, *, now: datetime, lease_seconds: int
+    ) -> StoredAnalysisRun:
+        with self._lock:
+            key = (run.actor_id, run.view.run_id)
+            current = self._runs[key]
+            if (
+                run.lease_token is None
+                or current.lease_token != run.lease_token
+                or current.lease_owner != run.lease_owner
+            ):
+                raise ValueError("analysis_lease_lost")
+            renewed = replace(
+                current,
+                lease_expires_at=now + timedelta(seconds=lease_seconds),
+            )
+            self._runs[key] = renewed
+            return renewed
 
     def get_run(self, actor_id: str, run_id: str) -> StoredAnalysisRun | None:
         with self._lock:
@@ -647,10 +682,14 @@ class PostgresAnalysisStore:
             event = AnalysisEvent(
                 len(run.view.events) + 1, "leased", "running", now
             )
+            lease_token = _identity_hash(
+                f"{worker_id}|{row.id}|{now.isoformat()}"
+            )
             leased = replace(
                 run,
                 lease_owner=worker_id,
                 lease_expires_at=now + timedelta(seconds=lease_seconds),
+                lease_token=lease_token,
                 view=replace(
                     run.view,
                     status="running",
@@ -664,7 +703,7 @@ class PostgresAnalysisStore:
             row.stage = "leased"
             row.attempt_count = leased.view.attempts
             row.lease_owner = worker_id
-            row.lease_token = _identity_hash(f"{worker_id}|{row.id}|{now.isoformat()}")
+            row.lease_token = lease_token
             row.lease_expires_at = leased.lease_expires_at
             envelope = self._cipher.encrypt_json(
                 _stored_run_payload(leased),
@@ -684,19 +723,18 @@ class PostgresAnalysisStore:
             )
             if row is None:
                 raise ValueError("private_object_not_found")
-            row.status = run.view.status
-            row.stage = run.view.stage
-            row.attempt_count = run.view.attempts
-            row.lease_owner = run.lease_owner
-            row.lease_token = (
-                _identity_hash(f"{run.lease_owner}|{row.id}")
-                if run.lease_owner is not None
-                else None
-            )
-            row.lease_expires_at = run.lease_expires_at
-            row.failure_code = run.view.failure_code
+            if row.lease_token != run.lease_token:
+                raise ValueError("analysis_lease_lost")
+            stored = replace(run, lease_token=None) if run.lease_owner is None else run
+            row.status = stored.view.status
+            row.stage = stored.view.stage
+            row.attempt_count = stored.view.attempts
+            row.lease_owner = stored.lease_owner
+            row.lease_token = stored.lease_token
+            row.lease_expires_at = stored.lease_expires_at
+            row.failure_code = stored.view.failure_code
             envelope = self._cipher.encrypt_json(
-                _stored_run_payload(run),
+                _stored_run_payload(stored),
                 aad=_analysis_aad("personal_analysis_runs", row.id),
             )
             _apply_envelope(row, envelope)
@@ -707,7 +745,7 @@ class PostgresAnalysisStore:
                     )
                 ).all()
             )
-            for event in run.view.events:
+            for event in stored.view.events:
                 if event.sequence not in existing_sequences:
                     self._append_event_row(session, row.id, event)
             existing_claim_orders = set(
@@ -717,7 +755,7 @@ class PostgresAnalysisStore:
                     )
                 ).all()
             )
-            for order, claim in enumerate(run.view.claims, start=1):
+            for order, claim in enumerate(stored.view.claims, start=1):
                 if order in existing_claim_orders:
                     continue
                 envelope = self._cipher.encrypt_json(
@@ -734,48 +772,76 @@ class PostgresAnalysisStore:
                         **_analysis_envelope_values(envelope),
                     )
                 )
-            if run.view.attempts > 0:
+            if stored.view.attempts > 0:
                 existing_attempt = session.scalar(
                     select(PersonalAnalysisAttempt).where(
                         PersonalAnalysisAttempt.run_id == row.id,
-                        PersonalAnalysisAttempt.attempt == run.view.attempts,
+                        PersonalAnalysisAttempt.attempt == stored.view.attempts,
                     )
                 )
                 if existing_attempt is None:
                     attempt_id = str(uuid4())
                     attempt_envelope = self._cipher.encrypt_json(
-                        {"failure_code": run.view.failure_code},
+                        {"failure_code": stored.view.failure_code},
                         aad=_analysis_aad("personal_analysis_attempts", attempt_id),
                     )
                     session.add(
                         PersonalAnalysisAttempt(
                             id=attempt_id,
                             run_id=row.id,
-                            attempt=run.view.attempts,
-                            status=run.view.status,
+                            attempt=stored.view.attempts,
+                            status=stored.view.status,
                             estimated_cost_usd=Decimal(
-                                run.view.actual_cost_usd
-                                or run.view.estimated_cost_usd
+                                stored.view.actual_cost_usd
+                                or stored.view.estimated_cost_usd
                             ),
-                            failure_code=run.view.failure_code,
+                            failure_code=stored.view.failure_code,
                             **_analysis_envelope_values(attempt_envelope),
                         )
                     )
                 else:
-                    existing_attempt.status = run.view.status
+                    existing_attempt.status = stored.view.status
                     existing_attempt.estimated_cost_usd = Decimal(
-                        run.view.actual_cost_usd or run.view.estimated_cost_usd
+                        stored.view.actual_cost_usd or stored.view.estimated_cost_usd
                     )
-                    existing_attempt.failure_code = run.view.failure_code
+                    existing_attempt.failure_code = stored.view.failure_code
                     refreshed = self._cipher.encrypt_json(
-                        {"failure_code": run.view.failure_code},
+                        {"failure_code": stored.view.failure_code},
                         aad=_analysis_aad(
                             "personal_analysis_attempts", existing_attempt.id
                         ),
                     )
                     _apply_envelope(existing_attempt, refreshed)
             session.flush()
-            return run
+            return stored
+
+    def heartbeat(
+        self, run: StoredAnalysisRun, *, now: datetime, lease_seconds: int
+    ) -> StoredAnalysisRun:
+        with self._session_factory() as session, session.begin():
+            row = session.scalar(
+                select(PersonalAnalysisRun)
+                .where(PersonalAnalysisRun.id == run.view.run_id)
+                .with_for_update()
+            )
+            if (
+                row is None
+                or run.lease_token is None
+                or row.lease_token != run.lease_token
+                or row.lease_owner != run.lease_owner
+            ):
+                raise ValueError("analysis_lease_lost")
+            renewed = replace(
+                run,
+                lease_expires_at=now + timedelta(seconds=lease_seconds),
+            )
+            row.lease_expires_at = renewed.lease_expires_at
+            envelope = self._cipher.encrypt_json(
+                _stored_run_payload(renewed),
+                aad=_analysis_aad("personal_analysis_runs", row.id),
+            )
+            _apply_envelope(row, envelope)
+            return renewed
 
     def get_run(self, actor_id: str, run_id: str) -> StoredAnalysisRun | None:
         with self._session_factory() as session:
@@ -882,7 +948,10 @@ class PostgresAnalysisStore:
             _analysis_row_envelope(row),
             aad=_analysis_aad("personal_analysis_runs", row.id),
         )
-        return _stored_run_from_payload(actor_id, payload)
+        return replace(
+            _stored_run_from_payload(actor_id, payload),
+            lease_token=row.lease_token,
+        )
 
     def _actor_id_from_draft(self, row: PersonalAnalysisDraft) -> str:
         payload = self._cipher.decrypt_json(
@@ -974,7 +1043,7 @@ class DeepSeekChatAdapter:
         *,
         api_key: str,
         transport: Callable[..., dict[str, Any]] | None = None,
-        timeout_seconds: int = 45,
+        timeout_seconds: int = DEEPSEEK_TIMEOUT_SECONDS,
     ) -> None:
         if not api_key.strip():
             raise ValueError("provider_unavailable")
@@ -1151,7 +1220,8 @@ class AnalysisWorkspace:
         monthly_soft_budget_usd: Decimal = Decimal("25"),
         monthly_spend_reader: Callable[[PersonalActor, datetime], Decimal]
         | None = None,
-        lease_seconds: int = 30,
+        lease_seconds: int = ANALYSIS_LEASE_SECONDS,
+        daily_budget_guard: Any | None = None,
     ) -> None:
         self._store = store
         self._evidence_reader = evidence_reader
@@ -1165,6 +1235,7 @@ class AnalysisWorkspace:
             lambda actor, now: Decimal("0")
         )
         self._lease_seconds = lease_seconds
+        self._daily_budget_guard = daily_budget_guard
 
     def prepare(
         self,
@@ -1348,10 +1419,32 @@ class AnalysisWorkspace:
         draft, run = leased
         validating = _append_event(run, "validating", "running", self._clock())
         self._store.save_run(validating)
-        return self._execute_provider(validating, draft, run)
+        budget_reservation = None
+        if self._daily_budget_guard is not None:
+            try:
+                budget_reservation = self._daily_budget_guard.start_call(
+                    actor_id=draft.actor_id,
+                    run_id=run.view.run_id,
+                    worker_id=worker_id,
+                    estimated_cost_usd=Decimal(run.view.estimated_cost_usd),
+                    now=self._clock(),
+                )
+            except ValueError as exc:
+                return self._fail_run(validating, str(exc))
+        return self._execute_provider(
+            validating,
+            draft,
+            run,
+            budget_reservation=budget_reservation,
+        )
 
     def _execute_provider(
-        self, validating: StoredAnalysisRun, draft: StoredAnalysisDraft, run: StoredAnalysisRun
+        self,
+        validating: StoredAnalysisRun,
+        draft: StoredAnalysisDraft,
+        run: StoredAnalysisRun,
+        *,
+        budget_reservation: Any | None = None,
     ) -> AnalysisRunView | None:
         """单发 provider 执行：请求→重试→校验→记账→完成事件。子类可覆写为 agent 循环。"""
         request = _responses_request(
@@ -1360,12 +1453,20 @@ class AnalysisWorkspace:
             evidence=draft.evidence,
         )
         response: dict[str, Any] | None = None
-        for attempt in range(1, 3):
+        maximum_attempts = 1 if budget_reservation is not None else 2
+        for attempt in range(1, maximum_attempts + 1):
             try:
                 response = self._provider.create_response(request)
                 break
             except ProviderFailure as exc:
-                if not exc.retryable or attempt == 2:
+                if not exc.retryable or attempt == maximum_attempts:
+                    if budget_reservation is not None:
+                        self._daily_budget_guard.mark_outcome_unknown(
+                            budget_reservation,
+                            run_id=run.view.run_id,
+                            failure_code=exc.code,
+                            now=self._clock(),
+                        )
                     return self._fail_run(validating, exc.code)
                 validating = _append_event(
                     validating,
@@ -1384,7 +1485,20 @@ class AnalysisWorkspace:
             claims = _validate_response(response, draft.evidence)
             usage = _analysis_usage(response)
         except ValueError as exc:
+            if budget_reservation is not None:
+                self._settle_daily_budget(
+                    budget_reservation,
+                    run_id=run.view.run_id,
+                    response=response,
+                    failure_code=str(exc),
+                )
             return self._fail_run(validating, str(exc))
+        if budget_reservation is not None:
+            self._settle_daily_budget(
+                budget_reservation,
+                run_id=run.view.run_id,
+                response=response,
+            )
         completed = _append_event(validating, "completed", "completed", self._clock())
         completed = replace(
             completed,
@@ -1404,6 +1518,40 @@ class AnalysisWorkspace:
             ),
         )
         return self._store.save_run(completed).view
+
+    def _settle_daily_budget(
+        self,
+        budget_reservation: Any,
+        *,
+        run_id: str,
+        response: dict[str, Any],
+        failure_code: str | None = None,
+    ) -> None:
+        if response.get("cost_usd") is None:
+            self._daily_budget_guard.mark_outcome_unknown(
+                budget_reservation,
+                run_id=run_id,
+                failure_code=failure_code or "provider_cost_unknown",
+                now=self._clock(),
+            )
+            return
+        try:
+            usage = _analysis_usage(response)
+        except ValueError:
+            usage = None
+        self._daily_budget_guard.complete_call(
+            budget_reservation,
+            run_id=run_id,
+            cost=BriefingCost(
+                input_tokens=usage.input_tokens if usage else 0,
+                output_tokens=usage.output_tokens if usage else 0,
+                cache_hit_tokens=usage.cache_hit_tokens if usage else 0,
+                cache_miss_tokens=usage.cache_miss_tokens if usage else 0,
+                cost_usd=Decimal(str(response.get("cost_usd") or 0)),
+            ),
+            failure_code=failure_code,
+            now=self._clock(),
+        )
 
     def _fail_run(self, run: StoredAnalysisRun, code: str) -> AnalysisRunView:
         failed = _append_event(run, "failed", "failed", self._clock(), code=code)
@@ -1696,6 +1844,7 @@ def _stored_run_payload(run: StoredAnalysisRun) -> dict[str, Any]:
         "actor_id": run.actor_id,
         "idempotency_key": run.idempotency_key,
         "lease_owner": run.lease_owner,
+        "lease_token": run.lease_token,
         "lease_expires_at": (
             run.lease_expires_at.isoformat()
             if run.lease_expires_at is not None
@@ -1720,6 +1869,7 @@ def _stored_run_from_payload(
         actor_id=actor_id or payload["actor_id"],
         idempotency_key=payload["idempotency_key"],
         lease_owner=payload.get("lease_owner"),
+        lease_token=payload.get("lease_token"),
         lease_expires_at=(
             datetime.fromisoformat(payload["lease_expires_at"])
             if payload.get("lease_expires_at") is not None

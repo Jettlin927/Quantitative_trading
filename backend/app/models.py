@@ -718,6 +718,93 @@ class PersonalAiClaim(PrivateBase):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class PersonalAutomaticBriefing(PrivateBase):
+    __tablename__ = "personal_automatic_briefings"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "trigger_key_hash",
+            name="uq_personal_automatic_briefing_trigger",
+        ),
+        UniqueConstraint(
+            "reservation_id",
+            name="uq_personal_automatic_briefing_reservation",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    trigger_key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    market_date: Mapped[date] = mapped_column(Date, nullable=False)
+    trigger_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    provider_state: Mapped[str] = mapped_column(String(24), nullable=False)
+    failure_code: Mapped[str | None] = mapped_column(String(64))
+    mode: Mapped[str | None] = mapped_column(String(16))
+    lease_owner: Mapped[str | None] = mapped_column(String(100))
+    lease_token: Mapped[str | None] = mapped_column(String(64))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reservation_id: Mapped[str | None] = mapped_column(String(36))
+    estimated_cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(16, 8))
+    estimated_cost_cny: Mapped[Decimal | None] = mapped_column(Numeric(16, 8))
+    actual_cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(16, 8))
+    actual_cost_cny: Mapped[Decimal | None] = mapped_column(Numeric(16, 8))
+    accounted_cost_usd: Mapped[Decimal] = mapped_column(
+        Numeric(16, 8), nullable=False, default=Decimal("0")
+    )
+    accounted_cost_cny: Mapped[Decimal] = mapped_column(
+        Numeric(16, 8), nullable=False, default=Decimal("0")
+    )
+    fx_cny_per_usd: Mapped[Decimal | None] = mapped_column(Numeric(16, 8))
+    policy_revision: Mapped[str | None] = mapped_column(String(64))
+    target_cny: Mapped[Decimal | None] = mapped_column(Numeric(16, 8))
+    soft_limit_cny: Mapped[Decimal | None] = mapped_column(Numeric(16, 8))
+    hard_limit_cny: Mapped[Decimal | None] = mapped_column(Numeric(16, 8))
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PersonalAutomaticBriefingDailyBudget(PrivateBase):
+    __tablename__ = "personal_automatic_briefing_daily_budgets"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "market_date",
+            name="uq_personal_automatic_briefing_daily_budget",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    market_date: Mapped[date] = mapped_column(Date, nullable=False)
+    reserved_cost_usd: Mapped[Decimal] = mapped_column(Numeric(16, 8), nullable=False)
+    reserved_cost_cny: Mapped[Decimal] = mapped_column(Numeric(16, 8), nullable=False)
+    settled_cost_usd: Mapped[Decimal] = mapped_column(Numeric(16, 8), nullable=False)
+    settled_cost_cny: Mapped[Decimal] = mapped_column(Numeric(16, 8), nullable=False)
+    target_notified: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class PersonalRedactionEvent(PrivateBase):
     __tablename__ = "personal_redaction_events"
     __table_args__ = (

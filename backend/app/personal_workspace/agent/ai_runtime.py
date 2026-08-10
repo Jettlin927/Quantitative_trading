@@ -41,8 +41,8 @@ class RuntimeRequest:
 class RuntimeUsage:
     input_tokens: int
     output_tokens: int
-    cache_read_tokens: int
-    cache_write_tokens: int
+    cache_hit_tokens: int
+    cache_miss_tokens: int
     cost_usd: Decimal
 
 
@@ -216,8 +216,8 @@ def _valid_usage(usage: RuntimeUsage) -> bool:
     token_values = (
         usage.input_tokens,
         usage.output_tokens,
-        usage.cache_read_tokens,
-        usage.cache_write_tokens,
+        usage.cache_hit_tokens,
+        usage.cache_miss_tokens,
     )
     return all(
         isinstance(value, int) and not isinstance(value, bool) and value >= 0
