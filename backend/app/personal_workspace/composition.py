@@ -221,6 +221,7 @@ def build_analysis_workspace(
         kwargs: dict[str, Any] = {
             "store": services.analysis_store,
             "domain_tools": services.domain_tools,
+            "evidence_ledger": services.evidence_store,
             "provider": provider,
             "monthly_soft_budget_usd": monthly_soft_budget_usd,
             "monthly_spend_reader": monthly_spend_reader

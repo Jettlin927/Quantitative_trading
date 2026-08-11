@@ -40,6 +40,7 @@ from .ai_runtime import (
     RuntimeExecutionContext,
     RuntimeRequest,
     RuntimeResult,
+    RuntimeToolEvidence,
     RuntimeUsage,
     run_runtime,
 )
@@ -50,6 +51,8 @@ from .client_tool_runtime import (
 )
 from .completion_runtime import DeepSeekCompletionRuntime
 from .domain_tools import DomainToolRegistry, RuntimeToolDefinition
+from .evidence import EvidenceLedger, EvidenceReadContext
+from .evidence import FrozenEvidence as LedgerFrozenEvidence
 from .protocol import Skill
 
 AGENT_CONFIG_REVISION = "personal-agent-deepseek-v1"
@@ -79,6 +82,7 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
         store: AnalysisStore,
         runtime: DeepSeekCompletionRuntime,
         domain_tools: DomainToolRegistry,
+        evidence_ledger: EvidenceLedger,
         tools: tuple[RuntimeToolDefinition, ...],
         skills: tuple[Skill, ...],
         model: str = DEEPSEEK_MODEL,
@@ -108,6 +112,7 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
         )
         self._runtime = runtime
         self._domain_tools = domain_tools
+        self._evidence_ledger = evidence_ledger
         self._tools = tuple(tools)
         self._skills = tuple(skills)
 
@@ -267,8 +272,18 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
             self._runtime_request(draft.intent, remaining_usd=remaining),
             context,
         )
-        tool_evidence = _analysis_evidence(result)
         tool_events = _analysis_tool_events(result.events)
+        evidence_failure = None
+        try:
+            tool_evidence = _freeze_analysis_evidence(
+                result,
+                ledger=self._evidence_ledger,
+                actor_id=draft.actor_id,
+                now=self._clock(),
+            )
+        except Exception:
+            tool_evidence = ()
+            evidence_failure = "tool_evidence_freeze_failed"
         current_run = replace(
             current_run,
             view=replace(
@@ -279,6 +294,37 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
         )
         usage = _analysis_runtime_usage(result.usage)
         cost_usd = format(result.usage.cost_usd, "f") if result.usage else None
+
+        if evidence_failure is not None and result.status == "completed":
+            outcome_unknown = result.usage is None and (
+                result.failure is None or result.failure.outcome_unknown
+            )
+            self._settle_runtime_budget(
+                budget_reservation,
+                run_id=run.view.run_id,
+                usage=result.usage,
+                failure_code=evidence_failure,
+                outcome_unknown=outcome_unknown,
+            )
+            failed = replace(
+                current_run,
+                view=replace(
+                    current_run.view,
+                    provider_call_state=(
+                        "outcome_unknown" if outcome_unknown else "completed"
+                    ),
+                    actual_cost_usd=cost_usd or (
+                        "0" if not outcome_unknown else None
+                    ),
+                    accounted_cost_usd=(
+                        cost_usd or "0"
+                        if not outcome_unknown
+                        else current_run.view.accounted_cost_usd
+                    ),
+                    usage=usage,
+                ),
+            )
+            return self._fail_run(failed, evidence_failure)
 
         if result.status == "cancelled":
             failure = result.failure
@@ -507,22 +553,80 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
         )
 
 
-def _analysis_evidence(result: RuntimeResult) -> tuple[FrozenEvidence, ...]:
-    evidence_by_id: dict[str, FrozenEvidence] = {}
-    for item in result.tool_evidence:
-        evidence_by_id.setdefault(
-            item.evidence_id,
-            FrozenEvidence(
-                evidence_id=item.evidence_id,
-                kind="tool_output",
-                source=item.source,
-                field=(item.authorized_fields[0] if item.authorized_fields else "tool_output"),
-                excerpt=item.excerpt,
-                content_sha256=item.content_sha256,
-                as_of=item.as_of,
-            ),
-        )
-    return tuple(evidence_by_id.values())
+def _freeze_analysis_evidence(
+    result: RuntimeResult,
+    *,
+    ledger: EvidenceLedger,
+    actor_id: str,
+    now: datetime,
+) -> tuple[FrozenEvidence, ...]:
+    runtime_evidence = tuple(result.tool_evidence)
+    if not runtime_evidence:
+        return ()
+    evidence_ids = tuple(item.evidence_id for item in runtime_evidence)
+    frozen = ledger.freeze(
+        EvidenceReadContext(
+            actor_id=actor_id,
+            permissions=ANALYSIS_TOOL_PERMISSIONS,
+            purpose="domain_tool",
+            now=now,
+        ),
+        evidence_ids,
+    )
+    if tuple(item.evidence_id for item in frozen) != evidence_ids:
+        raise ValueError("tool_evidence_identity_mismatch")
+    return tuple(
+        _analysis_frozen_evidence(runtime_item, ledger_item)
+        for runtime_item, ledger_item in zip(runtime_evidence, frozen, strict=True)
+    )
+
+
+def _analysis_frozen_evidence(
+    runtime_item: RuntimeToolEvidence, ledger_item: LedgerFrozenEvidence
+) -> FrozenEvidence:
+    if (
+        ledger_item.persistence != "encrypted_payload"
+        or ledger_item.payload is None
+        or ledger_item.content_sha256 != runtime_item.content_sha256
+    ):
+        raise ValueError("tool_evidence_identity_mismatch")
+    as_of = (
+        ledger_item.observed_at
+        or ledger_item.published_at
+        or ledger_item.effective_at
+        or ledger_item.available_from
+        or ledger_item.fetched_at
+    )
+    return FrozenEvidence(
+        evidence_id=ledger_item.evidence_id,
+        kind="tool_output",
+        source=ledger_item.source,
+        field=(
+            ledger_item.authorized_fields[0]
+            if ledger_item.authorized_fields
+            else "tool_output"
+        ),
+        excerpt=json.dumps(
+            _mutable_evidence_payload(ledger_item.payload),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )[:200],
+        content_sha256=ledger_item.content_sha256,
+        as_of=as_of,
+    )
+
+
+def _mutable_evidence_payload(value: Any) -> Any:
+    if isinstance(value, dict) or hasattr(value, "items"):
+        return {
+            str(key): _mutable_evidence_payload(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (tuple, list)):
+        return [_mutable_evidence_payload(item) for item in value]
+    return value
 
 
 def _analysis_tool_events(
@@ -565,6 +669,7 @@ def build_agent_workspace(
     *,
     store: AnalysisStore,
     domain_tools: DomainToolRegistry,
+    evidence_ledger: EvidenceLedger,
     provider: Any,
     monthly_soft_budget_usd: Decimal,
     monthly_spend_reader: Callable[[PersonalActor, datetime], Decimal],
@@ -589,6 +694,7 @@ def build_agent_workspace(
         store=store,
         runtime=runtime,
         domain_tools=domain_tools,
+        evidence_ledger=evidence_ledger,
         tools=tools,
         skills=DEFAULT_ACTIVE_SKILLS,
         model=DEEPSEEK_MODEL,
