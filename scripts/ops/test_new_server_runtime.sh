@@ -43,9 +43,12 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p \
-  "$TEST_ROOT/postgres"
+  "$TEST_ROOT/postgres" \
+  "$TEST_ROOT/news"
 touch \
   "$TEST_ROOT/personal-gateway-token" \
+  "$TEST_ROOT/personal-mcp-database-url" \
+  "$TEST_ROOT/personal-mcp-token" \
   "$TEST_ROOT/personal-keyring.json" \
   "$TEST_ROOT/deepseek-credentials.json" \
   "$TEST_ROOT/alpaca-credentials.json" \
@@ -174,6 +177,7 @@ config = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 test_root = Path(sys.argv[2]).resolve()
 services = config["services"]
 api = services["api"]
+assert "personal-mcp" not in services, services
 
 assert api["environment"]["PRIVATE_DATABASE_URL"] == (
     "postgresql+psycopg://quant_personal_api:compose-only@db:5432/quant_trading"
@@ -309,6 +313,96 @@ for service_name, service in services.items():
     assert deepseek_environment.isdisjoint(service.get("environment", {})), service_name
     targets = {mount["target"] for mount in service.get("volumes", [])}
     assert "/run/secrets/deepseek-credentials.json" not in targets, service_name
+PY
+
+POSTGRES_PASSWORD=compose-config-only \
+POSTGRES_DATA_DIR="$TEST_ROOT/postgres" \
+PRIVATE_DATABASE_URL='postgresql+psycopg://quant_personal_api:compose-only@db:5432/quant_trading' \
+PERSONAL_GATEWAY_TOKEN_HOST_FILE="$TEST_ROOT/personal-gateway-token" \
+PERSONAL_ALLOWED_ORIGINS='http://127.0.0.1:25173' \
+OFFICIAL_ANALYSIS_QUERY_HOST_FILE="$TEST_ROOT/official-analysis-queries.json" \
+OFFICIAL_ANALYSIS_AUTHORIZATION_HOST_FILE="$TEST_ROOT/official-analysis-authorization.json" \
+SEC_USER_AGENT='QuantitativeTrading compose@example.invalid' \
+PERSONAL_MCP_ENABLED=true \
+PERSONAL_MCP_ACTOR_ID='compose-fixed-owner' \
+PERSONAL_MCP_DATABASE_URL_HOST_FILE="$TEST_ROOT/personal-mcp-database-url" \
+PERSONAL_MCP_TOKEN_HOST_FILE="$TEST_ROOT/personal-mcp-token" \
+PERSONAL_DATA_KEYRING_HOST_FILE="$TEST_ROOT/personal-keyring.json" \
+ALPACA_CREDENTIALS_HOST_FILE="$TEST_ROOT/alpaca-credentials.json" \
+ALPACA_AUTHORIZATION_HOST_FILE="$TEST_ROOT/alpaca-authorization.json" \
+INVESTMENT_NEWS_HOST_DIR="$TEST_ROOT/news" \
+docker compose \
+  --profile personal-mcp \
+  --env-file /dev/null \
+  --file "$REPO_ROOT/docker-compose.yml" \
+  --file "$SERVER_COMPOSE_FILE" \
+  --file "$PERSONAL_COMPOSE_FILE" \
+  config --format json > "$TEST_ROOT/personal-mcp-config.json"
+
+python3 - "$TEST_ROOT/personal-mcp-config.json" "$TEST_ROOT" <<'PY'
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+
+config = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+test_root = Path(sys.argv[2]).resolve()
+service = config["services"]["personal-mcp"]
+assert service["profiles"] == ["personal-mcp"], service["profiles"]
+assert service["network_mode"] == "host", service.get("network_mode")
+assert not service.get("ports"), service.get("ports")
+assert service["command"] == [
+    "python",
+    "-m",
+    "backend.app.personal_workspace.mcp_http_server",
+], service["command"]
+
+environment = service["environment"]
+assert environment == {
+    "ALPACA_AUTHORIZATION_FILE": "/run/config/alpaca-authorization.json",
+    "ALPACA_CREDENTIALS_FILE": "/run/secrets/alpaca-credentials.json",
+    "INVESTMENT_NEWS_DIR": "/run/news",
+    "PERSONAL_DATA_KEYRING_FILE": "/run/secrets/personal-keyring.json",
+    "PERSONAL_MCP_ACTOR_ID": "compose-fixed-owner",
+    "PERSONAL_MCP_DATABASE_URL_FILE": "/run/secrets/personal-mcp-database-url",
+    "PERSONAL_MCP_ENABLED": "true",
+    "PERSONAL_MCP_TOKEN_FILE": "/run/secrets/personal-mcp-token",
+}, environment
+for forbidden in (
+    "PRIVATE_DATABASE_URL",
+    "PERSONAL_MCP_TOKEN",
+    "DEEPSEEK_TOKEN",
+    "DEEPSEEK_CREDENTIALS_FILE",
+    "PERSONAL_MCP_HTTP_HOST",
+    "PERSONAL_MCP_HTTP_PORT",
+):
+    assert forbidden not in environment, forbidden
+
+mounts = {mount["target"]: mount for mount in service.get("volumes", [])}
+expected = {
+    "/run/secrets/personal-mcp-database-url": test_root / "personal-mcp-database-url",
+    "/run/secrets/personal-mcp-token": test_root / "personal-mcp-token",
+    "/run/secrets/personal-keyring.json": test_root / "personal-keyring.json",
+    "/run/secrets/alpaca-credentials.json": test_root / "alpaca-credentials.json",
+    "/run/config/alpaca-authorization.json": test_root / "alpaca-authorization.json",
+    "/run/news": test_root / "news",
+}
+assert set(mounts) == set(expected), mounts
+for target, source in expected.items():
+    mount = mounts[target]
+    assert mount["type"] == "bind", mount
+    assert Path(mount["source"]).resolve() == source, mount
+    assert mount["read_only"] is True, mount
+    assert mount.get("bind", {}).get("create_host_path") in (None, False), mount
+
+for service_name, other in config["services"].items():
+    if service_name == "personal-mcp":
+        continue
+    targets = {mount["target"] for mount in other.get("volumes", [])}
+    assert "/run/secrets/personal-mcp-token" not in targets, service_name
+    assert "/run/secrets/personal-mcp-database-url" not in targets, service_name
 PY
 
 echo "新服务器 Compose 合同通过"

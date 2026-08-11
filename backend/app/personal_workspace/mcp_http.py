@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 import hmac
-import os
 from pathlib import Path
-import stat
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -16,6 +14,7 @@ from starlette.routing import Route
 
 from .mcp_gateway import PERSONAL_MCP_HTTP_POLICY, PersonalMcpGateway
 from .mcp_protocol import create_mcp_protocol_server, redact_mcp_protocol_logs
+from .owner_only_file import OwnerOnlyFileError, read_owner_only_file
 
 
 class PersonalMcpHttpConfigurationError(RuntimeError):
@@ -103,32 +102,19 @@ async def _reject(status: int, code: str, scope: Any, receive: Any, send: Any) -
 
 def _load_bearer_token(path: Path) -> bytes:
     try:
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-        descriptor = os.open(path, flags)
-        try:
-            metadata = os.fstat(descriptor)
-            if (
-                not stat.S_ISREG(metadata.st_mode)
-                or metadata.st_uid != os.geteuid()
-                or metadata.st_mode & 0o077
-                or not metadata.st_mode & stat.S_IRUSR
-            ):
-                raise PersonalMcpHttpConfigurationError(
-                    "personal_mcp_token_file_permissions_invalid"
-                )
-            raw = os.read(descriptor, 4097)
-        finally:
-            os.close(descriptor)
-    except PersonalMcpHttpConfigurationError:
-        raise
-    except (OSError, TypeError, ValueError) as exc:
+        raw = read_owner_only_file(path, maximum_bytes=4096)
+    except OwnerOnlyFileError as exc:
+        code = (
+            "personal_mcp_token_file_permissions_invalid"
+            if str(exc) == "permissions"
+            else "personal_mcp_token_file_invalid"
+        )
         raise PersonalMcpHttpConfigurationError(
-            "personal_mcp_token_file_invalid"
+            code
         ) from exc
     token = raw.rstrip(b"\r\n")
     if (
         not token
-        or len(raw) > 4096
         or any(byte <= 0x20 or byte == 0x7F for byte in token)
     ):
         raise PersonalMcpHttpConfigurationError("personal_mcp_token_invalid")

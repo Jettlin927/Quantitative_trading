@@ -5,7 +5,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from backend.app.market_observation.alpaca import (
     AlpacaCredentials,
@@ -89,9 +89,47 @@ def load_personal_market_readers(
 ) -> PersonalMarketReaders:
     """从只读文件装配个人工作台行情；任何配置异常都整体 fail closed。"""
 
+    return _load_personal_market_readers(
+        credentials_file=credentials_file,
+        authorization_file=authorization_file,
+        transport=transport,
+        mapping_reader=_read_mapping,
+    )
+
+
+def load_owner_only_personal_market_readers(
+    *,
+    credentials_file: str | Path,
+    authorization_file: str | Path,
+    transport: ProviderTransport | None = None,
+) -> PersonalMarketReaders:
+    """只从 owner-only 有界文件装配行情；任何异常都整体 fail closed。"""
+
+    return _load_personal_market_readers(
+        credentials_file=credentials_file,
+        authorization_file=authorization_file,
+        transport=transport,
+        mapping_reader=_read_owner_only_mapping,
+    )
+
+
+def _load_personal_market_readers(
+    *,
+    credentials_file: str | Path,
+    authorization_file: str | Path,
+    transport: ProviderTransport | None,
+    mapping_reader: Callable[[str | Path], Mapping[str, Any]],
+) -> PersonalMarketReaders:
     try:
-        authorizations = _load_authorizations(authorization_file)
-    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+        authorizations = _load_authorizations(authorization_file, mapping_reader)
+    except (
+        OSError,
+        RuntimeError,
+        json.JSONDecodeError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ):
         return PersonalMarketReaders.unavailable()
     retention_by_authorization = MappingProxyType(
         {
@@ -100,8 +138,15 @@ def load_personal_market_readers(
         }
     )
     try:
-        credentials = _load_credentials(credentials_file)
-    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+        credentials = _load_credentials(credentials_file, mapping_reader)
+    except (
+        OSError,
+        RuntimeError,
+        json.JSONDecodeError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ):
         return PersonalMarketReaders.unavailable(
             evidence_retention_by_authorization=retention_by_authorization
         )
@@ -124,8 +169,11 @@ def load_personal_market_readers(
     )
 
 
-def _load_credentials(path: str | Path) -> AlpacaCredentials:
-    payload = _read_mapping(path)
+def _load_credentials(
+    path: str | Path,
+    mapping_reader: Callable[[str | Path], Mapping[str, Any]],
+) -> AlpacaCredentials:
+    payload = mapping_reader(path)
     if set(payload) != {"key_id", "secret_key"}:
         raise ValueError("alpaca_credentials_schema_invalid")
     key_id = _required_clean_text(payload, "key_id")
@@ -133,8 +181,11 @@ def _load_credentials(path: str | Path) -> AlpacaCredentials:
     return AlpacaCredentials(key_id=key_id, secret_key=secret_key)
 
 
-def _load_authorizations(path: str | Path) -> AppendOnlyAuthorizationRegistry:
-    payload = _read_mapping(path)
+def _load_authorizations(
+    path: str | Path,
+    mapping_reader: Callable[[str | Path], Mapping[str, Any]],
+) -> AppendOnlyAuthorizationRegistry:
+    payload = mapping_reader(path)
     if set(payload) != {"feed", "delay_seconds", "snapshots"}:
         raise ValueError("alpaca_authorization_schema_invalid")
     if payload["feed"] != "sip" or payload["delay_seconds"] != 900:
@@ -205,6 +256,16 @@ def _evidence_persistence(snapshot: SourceAuthorizationSnapshot) -> str:
 
 def _read_mapping(path: str | Path) -> Mapping[str, Any]:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping):
+        raise ValueError("alpaca_file_schema_invalid")
+    return payload
+
+
+def _read_owner_only_mapping(path: str | Path) -> Mapping[str, Any]:
+    from .owner_only_file import read_owner_only_file
+
+    raw = read_owner_only_file(path, maximum_bytes=1024 * 1024)
+    payload = json.loads(raw.decode("utf-8", errors="strict"))
     if not isinstance(payload, Mapping):
         raise ValueError("alpaca_file_schema_invalid")
     return payload

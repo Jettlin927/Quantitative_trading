@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "personal-investment-workbench": {
+      "type": "http",
+      "url": "http://127.0.0.1:26174/mcp",
+      "headers": {
+        "Authorization": "Bearer ${PERSONAL_MCP_BEARER_TOKEN}"
+      }
+    }
+  }
+}

@@ -89,6 +89,7 @@ def build_personal_services(
     alpaca_credentials_file: str | None = None,
     alpaca_authorization_file: str | None = None,
     investment_news_dir: str | None = None,
+    market_readers: PersonalMarketReaders | None = None,
 ) -> PersonalServices:
     """从数据库 URL 与 keyring 装配服务骨架；Alpaca/新闻配置缺失时整体降级。
 
@@ -100,18 +101,19 @@ def build_personal_services(
         bind=private_engine, autoflush=False, expire_on_commit=False
     )
     cipher = PersonalDataCipher(keyring)
-    market_readers = load_personal_market_readers(
-        credentials_file=(
-            alpaca_credentials_file
-            if alpaca_credentials_file is not None
-            else os.getenv("ALPACA_CREDENTIALS_FILE", "").strip()
-        ),
-        authorization_file=(
-            alpaca_authorization_file
-            if alpaca_authorization_file is not None
-            else os.getenv("ALPACA_AUTHORIZATION_FILE", "").strip()
-        ),
-    )
+    if market_readers is None:
+        market_readers = load_personal_market_readers(
+            credentials_file=(
+                alpaca_credentials_file
+                if alpaca_credentials_file is not None
+                else os.getenv("ALPACA_CREDENTIALS_FILE", "").strip()
+            ),
+            authorization_file=(
+                alpaca_authorization_file
+                if alpaca_authorization_file is not None
+                else os.getenv("ALPACA_AUTHORIZATION_FILE", "").strip()
+            ),
+        )
     portfolio_store = PostgresPortfolioStore(session_factory, cipher=cipher)
     portfolio = PortfolioBook(
         store=portfolio_store,
