@@ -466,7 +466,19 @@ class TodayDomainToolsTest(unittest.TestCase):
             calls.append((actor.actor_id, symbol, now, bar_days, bar_limit))
             return {
                 "symbol": symbol,
-                "bars": [{"date": "2026-08-08", "close": "100"}],
+                "adjustment": "raw",
+                "as_of": now.isoformat(),
+                "source_health": "fresh",
+                "bars": [
+                    {
+                        "date": "2026-08-08",
+                        "open": "90",
+                        "high": "101",
+                        "low": "89",
+                        "close": "100",
+                        "volume": 1000,
+                    }
+                ],
                 "count": 1,
             }
 
