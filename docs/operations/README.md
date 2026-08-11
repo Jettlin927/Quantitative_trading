@@ -8,6 +8,7 @@
 - [生产服务器部署、受控变更与家庭电脑访问](production-deployment-and-home-access.md)
 - [生产 PostgreSQL 运行角色与私有权限](production-postgres-runtime-roles.md)
 - [个人工作台生产 secret 与 Compose 覆盖](personal-workbench-secrets.md)
+- [本机只读 MCP stdio 启用与关闭](personal-mcp-stdio.md)
 - [远程访问决策：仅使用 SSH 隧道](private-https-authentication-decision.md)
 
 `research-orchestrator.md`、`research-publication.md` 与 `docs/acceptance/` 只解释遗留系统
