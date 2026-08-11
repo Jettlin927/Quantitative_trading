@@ -107,7 +107,7 @@ class FactSourcesPostgresTest(unittest.TestCase):
         )
         self.assertEqual(
             frozen[0].authorization_snapshot_id,
-            "actor-owned-personal-portfolio-v1",
+            "actor-owned-personal-portfolio-v2",
         )
         self.assertEqual(
             {record.authorization_snapshot_id for record in frozen[1:]},
@@ -197,14 +197,8 @@ class FactSourcesPostgresTest(unittest.TestCase):
 
     def test_historical_private_policy_survives_restart_and_rotation(self) -> None:
         v1 = PRIVATE_FACT_POLICY_HISTORY["personal_portfolio"][0]
-        v2 = replace(
-            v1,
-            authorization_snapshot_id="actor-owned-personal-portfolio-v2",
-        )
-        retention = {
-            **RETENTION,
-            (v2.source, v2.authorization_snapshot_id): v2.persistence,
-        }
+        v2 = PRIVATE_FACT_POLICY_HISTORY["personal_portfolio"][1]
+        retention = RETENTION
         actor = f"fact-private-history-{uuid4()}"
         context = EvidenceReadContext(
             actor_id=actor,
@@ -239,10 +233,24 @@ class FactSourcesPostgresTest(unittest.TestCase):
                 "actor-owned-personal-portfolio-v2",
             ),
         )
+        mcp_context = replace(context, purpose="mcp_stdio")
+        with self.assertRaisesRegex(
+            EvidenceLedgerError, "evidence_purpose_denied"
+        ):
+            self._store().read(mcp_context, old.evidence_id)
+        self.assertEqual(
+            self._store().read(mcp_context, new.evidence_id).evidence_id,
+            new.evidence_id,
+        )
+        without_v1_retention = {
+            key: value
+            for key, value in retention.items()
+            if key != (v1.source, v1.authorization_snapshot_id)
+        }
         with self.assertRaisesRegex(
             EvidenceLedgerError, "source_retention_unknown"
         ):
-            self._store().read(context, new.evidence_id)
+            self._store(without_v1_retention).read(context, old.evidence_id)
 
 
 if __name__ == "__main__":

@@ -177,6 +177,7 @@ class DomainToolContractTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"portfolio:read", "market:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={},
@@ -208,6 +209,7 @@ class DomainToolContractTest(unittest.TestCase):
         context = DomainToolContext(
             actor_id="actor-1",
             granted_permissions=frozenset({"portfolio:read", "market:read", "news:read"}),
+            purpose="domain_tool",
             clock=lambda: NOW,
         )
         partial = registry.invoke(
@@ -226,11 +228,15 @@ class DomainToolContractTest(unittest.TestCase):
     def test_unavailable_unauthorized_unknown_and_invalid_input_are_stable(self) -> None:
         registry = DomainToolRegistry(handlers={})
         no_permissions = DomainToolContext(
-            actor_id="actor-1", granted_permissions=frozenset(), clock=lambda: NOW
+            actor_id="actor-1",
+            granted_permissions=frozenset(),
+            purpose="domain_tool",
+            clock=lambda: NOW,
         )
         allowed = DomainToolContext(
             actor_id="actor-1",
             granted_permissions=frozenset({"portfolio:read", "market:read"}),
+            purpose="domain_tool",
             clock=lambda: NOW,
         )
         unauthorized = registry.invoke(
@@ -256,6 +262,7 @@ class DomainToolContractTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"web_evidence:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={"query": "NVDA latest filing"},
@@ -287,6 +294,7 @@ class DomainToolContractTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"portfolio:read", "market:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={},
@@ -312,6 +320,7 @@ class DomainToolContractTest(unittest.TestCase):
                         granted_permissions=frozenset(
                             {"portfolio:read", "market:read"}
                         ),
+                        purpose="domain_tool",
                         clock=lambda: NOW,
                     ),
                     arguments={},
@@ -348,6 +357,7 @@ class DomainToolContractTest(unittest.TestCase):
                     context=DomainToolContext(
                         actor_id="actor-1",
                         granted_permissions=frozenset(permissions),
+                        purpose="domain_tool",
                         clock=lambda: NOW,
                     ),
                     arguments=arguments,
@@ -406,6 +416,7 @@ class DomainToolContractTest(unittest.TestCase):
                 context=DomainToolContext(
                     actor_id="actor-1",
                     granted_permissions=frozenset(permissions),
+                    purpose="domain_tool",
                     clock=lambda: NOW,
                 ),
                 arguments=arguments,
@@ -455,6 +466,7 @@ class DomainToolContractTest(unittest.TestCase):
         context = lambda permissions: DomainToolContext(
             actor_id="actor-1",
             granted_permissions=frozenset(permissions),
+            purpose="domain_tool",
             clock=lambda: NOW,
         )
 
@@ -522,6 +534,7 @@ class DomainToolContractTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"market:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={"symbol": "NVDA"},
@@ -580,6 +593,7 @@ class DomainToolContractTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"portfolio:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={},
@@ -650,6 +664,7 @@ class DomainToolContractTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"news:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={},
@@ -737,6 +752,7 @@ class DomainToolContractTest(unittest.TestCase):
                     context=DomainToolContext(
                         actor_id="actor-1",
                         granted_permissions=frozenset({"news:read"}),
+                        purpose="domain_tool",
                         clock=lambda: NOW,
                     ),
                     arguments={},
@@ -757,6 +773,7 @@ class DomainToolContractTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"portfolio:read", "market:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={},
@@ -871,6 +888,7 @@ class DomainToolContractTest(unittest.TestCase):
                     context=DomainToolContext(
                         actor_id="actor-1",
                         granted_permissions=frozenset(permissions),
+                        purpose="domain_tool",
                         clock=lambda: NOW,
                     ),
                     arguments=arguments,
@@ -922,6 +940,7 @@ class DomainToolContractTest(unittest.TestCase):
         context = DomainToolContext(
             actor_id="actor-1",
             granted_permissions=frozenset({"portfolio:read", "market:read"}),
+            purpose="domain_tool",
             clock=lambda: NOW,
         )
         for value in (

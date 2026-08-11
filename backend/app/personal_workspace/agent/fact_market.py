@@ -21,6 +21,12 @@ from .evidence import (
 
 
 MARKET_FACT_TTL = timedelta(hours=2)
+MARKET_EVIDENCE_PURPOSE_POLICY_REVISION = "market-evidence-purpose-v2"
+MARKET_EVIDENCE_ALLOWED_PURPOSES = frozenset({"domain_tool", "mcp_stdio"})
+MARKET_EVIDENCE_PURPOSE_POLICY_HISTORY = {
+    "market-evidence-purpose-v1": frozenset({"domain_tool"}),
+    MARKET_EVIDENCE_PURPOSE_POLICY_REVISION: MARKET_EVIDENCE_ALLOWED_PURPOSES,
+}
 
 
 @dataclass(frozen=True)
@@ -161,7 +167,7 @@ class MarketFactService:
 
     def _authorize(self, context: EvidenceReadContext) -> None:
         if (
-            context.purpose != "domain_tool"
+            context.purpose not in MARKET_EVIDENCE_ALLOWED_PURPOSES
             or "market:read" not in context.permissions
         ):
             raise PermissionError("source_unauthorized")
@@ -244,7 +250,8 @@ class MarketFactService:
             raise EvidenceLedgerError("source_retention_unknown")
         content_sha256 = _payload_sha256(payload)
         authorized_logical_identity = (
-            f"{provenance.authorization_snapshot_id}:{logical_identity}"
+            f"{provenance.authorization_snapshot_id}:"
+            f"{MARKET_EVIDENCE_PURPOSE_POLICY_REVISION}:{logical_identity}"
         )
         identity_sha256 = sha256(
             authorized_logical_identity.encode("utf-8")
@@ -270,6 +277,7 @@ class MarketFactService:
         revalidation = sha256(
             (
                 f"{provenance.authorization_snapshot_id}|"
+                f"{MARKET_EVIDENCE_PURPOSE_POLICY_REVISION}|"
                 f"{provenance.content_sha256}|"
                 f"{content_sha256}|{provenance.fetched_at.isoformat()}"
             ).encode("utf-8")
@@ -299,7 +307,7 @@ class MarketFactService:
             content_sha256=content_sha256,
             authorized_fields=tuple(payload),
             required_permissions=frozenset({"market:read"}),
-            allowed_purposes=frozenset({"domain_tool"}),
+            allowed_purposes=MARKET_EVIDENCE_ALLOWED_PURPOSES,
             authorization_snapshot_id=provenance.authorization_snapshot_id,
             observed_at=observed_at,
             published_at=None,

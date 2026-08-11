@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import json
@@ -26,6 +26,7 @@ from backend.app.personal_workspace.agent.evidence import (
     InMemoryEvidenceStore,
 )
 from backend.app.personal_workspace.agent.fact_market import (
+    MARKET_EVIDENCE_PURPOSE_POLICY_REVISION,
     MarketFactService,
 )
 from backend.app.personal_workspace.agent.fact_private import (
@@ -36,8 +37,11 @@ from backend.app.personal_workspace.agent.fact_private import (
     _actor_owned_record,
 )
 from backend.app.personal_workspace.agent.fact_news import (
+    FACT_NEWS_ALLOWED_PURPOSES,
+    FACT_NEWS_AUTHORIZATION_SNAPSHOT_V1,
     FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
     FACT_NEWS_RETENTION,
+    FACT_NEWS_RETENTION_BY_AUTHORIZATION,
     FACT_NEWS_SOURCE,
 )
 from backend.app.personal_workspace.agent.fact_news import InvestmentNewsReader
@@ -69,10 +73,12 @@ NOW = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc)
 @dataclass
 class SyntheticNewsSource:
     snapshot: NewsSourceSnapshot
+    purposes: list[str] = field(default_factory=list)
 
     def read(
         self, *, context: FactNewsReadContext, now: datetime
     ) -> NewsSourceSnapshot:
+        self.purposes.append(context.purpose)
         return self.snapshot
 
 
@@ -310,6 +316,7 @@ class TodayDomainToolsTest(unittest.TestCase):
                     "evidence:read",
                 }
             ),
+            purpose="domain_tool",
             clock=lambda: NOW,
         )
 
@@ -317,6 +324,15 @@ class TodayDomainToolsTest(unittest.TestCase):
         return self.registry.invoke(
             name, context=self.context, arguments=arguments
         )
+
+    def test_invocation_purpose_reaches_fact_source_without_adapter_override(self) -> None:
+        mcp_context = replace(self.context, purpose="mcp_stdio")
+
+        self.registry.invoke(
+            "search_market_news", context=mcp_context, arguments={"limit": 1}
+        )
+
+        self.assertEqual(self.source.purposes[-1], "mcp_stdio")
 
     def _invoke_legacy_kline(self, adapter):
         retention = {
@@ -343,6 +359,7 @@ class TodayDomainToolsTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"market:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={"symbol": "NVDA", "days": 30, "limit": 1},
@@ -529,6 +546,7 @@ class TodayDomainToolsTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=self.context.granted_permissions,
+                purpose="domain_tool",
                 clock=lambda: holiday,
             ),
             arguments={},
@@ -600,6 +618,7 @@ class TodayDomainToolsTest(unittest.TestCase):
         later_context = DomainToolContext(
             actor_id="actor-1",
             granted_permissions=self.context.granted_permissions,
+            purpose="domain_tool",
             clock=lambda: later,
         )
 
@@ -737,7 +756,7 @@ class TodayDomainToolsTest(unittest.TestCase):
         )
         self.assertEqual(record.available_from, record.fetched_at)
         self.assertEqual(record.expires_at, NOW + timedelta(minutes=110))
-        self.assertTrue(record.evidence_id.endswith(record.content_sha256[:24]))
+        self.assertRegex(record.evidence_id, r"^news:[0-9a-f]{24}$")
 
     def test_search_persists_only_events_returned_after_limit(self) -> None:
         ledger = CountingEvidenceStore()
@@ -844,6 +863,7 @@ class TodayDomainToolsTest(unittest.TestCase):
             granted_permissions=frozenset(
                 {"portfolio:read", "market:read", "evidence:read"}
             ),
+            purpose="domain_tool",
             clock=lambda: NOW,
         )
         no_news = self.registry.invoke(
@@ -854,6 +874,7 @@ class TodayDomainToolsTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"evidence:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={"evidence_id": private_evidence_id},
@@ -863,6 +884,7 @@ class TodayDomainToolsTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-2",
                 granted_permissions=frozenset({"evidence:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={"evidence_id": private_evidence_id},
@@ -906,6 +928,7 @@ class TodayDomainToolsTest(unittest.TestCase):
                 granted_permissions=frozenset(
                     {"evidence:read", "news:read"}
                 ),
+                purpose="domain_tool",
                 clock=lambda: NOW + timedelta(days=15),
             ),
             arguments={"evidence_id": evidence_id},
@@ -941,6 +964,7 @@ class TodayDomainToolsTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"market:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={"symbol": "NVDA", "days": 30, "limit": 1},
@@ -960,6 +984,7 @@ class TodayDomainToolsTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"portfolio:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={},
@@ -999,6 +1024,7 @@ class TodayDomainToolsTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"market:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={"symbol": "NVDA", "days": 30, "limit": 1},
@@ -1059,20 +1085,126 @@ class TodayDomainToolsTest(unittest.TestCase):
                 replace(later_context, actor_id="actor-2"), first.evidence_id
             )
 
-    def test_private_policy_rotation_changes_identity_without_phantom_current(self) -> None:
-        self.assertTrue(
-            all(len(history) == 1 for history in PRIVATE_FACT_POLICY_HISTORY.values())
-        )
-        v1 = PRIVATE_FACT_POLICY_HISTORY["personal_portfolio"][0]
-        self.assertIs(PRIVATE_FACT_POLICIES["personal_portfolio"], v1)
-        v2 = replace(
-            v1,
-            authorization_snapshot_id="actor-owned-personal-portfolio-v2",
-        )
+    def test_each_fact_source_explicitly_allows_mcp_stdio_and_ledger_enforces_it(self) -> None:
         retention = {
             **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
-            (v2.source, v2.authorization_snapshot_id): v2.persistence,
+            ("alpaca", "auth-alpaca_daily_bars"): "encrypted_payload",
         }
+        ledger = InMemoryEvidenceStore(retention_by_authorization=retention)
+        private_context = EvidenceReadContext(
+            actor_id="actor-1",
+            permissions=frozenset({"portfolio:read"}),
+            purpose="mcp_stdio",
+            now=NOW,
+        )
+        private = ActorOwnedFactService(ledger).record(
+            context=private_context,
+            source="personal_portfolio",
+            logical_identity="holdings:7",
+            payload={"holdings": [], "count": 0},
+            observed_at=NOW,
+        )
+        market_context = EvidenceReadContext(
+            actor_id="actor-1",
+            permissions=frozenset({"market:read"}),
+            purpose="mcp_stdio",
+            now=NOW,
+        )
+        market = MarketFactService(
+            adapter=FakeAiContextMarketAdapter(),
+            evidence_ledger=ledger,
+            retention_by_authorization=retention,
+        ).read_bars(
+            context=market_context,
+            symbol="NVDA",
+            bar_days=30,
+            bar_limit=1,
+        )
+
+        self.assertIn("mcp_stdio", FACT_NEWS_ALLOWED_PURPOSES)
+        self.assertIn(
+            "mcp_stdio",
+            PRIVATE_FACT_POLICIES["personal_portfolio"].allowed_purposes,
+        )
+        self.assertEqual(
+            ledger.freeze(private_context, (private.evidence_id,))[0].evidence_id,
+            private.evidence_id,
+        )
+        self.assertEqual(
+            ledger.freeze(market_context, (market.records[0].evidence_id,))[0].evidence_id,
+            market.records[0].evidence_id,
+        )
+        with self.assertRaisesRegex(EvidenceLedgerError, "evidence_purpose_denied"):
+            ledger.read(
+                replace(market_context, purpose="untrusted_purpose"),
+                market.records[0].evidence_id,
+            )
+
+    def test_news_policy_v2_changes_identity_without_expanding_v1(self) -> None:
+        item = raw_news(
+            url="https://wire.example/policy-version",
+            summary="同一正文用于验证本地授权版本。",
+            symbols=("NVDA",),
+        )
+        ledger = InMemoryEvidenceStore(
+            retention_by_authorization={
+                **FACT_NEWS_RETENTION_BY_AUTHORIZATION,
+                **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
+            }
+        )
+
+        def invoke(snapshot: NewsSourceSnapshot):
+            return TodayDomainTools(
+                portfolio_store=self.portfolio,
+                watchlist=self.tools.watchlist,
+                news_source=SyntheticNewsSource(snapshot),
+                evidence_ledger=ledger,
+            ).registry().invoke(
+                "search_market_news",
+                context=self.context,
+                arguments={"symbols": ["NVDA"], "limit": 1},
+            )
+
+        old = invoke(
+            NewsSourceSnapshot(
+                items=(item,),
+                authorization_snapshot_id=FACT_NEWS_AUTHORIZATION_SNAPSHOT_V1,
+                allowed_purposes=frozenset({"domain_tool"}),
+            )
+        )
+        new = invoke(
+            NewsSourceSnapshot(
+                items=(item,),
+                allowed_purposes=frozenset({"domain_tool", "mcp_stdio"}),
+            )
+        )
+        old_id = old.evidence[0].evidence_id
+        new_id = new.evidence[0].evidence_id
+        mcp_context = EvidenceReadContext(
+            actor_id="actor-1",
+            permissions=frozenset({"news:read"}),
+            purpose="mcp_stdio",
+            now=NOW,
+        )
+        domain_context = replace(mcp_context, purpose="domain_tool")
+
+        self.assertNotEqual(old_id, new_id)
+        self.assertEqual(
+            ledger.read(domain_context, old_id).content_sha256,
+            ledger.read(domain_context, new_id).content_sha256,
+        )
+        with self.assertRaisesRegex(EvidenceLedgerError, "evidence_purpose_denied"):
+            ledger.read(mcp_context, old_id)
+        self.assertEqual(ledger.read(mcp_context, new_id).evidence_id, new_id)
+
+    def test_private_policy_rotation_changes_identity_without_phantom_current(self) -> None:
+        self.assertTrue(
+            all(len(history) == 2 for history in PRIVATE_FACT_POLICY_HISTORY.values())
+        )
+        v1 = PRIVATE_FACT_POLICY_HISTORY["personal_portfolio"][0]
+        v2 = PRIVATE_FACT_POLICY_HISTORY["personal_portfolio"][1]
+        self.assertIs(PRIVATE_FACT_POLICIES["personal_portfolio"], v2)
+        retention = dict(PRIVATE_FACT_RETENTION_BY_AUTHORIZATION)
         ledger = InMemoryEvidenceStore(
             retention_by_authorization=retention
         )
@@ -1098,6 +1230,10 @@ class TodayDomainToolsTest(unittest.TestCase):
         self.assertNotEqual(old.evidence_id, new.evidence_id)
         self.assertNotEqual(old.logical_identity, new.logical_identity)
         self.assertEqual(old.content_sha256, new.content_sha256)
+        mcp_context = replace(context, purpose="mcp_stdio")
+        with self.assertRaisesRegex(EvidenceLedgerError, "evidence_purpose_denied"):
+            ledger.read(mcp_context, old.evidence_id)
+        self.assertEqual(ledger.read(mcp_context, new.evidence_id).evidence_id, new.evidence_id)
         unknown = replace(
             v2, authorization_snapshot_id="actor-owned-unknown"
         )
@@ -1133,6 +1269,7 @@ class TodayDomainToolsTest(unittest.TestCase):
         context = DomainToolContext(
             actor_id="actor-1",
             granted_permissions=frozenset({"portfolio:read", "market:read"}),
+            purpose="domain_tool",
             clock=lambda: NOW,
         )
 
@@ -1170,6 +1307,7 @@ class TodayDomainToolsTest(unittest.TestCase):
         context = DomainToolContext(
             actor_id="actor-1",
             granted_permissions=frozenset({"market:read"}),
+            purpose="domain_tool",
             clock=lambda: NOW,
         )
 
@@ -1241,6 +1379,7 @@ class TodayDomainToolsTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id="actor-1",
                 granted_permissions=frozenset({"market:read"}),
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={"symbol": "NVDA", "days": 30, "limit": 1},
@@ -1389,6 +1528,52 @@ class TodayDomainToolsTest(unittest.TestCase):
         self.assertEqual(len(analysis.data["bars"]), 2)
         self.assertEqual(frozen.payload["count"], 3)
         self.assertEqual(len(frozen.payload["bars"]), 3)
+
+    def test_market_local_purpose_v2_changes_identity_without_replacing_external_snapshot(self) -> None:
+        external_snapshot = "auth-alpaca_daily_bars"
+        retention = {("alpaca", external_snapshot): "encrypted_payload"}
+        ledger = InMemoryEvidenceStore(retention_by_authorization=retention)
+        domain_context = EvidenceReadContext(
+            actor_id="actor-1",
+            permissions=frozenset({"market:read"}),
+            purpose="domain_tool",
+            now=NOW,
+        )
+        current = MarketFactService(
+            adapter=FakeAiContextMarketAdapter(),
+            evidence_ledger=ledger,
+            retention_by_authorization=retention,
+        ).read_bars(
+            context=domain_context,
+            symbol="NVDA",
+            bar_days=30,
+            bar_limit=1,
+        ).records[0]
+        historical = replace(
+            current,
+            evidence_id="market:alpaca_daily_bars:legacy-purpose-policy",
+            logical_identity=current.logical_identity.replace(
+                MARKET_EVIDENCE_PURPOSE_POLICY_REVISION,
+                "market-evidence-purpose-v1",
+            ),
+            allowed_purposes=frozenset({"domain_tool"}),
+        )
+        ledger.put(domain_context, historical)
+        mcp_context = replace(domain_context, purpose="mcp_stdio")
+
+        self.assertNotEqual(historical.evidence_id, current.evidence_id)
+        self.assertEqual(
+            historical.authorization_snapshot_id,
+            current.authorization_snapshot_id,
+        )
+        self.assertEqual(current.authorization_snapshot_id, external_snapshot)
+        self.assertIn(MARKET_EVIDENCE_PURPOSE_POLICY_REVISION, current.logical_identity)
+        with self.assertRaisesRegex(EvidenceLedgerError, "evidence_purpose_denied"):
+            ledger.read(mcp_context, historical.evidence_id)
+        self.assertEqual(
+            ledger.read(mcp_context, current.evidence_id).evidence_id,
+            current.evidence_id,
+        )
 
     def test_market_revalidation_is_stable_per_refetched_observation(self) -> None:
         class RefetchedAdapter(FakeAiContextMarketAdapter):

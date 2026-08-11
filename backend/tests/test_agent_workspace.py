@@ -866,6 +866,7 @@ class AgentAnalysisWorkspaceTest(unittest.TestCase):
             context=DomainToolContext(
                 actor_id=ACTOR.actor_id,
                 granted_permissions=ANALYSIS_TOOL_PERMISSIONS,
+                purpose="domain_tool",
                 clock=lambda: NOW,
             ),
             arguments={"symbols": ["NVDA"], "limit": 8},
@@ -989,6 +990,7 @@ class AgentAnalysisWorkspaceTest(unittest.TestCase):
         context = DomainToolContext(
             actor_id=ACTOR.actor_id,
             granted_permissions=ANALYSIS_TOOL_PERMISSIONS,
+            purpose="domain_tool",
             clock=lambda: NOW,
         )
         direct = (

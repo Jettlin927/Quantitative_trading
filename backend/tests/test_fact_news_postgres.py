@@ -60,6 +60,7 @@ def _context(actor_id: str, *, now: datetime = NOW) -> DomainToolContext:
     return DomainToolContext(
         actor_id=actor_id,
         granted_permissions=frozenset({"news:read", "evidence:read"}),
+        purpose="domain_tool",
         clock=lambda: now,
     )
 

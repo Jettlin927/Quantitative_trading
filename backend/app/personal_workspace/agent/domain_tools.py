@@ -135,6 +135,7 @@ class DomainToolResult:
 class DomainToolContext:
     actor_id: str
     granted_permissions: frozenset[str]
+    purpose: str
     clock: Callable[[], datetime]
     requested_name: str | None = None
 

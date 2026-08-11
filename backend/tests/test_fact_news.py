@@ -67,7 +67,7 @@ class FactNewsSourceTest(unittest.TestCase):
         )
         denied_purpose = source.read(
             context=FactNewsReadContext(
-                permissions=frozenset({"news:read"}), purpose="mcp_stdio"
+                permissions=frozenset({"news:read"}), purpose="untrusted_purpose"
             ),
             now=NOW,
         )
@@ -87,7 +87,7 @@ class FactNewsSourceTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "source_purpose_denied"):
                 legacy_reader.search(
                     context=FactNewsReadContext(
-                        permissions=frozenset({"news:read"}), purpose="mcp_stdio"
+                        permissions=frozenset({"news:read"}), purpose="untrusted_purpose"
                     )
                 )
         refresh.assert_not_called()

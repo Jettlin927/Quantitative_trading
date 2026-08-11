@@ -72,6 +72,7 @@ class RegistryToolExecutor:
         self._context = DomainToolContext(
             actor_id=actor_id,
             granted_permissions=permissions,
+            purpose="domain_tool",
             clock=clock,
         )
 

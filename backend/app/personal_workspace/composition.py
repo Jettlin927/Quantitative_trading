@@ -50,9 +50,7 @@ from .watchlist import (
 from .agent.domain_tools import DomainToolMetrics, DomainToolRegistry
 from .agent.evidence import PostgresEvidenceStore
 from .agent.fact_news import (
-    FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
-    FACT_NEWS_RETENTION,
-    FACT_NEWS_SOURCE,
+    FACT_NEWS_RETENTION_BY_AUTHORIZATION,
     InvestmentNewsReader,
     InvestmentNewsStructuredSource,
 )
@@ -88,6 +86,9 @@ def build_personal_services(
     keyring: Any,
     challenge_key: bytes,
     refresh_news_before_read: bool = False,
+    alpaca_credentials_file: str | None = None,
+    alpaca_authorization_file: str | None = None,
+    investment_news_dir: str | None = None,
 ) -> PersonalServices:
     """从数据库 URL 与 keyring 装配服务骨架；Alpaca/新闻配置缺失时整体降级。
 
@@ -100,8 +101,16 @@ def build_personal_services(
     )
     cipher = PersonalDataCipher(keyring)
     market_readers = load_personal_market_readers(
-        credentials_file=os.getenv("ALPACA_CREDENTIALS_FILE", "").strip(),
-        authorization_file=os.getenv("ALPACA_AUTHORIZATION_FILE", "").strip(),
+        credentials_file=(
+            alpaca_credentials_file
+            if alpaca_credentials_file is not None
+            else os.getenv("ALPACA_CREDENTIALS_FILE", "").strip()
+        ),
+        authorization_file=(
+            alpaca_authorization_file
+            if alpaca_authorization_file is not None
+            else os.getenv("ALPACA_AUTHORIZATION_FILE", "").strip()
+        ),
     )
     portfolio_store = PostgresPortfolioStore(session_factory, cipher=cipher)
     portfolio = PortfolioBook(
@@ -151,7 +160,11 @@ def build_personal_services(
         rule_attention_reader=read_rule_events,
         formal_overlay_reader=lambda symbol: (),
     )
-    news_dir = os.getenv("INVESTMENT_NEWS_DIR", "").strip()
+    news_dir = (
+        investment_news_dir
+        if investment_news_dir is not None
+        else os.getenv("INVESTMENT_NEWS_DIR", "").strip()
+    )
     news_reader = None
     if news_dir:
         news_reader = InvestmentNewsReader(Path(news_dir))
@@ -159,7 +172,7 @@ def build_personal_services(
         session_factory,
         cipher=cipher,
         retention_by_authorization={
-            (FACT_NEWS_SOURCE, FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID): FACT_NEWS_RETENTION,
+            **FACT_NEWS_RETENTION_BY_AUTHORIZATION,
             **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
             **market_readers.evidence_retention_by_authorization,
         },

@@ -67,6 +67,7 @@ class CandidateLifecycleAutomation:
             context=DomainToolContext(
                 actor_id=actor.actor_id,
                 granted_permissions=frozenset({"market:read", "news:read"}),
+                purpose="domain_tool",
                 clock=lambda: as_of,
             ),
             arguments={"subject_ids": list(subjects)},

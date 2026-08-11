@@ -31,9 +31,7 @@ from .evidence import (
 )
 from .fact_market import MarketFactService, MarketFactUnavailable
 from .fact_news import (
-    FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
-    FACT_NEWS_RETENTION,
-    FACT_NEWS_SOURCE,
+    FACT_NEWS_RETENTION_BY_AUTHORIZATION,
     FactNewsReadContext,
     InvestmentNewsStructuredSource,
     NewsSourceSnapshot,
@@ -112,7 +110,6 @@ class TodayDomainTools:
         watchlist: Any,
         news_source: StructuredNewsSource | None,
         evidence_ledger: EvidenceLedger | None = None,
-        evidence_purpose: str = "domain_tool",
         relation_map: Mapping[str, tuple[str, ...]] | None = None,
         market_facts: MarketFactService | None = None,
         rule_attention_reader: Callable[[PersonalActor], tuple[Any, ...]]
@@ -128,12 +125,11 @@ class TodayDomainTools:
         self._news_source = news_source
         self._evidence_ledger = evidence_ledger or InMemoryEvidenceStore(
             retention_by_authorization={
-                (FACT_NEWS_SOURCE, FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID): FACT_NEWS_RETENTION,
+                **FACT_NEWS_RETENTION_BY_AUTHORIZATION,
                 **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
             }
         )
         self._private_facts = ActorOwnedFactService(self._evidence_ledger)
-        self._evidence_purpose = evidence_purpose
         self._relation_map = {
             _symbol(symbol): tuple(_symbol(item) for item in related)
             for symbol, related in (relation_map or _default_relation_map()).items()
@@ -655,7 +651,7 @@ class TodayDomainTools:
             snapshot = self._news_source.read(
                 context=FactNewsReadContext(
                     permissions=context.granted_permissions,
-                    purpose=self._evidence_purpose,
+                    purpose=context.purpose,
                 ),
                 now=now,
             )
@@ -822,7 +818,7 @@ class TodayDomainTools:
         return EvidenceReadContext(
             actor_id=context.actor_id,
             permissions=context.granted_permissions,
-            purpose=self._evidence_purpose,
+            purpose=context.purpose,
             now=now,
         )
 
@@ -1044,9 +1040,15 @@ def _event_payload(event: _FactNewsEvent) -> dict[str, Any]:
 
 def _with_event_identity(event: _FactNewsEvent) -> _FactNewsEvent:
     content_sha256 = _sha256(_event_payload(event))
+    evidence_identity = _sha256(
+        {
+            "authorization_snapshot_id": event.authorization_snapshot_id,
+            "content_sha256": content_sha256,
+        }
+    )
     return replace(
         event,
-        evidence_id=f"news:{content_sha256[:24]}",
+        evidence_id=f"news:{evidence_identity[:24]}",
         content_sha256=content_sha256,
     )
 

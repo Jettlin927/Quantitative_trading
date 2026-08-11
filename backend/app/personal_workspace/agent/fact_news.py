@@ -17,9 +17,26 @@ INVESTMENT_NEWS_MARKER = "window.DATA ="
 DEFAULT_CACHE_TTL_SECONDS = 1800
 DEFAULT_FETCH_TIMEOUT_SECONDS = 240
 FACT_NEWS_SOURCE = "investment_news"
-FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID = "investment-news-local-v1"
-FACT_NEWS_ALLOWED_PURPOSES = frozenset({"domain_tool"})
+FACT_NEWS_AUTHORIZATION_SNAPSHOT_V1 = "investment-news-local-v1"
+FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID = "investment-news-local-v2"
+FACT_NEWS_ALLOWED_PURPOSES = frozenset({"domain_tool", "mcp_stdio"})
 FACT_NEWS_RETENTION: Literal["encrypted_payload"] = "encrypted_payload"
+FACT_NEWS_POLICY_HISTORY = (
+    (
+        FACT_NEWS_AUTHORIZATION_SNAPSHOT_V1,
+        frozenset({"domain_tool"}),
+        FACT_NEWS_RETENTION,
+    ),
+    (
+        FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
+        FACT_NEWS_ALLOWED_PURPOSES,
+        FACT_NEWS_RETENTION,
+    ),
+)
+FACT_NEWS_RETENTION_BY_AUTHORIZATION = {
+    (FACT_NEWS_SOURCE, snapshot_id): persistence
+    for snapshot_id, _purposes, persistence in FACT_NEWS_POLICY_HISTORY
+}
 _FETCH_ENVIRONMENT_FIELDS = (
     "PATH",
     "LANG",
