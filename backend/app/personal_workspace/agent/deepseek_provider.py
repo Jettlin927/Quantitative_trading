@@ -189,8 +189,10 @@ def _normalize_tool_calls(
         if not isinstance(arguments_raw, str):
             raise ProviderFailure("provider_tool_arguments_invalid", retryable=False)
         try:
-            arguments = json.loads(arguments_raw)
-        except json.JSONDecodeError:
+            arguments = json.loads(
+                arguments_raw, parse_constant=_reject_non_finite_constant
+            )
+        except (json.JSONDecodeError, ValueError):
             raise ProviderFailure(
                 "provider_tool_arguments_invalid", retryable=False
             ) from None
@@ -204,3 +206,7 @@ def _normalize_tool_calls(
             }
         )
     return tuple(normalized)
+
+
+def _reject_non_finite_constant(_value: str) -> None:
+    raise ValueError("non_finite_json_constant")

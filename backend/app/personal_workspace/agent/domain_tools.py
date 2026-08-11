@@ -396,6 +396,7 @@ _LEGACY_KLINE_FIELDS = (
 )
 _LEGACY_BAR_FIELDS = ("date", "open", "high", "low", "close", "volume")
 _LEGACY_NEWS_SAFE_FIELDS = (
+    "evidence_id",
     "title",
     "url",
     "published_at",

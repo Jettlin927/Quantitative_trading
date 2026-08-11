@@ -15,6 +15,7 @@ from backend.app.personal_workspace.agent.runtime import AgentRuntime
 from backend.app.personal_workspace.agent.deepseek_provider import DeepSeekAgentChatAdapter
 from backend.app.personal_workspace.analysis import (
     AnalysisIntent,
+    DEEPSEEK_MAX_OUTPUT_TOKENS,
     DEEPSEEK_MODEL,
     ProviderFailure,
 )
@@ -53,6 +54,47 @@ def make_intent() -> AnalysisIntent:
 
 
 class AgentRuntimeTest(unittest.TestCase):
+    def test_deepseek_tool_arguments_reject_non_finite_json_constants(self) -> None:
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(constant=constant):
+                adapter = DeepSeekAgentChatAdapter(
+                    api_key="synthetic-key",
+                    transport=lambda **_kwargs: {
+                        "choices": [
+                            {
+                                "finish_reason": "tool_calls",
+                                "message": {
+                                    "content": None,
+                                    "tool_calls": [
+                                        {
+                                            "id": "call-1",
+                                            "type": "function",
+                                            "function": {
+                                                "name": "get_holdings",
+                                                "arguments": f'{{"value":{constant}}}',
+                                            },
+                                        }
+                                    ],
+                                },
+                            }
+                        ]
+                    },
+                )
+                request = {
+                    "model": DEEPSEEK_MODEL,
+                    "messages": [{"role": "user", "content": "test"}],
+                    "max_tokens": DEEPSEEK_MAX_OUTPUT_TOKENS,
+                    "stream": False,
+                    "thinking": {"type": "disabled"},
+                }
+
+                with self.assertRaises(ProviderFailure) as caught:
+                    adapter.create_response(request)
+
+                self.assertEqual(
+                    caught.exception.code, "provider_tool_arguments_invalid"
+                )
+
     def test_runtime_request_reaches_deepseek_adapter_with_json_array_tools(self) -> None:
         captured: list[dict] = []
 

@@ -819,6 +819,17 @@ class AgentAnalysisWorkspaceTest(unittest.TestCase):
                             sector="semi",
                             related_symbols=("NVDA",),
                         ),
+                        RawFactNews(
+                            title="英伟达产品节奏更新",
+                            url="https://wire.example/nvda-product-update",
+                            published_at=NOW - timedelta(minutes=30),
+                            fetched_at=NOW - timedelta(minutes=4),
+                            summary="另一篇结构化来源摘要。",
+                            source="Another Synthetic Wire",
+                            source_type="structured_news",
+                            sector="ai",
+                            related_symbols=("NVDA",),
+                        ),
                     ),
                     fetched_at=NOW - timedelta(minutes=5),
                 )
@@ -912,6 +923,22 @@ class AgentAnalysisWorkspaceTest(unittest.TestCase):
         )
         self.assertEqual(view.tool_evidence[0].as_of, frozen.published_at)
         self.assertLessEqual(len(view.tool_evidence[0].excerpt), 200)
+        tool_message = next(
+            message
+            for message in provider.captured_requests[1]["messages"]
+            if message["role"] == "tool"
+        )
+        feedback = json.loads(tool_message["content"])
+        item_mapping = {
+            item["evidence_id"]: item["url"] for item in feedback["data"]["items"]
+        }
+        direct_mapping = {
+            item["evidence_id"]: item["url"] for item in direct.data["items"]
+        }
+        self.assertEqual(item_mapping, direct_mapping)
+        self.assertEqual(
+            set(item_mapping), set(feedback["evidence_ids"])
+        )
 
     def test_cancelled_and_failed_results_keep_original_status_when_freeze_fails(self) -> None:
         expired = evidence_store(

@@ -623,6 +623,7 @@ class DomainToolContractTest(unittest.TestCase):
             as_of=NOW,
             content_sha256="a" * 64,
             authorized_fields=(
+                "evidence_id",
                 "title",
                 "url",
                 "published_at",
@@ -657,6 +658,7 @@ class DomainToolContractTest(unittest.TestCase):
         self.assertEqual(
             set(result.data["items"][0]),
             {
+                "evidence_id",
                 "title",
                 "url",
                 "published_at",

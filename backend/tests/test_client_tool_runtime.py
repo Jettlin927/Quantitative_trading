@@ -97,6 +97,25 @@ def context(
 
 
 class ClientToolRuntimeTest(unittest.TestCase):
+    def test_provider_usage_rejects_non_finite_cost(self) -> None:
+        for value in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(value=value):
+                response = completed_response(content='{"claims": []}')
+                response["cost_usd"] = value
+                result = run_runtime(
+                    DeepSeekCompletionRuntime(
+                        provider=ScriptedAgentProvider([response]),
+                        clock=lambda: NOW,
+                    ),
+                    request("get_holdings"),
+                    context(RecordingExecutor(), "get_holdings"),
+                )
+
+                self.assertEqual(
+                    result.failure.code, "provider_invalid_response"
+                )
+                self.assertTrue(result.failure.outcome_unknown)
+
     def test_single_and_multiple_tools_aggregate_usage_and_real_evidence(self) -> None:
         executor = RecordingExecutor()
         provider = ScriptedAgentProvider(

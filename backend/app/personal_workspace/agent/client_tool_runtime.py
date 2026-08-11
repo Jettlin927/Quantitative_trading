@@ -508,7 +508,7 @@ def _runtime_usage(response: Mapping[str, Any]) -> RuntimeUsage:
     if not isinstance(raw, Mapping) or response.get("cost_usd") is None:
         raise ProviderFailure("provider_usage_invalid", retryable=False)
     cost_usd = Decimal(str(response["cost_usd"]))
-    if cost_usd < Decimal("0"):
+    if not cost_usd.is_finite() or cost_usd < Decimal("0"):
         raise ProviderFailure("provider_usage_invalid", retryable=False)
     return RuntimeUsage(
         input_tokens=raw["input_tokens"],

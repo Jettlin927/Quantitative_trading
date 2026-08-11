@@ -191,6 +191,14 @@ class AIRuntimeContractTest(unittest.TestCase):
             RuntimeUsage(10, 10, 0, 10, Decimal("0.003"), 0, 2, Decimal("0.001")),
             RuntimeUsage(10, 10, 0, 10, Decimal("0.003"), 1, 1, Decimal("0.001")),
             RuntimeUsage(10, 10, 0, 10, Decimal("0.003"), 1, 2, Decimal("0.004")),
+            RuntimeUsage(10, 10, 0, 10, Decimal("NaN"), 1, 2, Decimal("0.001")),
+            RuntimeUsage(
+                10, 10, 0, 10, Decimal("Infinity"), 1, 2, Decimal("0.001")
+            ),
+            RuntimeUsage(10, 10, 0, 10, Decimal("0.003"), 1, 2, Decimal("NaN")),
+            RuntimeUsage(
+                10, 10, 0, 10, Decimal("0.003"), 1, 2, Decimal("Infinity")
+            ),
         )
 
         for usage in invalid_usage:

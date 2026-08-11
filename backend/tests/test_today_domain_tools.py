@@ -296,11 +296,12 @@ class TodayDomainToolsTest(unittest.TestCase):
         result = self.invoke("get_news", {"symbol": "AMD", "limit": 20})
 
         self.assertEqual(result.status, "success")
-        self.assertGreaterEqual(result.data["count"], 1)
+        self.assertGreaterEqual(result.data["count"], 2)
         item = result.data["items"][0]
         self.assertEqual(
             set(item),
             {
+                "evidence_id",
                 "title",
                 "url",
                 "published_at",
@@ -313,7 +314,17 @@ class TodayDomainToolsTest(unittest.TestCase):
             },
         )
         self.assertFalse(
-            {"event_id", "evidence_id", "content_sha256", "sector"} & set(item)
+            {"event_id", "content_sha256", "sector"} & set(item)
+        )
+        item_ids = [value["evidence_id"] for value in result.data["items"]]
+        self.assertEqual(len(item_ids), len(set(item_ids)))
+        self.assertEqual(item_ids, [value.evidence_id for value in result.evidence])
+        evidence_by_id = {value.evidence_id: value for value in result.evidence}
+        self.assertTrue(
+            all(
+                value["evidence_id"] in evidence_by_id
+                for value in result.data["items"]
+            )
         )
 
     def test_today_dossier_candidates_and_web_unavailable_are_independent(self) -> None:

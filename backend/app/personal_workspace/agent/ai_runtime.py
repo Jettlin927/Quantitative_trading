@@ -385,6 +385,8 @@ def _valid_usage(usage: RuntimeUsage) -> bool:
     ) and (
         isinstance(usage.cost_usd, Decimal)
         and isinstance(usage.hosted_cost_usd, Decimal)
+        and usage.cost_usd.is_finite()
+        and usage.hosted_cost_usd.is_finite()
         and usage.cost_usd >= Decimal("0")
         and Decimal("0") <= usage.hosted_cost_usd <= usage.cost_usd
     )
