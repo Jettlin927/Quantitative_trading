@@ -161,6 +161,7 @@ class AgentAnalysisWorkspaceTest(unittest.TestCase):
         self.assertEqual(view.tool_events[0].evidence_ids, ("tool:get_holdings:0",))
         self.assertEqual(len(view.tool_evidence), 1)
         self.assertEqual(view.accounted_cost_usd, "0.0004")
+        self.assertFalse(view.cancellable)
 
     def test_preflight_failure_never_starts_provider_or_charges_budget(self) -> None:
         class UnsafeProvider:

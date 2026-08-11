@@ -300,6 +300,43 @@ class AIRuntimeContractTest(unittest.TestCase):
         self.assertFalse(hasattr(result, "raw_response"))
         self.assertEqual(runtime.requests, [request])
 
+    def test_client_tool_failure_is_a_valid_paired_terminal_event(self) -> None:
+        events = (
+            RuntimeEvent(type="run_started"),
+            RuntimeEvent(
+                type="tool_requested",
+                tool_name="get_today_context",
+                tool_call_id="call-failed",
+                arguments={},
+            ),
+            RuntimeEvent(
+                type="tool_failed",
+                tool_name="get_today_context",
+                tool_call_id="call-failed",
+            ),
+            RuntimeEvent(type="output_completed", text='{"claims": []}'),
+        )
+        runtime = ScriptedCompletionRuntime(
+            RuntimeResult.completed(
+                events=events,
+                usage=RuntimeUsage(10, 5, 2, 8, Decimal("0.0001")),
+            )
+        )
+        request = RuntimeRequest(
+            model="model-under-test",
+            instructions="test",
+            input_text="test",
+            tools=("get_today_context",),
+            budget=RuntimeBudget(remaining_usd=Decimal("1")),
+        )
+
+        result = run_runtime(runtime, request)
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.events, events)
+        self.assertEqual(result.usage.cost_usd, Decimal("0.0001"))
+        self.assertEqual(runtime.requests, [request])
+
     def test_budget_is_rejected_before_adapter_call(self) -> None:
         runtime = ScriptedCompletionRuntime(completed_result())
         result = run_runtime(
