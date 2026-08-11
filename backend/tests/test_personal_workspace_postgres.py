@@ -75,6 +75,8 @@ PRIVATE_TABLES = {
     "personal_ai_claims",
     "personal_automatic_briefings",
     "personal_automatic_briefing_daily_budgets",
+    "personal_tool_evidence_records",
+    "personal_capability_audit_events",
     "personal_record_versions",
     "personal_record_private_fragments",
     "personal_verification_items",
@@ -96,12 +98,13 @@ ENCRYPTED_PRIVATE_TABLES = PRIVATE_TABLES - {
     "personal_audit_events",
     "personal_redaction_events",
     "personal_automatic_briefing_daily_budgets",
+    "personal_capability_audit_events",
 }
 
 
 class PersonalWorkspaceSchemaIdentityTest(unittest.TestCase):
     def test_private_orm_identity_is_separate_from_public_metadata(self) -> None:
-        self.assertEqual(expected_schema_heads(), ("0022_automatic_briefings",))
+        self.assertEqual(expected_schema_heads(), ("0023_tool_evidence",))
         self.assertEqual(
             set(PrivateBase.metadata.tables),
             {
@@ -294,6 +297,8 @@ class PersonalWorkspacePostgresIntegrationTest(unittest.TestCase):
                             "personal_instrument_revisions",
                             "personal_automatic_briefings",
                             "personal_automatic_briefing_daily_budgets",
+                            "personal_tool_evidence_records",
+                            "personal_capability_audit_events",
                         }
                         | RETIRED_RECORD_TABLES
                         else 1

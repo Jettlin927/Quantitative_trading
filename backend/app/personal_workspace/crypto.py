@@ -89,9 +89,15 @@ class PersonalDataCipher:
         return json.loads(plaintext.decode("utf-8"))
 
     def symbol_lookup(self, *, workspace_id: str, normalized_symbol: str) -> str:
+        return self.scoped_lookup(
+            workspace_id=workspace_id,
+            value=normalized_symbol,
+        )
+
+    def scoped_lookup(self, *, workspace_id: str, value: str) -> str:
         digest = hmac.new(
             self._keyring.lookup_key,
-            f"{workspace_id}|{normalized_symbol}".encode("utf-8"),
+            f"{workspace_id}|{value}".encode("utf-8"),
             sha256,
         )
         return digest.hexdigest()

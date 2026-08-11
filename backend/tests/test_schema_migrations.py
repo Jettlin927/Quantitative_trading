@@ -51,6 +51,26 @@ DUPLICATE_INDEX_NAMES = {
 
 
 class SchemaMigrationTest(unittest.TestCase):
+    def test_tool_evidence_migration_is_additive_and_fails_closed_on_downgrade(self):
+        migration_path = (
+            REPO_ROOT
+            / "backend"
+            / "migrations"
+            / "versions"
+            / "0023_personal_tool_evidence.py"
+        )
+        source = migration_path.read_text(encoding="utf-8")
+
+        self.assertIn('revision = "0023_tool_evidence"', source)
+        self.assertIn('down_revision = "0022_automatic_briefings"', source)
+        self.assertIn("personal_tool_evidence_records", source)
+        self.assertIn("personal_capability_audit_events", source)
+        self.assertIn("evidence_id_hmacs", source)
+        self.assertNotIn('sa.Column("evidence_ids"', source)
+        self.assertEqual(source.count("REVOKE ALL ON TABLE"), 1)
+        self.assertIn("禁止自动降级", source)
+        self.assertNotIn("op.drop_table", source)
+
     def test_all_revision_ids_fit_postgres_alembic_version_column(self):
         revision_dir = REPO_ROOT / "backend" / "migrations" / "versions"
         revisions = {}
