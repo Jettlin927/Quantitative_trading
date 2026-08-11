@@ -263,6 +263,10 @@ class TodayDomainToolsTest(unittest.TestCase):
         self.assertEqual(candidate["symbol"], "AMD")
         self.assertTrue(candidate["relation_evidence_ids"])
         self.assertTrue(candidate["fact_evidence_ids"])
+        self.assertEqual(candidate["relation_evidence"][0]["title"], "NVDA → AMD")
+        self.assertEqual(candidate["fact_evidence"][0]["source"], "Synthetic Wire")
+        self.assertTrue(candidate["fact_evidence"][0]["summary"])
+        self.assertTrue(candidate["fact_evidence"][0]["url"].startswith("https://"))
         self.assertEqual(web.status, "unavailable")
         self.assertEqual(web.error_code, "hosted_web_search_unavailable")
         self.assertFalse(

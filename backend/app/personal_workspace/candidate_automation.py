@@ -10,7 +10,7 @@ from typing import Mapping
 from zoneinfo import ZoneInfo
 
 from .agent.domain_tools import DomainToolContext, DomainToolRegistry
-from .contracts import PersonalActor
+from .contracts import CandidateEvidenceView, PersonalActor
 from .watchlist import CandidateEvidence, InstrumentStateBook, xnys_trading_days_elapsed
 
 
@@ -89,6 +89,8 @@ class CandidateLifecycleAutomation:
                         "symbol": raw["symbol"],
                         "relation": raw["relation_evidence_ids"],
                         "fact": raw["fact_evidence_ids"],
+                        "relation_evidence": raw.get("relation_evidence", ()),
+                        "fact_evidence": raw.get("fact_evidence", ()),
                         "observed_at": observed_at.isoformat(),
                     },
                     sort_keys=True,
@@ -102,6 +104,10 @@ class CandidateLifecycleAutomation:
                         fact_evidence_ids=tuple(raw["fact_evidence_ids"]),
                         observed_at=observed_at,
                         expected_revision=view.revision,
+                        relation_evidence=_evidence_views(
+                            raw.get("relation_evidence", ())
+                        ),
+                        fact_evidence=_evidence_views(raw.get("fact_evidence", ())),
                     ),
                     idempotency_key=(
                         "candidate-discovery:"
@@ -112,3 +118,20 @@ class CandidateLifecycleAutomation:
             except (KeyError, TypeError, ValueError):
                 failed += 1
         return CandidateAutomationResult(considered, archived_count, failed)
+
+
+def _evidence_views(raw_items: object) -> tuple[CandidateEvidenceView, ...]:
+    if not isinstance(raw_items, (list, tuple)):
+        raise ValueError("candidate_evidence_invalid")
+    return tuple(
+        CandidateEvidenceView(
+            evidence_id=str(item["evidence_id"]),
+            title=str(item["title"]),
+            summary=str(item["summary"]),
+            source=str(item["source"]),
+            as_of=datetime.fromisoformat(str(item["as_of"]).replace("Z", "+00:00")),
+            url=str(item["url"]) if item.get("url") else None,
+        )
+        for item in raw_items
+        if isinstance(item, Mapping)
+    )

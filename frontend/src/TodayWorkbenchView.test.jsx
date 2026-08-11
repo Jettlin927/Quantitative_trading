@@ -114,7 +114,7 @@ describe('90 秒今日分诊工作台', () => {
     }) }
     render(<PersonalTodayView client={emptyClient} />)
     expect(await screen.findByText('当前没有必须处理的规则命中或数据缺口')).toBeInTheDocument()
-    expect(screen.getByText('当前没有通过结构化来源进入投影的事件')).toBeInTheDocument()
+    expect(screen.getByText('当前没有活跃持仓可检查')).toBeInTheDocument()
     expect(screen.getAllByText('正常').length).toBeGreaterThan(0)
 
     cleanup()
@@ -158,5 +158,23 @@ describe('90 秒今日分诊工作台', () => {
     expect(await screen.findByText('权益快照读取失败，未伪装为空。')).toBeInTheDocument()
     expect(screen.getByText(/equity_snapshots_failed/)).toBeInTheDocument()
     expect(screen.getAllByText('部分数据').length).toBeGreaterThan(0)
+  })
+
+  it('持仓自动关注进入自选观察，新闻源失败时展示覆盖范围和原因', async () => {
+    const today = richToday('partial')
+    const holding = today.read_model.active_candidates[0]
+    holding.candidate_status = null
+    today.read_model.watch_observations = [holding]
+    today.read_model.fact_events = []
+    today.read_model.gaps = [{ code: 'source_unavailable', subject: 'structured_news' }]
+    const client = { openToday: vi.fn().mockResolvedValue(today) }
+
+    render(<PersonalTodayView client={client} />)
+
+    const watchSection = (await screen.findByRole('heading', { name: '自选观察' })).closest('section')
+    expect(within(watchSection).getByText('ACME')).toBeInTheDocument()
+    expect(within(watchSection).getByLabelText('ACME 状态')).toHaveTextContent('持仓')
+    expect(within(watchSection).getByLabelText('ACME 状态')).toHaveTextContent('自选')
+    expect(screen.getByText(/结构化新闻源不可用/)).toHaveTextContent('ACME')
   })
 })

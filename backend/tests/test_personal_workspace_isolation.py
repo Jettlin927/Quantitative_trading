@@ -147,6 +147,20 @@ class PersonalWorkspaceIsolationTest(unittest.TestCase):
             self.assertNotIn("OFFICIAL_ANALYSIS_QUERY_FILE", environment)
             self.assertNotIn("OFFICIAL_ANALYSIS_AUTHORIZATION_FILE", environment)
 
+    def test_api_receives_read_only_structured_news_snapshot(self) -> None:
+        personal = yaml.safe_load(
+            (REPO_ROOT / "docker-compose.personal.yml").read_text(encoding="utf-8")
+        )
+        api = personal["services"]["api"]
+        mounts = {mount["target"]: mount for mount in api["volumes"]}
+        news = mounts["${INVESTMENT_NEWS_DIR:-/run/disabled/news}"]
+
+        self.assertEqual(
+            news["source"], "${INVESTMENT_NEWS_HOST_DIR:-/run/disabled/news}"
+        )
+        self.assertTrue(news["read_only"])
+        self.assertFalse(news["bind"]["create_host_path"])
+
     def test_missing_any_private_configuration_fails_closed_without_initializing_store(self) -> None:
         names = {
             "PRIVATE_DATABASE_URL",

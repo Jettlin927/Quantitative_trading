@@ -129,13 +129,36 @@ export function WatchDiscoveryView({ client, onNavigate = (_path) => {} }) {
       {items.length ? items.map((item) => <article key={`${activeTab}-${item.symbol}`}>
         <div className="watch-symbol"><span>{item.symbol}</span><StateMarks item={item} /></div>
         <div className="watch-reasons"><strong>{item.preset_reasons?.join(' · ') || (item.candidate_status ? '关系证据 + 近期事实' : '持仓自动关注')}</strong><p>{item.custom_reason || candidateNote(item)}</p></div>
-        <div className="watch-evidence"><small>关系证据 {item.relation_evidence_ids?.length || 0}</small><small>事实证据 {item.fact_evidence_ids?.length || 0}</small></div>
+        <CandidateEvidenceSummary item={item} />
         <div className="watch-actions"><button onClick={() => onNavigate(`/markets/us/${encodeURIComponent(item.symbol)}`)}>进入标的</button><button onClick={() => setAnalysisContext({ subjectId: item.symbol, question: `${item.symbol} 当前事实与证据可能通过什么机制影响公司？` })}><Bot size={14} />深度分析</button>{item.is_followed && !item.is_holding ? <button disabled={writing} onClick={() => unfollow(item)}><X size={14} />取消自选</button> : null}</div>
       </article>) : <div className="watch-empty"><Archive size={20} /><strong>{activeTab === 'followed' ? '尚无自选标的' : activeTab === 'candidates' ? '当前没有满足证据门槛的 AI 候选' : '没有已归档候选'}</strong><p>空状态不会被填充为推荐列表。</p></div>}
     </section></>}
 
     {analysisContext ? <div key={analysisContext.subjectId} className="context-analysis"><button className="context-close" onClick={() => setAnalysisContext(null)}><X size={14} />关闭上下文分析</button><AnalysisWorkspaceView client={client} subjectId={analysisContext.subjectId} initialQuestion={analysisContext.question} contextLabel={`候选 / ${analysisContext.subjectId}`} /></div> : null}
   </div>
+}
+
+export function CandidateEvidenceSummary({ item, compact = false }) {
+  const relation = item.relation_evidence || []
+  const facts = item.fact_evidence || []
+  const relationCount = item.relation_evidence_ids?.length || 0
+  const factCount = item.fact_evidence_ids?.length || 0
+  if (!relationCount && !factCount) return <div className="watch-evidence evidence-empty"><small>尚无候选证据</small></div>
+  return <div className={`watch-evidence ${compact ? 'compact' : ''}`} aria-label={`${item.symbol} 候选证据`}>
+    <EvidenceGroup title="关系证据" count={relationCount} items={relation} compact={compact} />
+    <EvidenceGroup title="关键事实证据 · 待核验" count={factCount} items={facts} compact={compact} />
+  </div>
+}
+
+function EvidenceGroup({ title, count, items, compact }) {
+  return <section className="candidate-evidence-group">
+    <header><strong>{title}</strong><span>{items.length ? `${items.length} 条重点 / 共 ${count} 条` : `${count} 条`}</span></header>
+    {items.length ? items.map((evidence) => <article key={evidence.evidence_id}>
+      <strong>{evidence.title}</strong>
+      {!compact ? <p>{evidence.summary}</p> : null}
+      <footer><span>{evidence.source} · {formatTime(evidence.as_of)}</span>{evidence.url ? <a href={evidence.url} target="_blank" rel="noreferrer">查看原文</a> : null}</footer>
+    </article>) : <p className="evidence-legacy-note">历史候选仅保留证据身份；等待下一次来源刷新补齐摘要。</p>}
+  </section>
 }
 
 export function StateMarks({ item }) {

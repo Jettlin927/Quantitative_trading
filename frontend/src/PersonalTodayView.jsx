@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowRight, Bot, BriefcaseBusiness, Check, Circle, Clock
 
 import { AnalysisWorkspaceView } from './AnalysisWorkspaceView.jsx'
 import { MarketChart } from './MarketChart.jsx'
-import { StateMarks } from './WatchDiscoveryView.jsx'
+import { CandidateEvidenceSummary, StateMarks } from './WatchDiscoveryView.jsx'
 
 const RULE_STATES = {
   hit: { label: '命中 ◆', icon: Check },
@@ -146,6 +146,7 @@ function TodayDesk({ workspace, onNavigate, onAnalyze }) {
   const candidates = model?.active_candidates || []
   const facts = model?.fact_events || []
   const gaps = model?.gaps || []
+  const newsGap = gaps.find((gap) => gap.subject === 'structured_news')
 
   return <section className="today-desk" aria-label="今日组合总览">
     <header className="today-masthead">
@@ -160,13 +161,13 @@ function TodayDesk({ workspace, onNavigate, onAnalyze }) {
         </DeskSection>
 
         <DeskSection index="02" title="影响持仓的事实变化" meta={`${facts.length} 个去重事件`}>
-          {facts.length ? <div className="fact-ledger">{facts.map((event) => <article key={event.event_id}><header><span>■ 来源摘要 · 待核验</span><time>{formatTime(event.published_at)}</time></header><h3>{event.title}</h3><p>{event.summary}</p><div className="fact-scope"><span>{event.related_symbols?.join(' · ')}</span><small>{event.source} · 抓取 {formatTime(event.fetched_at)}</small></div><footer><a href={event.url} target="_blank" rel="noreferrer">查看来源</a><button onClick={() => onAnalyze({ contextId: `event-${event.event_id}`, subjectId: event.related_symbols?.[0] || portfolio?.active_holding_symbols?.[0] || '', label: '事件 / 待核验摘要', question: `请基于证据核验事件“${event.title}”，并区分确认事实、推断与未知项。` })}><Bot size={14} />分析此事件</button></footer></article>)}</div> : <EmptyLine text="当前没有通过结构化来源进入投影的事件" />}
+          {facts.length ? <div className="fact-ledger">{facts.map((event) => <article key={event.event_id}><header><span>■ 来源摘要 · 待核验</span><time>{formatTime(event.published_at)}</time></header><h3>{event.title}</h3><p>{event.summary}</p><div className="fact-scope"><span>{event.related_symbols?.join(' · ')}</span><small>{event.source} · 抓取 {formatTime(event.fetched_at)}</small></div><footer><a href={event.url} target="_blank" rel="noreferrer">查看来源</a><button onClick={() => onAnalyze({ contextId: `event-${event.event_id}`, subjectId: event.related_symbols?.[0] || portfolio?.active_holding_symbols?.[0] || '', label: '事件 / 待核验摘要', question: `请基于证据核验事件“${event.title}”，并区分确认事实、推断与未知项。` })}><Bot size={14} />分析此事件</button></footer></article>)}</div> : <EmptyLine text={factEmptyText(newsGap, portfolio)} tone={newsGap ? 'warning' : 'neutral'} />}
           <div className="inference-lane"><header><span>◇ AI 推断</span><b>与事实分栏</b></header><p>尚未生成上下文解释。只有从标的、事件或事项主动进入后，才展示带证据引用的推断。</p></div>
         </DeskSection>
 
         <div className="today-observation-grid">
           <DeskSection index="03" title="自选观察" meta={`${followed.length} 个`}>
-            {followed.length ? <InstrumentRows items={followed} onNavigate={onNavigate} onAnalyze={onAnalyze} /> : <EmptyLine text="尚无非持仓自选" />}
+            {followed.length ? <InstrumentRows items={followed} onNavigate={onNavigate} onAnalyze={onAnalyze} /> : <EmptyLine text="当前没有持仓或手动自选标的" />}
           </DeskSection>
           <DeskSection index="04" title="AI 候选" meta={`${candidates.length} 个`}>
             {candidates.length ? <InstrumentRows items={candidates} onNavigate={onNavigate} onAnalyze={onAnalyze} /> : <EmptyLine text="没有满足关系证据与近期事实门槛的候选" />}
@@ -189,7 +190,7 @@ function DeskSection({ index, title, meta, children }) {
 }
 
 function InstrumentRows({ items, onNavigate, onAnalyze }) {
-  return <div className="instrument-rows">{items.map((item) => <article key={item.symbol}><div><strong>{item.symbol}</strong><StateMarks item={item} /></div><small>{item.preset_reasons?.join(' · ') || item.custom_reason || '证据关系观察'}</small><footer><button onClick={() => onNavigate(`/markets/us/${encodeURIComponent(item.symbol)}`)}>进入标的</button><button onClick={() => onAnalyze({ contextId: `instrument-${item.symbol}`, subjectId: item.symbol, label: `标的 / ${item.symbol}`, question: `${item.symbol} 当前有哪些可核验事实、影响机制与证据缺口？` })}><Bot size={13} />深度分析</button></footer></article>)}</div>
+  return <div className="instrument-rows">{items.map((item) => <article key={item.symbol}><div><strong>{item.symbol}</strong><StateMarks item={item} /></div><small>{item.preset_reasons?.join(' · ') || item.custom_reason || (item.is_holding ? '持仓自动关注' : '证据关系观察')}</small>{item.candidate_status ? <CandidateEvidenceSummary item={item} compact /> : null}<footer><button onClick={() => onNavigate(`/markets/us/${encodeURIComponent(item.symbol)}`)}>进入标的</button><button onClick={() => onAnalyze({ contextId: `instrument-${item.symbol}`, subjectId: item.symbol, label: `标的 / ${item.symbol}`, question: `${item.symbol} 当前有哪些可核验事实、影响机制与证据缺口？` })}><Bot size={13} />深度分析</button></footer></article>)}</div>
 }
 
 function PortfolioFloatCard({ portfolio, onNavigate }) {
@@ -213,8 +214,16 @@ function EquitySparkline({ snapshots }) {
   return <svg className="equity-sparkline" viewBox="0 0 180 64" role="img" aria-label={`最近 ${values.length} 个真实权益快照波动图`}><polyline points={points} /></svg>
 }
 
-function EmptyLine({ text }) {
-  return <div className="today-empty-line"><Circle size={15} /><span>{text}</span></div>
+function EmptyLine({ text, tone = 'neutral' }) {
+  return <div className={`today-empty-line ${tone}`}><Circle size={15} /><span>{text}</span></div>
+}
+
+function factEmptyText(newsGap, portfolio) {
+  const symbols = portfolio?.active_holding_symbols || []
+  const scope = symbols.length ? `，尚未读取 ${symbols.join(' · ')} 的事实变化` : ''
+  if (newsGap?.code === 'source_unavailable') return `结构化新闻源不可用${scope}`
+  if (newsGap) return `结构化新闻存在数据缺口（${newsGap.code}）${scope}`
+  return symbols.length ? `已检查 ${symbols.join(' · ')}，当前没有匹配的去重事件` : '当前没有活跃持仓可检查'
 }
 
 function TodayLoadFailure({ error }) {

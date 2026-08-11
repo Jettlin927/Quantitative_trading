@@ -7,6 +7,7 @@ import unittest
 from backend.app.personal_workspace.contracts import (
     AddHoldingCommand,
     CreateObservationRuleCommand,
+    InstrumentStateView,
     InstrumentStatesView,
     PersonalActor,
     RemoveHoldingCommand,
@@ -147,10 +148,25 @@ class PersonalResearchJourneyTest(unittest.TestCase):
         self.assertEqual(today.portfolio.holdings[0].market_value.value, "241.0000")
 
     def test_today_projection_includes_server_owned_instrument_and_fact_context(self) -> None:
+        holding_watch = InstrumentStateView(
+            symbol="ACME",
+            is_holding=True,
+            is_followed=True,
+            follow_source="holding",
+            preset_reasons=(),
+            custom_reason=None,
+            candidate_status=None,
+            relation_evidence_ids=(),
+            fact_evidence_ids=(),
+            relation_evidence=(),
+            fact_evidence=(),
+            candidate_refreshed_at=None,
+            candidate_archived_at=None,
+        )
         states = InstrumentStatesView(
             revision=3,
-            items=(),
-            followed_items=(),
+            items=(holding_watch,),
+            followed_items=(holding_watch,),
             watch_observations=(),
             active_candidates=(),
             archived_candidates=(),
@@ -178,6 +194,7 @@ class PersonalResearchJourneyTest(unittest.TestCase):
 
         self.assertEqual(today.read_model.status, "partial")
         self.assertEqual(today.read_model.gaps[0].code, "structured_news_stale")
+        self.assertEqual(today.read_model.watch_observations, (holding_watch,))
 
     def test_today_default_does_not_return_synthetic_trace(self) -> None:
         self.journey.create_synthetic_trace(

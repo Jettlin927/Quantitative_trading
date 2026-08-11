@@ -280,7 +280,7 @@ def _today_read_model(
         portfolio=portfolio_summary,
         attention_items=attention_items,
         fact_events=today_context.fact_events if today_context is not None else (),
-        watch_observations=states.watch_observations,
+        watch_observations=states.followed_items,
         active_candidates=states.active_candidates,
         archived_candidates=states.archived_candidates,
         gaps=tuple(gaps),
