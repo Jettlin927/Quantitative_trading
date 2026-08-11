@@ -129,7 +129,19 @@ def _normalize_agent_response(raw: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(message, dict):
         raise ProviderFailure("provider_response_envelope_invalid", retryable=False)
     if finish_reason == "content_filter" or message.get("refusal"):
-        return {"status": "refusal", "message": {"content": None, "tool_calls": ()}}
+        refusal = {
+            "status": "refusal",
+            "message": {"content": None, "tool_calls": ()},
+        }
+        try:
+            usage = _normalize_deepseek_usage(raw.get("usage"))
+        except ProviderFailure:
+            return refusal
+        return {
+            **refusal,
+            "usage": usage,
+            "cost_usd": _deepseek_cost_usd(usage),
+        }
     tool_calls = _normalize_tool_calls(message.get("tool_calls"))
     content = message.get("content")
     if content is not None and not isinstance(content, str):
@@ -177,8 +189,10 @@ def _normalize_tool_calls(
         if not isinstance(arguments_raw, str):
             raise ProviderFailure("provider_tool_arguments_invalid", retryable=False)
         try:
-            arguments = json.loads(arguments_raw)
-        except json.JSONDecodeError:
+            arguments = json.loads(
+                arguments_raw, parse_constant=_reject_non_finite_constant
+            )
+        except (json.JSONDecodeError, ValueError):
             raise ProviderFailure(
                 "provider_tool_arguments_invalid", retryable=False
             ) from None
@@ -192,3 +206,7 @@ def _normalize_tool_calls(
             }
         )
     return tuple(normalized)
+
+
+def _reject_non_finite_constant(_value: str) -> None:
+    raise ValueError("non_finite_json_constant")

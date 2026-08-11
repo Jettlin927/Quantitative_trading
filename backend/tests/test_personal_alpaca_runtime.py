@@ -95,6 +95,13 @@ class PersonalAlpacaRuntimeTest(unittest.TestCase):
         self.assertEqual(readers.portfolio._adapter._request_deadline_seconds, 3.2)
         self.assertEqual(readers.instrument._provider_wait_seconds, 4.5)
         self.assertEqual(transport.requests, [])
+        self.assertEqual(
+            readers.evidence_retention_by_authorization,
+            {
+                ("alpaca", f"alpaca-{dataset}-20260803"): "encrypted_payload"
+                for dataset in DATASETS
+            },
+        )
         self.assertNotIn(self.credentials["key_id"], repr(readers))
         self.assertNotIn(self.credentials["secret_key"], repr(readers))
 
@@ -159,6 +166,9 @@ class PersonalAlpacaRuntimeTest(unittest.TestCase):
             "wrong_delay": lambda credentials, authorization: authorization.update(
                 {"delay_seconds": 0}
             ),
+            "retention_invalid": lambda credentials, authorization: authorization[
+                "snapshots"
+            ][0].update({"retention_policy": "caller_selected"}),
         }
         for name, mutate in cases.items():
             with self.subTest(name=name):
@@ -204,6 +214,75 @@ class PersonalAlpacaRuntimeTest(unittest.TestCase):
         granted = adapter._require_authorization("alpaca_daily_bars", "ai_context")
         self.assertTrue(granted.ai_context)
         self.assertEqual(transport.requests, [])
+
+    def test_history_snapshots_are_retained_while_adapter_uses_unique_latest(self) -> None:
+        authorization = deepcopy(self.authorization)
+        for snapshot in deepcopy(self.authorization["snapshots"]):
+            snapshot["snapshot_id"] = snapshot["snapshot_id"].replace(
+                "20260803", "20260810"
+            )
+            snapshot["checked_at"] = "2026-08-10T08:00:00+00:00"
+            snapshot["evidence_sha256"] = "b" * 64
+            authorization["snapshots"].append(snapshot)
+        self._write_json(self.authorization_path, authorization)
+        self._write_json(self.credentials_path, self.credentials)
+
+        readers = load_personal_market_readers(
+            credentials_file=self.credentials_path,
+            authorization_file=self.authorization_path,
+            transport=RecordingTransport(),
+        )
+
+        self.assertEqual(len(readers.evidence_retention_by_authorization), 8)
+        latest = readers.market._require_authorization(
+            "alpaca_daily_bars", "display"
+        )
+        self.assertEqual(latest.snapshot_id, "alpaca-alpaca_daily_bars-20260810")
+
+    def test_missing_credentials_keeps_authorization_history_for_ledger_readback(self) -> None:
+        authorization = deepcopy(self.authorization)
+        for snapshot in deepcopy(self.authorization["snapshots"]):
+            snapshot["snapshot_id"] = snapshot["snapshot_id"].replace(
+                "20260803", "20260810"
+            )
+            snapshot["checked_at"] = "2026-08-10T08:00:00+00:00"
+            snapshot["evidence_sha256"] = "b" * 64
+            authorization["snapshots"].append(snapshot)
+        self._write_json(self.authorization_path, authorization)
+
+        readers = load_personal_market_readers(
+            credentials_file=self.credentials_path,
+            authorization_file=self.authorization_path,
+            transport=RecordingTransport(),
+        )
+
+        self.assertIsNone(readers.market)
+        self.assertEqual(
+            readers.evidence_retention_by_authorization,
+            {
+                ("alpaca", f"alpaca-{dataset}-{date}"): "encrypted_payload"
+                for dataset in DATASETS
+                for date in ("20260803", "20260810")
+            },
+        )
+
+    def test_ambiguous_latest_authorization_fails_closed(self) -> None:
+        authorization = deepcopy(self.authorization)
+        duplicate = deepcopy(authorization["snapshots"][0])
+        duplicate["snapshot_id"] = "alpaca-assets-ambiguous"
+        duplicate["evidence_sha256"] = "b" * 64
+        authorization["snapshots"].append(duplicate)
+        self._write_json(self.authorization_path, authorization)
+        self._write_json(self.credentials_path, self.credentials)
+
+        readers = load_personal_market_readers(
+            credentials_file=self.credentials_path,
+            authorization_file=self.authorization_path,
+            transport=RecordingTransport(),
+        )
+
+        self.assertIsNone(readers.market)
+        self.assertEqual(readers.evidence_retention_by_authorization, {})
 
     def test_missing_authorization_file_fails_closed_without_request(self) -> None:
         self._write_json(self.credentials_path, self.credentials)

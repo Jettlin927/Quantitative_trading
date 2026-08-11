@@ -14,6 +14,7 @@ from backend.app.personal_workspace.agent.ai_runtime import (
     RuntimeEvent,
     RuntimeRequest,
     RuntimeResult,
+    RuntimeToolEvidence,
     RuntimeUsage,
     run_runtime,
 )
@@ -71,6 +72,16 @@ def completed_result() -> RuntimeResult:
             cache_hit_tokens=300,
             cache_miss_tokens=0,
             cost_usd=Decimal("0.0002"),
+        ),
+        tool_evidence=(
+            RuntimeToolEvidence(
+                evidence_id="portfolio:snapshot:1",
+                source="portfolio",
+                as_of=datetime(2026, 8, 11, tzinfo=timezone.utc),
+                content_sha256="a" * 64,
+                authorized_fields=("holdings",),
+                excerpt="持仓快照",
+            ),
         ),
     )
 
@@ -180,6 +191,14 @@ class AIRuntimeContractTest(unittest.TestCase):
             RuntimeUsage(10, 10, 0, 10, Decimal("0.003"), 0, 2, Decimal("0.001")),
             RuntimeUsage(10, 10, 0, 10, Decimal("0.003"), 1, 1, Decimal("0.001")),
             RuntimeUsage(10, 10, 0, 10, Decimal("0.003"), 1, 2, Decimal("0.004")),
+            RuntimeUsage(10, 10, 0, 10, Decimal("NaN"), 1, 2, Decimal("0.001")),
+            RuntimeUsage(
+                10, 10, 0, 10, Decimal("Infinity"), 1, 2, Decimal("0.001")
+            ),
+            RuntimeUsage(10, 10, 0, 10, Decimal("0.003"), 1, 2, Decimal("NaN")),
+            RuntimeUsage(
+                10, 10, 0, 10, Decimal("0.003"), 1, 2, Decimal("Infinity")
+            ),
         )
 
         for usage in invalid_usage:
@@ -425,6 +444,28 @@ class AIRuntimeContractTest(unittest.TestCase):
         )
         self.assertEqual(result.failure.code, "provider_unauthorized")
         self.assertFalse(result.failure.retryable)
+        self.assertTrue(result.failure.outcome_unknown)
+
+    def test_local_request_failure_has_known_outcome(self) -> None:
+        class LocalFailureRuntime(ScriptedCompletionRuntime):
+            def run(self, request: RuntimeRequest) -> RuntimeResult:
+                error = RuntimeError("local request rejected")
+                error.code = "provider_request_invalid"
+                error.retryable = False
+                raise error
+
+        result = run_runtime(
+            LocalFailureRuntime(completed_result()),
+            RuntimeRequest(
+                model="model-under-test",
+                instructions="test",
+                input_text="test",
+                budget=RuntimeBudget(remaining_usd=Decimal("1")),
+            ),
+        )
+
+        self.assertEqual(result.failure.code, "provider_invalid_response")
+        self.assertFalse(result.failure.outcome_unknown)
 
     def test_tool_events_require_ids_evidence_and_consistent_terminal_state(self) -> None:
         invalid_events = (
@@ -472,6 +513,42 @@ class AIRuntimeContractTest(unittest.TestCase):
                     ),
                 )
                 self.assertEqual(result.failure.code, "runtime_contract_invalid")
+
+    def test_completed_tool_evidence_requires_verifiable_envelope(self) -> None:
+        valid = completed_result()
+        result = run_runtime(
+            ScriptedCompletionRuntime(replace(valid, tool_evidence=())),
+            RuntimeRequest(
+                model="model-under-test",
+                instructions="test",
+                input_text="test",
+                tools=("get_today_context",),
+                budget=RuntimeBudget(remaining_usd=Decimal("1")),
+            ),
+        )
+
+        self.assertEqual(result.failure.code, "runtime_contract_invalid")
+
+    def test_tool_terminal_event_cannot_precede_its_request(self) -> None:
+        valid = completed_result()
+        events = (
+            valid.events[0],
+            valid.events[2],
+            valid.events[1],
+            valid.events[3],
+        )
+        result = run_runtime(
+            ScriptedCompletionRuntime(replace(valid, events=events)),
+            RuntimeRequest(
+                model="model-under-test",
+                instructions="test",
+                input_text="test",
+                tools=("get_today_context",),
+                budget=RuntimeBudget(remaining_usd=Decimal("1")),
+            ),
+        )
+
+        self.assertEqual(result.failure.code, "runtime_contract_invalid")
 
     def test_provider_envelopes_are_rejected_from_event_payloads(self) -> None:
         cases = (

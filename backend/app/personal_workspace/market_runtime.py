@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from datetime import datetime
 import json
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Mapping
 
 from backend.app.market_observation.alpaca import (
@@ -57,13 +58,26 @@ class PersonalMarketReaders:
     portfolio: PortfolioMarketReader
     instrument: InstrumentObservationReader
     market: AlpacaMarketObservationAdapter | None = None
+    evidence_retention_by_authorization: Mapping[
+        tuple[str, str], str
+    ] = field(default_factory=lambda: MappingProxyType({}))
 
     @classmethod
-    def unavailable(cls) -> "PersonalMarketReaders":
+    def unavailable(
+        cls,
+        *,
+        evidence_retention_by_authorization: Mapping[
+            tuple[str, str], str
+        ]
+        | None = None,
+    ) -> "PersonalMarketReaders":
         return cls(
             portfolio=UnavailablePortfolioMarketReader(),
             instrument=UnavailableInstrumentObservationReader(),
             market=None,
+            evidence_retention_by_authorization=(
+                evidence_retention_by_authorization or MappingProxyType({})
+            ),
         )
 
 
@@ -76,10 +90,21 @@ def load_personal_market_readers(
     """从只读文件装配个人工作台行情；任何配置异常都整体 fail closed。"""
 
     try:
-        credentials = _load_credentials(credentials_file)
         authorizations = _load_authorizations(authorization_file)
     except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
         return PersonalMarketReaders.unavailable()
+    retention_by_authorization = MappingProxyType(
+        {
+            (snapshot.source, snapshot.snapshot_id): _evidence_persistence(snapshot)
+            for snapshot in authorizations.snapshots
+        }
+    )
+    try:
+        credentials = _load_credentials(credentials_file)
+    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+        return PersonalMarketReaders.unavailable(
+            evidence_retention_by_authorization=retention_by_authorization
+        )
 
     adapter = AlpacaMarketObservationAdapter(
         transport=transport or UrllibProviderTransport(),
@@ -95,6 +120,7 @@ def load_personal_market_readers(
             provider_wait_seconds=4.5,
         ),
         market=adapter,
+        evidence_retention_by_authorization=retention_by_authorization,
     )
 
 
@@ -114,7 +140,7 @@ def _load_authorizations(path: str | Path) -> AppendOnlyAuthorizationRegistry:
     if payload["feed"] != "sip" or payload["delay_seconds"] != 900:
         raise ValueError("alpaca_authorization_market_scope_invalid")
     raw_snapshots = payload["snapshots"]
-    if not isinstance(raw_snapshots, list) or len(raw_snapshots) != len(
+    if not isinstance(raw_snapshots, list) or len(raw_snapshots) < len(
         _ALPACA_DATASETS
     ):
         raise ValueError("alpaca_authorization_datasets_invalid")
@@ -141,7 +167,7 @@ def _load_authorizations(path: str | Path) -> AppendOnlyAuthorizationRegistry:
         if raw_snapshot["source"] != "alpaca" or raw_snapshot["plan"] != _ALPACA_PLAN:
             raise ValueError("alpaca_authorization_identity_invalid")
         dataset = _required_clean_text(raw_snapshot, "dataset")
-        if dataset not in _ALPACA_DATASETS or dataset in datasets:
+        if dataset not in _ALPACA_DATASETS:
             raise ValueError("alpaca_authorization_datasets_invalid")
         datasets.add(dataset)
         snapshot = SourceAuthorizationSnapshot(
@@ -162,10 +188,19 @@ def _load_authorizations(path: str | Path) -> AppendOnlyAuthorizationRegistry:
                 ),
             }
         )
+        _evidence_persistence(snapshot)
         registry.append(snapshot)
     if datasets != _ALPACA_DATASETS:
         raise ValueError("alpaca_authorization_datasets_invalid")
+    for dataset in _ALPACA_DATASETS:
+        registry.require("alpaca", dataset, _ALPACA_PLAN, "display")
     return registry
+
+
+def _evidence_persistence(snapshot: SourceAuthorizationSnapshot) -> str:
+    if snapshot.retention_policy != "personal_private_workspace_only":
+        raise ValueError("alpaca_authorization_retention_invalid")
+    return "encrypted_payload"
 
 
 def _read_mapping(path: str | Path) -> Mapping[str, Any]:

@@ -17,14 +17,15 @@ from backend.app.personal_workspace.analysis import DEEPSEEK_MODEL
 
 
 class DeepSeekCompletionRuntimeTest(unittest.TestCase):
-    def test_client_or_hosted_tools_are_rejected_before_transport(self) -> None:
+    def test_tools_require_execution_context_and_hosted_tools_stay_rejected(self) -> None:
         calls = []
         runtime = DeepSeekCompletionRuntime(
             api_key="synthetic",
             transport=lambda **kwargs: calls.append(kwargs),
         )
 
-        for request in (
+        result = run_runtime(
+            runtime,
             RuntimeRequest(
                 model=DEEPSEEK_MODEL,
                 instructions="test",
@@ -32,6 +33,10 @@ class DeepSeekCompletionRuntimeTest(unittest.TestCase):
                 tools=("get_today_context",),
                 budget=RuntimeBudget(remaining_usd=Decimal("1")),
             ),
+        )
+        self.assertEqual(result.failure.code, "runtime_contract_invalid")
+        result = run_runtime(
+            runtime,
             RuntimeRequest(
                 model=DEEPSEEK_MODEL,
                 instructions="test",
@@ -39,10 +44,8 @@ class DeepSeekCompletionRuntimeTest(unittest.TestCase):
                 hosted_tools=("web_search",),
                 budget=RuntimeBudget(remaining_usd=Decimal("1")),
             ),
-        ):
-            with self.subTest(request=request):
-                result = run_runtime(runtime, request)
-                self.assertEqual(result.failure.code, "capability_unsupported")
+        )
+        self.assertEqual(result.failure.code, "capability_unsupported")
         self.assertEqual(calls, [])
 
     def test_one_completion_uses_fixed_request_and_returns_neutral_events(self) -> None:
@@ -148,7 +151,7 @@ class DeepSeekCompletionRuntimeTest(unittest.TestCase):
         self.assertTrue(result.failure.retryable)
         self.assertEqual([event.type for event in result.events], ["run_failed"])
 
-    def test_refusal_is_a_stable_runtime_failure(self) -> None:
+    def test_refusal_with_usage_is_a_stable_known_cost_failure(self) -> None:
         runtime = DeepSeekCompletionRuntime(
             api_key="synthetic",
             transport=lambda **_kwargs: {
@@ -157,7 +160,13 @@ class DeepSeekCompletionRuntimeTest(unittest.TestCase):
                         "finish_reason": "content_filter",
                         "message": {"content": None, "refusal": "raw refusal"},
                     }
-                ]
+                ],
+                "usage": {
+                    "prompt_tokens": 1000,
+                    "completion_tokens": 20,
+                    "prompt_cache_hit_tokens": 200,
+                    "prompt_cache_miss_tokens": 800,
+                },
             },
         )
         result = run_runtime(
@@ -172,6 +181,36 @@ class DeepSeekCompletionRuntimeTest(unittest.TestCase):
 
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.failure.code, "provider_refusal")
+        self.assertFalse(result.failure.outcome_unknown)
+        self.assertEqual(result.usage.cost_usd, Decimal("0.00011816"))
+        self.assertNotIn("raw refusal", repr(result))
+
+    def test_refusal_without_valid_usage_has_unknown_outcome(self) -> None:
+        runtime = DeepSeekCompletionRuntime(
+            api_key="synthetic",
+            transport=lambda **_kwargs: {
+                "choices": [
+                    {
+                        "finish_reason": "content_filter",
+                        "message": {"content": None, "refusal": "raw refusal"},
+                    }
+                ]
+            },
+        )
+
+        result = run_runtime(
+            runtime,
+            RuntimeRequest(
+                model=DEEPSEEK_MODEL,
+                instructions="输出 JSON。",
+                input_text="生成简报。",
+                budget=RuntimeBudget(remaining_usd=Decimal("0.01")),
+            ),
+        )
+
+        self.assertEqual(result.failure.code, "provider_refusal")
+        self.assertTrue(result.failure.outcome_unknown)
+        self.assertIsNone(result.usage)
         self.assertNotIn("raw refusal", repr(result))
 
 

@@ -11,8 +11,10 @@ from datetime import datetime
 from decimal import Decimal
 from hashlib import sha256
 import json
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 from urllib.parse import urlsplit
+
+from .domain_tools import DomainToolResult, RuntimeToolDefinition
 
 
 @dataclass(frozen=True)
@@ -79,12 +81,24 @@ class RuntimeEvent:
     arguments: dict[str, Any] | None = None
     evidence_ids: tuple[str, ...] = ()
     text: str | None = None
+    error_code: str | None = None
+
+
+@dataclass(frozen=True)
+class RuntimeToolEvidence:
+    evidence_id: str
+    source: str
+    as_of: datetime
+    content_sha256: str
+    authorized_fields: tuple[str, ...]
+    excerpt: str
 
 
 @dataclass(frozen=True)
 class RuntimeFailure:
     code: str
     retryable: bool
+    outcome_unknown: bool = False
 
 
 @dataclass(frozen=True)
@@ -95,6 +109,7 @@ class RuntimeResult:
     failure: RuntimeFailure | None
     evidence: tuple[RuntimeEvidence, ...] = ()
     citations: tuple[RuntimeCitation, ...] = ()
+    tool_evidence: tuple[RuntimeToolEvidence, ...] = ()
 
     @classmethod
     def completed(
@@ -104,6 +119,7 @@ class RuntimeResult:
         usage: RuntimeUsage,
         evidence: tuple[RuntimeEvidence, ...] = (),
         citations: tuple[RuntimeCitation, ...] = (),
+        tool_evidence: tuple[RuntimeToolEvidence, ...] = (),
     ) -> "RuntimeResult":
         return cls(
             status="completed",
@@ -112,31 +128,70 @@ class RuntimeResult:
             failure=None,
             evidence=evidence,
             citations=citations,
+            tool_evidence=tool_evidence,
         )
 
     @classmethod
-    def failed(cls, code: str, *, retryable: bool = False) -> "RuntimeResult":
+    def failed(
+        cls,
+        code: str,
+        *,
+        retryable: bool = False,
+        outcome_unknown: bool = False,
+        events: tuple[RuntimeEvent, ...] | None = None,
+        usage: RuntimeUsage | None = None,
+        tool_evidence: tuple[RuntimeToolEvidence, ...] = (),
+    ) -> "RuntimeResult":
         return cls(
             status="failed",
-            events=(RuntimeEvent(type="run_failed"),),
-            usage=None,
-            failure=RuntimeFailure(code=code, retryable=retryable),
+            events=events or (RuntimeEvent(type="run_failed"),),
+            usage=usage,
+            failure=RuntimeFailure(
+                code=code,
+                retryable=retryable,
+                outcome_unknown=outcome_unknown,
+            ),
+            tool_evidence=tool_evidence,
         )
 
     @classmethod
-    def cancelled(cls) -> "RuntimeResult":
+    def cancelled(
+        cls,
+        *,
+        events: tuple[RuntimeEvent, ...] | None = None,
+        usage: RuntimeUsage | None = None,
+        tool_evidence: tuple[RuntimeToolEvidence, ...] = (),
+    ) -> "RuntimeResult":
         return cls(
             status="cancelled",
-            events=(RuntimeEvent(type="run_cancelled"),),
-            usage=None,
+            events=events or (RuntimeEvent(type="run_cancelled"),),
+            usage=usage,
             failure=RuntimeFailure(code="cancelled", retryable=False),
+            tool_evidence=tool_evidence,
         )
 
 
 class AIRuntime(Protocol):
     capabilities: AIRuntimeCapabilities
 
-    def run(self, request: RuntimeRequest) -> RuntimeResult: ...
+    def run(
+        self,
+        request: RuntimeRequest,
+        context: "RuntimeExecutionContext | None" = None,
+    ) -> RuntimeResult: ...
+
+
+class RuntimeToolExecutor(Protocol):
+    def invoke(self, name: str, arguments: dict[str, Any]) -> DomainToolResult: ...
+
+
+@dataclass(frozen=True)
+class RuntimeExecutionContext:
+    tools: tuple[RuntimeToolDefinition, ...]
+    executor: RuntimeToolExecutor | None
+    deadline: datetime
+    heartbeat: Callable[[], None]
+    cancel_requested: Callable[[], bool] = lambda: False
 
 
 RUNTIME_EVENT_TYPES = frozenset(
@@ -165,6 +220,8 @@ RUNTIME_FAILURE_CODES = frozenset(
         "provider_refusal",
         "provider_rate_limited",
         "provider_invalid_response",
+        "provider_tool_calls_invalid",
+        "agent_tool_rounds_exceeded",
         "runtime_contract_invalid",
         "runtime_failed",
     }
@@ -184,8 +241,23 @@ _PROVIDER_FAILURE_CODES = {
     "provider_invalid_status": "provider_invalid_response",
 }
 
+_LOCAL_FAILURE_CODES = frozenset(
+    {
+        "budget_blocked",
+        "budget_insufficient",
+        "capability_unsupported",
+        "provider_request_invalid",
+        "provider_request_unsafe",
+        "runtime_contract_invalid",
+    }
+)
 
-def run_runtime(runtime: AIRuntime, request: RuntimeRequest) -> RuntimeResult:
+
+def run_runtime(
+    runtime: AIRuntime,
+    request: RuntimeRequest,
+    context: RuntimeExecutionContext | None = None,
+) -> RuntimeResult:
     """执行统一前置门禁，并把 adapter 失败收敛为稳定 RuntimeResult。"""
 
     if request.cancel_requested:
@@ -199,18 +271,28 @@ def run_runtime(runtime: AIRuntime, request: RuntimeRequest) -> RuntimeResult:
         return RuntimeResult.failed("capability_unsupported")
     if request.hosted_tools and not capabilities.hosted_tools:
         return RuntimeResult.failed("capability_unsupported")
+    if context is not None and not _valid_execution_context(request, context):
+        return RuntimeResult.failed("runtime_contract_invalid")
     try:
-        result = runtime.run(request)
+        result = runtime.run(request, context) if context is not None else runtime.run(request)
     except Exception as exc:
         raw_code = getattr(exc, "code", "runtime_failed")
         code = _PROVIDER_FAILURE_CODES.get(raw_code, raw_code)
         retryable = bool(getattr(exc, "retryable", False))
         if code not in RUNTIME_FAILURE_CODES:
             code = "runtime_failed"
-        return RuntimeResult.failed(code, retryable=retryable)
+        return RuntimeResult.failed(
+            code,
+            retryable=retryable,
+            outcome_unknown=raw_code not in _LOCAL_FAILURE_CODES,
+        )
     if not _valid_result(result, capabilities, request):
         return RuntimeResult.failed("runtime_contract_invalid")
-    if result.usage is not None and result.usage.cost_usd > request.budget.remaining_usd:
+    if (
+        result.status == "completed"
+        and result.usage is not None
+        and result.usage.cost_usd > request.budget.remaining_usd
+    ):
         return RuntimeResult(
             status="failed",
             events=(*result.events, RuntimeEvent(type="run_failed")),
@@ -218,8 +300,30 @@ def run_runtime(runtime: AIRuntime, request: RuntimeRequest) -> RuntimeResult:
             failure=RuntimeFailure(code="budget_exceeded", retryable=False),
             evidence=result.evidence,
             citations=result.citations,
+            tool_evidence=result.tool_evidence,
         )
     return result
+
+
+def _valid_execution_context(
+    request: RuntimeRequest, context: RuntimeExecutionContext
+) -> bool:
+    if (
+        context.deadline.tzinfo is None
+        or context.deadline.utcoffset() is None
+        or not callable(context.heartbeat)
+        or not callable(context.cancel_requested)
+    ):
+        return False
+    names = tuple(item.name for item in context.tools)
+    return (
+        len(names) == len(set(names))
+        and names == request.tools
+        and (
+            (not names and context.executor is None)
+            or (bool(names) and context.executor is not None)
+        )
+    )
 
 
 def _valid_result(
@@ -259,6 +363,7 @@ def _valid_result(
         return False
     return (
         _tool_events_pair(result.events, request.tools)
+        and _valid_client_tool_evidence_contract(result)
         and _hosted_tool_events_pair(result.events, request.hosted_tools)
         and _hosted_usage_matches(result.events, result.usage)
         and _valid_hosted_evidence_contract(result)
@@ -280,6 +385,8 @@ def _valid_usage(usage: RuntimeUsage) -> bool:
     ) and (
         isinstance(usage.cost_usd, Decimal)
         and isinstance(usage.hosted_cost_usd, Decimal)
+        and usage.cost_usd.is_finite()
+        and usage.hosted_cost_usd.is_finite()
         and usage.cost_usd >= Decimal("0")
         and Decimal("0") <= usage.hosted_cost_usd <= usage.cost_usd
     )
@@ -331,8 +438,6 @@ def _tool_events_pair(
     )
     if any(not event.tool_name or not event.tool_call_id for event in tool_events):
         return False
-    if any(event.tool_name not in allowed_tools for event in tool_events):
-        return False
     if any(
         event.type == "tool_requested" and not isinstance(event.arguments, dict)
         for event in tool_events
@@ -343,24 +448,60 @@ def _tool_events_pair(
         for event in tool_events
     ):
         return False
-    requested_events = tuple(
-        event for event in tool_events if event.type == "tool_requested"
-    )
-    requested = {event.tool_call_id: event.tool_name for event in requested_events}
-    finished = {
-        event.tool_call_id: event.tool_name
-        for event in tool_events
-        if event.type in {"tool_completed", "tool_failed"}
+    state: dict[str, tuple[str, bool]] = {}
+    for event in tool_events:
+        call_id = event.tool_call_id
+        tool_name = event.tool_name
+        if event.type == "tool_requested":
+            if call_id in state:
+                return False
+            state[call_id] = (tool_name, False)
+            continue
+        requested = state.get(call_id)
+        if (
+            requested is None
+            or requested[0] != tool_name
+            or requested[1]
+            or (tool_name not in allowed_tools and event.type != "tool_failed")
+        ):
+            return False
+        state[call_id] = (tool_name, True)
+    return all(finished for _, finished in state.values())
+
+
+def _valid_client_tool_evidence_contract(result: RuntimeResult) -> bool:
+    completed_ids = {
+        evidence_id
+        for event in result.events
+        if event.type == "tool_completed"
+        for evidence_id in event.evidence_ids
     }
-    finished_events = tuple(
-        event
-        for event in tool_events
-        if event.type in {"tool_completed", "tool_failed"}
-    )
+    evidence_ids = [item.evidence_id for item in result.tool_evidence]
+    if not completed_ids:
+        return not result.tool_evidence
+    if not result.tool_evidence:
+        return False
     return (
-        len(requested) == len(requested_events)
-        and len(finished) == len(finished_events)
-        and requested == finished
+        len(evidence_ids) == len(set(evidence_ids))
+        and set(evidence_ids) == completed_ids
+        and all(
+            isinstance(item, RuntimeToolEvidence)
+            and isinstance(item.evidence_id, str)
+            and bool(item.evidence_id.strip())
+            and isinstance(item.source, str)
+            and bool(item.source.strip())
+            and isinstance(item.as_of, datetime)
+            and item.as_of.tzinfo is not None
+            and item.as_of.utcoffset() is not None
+            and _valid_sha256(item.content_sha256)
+            and isinstance(item.authorized_fields, tuple)
+            and all(
+                isinstance(field, str) and bool(field.strip())
+                for field in item.authorized_fields
+            )
+            and isinstance(item.excerpt, str)
+            for item in result.tool_evidence
+        )
     )
 
 

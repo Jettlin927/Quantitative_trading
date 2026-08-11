@@ -54,12 +54,13 @@ from .agent.fact_news import (
     FACT_NEWS_RETENTION,
     FACT_NEWS_SOURCE,
     InvestmentNewsReader,
-)
-from .agent.today_tools import (
-    AiContextMarketDossierReader,
     InvestmentNewsStructuredSource,
-    TodayDomainTools,
 )
+from .agent.fact_market import MarketFactService
+from .agent.fact_private import (
+    PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
+)
+from .agent.today_tools import TodayDomainTools
 
 
 @dataclass(frozen=True)
@@ -77,7 +78,6 @@ class PersonalServices:
     analysis_store: PostgresAnalysisStore
     automatic_briefing_store: PostgresAutomaticBriefingStore
     evidence_store: PostgresEvidenceStore
-    news_reader: Any | None
     domain_tools: DomainToolRegistry
     domain_tool_metrics: DomainToolMetrics
 
@@ -159,7 +159,9 @@ def build_personal_services(
         session_factory,
         cipher=cipher,
         retention_by_authorization={
-            (FACT_NEWS_SOURCE, FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID): FACT_NEWS_RETENTION
+            (FACT_NEWS_SOURCE, FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID): FACT_NEWS_RETENTION,
+            **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
+            **market_readers.evidence_retention_by_authorization,
         },
     )
     domain_tool_metrics = DomainToolMetrics()
@@ -174,7 +176,13 @@ def build_personal_services(
             else None
         ),
         evidence_ledger=evidence_store,
-        dossier_reader=AiContextMarketDossierReader(market_readers.market),
+        market_facts=MarketFactService(
+            adapter=market_readers.market,
+            evidence_ledger=evidence_store,
+            retention_by_authorization=(
+                market_readers.evidence_retention_by_authorization
+            ),
+        ),
         rule_attention_reader=lambda actor: rules.attention(actor),
     )
     return PersonalServices(
@@ -191,7 +199,6 @@ def build_personal_services(
             session_factory, cipher=cipher
         ),
         evidence_store=evidence_store,
-        news_reader=news_reader,
         domain_tools=today_domain_tools.registry(
             observation_recorder=domain_tool_metrics.record
         ),
@@ -220,10 +227,8 @@ def build_analysis_workspace(
 
         kwargs: dict[str, Any] = {
             "store": services.analysis_store,
-            "portfolio_store": services.portfolio_store,
-            "price_reader": services.market_readers.portfolio,
-            "market_adapter": services.market_readers.market,
-            "news_reader": services.news_reader,
+            "domain_tools": services.domain_tools,
+            "evidence_ledger": services.evidence_store,
             "provider": provider,
             "monthly_soft_budget_usd": monthly_soft_budget_usd,
             "monthly_spend_reader": monthly_spend_reader
