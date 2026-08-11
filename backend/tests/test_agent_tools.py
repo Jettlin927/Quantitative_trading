@@ -226,7 +226,7 @@ class GetNewsToolTest(unittest.TestCase):
         return InvestmentNewsReader(root, runner=runner, cache_ttl_seconds=3600)
 
     def test_search_by_symbol_matches_sector_and_keyword(self) -> None:
-        reader = self._make_reader(runner=lambda argv, cwd: 0)
+        reader = self._make_reader(runner=lambda argv, cwd, env: 0)
         result = build_agent_tools(
             portfolio_store=InMemoryPortfolioStore(), news_reader=reader
         )[2].run(make_context(), {"symbol": "NVDA", "limit": 5})
@@ -236,7 +236,7 @@ class GetNewsToolTest(unittest.TestCase):
         self.assertEqual(payload["items"][0]["sector"], "semi")
 
     def test_search_by_keyword(self) -> None:
-        reader = self._make_reader(runner=lambda argv, cwd: 0)
+        reader = self._make_reader(runner=lambda argv, cwd, env: 0)
         tool = GetNewsTool(reader=reader).as_tool()
         result = tool.run(make_context(), {"keyword": "台积电"})
         payload = json.loads(result.content)
@@ -244,7 +244,7 @@ class GetNewsToolTest(unittest.TestCase):
         self.assertIn("台积电", payload["items"][0]["title"])
 
     def test_search_by_sector_filter(self) -> None:
-        reader = self._make_reader(runner=lambda argv, cwd: 0)
+        reader = self._make_reader(runner=lambda argv, cwd, env: 0)
         tool = GetNewsTool(reader=reader).as_tool()
         result = tool.run(make_context(), {"sector": "auto"})
         payload = json.loads(result.content)
@@ -259,7 +259,11 @@ class GetNewsToolTest(unittest.TestCase):
         data_path.write_text(NEWS_FIXTURE, encoding="utf-8")
         old_mtime = (datetime.now(timezone.utc) - timedelta(hours=2)).timestamp()
         os.utime(data_path, (old_mtime, old_mtime))
-        reader = InvestmentNewsReader(root, runner=lambda argv, cwd: 1, cache_ttl_seconds=3600)
+        reader = InvestmentNewsReader(
+            root,
+            runner=lambda argv, cwd, env: 1,
+            cache_ttl_seconds=3600,
+        )
         tool = GetNewsTool(reader=reader).as_tool()
         result = tool.run(make_context(), {"keyword": "NVIDIA"})
         self.assertFalse(result.ok)
@@ -274,7 +278,7 @@ class GetNewsToolTest(unittest.TestCase):
         calls: list[tuple] = []
         reader = InvestmentNewsReader(
             root,
-            runner=lambda argv, cwd: calls.append((argv, cwd)) or 0,
+            runner=lambda argv, cwd, env: calls.append((argv, cwd)) or 0,
             cache_ttl_seconds=3600,
         )
         tool = GetNewsTool(reader=reader).as_tool()
@@ -293,7 +297,11 @@ class GetNewsToolTest(unittest.TestCase):
         root = Path(tempfile.mkdtemp())
         (root / "scripts").mkdir(parents=True)
         (root / "scripts" / "fetch.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
-        reader = InvestmentNewsReader(root, runner=lambda argv, cwd: 0, cache_ttl_seconds=3600)
+        reader = InvestmentNewsReader(
+            root,
+            runner=lambda argv, cwd, env: 0,
+            cache_ttl_seconds=3600,
+        )
         tool = GetNewsTool(reader=reader).as_tool()
         result = tool.run(make_context(), {"keyword": "NVIDIA"})
         self.assertFalse(result.ok)

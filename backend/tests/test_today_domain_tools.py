@@ -20,6 +20,16 @@ from backend.app.personal_workspace.agent.today_tools import (
     RawFactNews,
     TodayDomainTools,
 )
+from backend.app.personal_workspace.agent.fact_news import FactNewsReadContext
+from backend.app.personal_workspace.agent.evidence import (
+    EvidenceReadContext,
+    InMemoryEvidenceStore,
+)
+from backend.app.personal_workspace.agent.fact_news import (
+    FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
+    FACT_NEWS_RETENTION,
+    FACT_NEWS_SOURCE,
+)
 from backend.app.personal_workspace.agent.tools_impl.news import InvestmentNewsReader
 from backend.app.personal_workspace.contracts import PersonalActor
 from backend.app.market_observation.contracts import (
@@ -49,8 +59,27 @@ NOW = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc)
 class SyntheticNewsSource:
     snapshot: NewsSourceSnapshot
 
-    def read(self, *, now: datetime) -> NewsSourceSnapshot:
+    def read(
+        self, *, context: FactNewsReadContext, now: datetime
+    ) -> NewsSourceSnapshot:
         return self.snapshot
+
+
+class CountingEvidenceStore(InMemoryEvidenceStore):
+    def __init__(self) -> None:
+        super().__init__(
+            retention_by_authorization={
+                (
+                    FACT_NEWS_SOURCE,
+                    FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
+                ): FACT_NEWS_RETENTION
+            }
+        )
+        self.put_ids: list[str] = []
+
+    def put(self, context, record):
+        self.put_ids.append(record.evidence_id)
+        return super().put(context, record)
 
 
 def raw_news(
@@ -233,6 +262,14 @@ class TodayDomainToolsTest(unittest.TestCase):
         self.assertEqual(len(merged["content_sha256"]), 64)
         self.assertEqual(merged["published_at"], "2026-08-10T10:00:00+00:00")
         self.assertEqual(merged["fetched_at"], "2026-08-10T11:50:00+00:00")
+        merged_envelope = next(
+            item
+            for item in result.evidence
+            if item.evidence_id == merged["evidence_id"]
+        )
+        self.assertEqual(
+            set(merged), set(merged_envelope.authorized_fields)
+        )
 
         evidence = self.invoke(
             "get_evidence", {"evidence_id": merged["evidence_id"]}
@@ -242,6 +279,41 @@ class TodayDomainToolsTest(unittest.TestCase):
         self.assertEqual(
             evidence.data["confirmation_state"],
             "source_summary_unconfirmed",
+        )
+        self.assertEqual(
+            tuple(evidence.data), evidence.evidence[0].authorized_fields
+        )
+        self.assertTrue(
+            {
+                "event_id",
+                "evidence_id",
+                "fetched_at",
+                "content_sha256",
+            }.issubset(evidence.data)
+        )
+
+    def test_legacy_news_alias_keeps_safe_projection_on_persisted_path(self) -> None:
+        result = self.invoke("get_news", {"symbol": "AMD", "limit": 20})
+
+        self.assertEqual(result.status, "success")
+        self.assertGreaterEqual(result.data["count"], 1)
+        item = result.data["items"][0]
+        self.assertEqual(
+            set(item),
+            {
+                "title",
+                "url",
+                "published_at",
+                "fetched_at",
+                "summary",
+                "source",
+                "source_type",
+                "related_symbols",
+                "confirmation_state",
+            },
+        )
+        self.assertFalse(
+            {"event_id", "evidence_id", "content_sha256", "sector"} & set(item)
         )
 
     def test_today_dossier_candidates_and_web_unavailable_are_independent(self) -> None:
@@ -347,7 +419,7 @@ class TodayDomainToolsTest(unittest.TestCase):
         )
         self.assertEqual(result.data["period"], "market_closed")
 
-    def test_refetch_updates_metadata_without_changing_content_evidence_id(self) -> None:
+    def test_refetch_keeps_immutable_persisted_evidence_version(self) -> None:
         first = self.invoke(
             "search_market_news", {"symbols": ["AMD"], "limit": 20}
         )
@@ -375,8 +447,278 @@ class TodayDomainToolsTest(unittest.TestCase):
         )
 
         self.assertEqual(refreshed["evidence_id"], original["evidence_id"])
-        self.assertNotEqual(refreshed["fetched_at"], original["fetched_at"])
-        self.assertEqual(evidence.data["fetched_at"], refreshed["fetched_at"])
+        self.assertEqual(refreshed["fetched_at"], original["fetched_at"])
+        self.assertEqual(evidence.data["fetched_at"], original["fetched_at"])
+
+    def test_expired_content_revalidation_creates_stable_readable_version(self) -> None:
+        ledger = CountingEvidenceStore()
+        tools = TodayDomainTools(
+            portfolio_store=self.portfolio,
+            watchlist=self.tools.watchlist,
+            news_source=self.source,
+            evidence_ledger=ledger,
+        )
+        registry = tools.registry()
+        first = registry.invoke(
+            "search_market_news",
+            context=self.context,
+            arguments={"symbols": ["AMD"], "limit": 20},
+        )
+        original = next(
+            item
+            for item in first.data["items"]
+            if item["url"].endswith("amd-earnings")
+        )
+        later = NOW + timedelta(hours=3)
+        revalidated_at = later - timedelta(minutes=10)
+        self.source.snapshot = NewsSourceSnapshot(
+            items=(
+                raw_news(
+                    url="https://wire.example/events/amd-earnings",
+                    summary="AMD 发布近期结构化事实摘要。",
+                    symbols=("AMD",),
+                    fetched_at=revalidated_at,
+                ),
+            )
+        )
+        later_context = DomainToolContext(
+            actor_id="actor-1",
+            granted_permissions=self.context.granted_permissions,
+            clock=lambda: later,
+        )
+
+        refreshed = registry.invoke(
+            "search_market_news",
+            context=later_context,
+            arguments={"symbols": ["AMD"], "limit": 20},
+        )
+        repeated = registry.invoke(
+            "search_market_news",
+            context=later_context,
+            arguments={"symbols": ["AMD"], "limit": 20},
+        )
+        item = refreshed.data["items"][0]
+        evidence = registry.invoke(
+            "get_evidence",
+            context=later_context,
+            arguments={"evidence_id": item["evidence_id"]},
+        )
+        frozen = ledger.freeze(
+            EvidenceReadContext(
+                actor_id="actor-1",
+                permissions=frozenset({"news:read", "evidence:read"}),
+                purpose="domain_tool",
+                now=later,
+            ),
+            (item["evidence_id"],),
+        )[0]
+
+        self.assertEqual(refreshed.status, "success")
+        self.assertNotEqual(item["evidence_id"], original["evidence_id"])
+        self.assertEqual(
+            repeated.data["items"][0]["evidence_id"], item["evidence_id"]
+        )
+        self.assertGreaterEqual(len(item["evidence_id"].rsplit(":", 1)[1]), 24)
+        self.assertEqual(evidence.status, "success")
+        self.assertEqual(evidence.data["fetched_at"], item["fetched_at"])
+        self.assertEqual(frozen.fetched_at.isoformat(), item["fetched_at"])
+        self.assertEqual(frozen.available_from, frozen.fetched_at)
+
+    def test_old_empty_snapshot_is_stale_and_is_not_persisted_as_fresh(self) -> None:
+        root = Path(tempfile.mkdtemp())
+        (root / "data.js").write_text(
+            'window.DATA = {"industries": []}', encoding="utf-8"
+        )
+        old = NOW - timedelta(hours=3)
+        os.utime(root / "data.js", (old.timestamp(), old.timestamp()))
+        source = InvestmentNewsStructuredSource(
+            InvestmentNewsReader(root), refresh_before_read=False
+        )
+        ledger = CountingEvidenceStore()
+        registry = TodayDomainTools(
+            portfolio_store=self.portfolio,
+            watchlist=self.tools.watchlist,
+            news_source=source,
+            evidence_ledger=ledger,
+        ).registry()
+
+        result = registry.invoke(
+            "search_market_news", context=self.context, arguments={}
+        )
+
+        self.assertEqual(result.status, "unavailable")
+        self.assertEqual(result.error_code, "source_stale")
+        self.assertEqual(ledger.put_ids, [])
+
+    def test_news_identity_is_order_independent_and_content_changes_version(self) -> None:
+        original = self.invoke(
+            "search_market_news", {"symbols": ["NVDA", "AMD"], "limit": 20}
+        )
+        original_item = next(
+            item for item in original.data["items"] if item["url"].endswith("semis-1")
+        )
+        self.source.snapshot = NewsSourceSnapshot(
+            items=tuple(reversed(self.source.snapshot.items))
+        )
+        reordered_item = next(
+            item
+            for item in self.invoke(
+                "search_market_news", {"symbols": ["NVDA", "AMD"], "limit": 20}
+            ).data["items"]
+            if item["url"].endswith("semis-1")
+        )
+        self.source.snapshot = NewsSourceSnapshot(
+            items=(
+                raw_news(
+                    url="https://wire.example/events/semis-1",
+                    summary="来源摘要已经发生实质变化。",
+                    symbols=("AMD", "NVDA"),
+                ),
+            )
+        )
+        changed_item = self.invoke(
+            "search_market_news", {"symbols": ["NVDA", "AMD"], "limit": 20}
+        ).data["items"][0]
+
+        self.assertEqual(reordered_item["evidence_id"], original_item["evidence_id"])
+        self.assertNotEqual(changed_item["evidence_id"], original_item["evidence_id"])
+
+    def test_news_ledger_record_keeps_authorization_available_from_and_ttl(self) -> None:
+        ledger = InMemoryEvidenceStore(
+            retention_by_authorization={
+                (FACT_NEWS_SOURCE, FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID): FACT_NEWS_RETENTION
+            }
+        )
+        registry = TodayDomainTools(
+            portfolio_store=self.portfolio,
+            watchlist=self.tools.watchlist,
+            news_source=self.source,
+            evidence_ledger=ledger,
+        ).registry()
+        searched = registry.invoke(
+            "search_market_news",
+            context=self.context,
+            arguments={"symbols": ["AMD"], "limit": 20},
+        )
+        item = next(
+            value
+            for value in searched.data["items"]
+            if value["url"].endswith("amd-earnings")
+        )
+        record = ledger.read(
+            EvidenceReadContext(
+                actor_id="actor-1",
+                permissions=frozenset({"news:read", "evidence:read"}),
+                purpose="domain_tool",
+                now=NOW,
+            ),
+            item["evidence_id"],
+        )
+
+        self.assertEqual(
+            record.authorization_snapshot_id,
+            FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
+        )
+        self.assertEqual(record.available_from, record.fetched_at)
+        self.assertEqual(record.expires_at, NOW + timedelta(minutes=110))
+        self.assertTrue(record.evidence_id.endswith(record.content_sha256[:24]))
+
+    def test_search_persists_only_events_returned_after_limit(self) -> None:
+        ledger = CountingEvidenceStore()
+        registry = TodayDomainTools(
+            portfolio_store=self.portfolio,
+            watchlist=self.tools.watchlist,
+            news_source=self.source,
+            evidence_ledger=ledger,
+        ).registry()
+
+        result = registry.invoke(
+            "search_market_news",
+            context=self.context,
+            arguments={"symbols": ["AMD", "NVDA"], "limit": 1},
+        )
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(result.data["count"], 1)
+        self.assertEqual(ledger.put_ids, [result.data["items"][0]["evidence_id"]])
+
+    def test_discover_persists_only_snapshot_and_referenced_fact_limit(self) -> None:
+        self.source.snapshot = NewsSourceSnapshot(
+            items=tuple(
+                raw_news(
+                    url=f"https://wire.example/events/amd-{index}",
+                    summary=f"AMD 结构化摘要 {index}。",
+                    symbols=("AMD",),
+                    published_at=NOW - timedelta(minutes=index + 1),
+                )
+                for index in range(5)
+            )
+        )
+        ledger = CountingEvidenceStore()
+        registry = TodayDomainTools(
+            portfolio_store=self.portfolio,
+            watchlist=self.tools.watchlist,
+            news_source=self.source,
+            evidence_ledger=ledger,
+            relation_map={"NVDA": ("AMD",)},
+        ).registry()
+
+        result = registry.invoke(
+            "discover_related_candidates",
+            context=self.context,
+            arguments={"subject_ids": ["NVDA"]},
+        )
+        candidate = result.data["candidates"][0]
+        persisted_result_ids = {
+            item.evidence_id
+            for item in result.evidence
+            if item.evidence_id.startswith(("news:", "news-snapshot:"))
+        }
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(len(candidate["fact_evidence_ids"]), 3)
+        self.assertEqual(set(ledger.put_ids), persisted_result_ids)
+        self.assertEqual(len(ledger.put_ids), 4)
+
+    def test_empty_snapshot_uses_its_exact_authorization_retention_policy(self) -> None:
+        ledger = InMemoryEvidenceStore(
+            retention_by_authorization={
+                ("custom-news", "custom-auth-v2"): "metadata_only"
+            }
+        )
+        registry = TodayDomainTools(
+            portfolio_store=self.portfolio,
+            watchlist=self.tools.watchlist,
+            news_source=SyntheticNewsSource(
+                NewsSourceSnapshot(
+                    items=(),
+                    fetched_at=NOW - timedelta(minutes=10),
+                    source="custom-news",
+                    authorization_snapshot_id="custom-auth-v2",
+                    persistence="metadata_only",
+                )
+            ),
+            evidence_ledger=ledger,
+        ).registry()
+        searched = registry.invoke(
+            "search_market_news", context=self.context, arguments={}
+        )
+        evidence_id = searched.evidence[0].evidence_id
+        record = ledger.read(
+            EvidenceReadContext(
+                actor_id="actor-1",
+                permissions=frozenset({"news:read"}),
+                purpose="domain_tool",
+                now=NOW,
+            ),
+            evidence_id,
+        )
+
+        self.assertEqual(searched.status, "success")
+        self.assertEqual(record.source, "custom-news")
+        self.assertEqual(record.authorization_snapshot_id, "custom-auth-v2")
+        self.assertEqual(record.persistence, "metadata_only")
+        self.assertIsNone(record.payload)
 
     def test_optional_news_permission_and_private_evidence_are_actor_scoped(self) -> None:
         today = self.invoke("get_today_context", {})
@@ -422,7 +764,7 @@ class TodayDomainToolsTest(unittest.TestCase):
         )
         self.assertEqual(other_actor.error_code, "evidence_not_found")
 
-    def test_cached_news_evidence_rechecks_current_source_and_ttl(self) -> None:
+    def test_persisted_news_survives_source_failure_but_not_ttl(self) -> None:
         news = self.invoke(
             "search_market_news", {"symbols": ["AMD"], "limit": 20}
         )
@@ -430,12 +772,12 @@ class TodayDomainToolsTest(unittest.TestCase):
         self.source.snapshot = NewsSourceSnapshot(
             items=(), gaps=("source_unavailable",)
         )
-        unavailable = self.invoke(
+        persisted = self.invoke(
             "get_evidence", {"evidence_id": evidence_id}
         )
 
-        self.assertEqual(unavailable.status, "unavailable")
-        self.assertEqual(unavailable.error_code, "source_unavailable")
+        self.assertEqual(persisted.status, "success")
+        self.assertEqual(persisted.data["evidence_id"], evidence_id)
         self.source.snapshot = NewsSourceSnapshot(
             items=(
                 raw_news(
@@ -457,7 +799,7 @@ class TodayDomainToolsTest(unittest.TestCase):
             arguments={"evidence_id": evidence_id},
         )
         self.assertEqual(expired.status, "unavailable")
-        self.assertIn(expired.error_code, {"source_stale", "event_expired"})
+        self.assertEqual(expired.error_code, "evidence_expired")
 
     def test_legacy_kline_parameters_reach_market_reader_without_private_or_news(self) -> None:
         calls = []
@@ -610,12 +952,17 @@ class TodayDomainToolsTest(unittest.TestCase):
         refresh_calls = []
         reader = InvestmentNewsReader(
             root,
-            runner=lambda argv, cwd: refresh_calls.append((argv, cwd)) or 0,
+            runner=lambda argv, cwd, _env: refresh_calls.append((argv, cwd)) or 0,
             cache_ttl_seconds=3600,
         )
         source = InvestmentNewsStructuredSource(reader)
 
-        snapshot = source.read(now=NOW)
+        snapshot = source.read(
+            context=FactNewsReadContext(
+                permissions=frozenset({"news:read"}), purpose="domain_tool"
+            ),
+            now=NOW,
+        )
 
         self.assertEqual(snapshot.gaps, ())
         self.assertEqual(snapshot.items[0].related_symbols, ("NVDA",))
@@ -625,7 +972,12 @@ class TodayDomainToolsTest(unittest.TestCase):
         refresh_calls.clear()
         cached = InvestmentNewsStructuredSource(
             reader, refresh_before_read=False
-        ).read(now=NOW)
+        ).read(
+            context=FactNewsReadContext(
+                permissions=frozenset({"news:read"}), purpose="domain_tool"
+            ),
+            now=NOW,
+        )
         self.assertEqual(cached.items[0].related_symbols, ("NVDA",))
         self.assertEqual(refresh_calls, [])
 
