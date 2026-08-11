@@ -11,6 +11,8 @@ import re
 from typing import Any, Callable, Mapping
 from urllib.parse import urlsplit, urlunsplit
 
+from backend.app.market_observation.alpaca import MarketObservationError
+
 from ..contracts import PersonalActor
 from ..rule_automation import personal_rule_evaluation_slot
 from .domain_tools import (
@@ -27,7 +29,7 @@ from .evidence import (
     EvidenceRecord,
     InMemoryEvidenceStore,
 )
-from .fact_market import MarketFactService
+from .fact_market import MarketFactService, MarketFactUnavailable
 from .fact_news import (
     FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
     FACT_NEWS_RETENTION,
@@ -337,13 +339,35 @@ class TodayDomainTools:
                     _ledger_evidence_record(record) for record in market_fact.records
                 )
                 market_source_health = market_fact.source_health
-                gaps.extend(market_fact.gaps)
-            except PermissionError:
-                gaps.append("source_unauthorized")
-            except (EvidenceLedgerError, RuntimeError, ValueError, OSError):
-                gaps.append("market_dossier_unavailable")
+                if context.requested_name != "get_kline":
+                    gaps.extend(market_fact.gaps)
+            except (PermissionError, ValueError, MarketObservationError) as exc:
+                if context.requested_name == "get_kline":
+                    gaps.append(_legacy_kline_failure_code(exc))
+                elif isinstance(exc, PermissionError):
+                    gaps.append("source_unauthorized")
+                else:
+                    gaps.append("market_dossier_unavailable")
+            except MarketFactUnavailable as exc:
+                gaps.append(
+                    exc.reason_code
+                    if context.requested_name == "get_kline"
+                    else "market_dossier_unavailable"
+                )
+            except (EvidenceLedgerError, RuntimeError, OSError) as exc:
+                gaps.append(
+                    "kline_unavailable"
+                    if context.requested_name == "get_kline"
+                    and isinstance(exc, RuntimeError)
+                    and str(exc) == "market_dossier_unavailable"
+                    else "market_dossier_unavailable"
+                )
         else:
-            gaps.append("market_dossier_unavailable")
+            gaps.append(
+                "kline_unavailable"
+                if context.requested_name == "get_kline"
+                else "market_dossier_unavailable"
+            )
         state_data = {
             "available": can_read_private,
             "holding": (
@@ -388,7 +412,10 @@ class TodayDomainTools:
             return DomainToolResult.unavailable(
                 gaps[0] if gaps else "tool_unavailable", symbol
             )
-        if market_source_health == "stale":
+        if (
+            market_source_health == "stale"
+            and context.requested_name != "get_kline"
+        ):
             return DomainToolResult.stale(
                 data=data,
                 gaps=_tool_gaps((*gaps, "source_stale")),
@@ -1090,6 +1117,17 @@ def _freshness_seconds(
     if not events:
         return None
     return max(0, int((now - max(item.fetched_at for item in events)).total_seconds()))
+
+
+def _legacy_kline_failure_code(exc: Exception) -> str:
+    code = getattr(exc, "code", None)
+    if isinstance(code, str) and code:
+        return code[:80]
+    if isinstance(exc, PermissionError):
+        return "authorization_denied"
+    if isinstance(exc, ValueError) and str(exc):
+        return str(exc)[:80]
+    return type(exc).__name__
 
 
 def _market_period(now: datetime) -> str:

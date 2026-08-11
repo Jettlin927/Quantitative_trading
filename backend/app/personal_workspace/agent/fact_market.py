@@ -31,6 +31,12 @@ class MarketDossierFact:
     source_health: str
 
 
+class MarketFactUnavailable(RuntimeError):
+    def __init__(self, reason_code: str) -> None:
+        super().__init__(reason_code)
+        self.reason_code = reason_code
+
+
 class MarketFactService:
     """授权先于 I/O，并只信任 adapter provenance 与装配期 retention。"""
 
@@ -62,10 +68,11 @@ class MarketFactService:
             symbol=symbol,
             now=now,
             bar_days=bar_days,
-            bar_limit=bar_limit,
         )
         if identity.availability != "available" or identity.value is None:
-            raise RuntimeError(identity.reason_code or "asset_identity_unavailable")
+            raise MarketFactUnavailable(
+                identity.reason_code or "asset_identity_unavailable"
+            )
         self._require_provenance(identity, dataset="alpaca_assets")
         normalized_symbol = identity.value.symbol
         if normalized_symbol != symbol:
@@ -89,17 +96,19 @@ class MarketFactService:
         bars_record = self._put(
             context=context,
             provenance=selected.provenance,
-            logical_identity=(
-                f"alpaca_daily_bars:{normalized_symbol}:{adjustment}:"
-                f"{now.date() - timedelta(days=bar_days)}:{now.date()}"
+            logical_identity=_bars_logical_identity(
+                symbol=normalized_symbol,
+                adjustment=adjustment,
+                observation=selected,
             ),
             payload=bars_payload,
             observed_at=selected.as_of,
         )
+        projected_bars = _project_bars(bars_payload, bar_limit=bar_limit)
         return MarketDossierFact(
             data={
                 **asset_payload,
-                **bars_payload,
+                **projected_bars,
                 "authorization_snapshot_ids": sorted(
                     {
                         identity.provenance.authorization_snapshot_id,
@@ -126,22 +135,21 @@ class MarketFactService:
             symbol=symbol,
             now=context.now,
             bar_days=bar_days,
-            bar_limit=bar_limit,
         )
         record = self._put(
             context=context,
             provenance=selected.provenance,
-            logical_identity=(
-                f"alpaca_daily_bars:{symbol}:{adjustment}:"
-                f"{context.now.date() - timedelta(days=bar_days)}:"
-                f"{context.now.date()}"
+            logical_identity=_bars_logical_identity(
+                symbol=symbol,
+                adjustment=adjustment,
+                observation=selected,
             ),
             payload=payload,
             observed_at=selected.as_of,
         )
         return MarketDossierFact(
             data={
-                **payload,
+                **_project_bars(payload, bar_limit=bar_limit),
                 "authorization_snapshot_ids": [
                     selected.provenance.authorization_snapshot_id
                 ],
@@ -166,7 +174,6 @@ class MarketFactService:
         symbol: str,
         now: datetime,
         bar_days: int,
-        bar_limit: int,
     ) -> tuple[ObservedValue[Any], dict[str, Any], tuple[str, ...], str]:
         bars = self._adapter.observe_daily_bars(
             symbol,
@@ -181,7 +188,9 @@ class MarketFactService:
             else bars.raw
         )
         if selected.availability != "available" or not selected.value:
-            raise RuntimeError(selected.reason_code or "daily_bars_unavailable")
+            raise MarketFactUnavailable(
+                selected.reason_code or "daily_bars_unavailable"
+            )
         self._require_provenance(selected, dataset="alpaca_daily_bars")
         if any(bar.symbol != symbol for bar in selected.value):
             raise ValueError("provider_symbol_mismatch")
@@ -190,7 +199,6 @@ class MarketFactService:
             if selected is bars.provider_adjusted
             else "raw"
         )
-        selected_bars = selected.value[-bar_limit:]
         payload = {
             "symbol": symbol,
             "adjustment": adjustment,
@@ -205,9 +213,9 @@ class MarketFactService:
                     "close": str(bar.close),
                     "volume": bar.volume,
                 }
-                for bar in selected_bars
+                for bar in selected.value
             ],
-            "count": len(selected_bars),
+            "count": len(selected.value),
         }
         gaps = ()
         if (
@@ -235,15 +243,21 @@ class MarketFactService:
         if persistence is None:
             raise EvidenceLedgerError("source_retention_unknown")
         content_sha256 = _payload_sha256(payload)
+        authorized_logical_identity = (
+            f"{provenance.authorization_snapshot_id}:{logical_identity}"
+        )
+        identity_sha256 = sha256(
+            authorized_logical_identity.encode("utf-8")
+        ).hexdigest()
         base_id = (
             f"market:{provenance.dataset}:"
-            f"{sha256(logical_identity.encode('utf-8')).hexdigest()[:12]}:"
+            f"{identity_sha256[:12]}:"
             f"{content_sha256[:24]}"
         )
         record = self._record(
             context=context,
             provenance=provenance,
-            logical_identity=logical_identity,
+            logical_identity=authorized_logical_identity,
             evidence_id=base_id,
             content_sha256=content_sha256,
             persistence=persistence,
@@ -256,7 +270,8 @@ class MarketFactService:
         revalidation = sha256(
             (
                 f"{provenance.authorization_snapshot_id}|"
-                f"{content_sha256}|{context.now.isoformat()}"
+                f"{provenance.content_sha256}|"
+                f"{content_sha256}|{provenance.fetched_at.isoformat()}"
             ).encode("utf-8")
         ).hexdigest()
         return self._evidence_ledger.put(
@@ -321,3 +336,19 @@ def _payload_sha256(payload: Mapping[str, Any]) -> str:
         allow_nan=False,
     ).encode("utf-8")
     return sha256(encoded).hexdigest()
+
+
+def _bars_logical_identity(
+    *, symbol: str, adjustment: str, observation: ObservedValue[Any]
+) -> str:
+    return (
+        f"alpaca_daily_bars:{symbol}:{adjustment}:"
+        f"{observation.provenance.content_sha256}"
+    )
+
+
+def _project_bars(
+    payload: Mapping[str, Any], *, bar_limit: int
+) -> dict[str, Any]:
+    bars = list(payload["bars"])[-bar_limit:]
+    return {**payload, "bars": bars, "count": len(bars)}
