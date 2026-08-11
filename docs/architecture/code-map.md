@@ -41,6 +41,21 @@
   只有私有覆盖中的该进程可读取模型 secret。
 - `market_observation/`：Alpaca adapter、用途授权、来源健康与追加式授权注册表。
 
+### MCP 与 DeepSeek 工具边界
+
+- `personal_workspace/mcp_gateway.py`：单 actor、exact-five、固定只读权限、限额与审计的
+  MCP 安全模块，只调用唯一 `DomainToolRegistry`。
+- `personal_workspace/mcp_server.py`：现有 `stdio` 协议 adapter；只用于非生产和测试，
+  不是生产拓扑。
+- 远端生产目标运行在 `quant-trading-prod`：本机客户端经 SSH 隧道访问服务器 loopback
+  上的单一 `/mcp` Streamable HTTP adapter；该 adapter 尚未实现，也未加入 Compose。
+  它必须用不可由客户端覆盖的服务端入口上下文构造 gateway：审计 channel 为
+  `mcp_streamable_http`，领域 purpose 为 `mcp_remote_read`；现有 `mcp_stdio` 硬编码只属于
+  stdio 行为，不能原样复用为 HTTP 入口。
+- `personal_workspace/agent/completion_runtime.py` 与 `client_tool_runtime.py`：DeepSeek
+  Chat Completions `tool_calls` 的内部 adapter，直接调用同一个 `DomainToolRegistry`，不导入
+  或调用 MCP。MCP 与 DeepSeek 不共享 transport、session、token、provider 或 secret。
+
 ## 前端（`frontend/src/`）
 
 路由和一级导航定义在 `main.jsx`。前端只做交互和投影，不复制持仓、权益、规则或权限计算。

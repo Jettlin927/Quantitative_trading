@@ -114,6 +114,42 @@ class DocumentationContractTest(unittest.TestCase):
         self.assertIn("停止 MCP 子进程", runbook)
         self.assertIn("不删除证据或审计记录", runbook)
 
+    def test_remote_mcp_decision_and_operations_contract_are_explicit(self) -> None:
+        adr_0013 = (
+            DOCS_ROOT / "adr" / "0013-local-read-only-personal-mcp.md"
+        ).read_text(encoding="utf-8")
+        adr_0014 = (
+            DOCS_ROOT / "adr" / "0014-remote-loopback-personal-mcp.md"
+        ).read_text(encoding="utf-8")
+        code_map = (DOCS_ROOT / "architecture" / "code-map.md").read_text(
+            encoding="utf-8"
+        )
+        runbook = (
+            DOCS_ROOT / "operations" / "personal-mcp-remote.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("拓扑条款已由", adr_0013)
+        for text in (adr_0014, code_map, runbook):
+            with self.subTest(document=text[:40]):
+                self.assertIn("quant-trading-prod", text)
+                self.assertIn("Streamable HTTP", text)
+                self.assertIn("SSH 隧道", text)
+                self.assertIn("DomainToolRegistry", text)
+                self.assertIn("mcp_streamable_http", text)
+                self.assertIn("mcp_remote_read", text)
+
+        self.assertIn("127.0.0.1", adr_0014)
+        self.assertIn("/mcp", adr_0014)
+        self.assertIn("bearer token", adr_0014)
+        self.assertIn("Origin", adr_0014)
+        self.assertIn("历史证据", adr_0014)
+        self.assertIn("服务端入口上下文", adr_0014)
+        self.assertIn("客户端不能覆盖", adr_0014)
+        self.assertIn("stdio", adr_0014)
+        self.assertIn("Chat Completions", adr_0014)
+        self.assertIn("不实现", runbook)
+        self.assertIn("不构成生产授权", runbook)
+
     def test_document_index_routes_every_module(self) -> None:
         index = (DOCS_ROOT / "index.md").read_text(encoding="utf-8")
         for target in [
