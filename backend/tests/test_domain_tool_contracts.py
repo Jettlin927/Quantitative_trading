@@ -6,11 +6,13 @@ import unittest
 
 from backend.app.personal_workspace.agent.domain_tools import (
     DOMAIN_TOOL_DEFINITIONS,
+    LEGACY_TOOL_DEFINITIONS,
     LEGACY_TOOL_ALIASES,
     DomainToolContext,
     DomainToolRegistry,
     DomainToolResult,
     EvidenceEnvelope,
+    RuntimeToolDefinition,
     ToolGap,
 )
 
@@ -52,6 +54,106 @@ class DomainToolContractTest(unittest.TestCase):
             },
         )
 
+    def test_default_discovery_returns_permitted_canonical_definitions_only(
+        self,
+    ) -> None:
+        registry = DomainToolRegistry(handlers={})
+
+        definitions = registry.definitions(
+            permissions=frozenset(
+                {
+                    "portfolio:read",
+                    "market:read",
+                    "news:read",
+                    "evidence:read",
+                }
+            )
+        )
+
+        self.assertEqual(
+            tuple(item.name for item in definitions),
+            (
+                "discover_related_candidates",
+                "get_evidence",
+                "get_symbol_dossier",
+                "get_today_context",
+                "search_market_news",
+            ),
+        )
+        self.assertNotIn("get_holdings", tuple(item.name for item in definitions))
+        self.assertNotIn(
+            "search_web_evidence", tuple(item.name for item in definitions)
+        )
+
+    def test_explicit_discovery_supports_aliases_and_silently_filters_unknown_or_denied(
+        self,
+    ) -> None:
+        registry = DomainToolRegistry(handlers={})
+
+        definitions = registry.definitions(
+            permissions=frozenset({"portfolio:read"}),
+            names=(
+                "place_order",
+                "get_symbol_dossier",
+                "get_holdings",
+                "get_holdings",
+            ),
+        )
+
+        self.assertEqual(tuple(item.name for item in definitions), ("get_holdings",))
+        self.assertEqual(definitions[0], LEGACY_TOOL_DEFINITIONS[0])
+        self.assertEqual(
+            definitions[0].required_permissions, frozenset({"portfolio:read"})
+        )
+        self.assertEqual(definitions[0].input_schema["properties"], {})
+        self.assertNotIn("additionalProperties", definitions[0].input_schema)
+        self.assertNotIn("最新价", definitions[0].description)
+
+    def test_provider_neutral_projection_is_sorted_allowlisted_and_hides_permissions(
+        self,
+    ) -> None:
+        registry = DomainToolRegistry(handlers={})
+
+        projections = registry.projected_definitions(
+            permissions=frozenset({"market:read", "news:read"}),
+            names=(
+                "search_market_news",
+                "discover_related_candidates",
+                "get_news",
+                "get_today_context",
+            ),
+        )
+
+        self.assertEqual(
+            tuple(item.name for item in projections),
+            ("discover_related_candidates", "get_news", "search_market_news"),
+        )
+        self.assertTrue(
+            all(isinstance(item, RuntimeToolDefinition) for item in projections)
+        )
+        self.assertTrue(
+            all(not hasattr(item, "required_permissions") for item in projections)
+        )
+        self.assertEqual(
+            projections[1].input_schema["properties"],
+            LEGACY_TOOL_DEFINITIONS[2].input_schema["properties"],
+        )
+
+    def test_unknown_and_permission_denied_discovery_have_identical_empty_projection(
+        self,
+    ) -> None:
+        registry = DomainToolRegistry(handlers={})
+
+        unknown = registry.projected_definitions(
+            permissions=frozenset(), names=("place_order",)
+        )
+        denied = registry.projected_definitions(
+            permissions=frozenset(), names=("get_evidence",)
+        )
+
+        self.assertEqual(unknown, ())
+        self.assertEqual(denied, ())
+
     def test_alias_uses_canonical_contract_and_records_success_metrics(self) -> None:
         observations = []
 
@@ -59,7 +161,7 @@ class DomainToolContractTest(unittest.TestCase):
             self.assertEqual(context.actor_id, "actor-1")
             self.assertEqual(arguments, {})
             return DomainToolResult.success(
-                data={"holdings": []},
+                data={"holdings": [], "count": 0, "usd_cash": "0"},
                 evidence=(evidence("portfolio:snapshot:1"),),
                 field_coverage=Decimal("1"),
                 freshness_seconds=0,
@@ -258,7 +360,16 @@ class DomainToolContractTest(unittest.TestCase):
         responses = iter(
             (
                 {"holdings": [], "count": 0, "usd_cash": "0"},
-                {"market": {"symbol": "NVDA", "bars": []}},
+                {
+                    "market": {
+                        "symbol": "NVDA",
+                        "adjustment": "raw",
+                        "as_of": NOW.isoformat(),
+                        "source_health": "fresh",
+                        "bars": [],
+                        "count": 0,
+                    }
+                },
                 {"items": [], "count": 0},
             )
         )
@@ -307,15 +418,102 @@ class DomainToolContractTest(unittest.TestCase):
             {"symbols": ["NVDA"], "query": "earnings", "sector": "semi", "limit": 5},
         )
 
-    def test_legacy_alias_rejects_canonical_private_field_leak(self) -> None:
+    def test_legacy_aliases_ignore_extras_and_clamp_or_coerce_like_old_tools(self) -> None:
+        captured = []
+
+        def handler(context, arguments):
+            captured.append((context.requested_name, arguments))
+            if context.requested_name == "get_holdings":
+                data = {"holdings": [], "count": 0, "usd_cash": "0"}
+                source = "personal_portfolio"
+            elif context.requested_name == "get_kline":
+                data = {
+                    "market": {
+                        "symbol": "NVDA",
+                        "adjustment": "raw",
+                        "as_of": NOW.isoformat(),
+                        "source_health": "fresh",
+                        "bars": [],
+                        "count": 0,
+                    }
+                }
+                source = "market_dossier"
+            else:
+                data = {"items": [], "count": 0}
+                source = "synthetic"
+            return DomainToolResult.success(
+                data=data, evidence=(evidence(source=source),)
+            )
+
+        registry = DomainToolRegistry(
+            handlers={
+                "get_today_context": handler,
+                "get_symbol_dossier": handler,
+                "search_market_news": handler,
+            }
+        )
+        context = lambda permissions: DomainToolContext(
+            actor_id="actor-1",
+            granted_permissions=frozenset(permissions),
+            clock=lambda: NOW,
+        )
+
+        holdings = registry.invoke(
+            "get_holdings",
+            context=context({"portfolio:read"}),
+            arguments={"extra": "ignored"},
+        )
+        kline = registry.invoke(
+            "get_kline",
+            context=context({"market:read"}),
+            arguments={"symbol": "nvda", "days": 1, "limit": "6", "extra": True},
+        )
+        news = registry.invoke(
+            "get_news",
+            context=context({"news:read"}),
+            arguments={"limit": 21, "extra": "ignored"},
+        )
+
+        self.assertEqual((holdings.status, kline.status, news.status), ("success",) * 3)
+        self.assertEqual(captured[0], ("get_holdings", {}))
+        self.assertEqual(
+            captured[1],
+            ("get_kline", {"symbol": "NVDA", "bar_days": 10, "bar_limit": 6}),
+        )
+        self.assertEqual(captured[2], ("get_news", {"limit": 20}))
+        self.assertEqual(
+            news.data["note"], "未找到匹配新闻（可换关键词或赛道重试）"
+        )
+
+    def test_legacy_kline_strictly_projects_old_result_fields(self) -> None:
         registry = DomainToolRegistry(
             handlers={
                 "get_symbol_dossier": lambda _context, _arguments: DomainToolResult.success(
                     data={
-                        "market": {"symbol": "NVDA", "bars": []},
+                        "market": {
+                            "symbol": "NVDA",
+                            "name": "NVIDIA",
+                            "asset_class": "us_equity",
+                            "adjustment": "raw",
+                            "as_of": NOW.isoformat(),
+                            "source_health": "fresh",
+                            "bars": [
+                                {
+                                    "date": "2026-08-09",
+                                    "open": "90",
+                                    "high": "101",
+                                    "low": "89",
+                                    "close": "100",
+                                    "volume": 1000,
+                                    "internal_id": "bar-1",
+                                }
+                            ],
+                            "count": 1,
+                            "authorization_snapshot_ids": ["auth-1"],
+                        },
                         "states": {"holding": True},
                     },
-                    evidence=(evidence(),),
+                    evidence=(evidence(source="market_dossier"),),
                 )
             }
         )
@@ -328,8 +526,416 @@ class DomainToolContractTest(unittest.TestCase):
             ),
             arguments={"symbol": "NVDA"},
         )
-        self.assertEqual(result.status, "unavailable")
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(
+            result.data,
+            {
+                "symbol": "NVDA",
+                "adjustment": "raw",
+                "as_of": NOW.isoformat(),
+                "source_health": "fresh",
+                "bars": [
+                    {
+                        "date": "2026-08-09",
+                        "open": "90",
+                        "high": "101",
+                        "low": "89",
+                        "close": "100",
+                        "volume": 1000,
+                    }
+                ],
+                "count": 1,
+            },
+        )
+        self.assertEqual(result.evidence[0].source, "market_dossier")
+
+    def test_legacy_holdings_only_projects_currently_equivalent_core_fields(self) -> None:
+        registry = DomainToolRegistry(
+            handlers={
+                "get_today_context": lambda _context, _arguments: DomainToolResult.success(
+                    data={
+                        "holdings": [
+                            {
+                                "symbol": "NVDA",
+                                "name": "NVIDIA",
+                                "quantity": "10",
+                                "average_cost": "90",
+                                "currency": "USD",
+                                "state": "active",
+                                "current_price": "123.45",
+                                "price_as_of": NOW.isoformat(),
+                            }
+                        ],
+                        "count": 1,
+                        "usd_cash": "500",
+                    },
+                    evidence=(evidence(source="personal_portfolio"),),
+                )
+            }
+        )
+
+        result = registry.invoke(
+            "get_holdings",
+            context=DomainToolContext(
+                actor_id="actor-1",
+                granted_permissions=frozenset({"portfolio:read"}),
+                clock=lambda: NOW,
+            ),
+            arguments={},
+        )
+
+        self.assertEqual(
+            result.data["holdings"][0],
+            {
+                "symbol": "NVDA",
+                "name": "NVIDIA",
+                "quantity": "10",
+                "average_cost": "90",
+                "currency": "USD",
+                "state": "active",
+            },
+        )
+
+    def test_legacy_news_deep_projects_authorized_safe_fields_without_shared_refs(
+        self,
+    ) -> None:
+        related_symbols = ["NVDA"]
+        item = {
+            "event_id": "event-secret",
+            "evidence_id": "news:1",
+            "title": "NVIDIA 发布公告",
+            "url": "https://example.com/news/1",
+            "published_at": NOW.isoformat(),
+            "fetched_at": NOW.isoformat(),
+            "summary": "摘要",
+            "content_sha256": "b" * 64,
+            "source": "wire",
+            "source_type": "structured_news",
+            "sector": "semi",
+            "related_symbols": related_symbols,
+            "confirmation_state": "source_summary_unconfirmed",
+            "internal": {"secret": "do-not-leak"},
+        }
+        envelope = EvidenceEnvelope(
+            evidence_id="news:1",
+            source="wire",
+            as_of=NOW,
+            content_sha256="a" * 64,
+            authorized_fields=(
+                "title",
+                "url",
+                "published_at",
+                "fetched_at",
+                "summary",
+                "source",
+                "source_type",
+                "related_symbols",
+                "confirmation_state",
+                "sector",
+                "internal",
+            ),
+        )
+        registry = DomainToolRegistry(
+            handlers={
+                "search_market_news": lambda _context, _arguments: DomainToolResult.success(
+                    data={"items": [item], "count": 1}, evidence=(envelope,)
+                )
+            }
+        )
+
+        result = registry.invoke(
+            "get_news",
+            context=DomainToolContext(
+                actor_id="actor-1",
+                granted_permissions=frozenset({"news:read"}),
+                clock=lambda: NOW,
+            ),
+            arguments={},
+        )
+
+        self.assertEqual(
+            set(result.data["items"][0]),
+            {
+                "title",
+                "url",
+                "published_at",
+                "fetched_at",
+                "summary",
+                "source",
+                "source_type",
+                "related_symbols",
+                "confirmation_state",
+            },
+        )
+        related_symbols.append("AMD")
+        item["title"] = "已变异"
+        self.assertEqual(result.data["items"][0]["title"], "NVIDIA 发布公告")
+        self.assertEqual(result.data["items"][0]["related_symbols"], ["NVDA"])
+
+    def test_legacy_news_rejects_incomplete_unmatched_or_untyped_items(self) -> None:
+        safe_fields = (
+            "title",
+            "url",
+            "published_at",
+            "fetched_at",
+            "summary",
+            "source",
+            "source_type",
+            "related_symbols",
+            "confirmation_state",
+        )
+        valid_item = {
+            "evidence_id": "news:1",
+            "title": "NVIDIA 发布公告",
+            "url": "https://example.com/news/1",
+            "published_at": NOW.isoformat(),
+            "fetched_at": NOW.isoformat(),
+            "summary": "摘要",
+            "source": "wire",
+            "source_type": "structured_news",
+            "related_symbols": ["NVDA"],
+            "confirmation_state": "source_summary_unconfirmed",
+        }
+
+        def envelope(*, evidence_id="news:1", authorized_fields=safe_fields):
+            return EvidenceEnvelope(
+                evidence_id=evidence_id,
+                source="wire",
+                as_of=NOW,
+                content_sha256="a" * 64,
+                authorized_fields=authorized_fields,
+            )
+
+        cases = (
+            ({}, envelope()),
+            ({**valid_item, "evidence_id": "news:missing"}, envelope()),
+            (
+                valid_item,
+                envelope(
+                    authorized_fields=tuple(
+                        name for name in safe_fields if name != "summary"
+                    )
+                ),
+            ),
+            ({**valid_item, "related_symbols": "NVDA"}, envelope()),
+        )
+        for item, item_evidence in cases:
+            with self.subTest(item=item, authorized=item_evidence.authorized_fields):
+                registry = DomainToolRegistry(
+                    handlers={
+                        "search_market_news": lambda _context, _arguments, item=item, item_evidence=item_evidence: DomainToolResult.success(
+                            data={"items": [item], "count": 1},
+                            evidence=(item_evidence,),
+                        )
+                    }
+                )
+                result = registry.invoke(
+                    "get_news",
+                    context=DomainToolContext(
+                        actor_id="actor-1",
+                        granted_permissions=frozenset({"news:read"}),
+                        clock=lambda: NOW,
+                    ),
+                    arguments={},
+                )
+                self.assertEqual(result.error_code, "tool_contract_invalid")
+
+    def test_malformed_non_mapping_handler_data_is_contract_invalid(self) -> None:
+        registry = DomainToolRegistry(
+            handlers={
+                "get_today_context": lambda _context, _arguments: DomainToolResult.success(
+                    data=[], evidence=(evidence(),)  # type: ignore[arg-type]
+                )
+            }
+        )
+
+        result = registry.invoke(
+            "get_today_context",
+            context=DomainToolContext(
+                actor_id="actor-1",
+                granted_permissions=frozenset({"portfolio:read", "market:read"}),
+                clock=lambda: NOW,
+            ),
+            arguments={},
+        )
+
         self.assertEqual(result.error_code, "tool_contract_invalid")
+
+    def test_legacy_results_require_complete_typed_count_consistent_contracts(
+        self,
+    ) -> None:
+        valid_bar = {
+            "date": "2026-08-09",
+            "open": "90",
+            "high": "101",
+            "low": "89",
+            "close": "100",
+            "volume": 1000,
+        }
+        valid_kline = {
+            "symbol": "NVDA",
+            "adjustment": "raw",
+            "as_of": NOW.isoformat(),
+            "source_health": "fresh",
+            "bars": [valid_bar],
+            "count": 1,
+        }
+        valid_holding = {
+            "symbol": "NVDA",
+            "name": "NVIDIA",
+            "quantity": "10",
+            "average_cost": "90",
+            "currency": "USD",
+            "state": "active",
+        }
+        cases = (
+            (
+                "get_kline",
+                "get_symbol_dossier",
+                {"market": {name: value for name, value in valid_kline.items() if name != "as_of"}},
+                {"symbol": "NVDA"},
+                {"market:read"},
+                "market_dossier",
+            ),
+            (
+                "get_kline",
+                "get_symbol_dossier",
+                {"market": {**valid_kline, "count": 2}},
+                {"symbol": "NVDA"},
+                {"market:read"},
+                "market_dossier",
+            ),
+            (
+                "get_kline",
+                "get_symbol_dossier",
+                {"market": {**valid_kline, "bars": [{name: value for name, value in valid_bar.items() if name != "volume"}]}},
+                {"symbol": "NVDA"},
+                {"market:read"},
+                "market_dossier",
+            ),
+            (
+                "get_holdings",
+                "get_today_context",
+                {"holdings": [valid_holding], "count": 1},
+                {},
+                {"portfolio:read"},
+                "personal_portfolio",
+            ),
+            (
+                "get_holdings",
+                "get_today_context",
+                {"holdings": [{**valid_holding, "quantity": 10}], "count": 1, "usd_cash": "0"},
+                {},
+                {"portfolio:read"},
+                "personal_portfolio",
+            ),
+            (
+                "get_holdings",
+                "get_today_context",
+                {"holdings": [valid_holding], "count": 0, "usd_cash": "0"},
+                {},
+                {"portfolio:read"},
+                "personal_portfolio",
+            ),
+            (
+                "get_news",
+                "search_market_news",
+                {"items": [], "count": 1},
+                {},
+                {"news:read"},
+                "structured_news",
+            ),
+            (
+                "get_news",
+                "search_market_news",
+                {"items": "not-a-list", "count": 0},
+                {},
+                {"news:read"},
+                "structured_news",
+            ),
+        )
+        for alias, canonical, data, arguments, permissions, source in cases:
+            with self.subTest(alias=alias, data=data):
+                registry = DomainToolRegistry(
+                    handlers={
+                        canonical: lambda _context, _arguments, data=data, source=source: DomainToolResult.success(
+                            data=data, evidence=(evidence(source=source),)
+                        )
+                    }
+                )
+                result = registry.invoke(
+                    alias,
+                    context=DomainToolContext(
+                        actor_id="actor-1",
+                        granted_permissions=frozenset(permissions),
+                        clock=lambda: NOW,
+                    ),
+                    arguments=arguments,
+                )
+                self.assertEqual(result.error_code, "tool_contract_invalid")
+
+    def test_registry_snapshots_catalogs_and_returned_schemas_are_isolated(self) -> None:
+        registry = DomainToolRegistry(handlers={})
+        canonical_format = DOMAIN_TOOL_DEFINITIONS[0].input_schema["properties"][
+            "as_of"
+        ]["format"]
+        legacy_properties = LEGACY_TOOL_DEFINITIONS[0].input_schema["properties"]
+        try:
+            DOMAIN_TOOL_DEFINITIONS[0].input_schema["properties"]["as_of"][
+                "format"
+            ] = "date"
+            legacy_properties["polluted"] = {"type": "string"}
+            discovered = registry.definitions(
+                permissions=frozenset({"portfolio:read", "market:read"})
+            )
+            aliases = registry.definitions(
+                permissions=frozenset({"portfolio:read"}), names=("get_holdings",)
+            )
+            discovered[0].input_schema["properties"]["mutated"] = {
+                "type": "string"
+            }
+        finally:
+            DOMAIN_TOOL_DEFINITIONS[0].input_schema["properties"]["as_of"][
+                "format"
+            ] = canonical_format
+            legacy_properties.pop("polluted", None)
+
+        today = next(item for item in discovered if item.name == "get_today_context")
+        self.assertEqual(today.input_schema["properties"]["as_of"]["format"], "date-time")
+        self.assertNotIn("polluted", aliases[0].input_schema["properties"])
+        fresh = registry.definitions(
+            permissions=frozenset({"portfolio:read", "market:read"})
+        )
+        self.assertNotIn("mutated", fresh[0].input_schema["properties"])
+
+    def test_canonical_date_time_format_is_validated_before_handler(self) -> None:
+        called = []
+        registry = DomainToolRegistry(
+            handlers={
+                "get_today_context": lambda _context, arguments: called.append(arguments)
+            }
+        )
+
+        context = DomainToolContext(
+            actor_id="actor-1",
+            granted_permissions=frozenset({"portfolio:read", "market:read"}),
+            clock=lambda: NOW,
+        )
+        for value in (
+            "not-a-date",
+            "2026-08-10T12:00Z",
+            "20260810T120000Z",
+            "2026-W33-1T12:00:00Z",
+        ):
+            with self.subTest(value=value):
+                result = registry.invoke(
+                    "get_today_context",
+                    context=context,
+                    arguments={"as_of": value},
+                )
+                self.assertEqual(result.error_code, "invalid_arguments")
+        self.assertEqual(called, [])
 
 
 if __name__ == "__main__":

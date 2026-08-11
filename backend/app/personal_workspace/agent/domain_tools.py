@@ -7,10 +7,12 @@ handler adapter 接入；来源 SDK 或供应商原始响应不得进入这些�
 from __future__ import annotations
 
 from collections import deque
+from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 import math
+import re
 from threading import Lock
 from typing import Any, Callable, Mapping
 
@@ -21,6 +23,15 @@ class ToolDefinition:
     description: str
     input_schema: Mapping[str, Any]
     required_permissions: frozenset[str]
+
+
+@dataclass(frozen=True)
+class RuntimeToolDefinition:
+    """供 AIRuntime/MCP 出口消费的 provider-neutral 工具定义。"""
+
+    name: str
+    description: str
+    input_schema: Mapping[str, Any]
 
 
 @dataclass(frozen=True)
@@ -317,11 +328,87 @@ LEGACY_TOOL_ALIASES = {
     "get_news": "search_market_news",
 }
 
-_LEGACY_REQUIRED_PERMISSIONS = {
-    "get_holdings": frozenset({"portfolio:read"}),
-    "get_kline": frozenset({"market:read"}),
-    "get_news": frozenset({"news:read"}),
-}
+LEGACY_TOOL_DEFINITIONS = (
+    ToolDefinition(
+        name="get_holdings",
+        description=(
+            "查询当前真实美股持仓（用户手工维护的私有数据）：返回各持仓的 symbol、名称、数量、"
+            "平均成本、币种与状态，以及美元现金余额。无参数。数据仅限当前用户，为时间点快照。"
+        ),
+        input_schema={"type": "object", "properties": {}, "required": []},
+        required_permissions=frozenset({"portfolio:read"}),
+    ),
+    ToolDefinition(
+        name="get_kline",
+        description=(
+            "查询目标美股标的的日 K 线（open/high/low/close + 成交量，按交易日升序）。"
+            "参数：symbol（美股代码，必需）、days（回溯自然日，默认 90，范围 10-500）、"
+            "limit（返回最近 N 根，默认 120，范围 1-500）。数据为 Alpaca 日线快照。"
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "symbol": {"type": "string"},
+                "days": {"type": "integer", "minimum": 10, "maximum": 500},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+            },
+            "required": ["symbol"],
+        },
+        required_permissions=frozenset({"market:read"}),
+    ),
+    ToolDefinition(
+        name="get_news",
+        description=(
+            "检索目标标的或产业赛道最近 7 天的产业新闻（investment-news 本地抓取，覆盖全球 100+ 权威源）。"
+            "参数：symbol（美股代码，可选）、keyword（关键词，可选）、sector（赛道 key，可选，"
+            "取值 ai/semi/robot/auto/energy/bio/space/security/tech/consumer/macro/science）、"
+            "limit（返回条数，默认 8，最大 20）。标的→赛道为启发式映射，未收录标的使用关键词检索。"
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "symbol": {"type": "string"},
+                "keyword": {"type": "string"},
+                "sector": {"type": "string"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+            },
+            "required": [],
+        },
+        required_permissions=frozenset({"news:read"}),
+    ),
+)
+
+_LEGACY_HOLDING_FIELDS = (
+    "symbol",
+    "name",
+    "quantity",
+    "average_cost",
+    "currency",
+    "state",
+)
+_LEGACY_KLINE_FIELDS = (
+    "symbol",
+    "adjustment",
+    "as_of",
+    "source_health",
+    "bars",
+    "count",
+)
+_LEGACY_BAR_FIELDS = ("date", "open", "high", "low", "close", "volume")
+_LEGACY_NEWS_SAFE_FIELDS = (
+    "title",
+    "url",
+    "published_at",
+    "fetched_at",
+    "summary",
+    "source",
+    "source_type",
+    "related_symbols",
+    "confirmation_state",
+)
+_RFC3339_DATE_TIME = re.compile(
+    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})"
+)
 
 
 class DomainToolRegistry:
@@ -331,32 +418,83 @@ class DomainToolRegistry:
         handlers: Mapping[str, DomainToolHandler],
         observation_recorder: Callable[[ToolObservation], None] | None = None,
     ) -> None:
-        self._definitions = {item.name: item for item in DOMAIN_TOOL_DEFINITIONS}
+        self._definitions = {
+            item.name: deepcopy(item) for item in DOMAIN_TOOL_DEFINITIONS
+        }
+        self._legacy_definitions = {
+            item.name: deepcopy(item) for item in LEGACY_TOOL_DEFINITIONS
+        }
         unknown_handlers = set(handlers) - set(self._definitions)
         if unknown_handlers:
             raise ValueError("unknown_tool_handler")
         self._handlers = dict(handlers)
         self._record = observation_recorder or (lambda _observation: None)
 
+    def definitions(
+        self,
+        *,
+        permissions: frozenset[str],
+        names: tuple[str, ...] = (),
+    ) -> tuple[ToolDefinition, ...]:
+        """发现调用方有权使用的定义；空 names 只发现 canonical 工具。"""
+
+        catalog = self._definitions | self._legacy_definitions
+        requested = self._definitions.values() if not names else (
+            catalog.get(name) for name in names
+        )
+        permitted = {
+            item.name: item
+            for item in requested
+            if item is not None and item.required_permissions <= permissions
+        }
+        return tuple(
+            replace(
+                permitted[name],
+                input_schema=deepcopy(permitted[name].input_schema),
+            )
+            for name in sorted(permitted)
+        )
+
+    def projected_definitions(
+        self,
+        *,
+        permissions: frozenset[str],
+        names: tuple[str, ...] = (),
+    ) -> tuple[RuntimeToolDefinition, ...]:
+        """投影出口所需字段，不暴露内部权限元数据。"""
+
+        return tuple(
+            RuntimeToolDefinition(
+                name=item.name,
+                description=item.description,
+                input_schema=deepcopy(item.input_schema),
+            )
+            for item in self.definitions(permissions=permissions, names=names)
+        )
+
     def invoke(
         self,
         requested_name: str,
         *,
         context: DomainToolContext,
-        arguments: dict[str, Any],
+        arguments: Mapping[str, Any],
     ) -> DomainToolResult:
         canonical_name = LEGACY_TOOL_ALIASES.get(requested_name, requested_name)
         definition = self._definitions.get(canonical_name)
-        if definition is None:
+        requested_definition = (
+            self._legacy_definitions.get(requested_name)
+            if requested_name in LEGACY_TOOL_ALIASES
+            else definition
+        )
+        if definition is None or requested_definition is None:
             return self._finish(
                 requested_name,
                 canonical_name,
                 DomainToolResult.unavailable("unknown_tool", requested_name),
             )
-        required_permissions = _LEGACY_REQUIRED_PERMISSIONS.get(
-            requested_name, definition.required_permissions
+        missing_permissions = (
+            requested_definition.required_permissions - context.granted_permissions
         )
-        missing_permissions = required_permissions - context.granted_permissions
         if missing_permissions:
             return self._finish(
                 requested_name,
@@ -365,7 +503,28 @@ class DomainToolRegistry:
                     "source_unauthorized", ",".join(sorted(missing_permissions))
                 ),
             )
-        normalized_arguments = _normalize_legacy_arguments(requested_name, arguments)
+        if requested_name in LEGACY_TOOL_ALIASES:
+            if not isinstance(arguments, Mapping):
+                return self._finish(
+                    requested_name,
+                    canonical_name,
+                    DomainToolResult.unavailable(
+                        "invalid_arguments", canonical_name
+                    ),
+                )
+            normalized_arguments = _normalize_legacy_arguments(
+                requested_name, arguments
+            )
+        else:
+            if not _arguments_match(requested_definition.input_schema, arguments):
+                return self._finish(
+                    requested_name,
+                    canonical_name,
+                    DomainToolResult.unavailable(
+                        "invalid_arguments", canonical_name
+                    ),
+                )
+            normalized_arguments = dict(arguments)
         if not _arguments_match(definition.input_schema, normalized_arguments):
             return self._finish(
                 requested_name,
@@ -412,7 +571,7 @@ class DomainToolRegistry:
 
 
 def _arguments_match(schema: Mapping[str, Any], arguments: Any) -> bool:
-    if not isinstance(arguments, dict):
+    if not isinstance(arguments, Mapping):
         return False
     properties = schema.get("properties", {})
     if set(arguments) - set(properties):
@@ -423,27 +582,79 @@ def _arguments_match(schema: Mapping[str, Any], arguments: Any) -> bool:
 
 
 def _normalize_legacy_arguments(
-    requested_name: str, arguments: dict[str, Any]
+    requested_name: str, arguments: Mapping[str, Any]
 ) -> dict[str, Any]:
+    if requested_name == "get_holdings":
+        return {}
     if requested_name == "get_kline":
-        mapping = {"days": "bar_days", "limit": "bar_limit"}
-        return {mapping.get(name, name): value for name, value in arguments.items()}
+        return {
+            "symbol": str(arguments.get("symbol") or "").strip().upper(),
+            "bar_days": _clamp_legacy_int(arguments.get("days"), 90, 10, 500),
+            "bar_limit": _clamp_legacy_int(arguments.get("limit"), 120, 1, 500),
+        }
     if requested_name == "get_news":
-        normalized = dict(arguments)
-        symbol = normalized.pop("symbol", None)
+        normalized: dict[str, Any] = {
+            "limit": _clamp_legacy_int(arguments.get("limit"), 8, 1, 20)
+        }
+        symbol = str(arguments.get("symbol") or "").strip()
         if symbol:
             normalized["symbols"] = [symbol]
-        keyword = normalized.pop("keyword", None)
+        keyword = str(arguments.get("keyword") or "").strip()
         if keyword:
             normalized["query"] = keyword
+        sector = str(arguments.get("sector") or "").strip()
+        if sector:
+            normalized["sector"] = sector
         return normalized
     return dict(arguments)
+
+
+def _clamp_legacy_int(
+    value: Any, default: int, minimum: int, maximum: int
+) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, parsed))
 
 
 def _normalize_legacy_result(
     requested_name: str, result: DomainToolResult
 ) -> DomainToolResult:
-    if requested_name != "get_kline" or result.status == "unavailable":
+    if result.status == "unavailable":
+        return result
+    if requested_name == "get_holdings":
+        holdings = [
+            _project_fields(item, _LEGACY_HOLDING_FIELDS)
+            for item in result.data["holdings"]
+        ]
+        data = _project_fields(result.data, ("holdings", "count", "usd_cash"))
+        data["holdings"] = holdings
+        return replace(
+            result,
+            data=data,
+        )
+    if requested_name == "get_news":
+        data = _project_fields(result.data, ("items", "count"))
+        authorized_by_evidence_id = {
+            item.evidence_id: frozenset(item.authorized_fields)
+            for item in result.evidence
+        }
+        data["items"] = [
+            _project_legacy_news_item(item, authorized_by_evidence_id)
+            for item in result.data["items"]
+        ]
+        data["note"] = (
+            "标的→赛道为启发式映射；条目为最近 7 天抓取快照"
+            if result.data["items"]
+            else "未找到匹配新闻（可换关键词或赛道重试）"
+        )
+        return replace(
+            result,
+            data=data,
+        )
+    if requested_name != "get_kline":
         return result
     market = result.data.get("market")
     if not isinstance(market, Mapping):
@@ -453,7 +664,36 @@ def _normalize_legacy_result(
     )
     if not evidence:
         return DomainToolResult.unavailable("tool_contract_invalid", requested_name)
-    return replace(result, data=dict(market), evidence=evidence)
+    projected = _project_fields(
+        market,
+        _LEGACY_KLINE_FIELDS,
+    )
+    projected["bars"] = [
+        _project_fields(item, _LEGACY_BAR_FIELDS)
+        for item in market.get("bars", ())
+    ]
+    return replace(result, data=projected, evidence=evidence)
+
+
+def _project_fields(
+    value: Mapping[str, Any], fields: tuple[str, ...]
+) -> dict[str, Any]:
+    return {name: value[name] for name in fields if name in value}
+
+
+def _project_legacy_news_item(
+    item: Mapping[str, Any],
+    authorized_by_evidence_id: Mapping[str, frozenset[str]],
+) -> dict[str, Any]:
+    evidence_id = item.get("evidence_id")
+    authorized_fields = authorized_by_evidence_id.get(
+        evidence_id if isinstance(evidence_id, str) else "", frozenset()
+    )
+    return {
+        name: deepcopy(item[name])
+        for name in _LEGACY_NEWS_SAFE_FIELDS
+        if name in authorized_fields and name in item
+    }
 
 
 def _valid_legacy_result(
@@ -461,19 +701,103 @@ def _valid_legacy_result(
 ) -> bool:
     if result.status == "unavailable" or requested_name not in LEGACY_TOOL_ALIASES:
         return True
-    allowed_keys = {
-        "get_holdings": frozenset({"holdings", "count", "usd_cash"}),
-        "get_news": frozenset({"items", "count"}),
-    }
     if requested_name == "get_kline":
-        return isinstance(result.data.get("market"), Mapping)
-    return set(result.data) <= allowed_keys[requested_name]
+        market = result.data.get("market")
+        if not isinstance(market, Mapping) or not set(
+            _LEGACY_KLINE_FIELDS
+        ) <= set(market):
+            return False
+        bars = market["bars"]
+        count = market["count"]
+        return (
+            isinstance(market["symbol"], str)
+            and bool(market["symbol"])
+            and isinstance(market["adjustment"], str)
+            and market["adjustment"] in {"raw", "provider_adjusted"}
+            and (market["as_of"] is None or isinstance(market["as_of"], str))
+            and isinstance(market["source_health"], str)
+            and isinstance(bars, list)
+            and _valid_count(count, bars)
+            and all(_valid_legacy_bar(item) for item in bars)
+        )
+    if requested_name == "get_holdings":
+        if not {"holdings", "count", "usd_cash"} <= set(result.data):
+            return False
+        holdings = result.data["holdings"]
+        return (
+            isinstance(holdings, list)
+            and isinstance(result.data["usd_cash"], str)
+            and _valid_count(result.data["count"], holdings)
+            and all(_valid_legacy_holding(item) for item in holdings)
+        )
+    if not {"items", "count"} <= set(result.data):
+        return False
+    items = result.data["items"]
+    evidence_by_id = {item.evidence_id: item for item in result.evidence}
+    return (
+        isinstance(items, list)
+        and _valid_count(result.data["count"], items)
+        and all(
+            _valid_legacy_news_item(item, evidence_by_id) for item in items
+        )
+    )
+
+
+def _valid_count(value: Any, items: list[Any]) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value == len(items)
+
+
+def _valid_legacy_bar(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and set(_LEGACY_BAR_FIELDS) <= set(value)
+        and all(isinstance(value[name], str) for name in _LEGACY_BAR_FIELDS[:-1])
+        and isinstance(value["volume"], int)
+        and not isinstance(value["volume"], bool)
+    )
+
+
+def _valid_legacy_holding(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and set(_LEGACY_HOLDING_FIELDS) <= set(value)
+        and all(isinstance(value[name], str) for name in _LEGACY_HOLDING_FIELDS)
+    )
+
+
+def _valid_legacy_news_item(
+    value: Any, evidence_by_id: Mapping[str, EvidenceEnvelope]
+) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    evidence_id = value.get("evidence_id")
+    if not isinstance(evidence_id, str):
+        return False
+    envelope = evidence_by_id.get(evidence_id)
+    safe_fields = set(_LEGACY_NEWS_SAFE_FIELDS)
+    if (
+        envelope is None
+        or not safe_fields <= set(value)
+        or not safe_fields <= set(envelope.authorized_fields)
+    ):
+        return False
+    string_fields = safe_fields - {"related_symbols"}
+    related_symbols = value["related_symbols"]
+    return (
+        all(isinstance(value[name], str) for name in string_fields)
+        and isinstance(related_symbols, list)
+        and all(isinstance(item, str) for item in related_symbols)
+    )
 
 
 def _value_matches(schema: Mapping[str, Any], value: Any) -> bool:
     expected = schema.get("type")
     if expected == "string":
-        return isinstance(value, str) and len(value) >= schema.get("minLength", 0)
+        if not isinstance(value, str) or len(value) < schema.get("minLength", 0):
+            return False
+        if schema.get("format") == "date-time":
+            return _date_time_matches(value)
+        return True
     if expected == "integer":
         return (
             isinstance(value, int)
@@ -490,8 +814,22 @@ def _value_matches(schema: Mapping[str, Any], value: Any) -> bool:
     return False
 
 
+def _date_time_matches(value: str) -> bool:
+    if _RFC3339_DATE_TIME.fullmatch(value) is None:
+        return False
+    try:
+        parsed = datetime.fromisoformat(
+            value[:-1] + "+00:00" if value.endswith("Z") else value
+        )
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
+
+
 def _valid_result(result: Any) -> bool:
     if not isinstance(result, DomainToolResult):
+        return False
+    if not isinstance(result.data, Mapping):
         return False
     if result.status not in {"success", "partial", "stale", "unavailable"}:
         return False
