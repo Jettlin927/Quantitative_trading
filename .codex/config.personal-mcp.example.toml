@@ -1,0 +1,12 @@
+[mcp_servers.personal-investment-workbench]
+url = "http://127.0.0.1:26174/mcp"
+bearer_token_env_var = "PERSONAL_MCP_BEARER_TOKEN"
+required = true
+enabled_tools = [
+  "get_today_context",
+  "get_symbol_dossier",
+  "search_market_news",
+  "discover_related_candidates",
+  "get_evidence",
+]
+default_tools_approval_mode = "auto"

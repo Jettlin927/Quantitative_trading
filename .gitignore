@@ -29,6 +29,7 @@ outputs/private/
 /docs/research/strategy-results/ma-trend-reversal-20260629/signals.csv
 .agent/
 tmp/
+.personal-mcp-token
 
 # OS/editor files
 .DS_Store

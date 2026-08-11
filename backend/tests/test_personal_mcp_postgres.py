@@ -85,7 +85,7 @@ class PersonalMcpActorGatePostgresTest(unittest.TestCase):
 
         with (
             patch(
-                "backend.app.personal_workspace.crypto.load_keyring_file",
+                "backend.app.personal_workspace.crypto.load_owner_only_keyring_file",
                 return_value=object(),
             ),
             patch(
@@ -117,7 +117,7 @@ class PersonalMcpActorGatePostgresTest(unittest.TestCase):
 
         with (
             patch(
-                "backend.app.personal_workspace.crypto.load_keyring_file",
+                "backend.app.personal_workspace.crypto.load_owner_only_keyring_file",
                 return_value=object(),
             ),
             patch(

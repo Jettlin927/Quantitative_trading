@@ -321,7 +321,7 @@ class PersonalMcpServerTest(unittest.TestCase):
             stderr = io.StringIO()
             with (
                 patch(
-                    "backend.app.personal_workspace.crypto.load_keyring_file",
+                    "backend.app.personal_workspace.crypto.load_owner_only_keyring_file",
                     return_value=object(),
                 ),
                 patch(
@@ -343,7 +343,7 @@ class PersonalMcpServerTest(unittest.TestCase):
             for terminal_exception in (KeyboardInterrupt(), SystemExit(7)):
                 with (
                     patch(
-                        "backend.app.personal_workspace.crypto.load_keyring_file",
+                        "backend.app.personal_workspace.crypto.load_owner_only_keyring_file",
                         return_value=object(),
                     ),
                     patch(
@@ -391,7 +391,7 @@ class PersonalMcpServerTest(unittest.TestCase):
             unknown_store = ReadOnlyPortfolioStore(None)
             with (
                 patch(
-                    "backend.app.personal_workspace.crypto.load_keyring_file",
+                    "backend.app.personal_workspace.crypto.load_owner_only_keyring_file",
                     return_value=object(),
                 ),
                 patch(
@@ -408,7 +408,7 @@ class PersonalMcpServerTest(unittest.TestCase):
             existing_store = ReadOnlyPortfolioStore("workspace-existing")
             with (
                 patch(
-                    "backend.app.personal_workspace.crypto.load_keyring_file",
+                    "backend.app.personal_workspace.crypto.load_owner_only_keyring_file",
                     return_value=object(),
                 ),
                 patch(
@@ -421,6 +421,63 @@ class PersonalMcpServerTest(unittest.TestCase):
 
             self.assertEqual(unknown_store.actor_ids, ["fixed-actor"])
             self.assertEqual(existing_store.actor_ids, ["fixed-actor"])
+
+    def test_build_uses_owner_only_keyring_and_market_source_loaders(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            news_dir = Path(temporary_directory)
+            (news_dir / "scripts").mkdir()
+            (news_dir / "scripts" / "fetch.py").touch()
+            config = PersonalMcpConfig(
+                enabled=True,
+                actor_id="fixed-actor",
+                database_url="postgresql+psycopg://localhost/private",
+                keyring_file="/strict/keyring.json",
+                alpaca_credentials_file="/strict/alpaca.json",
+                alpaca_authorization_file="/strict/authorization.json",
+                investment_news_dir=str(news_dir),
+            )
+            market_readers = SimpleNamespace(market=object())
+            services = SimpleNamespace(
+                portfolio_store=SimpleNamespace(
+                    load=lambda **_kwargs: SimpleNamespace(
+                        workspace_id="workspace-existing"
+                    )
+                ),
+                market_readers=market_readers,
+                domain_tools=DomainToolRegistry(handlers={}),
+                evidence_store=InMemoryEvidenceStore(
+                    retention_by_authorization={}
+                ),
+            )
+            with (
+                patch(
+                    "backend.app.personal_workspace.crypto."
+                    "load_owner_only_keyring_file",
+                    return_value=object(),
+                ) as keyring_loader,
+                patch(
+                    "backend.app.personal_workspace.market_runtime."
+                    "load_owner_only_personal_market_readers",
+                    return_value=market_readers,
+                ) as market_loader,
+                patch(
+                    "backend.app.personal_workspace.composition."
+                    "build_personal_services",
+                    return_value=services,
+                ) as services_builder,
+            ):
+                gateway = build_personal_mcp_gateway(config)
+                gateway.close()
+
+            keyring_loader.assert_called_once_with(config.keyring_file)
+            market_loader.assert_called_once_with(
+                credentials_file=config.alpaca_credentials_file,
+                authorization_file=config.alpaca_authorization_file,
+            )
+            self.assertIs(
+                services_builder.call_args.kwargs["market_readers"],
+                market_readers,
+            )
 
 
 class PersonalMcpAdapterAsyncTest(unittest.IsolatedAsyncioTestCase):

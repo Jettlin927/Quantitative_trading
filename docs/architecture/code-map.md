@@ -47,9 +47,14 @@
   MCP 安全模块，只调用唯一 `DomainToolRegistry`。
 - `personal_workspace/mcp_server.py`：现有 `stdio` 协议 adapter；只用于非生产和测试，
   不是生产拓扑。
+- `personal_workspace/mcp_composition.py`：两个 transport 共用的唯一领域装配；不包含
+  stdio 或 HTTP 协议行为。
+- `personal_workspace/mcp_http_server.py`：远端 MCP 的最小独立进程入口；固定绑定
+  `127.0.0.1:16174`，从 owner-only 文件读取数据库 URL 与 bearer token，并复用
+  `mcp_composition.py` 的唯一领域装配。
 - 远端生产目标运行在 `quant-trading-prod`：本机客户端经 SSH 隧道访问服务器 loopback
-  上的单一 `/mcp` Streamable HTTP adapter；ASGI adapter 已实现，但尚未加入 Compose、
-  部署或启用。
+  上的单一 `/mcp` Streamable HTTP adapter；ASGI adapter、默认关闭的 `personal-mcp`
+  Compose profile 与本机 SSH 隧道脚本已实现，但尚未部署或启用。
   它必须用不可由客户端覆盖的服务端入口上下文构造 gateway：审计 channel 为
   `mcp_streamable_http`，领域 purpose 为 `mcp_remote_read`；现有 `mcp_stdio` 硬编码只属于
   stdio 行为，不能原样复用为 HTTP 入口。
@@ -75,6 +80,8 @@
 ## 脚本与配置
 
 - `scripts/ops/`：部署、巡检、PostgreSQL 角色、隔离测试和读延迟核验。
+- `scripts/ops/personal_mcp_tunnel.sh`：固定本地/远端 loopback 端口的 SSH ControlMaster
+  隧道 start/status/stop 入口，不读取 bearer token。
 - `.env.example`：可发现的配置键；真实值只存在于受保护环境。
 - `docs/operations/`：部署、安全访问、secret 和数据库角色合同。
 

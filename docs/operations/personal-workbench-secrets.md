@@ -26,6 +26,17 @@
 | `OFFICIAL_ANALYSIS_AUTHORIZATION_HOST_FILE` | 官方证据用途授权快照的宿主绝对路径 | 只读挂载给 API；必须允许 display/internal_analysis/ai_context，禁止 redistribute/formal_research |
 | `SEC_USER_AGENT` | SEC 要求的非空 User-Agent | 不得包含 secret；由 API 访问固定 SEC host 时使用 |
 
+远端个人 MCP 另使用两个只读宿主文件，不复用 API gateway token 或 API 数据库 URL 环境：
+
+| 键 | 内容 | 规则 |
+| --- | --- | --- |
+| `PERSONAL_MCP_DATABASE_URL_HOST_FILE` | MCP 只读角色的完整 PostgreSQL URL 文件 | root owner、600、单行；内容不进入 env、命令行或 Compose render |
+| `PERSONAL_MCP_TOKEN_HOST_FILE` | 独立 MCP bearer token 文件 | root owner、600；不得复用个人 API gateway 或 DeepSeek token |
+
+`personal-mcp` profile 还只读复用 keyring、Alpaca 凭据/授权和新闻目录，但绝不挂载
+DeepSeek 凭据。数据库 URL 与 token 在进程启动时读取；token 轮换必须强制重建该容器，
+只改挂载文件不会更新内存中的认证值。真实文件创建、权限设置与轮换仍须 #266 明确授权。
+
 覆盖把个人访问文件只读挂载到 API：
 
 - gateway token：`/run/secrets/personal-gateway-token`

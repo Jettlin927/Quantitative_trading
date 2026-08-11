@@ -123,7 +123,18 @@ class PersonalDataCipher:
 
 
 def load_keyring_file(path: str | Path) -> FixedKeyring:
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    return _load_keyring_payload(Path(path).read_text(encoding="utf-8"))
+
+
+def load_owner_only_keyring_file(path: str | Path) -> FixedKeyring:
+    from .owner_only_file import read_owner_only_file
+
+    raw = read_owner_only_file(path, maximum_bytes=1024 * 1024)
+    return _load_keyring_payload(raw.decode("utf-8", errors="strict"))
+
+
+def _load_keyring_payload(raw: str) -> FixedKeyring:
+    payload = json.loads(raw)
     active_key_id = str(payload["active_key_id"])
     encoded_keys = payload["data_keys"]
     if not isinstance(encoded_keys, dict):

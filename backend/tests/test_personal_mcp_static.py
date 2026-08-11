@@ -175,6 +175,15 @@ class PersonalMcpStaticContractTest(unittest.TestCase):
                 gateway.close()
                 """,
             ),
+            (
+                "backend.app.personal_workspace.mcp_server",
+                """
+                from backend.app.personal_workspace.mcp_http_server import load_http_server_config
+
+                config = load_http_server_config({})
+                assert config.enabled is False
+                """,
+            ),
         )
         for blocked, body in cases:
             with self.subTest(blocked=blocked):

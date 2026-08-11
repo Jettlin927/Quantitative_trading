@@ -147,7 +147,8 @@ class DocumentationContractTest(unittest.TestCase):
         self.assertIn("客户端不能覆盖", adr_0014)
         self.assertIn("stdio", adr_0014)
         self.assertIn("Chat Completions", adr_0014)
-        self.assertIn("不实现", runbook)
+        self.assertIn("personal-mcp", runbook)
+        self.assertIn("scripts/ops/personal_mcp_tunnel.sh", runbook)
         self.assertIn("不构成生产授权", runbook)
 
     def test_document_index_routes_every_module(self) -> None:
