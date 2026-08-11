@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
+from dataclasses import asdict, dataclass, replace
+from datetime import datetime, timedelta
 from decimal import Decimal
 from hashlib import sha256
 import json
 import re
 from threading import Lock
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Callable, Mapping
 from urllib.parse import urlsplit, urlunsplit
 
 from backend.app.market_observation.alpaca import AlpacaMarketObservationAdapter
@@ -24,84 +24,24 @@ from .domain_tools import (
     EvidenceEnvelope,
     ToolGap,
 )
-from .tools_impl.news import InvestmentNewsReader, SYMBOL_SECTORS
-
-
-@dataclass(frozen=True)
-class RawFactNews:
-    title: str
-    url: str
-    published_at: datetime
-    fetched_at: datetime
-    summary: str
-    source: str
-    source_type: str
-    sector: str
-    related_symbols: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class NewsSourceSnapshot:
-    items: tuple[RawFactNews, ...]
-    gaps: tuple[str, ...] = ()
-
-
-class StructuredNewsSource(Protocol):
-    def read(self, *, now: datetime) -> NewsSourceSnapshot: ...
-
-
-class InvestmentNewsStructuredSource:
-    """将受控 investment-news 快照转换为稳定的结构化新闻来源合同。"""
-
-    def __init__(
-        self, reader: InvestmentNewsReader, *, refresh_before_read: bool = True
-    ) -> None:
-        self._reader = reader
-        self._refresh_before_read = refresh_before_read
-
-    def read(self, *, now: datetime) -> NewsSourceSnapshot:
-        try:
-            if self._refresh_before_read:
-                self._reader.refresh(now=now)
-            payload = self._reader.load()
-            fetched_at = datetime.fromtimestamp(
-                (self._reader.checkout_dir / "data.js").stat().st_mtime,
-                tz=timezone.utc,
-            )
-        except (RuntimeError, OSError, ValueError):
-            return NewsSourceSnapshot(items=(), gaps=("source_unavailable",))
-        industries = payload.get("industries")
-        if not isinstance(industries, list):
-            return NewsSourceSnapshot(
-                items=(), gaps=("source_contract_invalid",)
-            )
-        items: list[RawFactNews] = []
-        gaps: list[str] = []
-        for industry in industries:
-            if not isinstance(industry, Mapping):
-                gaps.append("source_contract_invalid")
-                continue
-            sector = str(industry.get("key", "")).strip()
-            raw_items = industry.get("items")
-            if not isinstance(raw_items, list):
-                gaps.append("source_contract_invalid")
-                continue
-            for item in raw_items:
-                try:
-                    normalized = _raw_investment_news_item(
-                        item,
-                        sector=sector,
-                        fetched_at=fetched_at,
-                    )
-                except (OSError, OverflowError, ValueError):
-                    normalized = None
-                if normalized is None:
-                    gaps.append("source_contract_invalid")
-                else:
-                    items.append(normalized)
-        return NewsSourceSnapshot(
-            items=tuple(items), gaps=tuple(dict.fromkeys(gaps))
-        )
+from .evidence import (
+    EvidenceLedger,
+    EvidenceLedgerError,
+    EvidenceReadContext,
+    EvidenceRecord,
+    InMemoryEvidenceStore,
+)
+from .fact_news import (
+    FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
+    FACT_NEWS_RETENTION,
+    FACT_NEWS_SOURCE,
+    FactNewsReadContext,
+    InvestmentNewsStructuredSource,
+    NewsSourceSnapshot,
+    RawFactNews,
+    StructuredNewsSource,
+    SYMBOL_SECTORS,
+)
 
 
 class AiContextMarketDossierReader:
@@ -186,6 +126,10 @@ class _FactNewsEvent:
     source_type: str
     sector: str
     related_symbols: tuple[str, ...]
+    ledger_source: str
+    authorization_snapshot_id: str
+    persistence: str
+    allowed_purposes: frozenset[str]
     confirmation_state: str = "source_summary_unconfirmed"
 
     def data(self) -> Mapping[str, Any]:
@@ -206,13 +150,21 @@ class _FactNewsEvent:
         }
 
 
+# get_evidence 在授权 payload 之外返回的稳定证据元数据；它们不写入 payload。
+_NEWS_EVIDENCE_METADATA_FIELDS = (
+    "event_id",
+    "evidence_id",
+    "fetched_at",
+    "content_sha256",
+)
+
+
 @dataclass(frozen=True)
 class _EvidenceRecord:
     envelope: EvidenceEnvelope
     data: Mapping[str, Any]
     owner_actor_id: str | None = None
     expires_at: datetime | None = None
-    requires_news_source: bool = False
     required_permissions: frozenset[str] = frozenset()
 
 
@@ -250,6 +202,8 @@ class TodayDomainTools:
         portfolio_store: Any,
         watchlist: Any,
         news_source: StructuredNewsSource | None,
+        evidence_ledger: EvidenceLedger | None = None,
+        evidence_purpose: str = "domain_tool",
         relation_map: Mapping[str, tuple[str, ...]] | None = None,
         dossier_reader: Callable[
             [PersonalActor, str, datetime, int, int], Any
@@ -266,6 +220,12 @@ class TodayDomainTools:
         self._portfolio_store = portfolio_store
         self.watchlist = watchlist
         self._news_source = news_source
+        self._evidence_ledger = evidence_ledger or InMemoryEvidenceStore(
+            retention_by_authorization={
+                (FACT_NEWS_SOURCE, FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID): FACT_NEWS_RETENTION
+            }
+        )
+        self._evidence_purpose = evidence_purpose
         self._relation_map = {
             _symbol(symbol): tuple(_symbol(item) for item in related)
             for symbol, related in (relation_map or _default_relation_map()).items()
@@ -318,7 +278,9 @@ class TodayDomainTools:
             if item.symbol in active_holdings
         )
         if "news:read" in context.granted_permissions:
-            news_events, news_gaps = self._read_news(now=now)
+            news_events, news_gaps, _ = self._read_news(
+                context=context, now=now
+            )
         else:
             news_events, news_gaps = (), ("source_unauthorized",)
         relevant = tuple(
@@ -366,8 +328,11 @@ class TodayDomainTools:
             ).envelope
             for item in attention_items
         )
+        event_records = tuple(
+            self._event_evidence(context, event) for event in relevant
+        )
         evidence = (portfolio_record.envelope,) + attention_evidence + tuple(
-            self._event_evidence(event).envelope for event in relevant
+            record.envelope for record in event_records
         )
         data = {
             "as_of": now.isoformat(),
@@ -378,7 +343,7 @@ class TodayDomainTools:
             "active_holding_symbols": list(active_holdings),
             "followed_symbols": list(followed),
             "attention_items": [_attention_data(item) for item in attention_items],
-            "fact_events": [event.data() for event in relevant],
+            "fact_events": [dict(record.data) for record in event_records],
         }
         if news_gaps:
             return DomainToolResult.partial(
@@ -456,8 +421,8 @@ class TodayDomainTools:
         if context.requested_name == "get_kline":
             news_events, news_gaps = (), ()
         elif "news:read" in context.granted_permissions:
-            news_events, news_gaps = self._read_news(
-                now=now, symbols=(symbol,)
+            news_events, news_gaps, _ = self._read_news(
+                context=context, now=now, symbols=(symbol,)
             )
         else:
             news_events, news_gaps = (), ("source_unauthorized",)
@@ -523,15 +488,16 @@ class TodayDomainTools:
                     required_permissions=frozenset({"market:read"}),
                 ).envelope
             )
-        evidence_items.extend(
-            self._event_evidence(event).envelope for event in news_events
+        event_records = tuple(
+            self._event_evidence(context, event) for event in news_events
         )
+        evidence_items.extend(record.envelope for record in event_records)
         evidence = tuple(evidence_items)
         data = {
             "symbol": symbol,
             "states": state_data,
             "market": dossier,
-            "fact_events": [event.data() for event in news_events],
+            "fact_events": [dict(record.data) for record in event_records],
         }
         if not evidence:
             return DomainToolResult.unavailable(
@@ -559,7 +525,8 @@ class TodayDomainTools:
         symbols = tuple(
             _symbol(value) for value in arguments.get("symbols", ())
         )
-        events, gaps = self._read_news(
+        events, gaps, source_snapshot = self._read_news(
+            context=context,
             now=now,
             symbols=symbols,
             query=str(arguments.get("query", "")).strip(),
@@ -572,17 +539,38 @@ class TodayDomainTools:
                 return DomainToolResult.unavailable(
                     gaps[0], "structured_news"
                 )
-            snapshot_record = self._news_snapshot_evidence(events, now)
+            if source_snapshot is None:
+                return DomainToolResult.unavailable(
+                    "source_unavailable", "structured_news"
+                )
+            snapshot_record = self._news_snapshot_evidence(
+                context, events, now, source_snapshot
+            )
             return DomainToolResult.success(
                 data={"items": [], "count": 0},
                 evidence=(snapshot_record.envelope,),
                 field_coverage=Decimal("1"),
-                freshness_seconds=0,
+                freshness_seconds=max(
+                    0,
+                    int(
+                        (
+                            now
+                            - (
+                                source_snapshot.fetched_at
+                                or snapshot_record.envelope.as_of
+                            )
+                        ).total_seconds()
+                    ),
+                ),
             )
-        evidence = tuple(
-            self._event_evidence(event).envelope for event in events
+        event_records = tuple(
+            self._event_evidence(context, event) for event in events
         )
-        data = {"items": [event.data() for event in events], "count": len(events)}
+        evidence = tuple(record.envelope for record in event_records)
+        data = {
+            "items": [dict(record.data) for record in event_records],
+            "count": len(event_records),
+        }
         freshness = _freshness_seconds(events, now)
         if gaps:
             return DomainToolResult.partial(
@@ -613,7 +601,9 @@ class TodayDomainTools:
     ) -> DomainToolResult:
         now = context.clock()
         subjects = tuple(_symbol(item) for item in arguments["subject_ids"])
-        events, gaps = self._read_news(now=now)
+        events, gaps, source_snapshot = self._read_news(
+            context=context, now=now
+        )
         relation_records: dict[str, list[_EvidenceRecord]] = {}
         for subject in subjects:
             for candidate in self._relation_map.get(subject, ()):
@@ -624,8 +614,12 @@ class TodayDomainTools:
                 )
         candidates = []
         evidence_records: list[_EvidenceRecord] = []
-        if not gaps:
-            evidence_records.append(self._news_snapshot_evidence(events, now))
+        if not gaps and source_snapshot is not None:
+            evidence_records.append(
+                self._news_snapshot_evidence(
+                    context, events, now, source_snapshot
+                )
+            )
         evidence_records.extend(
             record
             for records in relation_records.values()
@@ -634,10 +628,12 @@ class TodayDomainTools:
         for candidate, relations in sorted(relation_records.items()):
             facts = tuple(
                 event for event in events if candidate in event.related_symbols
-            )
+            )[:3]
             if not relations or not facts:
                 continue
-            fact_records = tuple(self._event_evidence(event) for event in facts)
+            fact_records = tuple(
+                self._event_evidence(context, event) for event in facts
+            )
             evidence_records.extend(fact_records)
             candidates.append(
                 {
@@ -652,7 +648,7 @@ class TodayDomainTools:
                         _relation_evidence_view(record) for record in relations
                     ],
                     "fact_evidence": [
-                        _fact_evidence_view(event) for event in facts[:3]
+                        _fact_evidence_view(record) for record in fact_records
                     ],
                     "latest_fact_at": max(
                         event.published_at for event in facts
@@ -685,12 +681,42 @@ class TodayDomainTools:
     ) -> DomainToolResult:
         evidence_id = str(arguments["evidence_id"])
         now = context.clock()
-        record = self._catalog.get(evidence_id, actor_id=context.actor_id)
-        if record is None:
-            self._read_news(now=now)
-            record = self._catalog.get(
-                evidence_id, actor_id=context.actor_id
+        try:
+            persisted = self._evidence_ledger.read(
+                self._ledger_context(context, now), evidence_id
             )
+        except EvidenceLedgerError as exc:
+            if exc.code != "evidence_not_found":
+                return DomainToolResult.unavailable(
+                    _evidence_gap_code(exc.code), evidence_id
+                )
+        else:
+            if persisted.expires_at is not None and now >= persisted.expires_at:
+                return DomainToolResult.unavailable(
+                    "evidence_expired", evidence_id
+                )
+            if persisted.payload is None:
+                return DomainToolResult.unavailable(
+                    "evidence_payload_not_retained", evidence_id
+                )
+            data = _persisted_evidence_data(persisted)
+            authorized_fields = tuple(data)
+            envelope = EvidenceEnvelope(
+                evidence_id=persisted.evidence_id,
+                source=str(data.get("source", persisted.source)),
+                as_of=persisted.published_at or persisted.fetched_at,
+                content_sha256=persisted.content_sha256,
+                authorized_fields=authorized_fields,
+            )
+            return DomainToolResult.success(
+                data=data,
+                evidence=(envelope,),
+                field_coverage=Decimal("1"),
+                freshness_seconds=max(
+                    0, int((now - persisted.fetched_at).total_seconds())
+                ),
+            )
+        record = self._catalog.get(evidence_id, actor_id=context.actor_id)
         if record is None:
             return DomainToolResult.unavailable("evidence_not_found", evidence_id)
         missing_permissions = (
@@ -700,20 +726,6 @@ class TodayDomainTools:
             return DomainToolResult.unavailable(
                 "source_unauthorized", ",".join(sorted(missing_permissions))
             )
-        source_gaps: tuple[str, ...] = ()
-        if record.requires_news_source:
-            current_events, gaps = self._read_news(now=now)
-            current_ids = {event.evidence_id for event in current_events}
-            if evidence_id.startswith("news:") and evidence_id not in current_ids:
-                return DomainToolResult.unavailable(
-                    gaps[0] if gaps else "evidence_not_found", evidence_id
-                )
-            if evidence_id.startswith("news-snapshot:") and gaps:
-                return DomainToolResult.unavailable(gaps[0], evidence_id)
-            source_gaps = gaps
-            record = self._catalog.get(
-                evidence_id, actor_id=context.actor_id
-            ) or record
         if record.expires_at is not None and now >= record.expires_at:
             return DomainToolResult.unavailable("evidence_expired", evidence_id)
         result_kwargs = {
@@ -725,11 +737,6 @@ class TodayDomainTools:
                 int((now - record.envelope.as_of).total_seconds()),
             ),
         }
-        if source_gaps:
-            return DomainToolResult.partial(
-                **result_kwargs,
-                gaps=_tool_gaps(source_gaps),
-            )
         return DomainToolResult.success(
             **result_kwargs,
         )
@@ -737,18 +744,39 @@ class TodayDomainTools:
     def _read_news(
         self,
         *,
+        context: DomainToolContext,
         now: datetime,
         symbols: tuple[str, ...] = (),
         query: str = "",
         sector: str = "",
-    ) -> tuple[tuple[_FactNewsEvent, ...], tuple[str, ...]]:
+    ) -> tuple[
+        tuple[_FactNewsEvent, ...], tuple[str, ...], NewsSourceSnapshot | None
+    ]:
         if self._news_source is None:
-            return (), ("source_unavailable",)
+            return (), ("source_unavailable",), None
         try:
-            snapshot = self._news_source.read(now=now)
+            snapshot = self._news_source.read(
+                context=FactNewsReadContext(
+                    permissions=context.granted_permissions,
+                    purpose=self._evidence_purpose,
+                ),
+                now=now,
+            )
         except (RuntimeError, OSError, ValueError):
-            return (), ("source_unavailable",)
-        gaps = list(snapshot.gaps)
+            return (), ("source_unavailable",), None
+        gaps = [gap.code for gap in snapshot.gaps]
+        snapshot_fetched_at = snapshot.fetched_at
+        if snapshot_fetched_at is None and snapshot.items:
+            snapshot_fetched_at = max(item.fetched_at for item in snapshot.items)
+        if snapshot_fetched_at is None:
+            if not gaps:
+                gaps.append("source_unavailable")
+        elif snapshot_fetched_at.tzinfo is None or snapshot_fetched_at > now:
+            gaps.append("source_contract_invalid")
+        elif now >= snapshot_fetched_at + self._maximum_fetch_age:
+            gaps.append("source_stale")
+        else:
+            snapshot = replace(snapshot, fetched_at=snapshot_fetched_at)
         deduplicated: dict[str, _FactNewsEvent] = {}
         for raw in snapshot.items:
             validation = self._validate_news(raw, now)
@@ -756,7 +784,7 @@ class TodayDomainTools:
                 gaps.append(validation)
                 continue
             try:
-                event = _normalize_event(raw)
+                event = _normalize_event(raw, snapshot=snapshot)
             except ValueError:
                 gaps.append("source_contract_invalid")
                 continue
@@ -778,12 +806,11 @@ class TodayDomainTools:
                 (event.title, event.summary, event.source)
             ).lower():
                 continue
-            self._event_evidence(event)
             events.append(event)
         events.sort(
             key=lambda item: (item.published_at, item.event_id), reverse=True
         )
-        return tuple(events), tuple(dict.fromkeys(gaps))
+        return tuple(events), tuple(dict.fromkeys(gaps)), snapshot
 
     def _validate_news(
         self, raw: RawFactNews, now: datetime
@@ -805,35 +832,102 @@ class TodayDomainTools:
             return "source_contract_invalid"
         return None
 
-    def _event_evidence(self, event: _FactNewsEvent) -> _EvidenceRecord:
+    def _event_evidence(
+        self, context: DomainToolContext, event: _FactNewsEvent
+    ) -> _EvidenceRecord:
+        expires_at = min(
+            event.published_at + self._maximum_event_age,
+            event.fetched_at + self._maximum_fetch_age,
+        )
+        payload = _event_payload(event)
+        stored = self._evidence_ledger.put(
+            self._ledger_context(context, context.clock()),
+            EvidenceRecord(
+                evidence_id=event.evidence_id,
+                logical_identity=event.event_id,
+                scope="actor",
+                source=event.ledger_source,
+                content_sha256=event.content_sha256,
+                authorized_fields=tuple(payload),
+                required_permissions=frozenset({"news:read"}),
+                allowed_purposes=event.allowed_purposes,
+                authorization_snapshot_id=event.authorization_snapshot_id,
+                observed_at=None,
+                published_at=event.published_at,
+                effective_at=None,
+                available_from=event.fetched_at,
+                fetched_at=event.fetched_at,
+                verified_at=None,
+                expires_at=expires_at,
+                persistence=event.persistence,  # type: ignore[arg-type]
+                payload=payload,
+            ),
+        )
+        now = context.clock()
+        if stored.expires_at is not None and now >= stored.expires_at:
+            version_digest = _sha256(
+                {
+                    "authorization_snapshot_id": event.authorization_snapshot_id,
+                    "content_sha256": event.content_sha256,
+                    "fetched_at": event.fetched_at.isoformat(),
+                }
+            )
+            event = replace(
+                event,
+                evidence_id=f"news:{event.content_sha256[:16]}:{version_digest[:24]}",
+            )
+            stored = self._evidence_ledger.put(
+                self._ledger_context(context, now),
+                EvidenceRecord(
+                    evidence_id=event.evidence_id,
+                    logical_identity=event.event_id,
+                    scope="actor",
+                    source=event.ledger_source,
+                    content_sha256=event.content_sha256,
+                    authorized_fields=tuple(payload),
+                    required_permissions=frozenset({"news:read"}),
+                    allowed_purposes=event.allowed_purposes,
+                    authorization_snapshot_id=event.authorization_snapshot_id,
+                    observed_at=None,
+                    published_at=event.published_at,
+                    effective_at=None,
+                    available_from=event.fetched_at,
+                    fetched_at=event.fetched_at,
+                    verified_at=None,
+                    expires_at=expires_at,
+                    persistence=event.persistence,  # type: ignore[arg-type]
+                    payload=payload,
+                ),
+            )
+        persisted_event = replace(
+            event,
+            evidence_id=stored.evidence_id,
+            fetched_at=stored.fetched_at,
+        )
+        data = dict(persisted_event.data())
         record = _EvidenceRecord(
             envelope=EvidenceEnvelope(
-                evidence_id=event.evidence_id,
-                source=event.source,
-                as_of=event.published_at,
-                content_sha256=event.content_sha256,
-                authorized_fields=(
-                    "title",
-                    "url",
-                    "published_at",
-                    "fetched_at",
-                    "summary",
-                    "source",
-                    "source_type",
-                    "related_symbols",
-                    "confirmation_state",
-                ),
+                evidence_id=stored.evidence_id,
+                source=persisted_event.source,
+                as_of=stored.published_at or stored.fetched_at,
+                content_sha256=stored.content_sha256,
+                authorized_fields=tuple(data),
             ),
-            data=event.data(),
-            expires_at=min(
-                event.published_at + self._maximum_event_age,
-                event.fetched_at + self._maximum_fetch_age,
-            ),
-            requires_news_source=True,
+            data=data,
+            expires_at=stored.expires_at,
             required_permissions=frozenset({"news:read"}),
         )
-        self._catalog.put(record)
         return record
+
+    def _ledger_context(
+        self, context: DomainToolContext, now: datetime
+    ) -> EvidenceReadContext:
+        return EvidenceReadContext(
+            actor_id=context.actor_id,
+            permissions=context.granted_permissions,
+            purpose=self._evidence_purpose,
+            now=now,
+        )
 
     def _relation_evidence(
         self, subject: str, candidate: str, now: datetime
@@ -856,20 +950,56 @@ class TodayDomainTools:
         )
 
     def _news_snapshot_evidence(
-        self, events: tuple[_FactNewsEvent, ...], now: datetime
+        self,
+        context: DomainToolContext,
+        events: tuple[_FactNewsEvent, ...],
+        now: datetime,
+        source_snapshot: NewsSourceSnapshot,
     ) -> _EvidenceRecord:
-        return self._record_evidence(
-            source="structured_news_snapshot",
-            as_of=now,
-            data={
-                "as_of": now.isoformat(),
-                "event_count": len(events),
-                "event_ids": [event.event_id for event in events],
-            },
-            authorized_fields=("as_of", "event_count", "event_ids"),
-            prefix="news-snapshot",
-            expires_at=now + self._maximum_fetch_age,
-            requires_news_source=True,
+        fetched_at = source_snapshot.fetched_at
+        if fetched_at is None:
+            raise EvidenceLedgerError("source_unavailable")
+        data = {
+            "as_of": fetched_at.isoformat(),
+            "event_count": len(events),
+            "event_ids": [event.event_id for event in events],
+        }
+        digest = _sha256(data)
+        evidence_id = f"news-snapshot:{digest[:24]}"
+        expires_at = fetched_at + self._maximum_fetch_age
+        self._evidence_ledger.put(
+            self._ledger_context(context, now),
+            EvidenceRecord(
+                evidence_id=evidence_id,
+                logical_identity=evidence_id,
+                scope="actor",
+                source=source_snapshot.source,
+                content_sha256=digest,
+                authorized_fields=tuple(data),
+                required_permissions=frozenset({"news:read"}),
+                allowed_purposes=source_snapshot.allowed_purposes,
+                authorization_snapshot_id=source_snapshot.authorization_snapshot_id,
+                observed_at=fetched_at,
+                published_at=None,
+                effective_at=None,
+                available_from=fetched_at,
+                fetched_at=fetched_at,
+                verified_at=None,
+                expires_at=expires_at,
+                persistence=source_snapshot.persistence,
+                payload=data,
+            ),
+        )
+        return _EvidenceRecord(
+            envelope=EvidenceEnvelope(
+                evidence_id=evidence_id,
+                source="structured_news_snapshot",
+                as_of=fetched_at,
+                content_sha256=digest,
+                authorized_fields=tuple(data),
+            ),
+            data=data,
+            expires_at=expires_at,
             required_permissions=frozenset({"news:read"}),
         )
 
@@ -883,7 +1013,6 @@ class TodayDomainTools:
         prefix: str,
         owner_actor_id: str | None = None,
         expires_at: datetime | None = None,
-        requires_news_source: bool = False,
         required_permissions: frozenset[str] = frozenset(),
     ) -> _EvidenceRecord:
         digest = _sha256(data)
@@ -899,40 +1028,36 @@ class TodayDomainTools:
             data=dict(data),
             owner_actor_id=owner_actor_id,
             expires_at=expires_at,
-            requires_news_source=requires_news_source,
             required_permissions=required_permissions,
         )
         self._catalog.put(record)
         return record
 
 
-def _normalize_event(raw: RawFactNews) -> _FactNewsEvent:
+def _normalize_event(
+    raw: RawFactNews, *, snapshot: NewsSourceSnapshot
+) -> _FactNewsEvent:
     url = _canonical_url(raw.url)
     event_digest = _sha256({"url": url})
-    content = {
-        "title": raw.title.strip(),
-        "url": url,
-        "published_at": raw.published_at,
-        "summary": raw.summary.strip(),
-        "source": raw.source.strip(),
-        "source_type": raw.source_type,
-        "sector": raw.sector,
-    }
-    content_digest = _sha256(content)
-    return _FactNewsEvent(
+    event = _FactNewsEvent(
         event_id=f"event:{event_digest[:24]}",
-        evidence_id=f"news:{content_digest[:24]}",
+        evidence_id="",
         title=raw.title.strip(),
         url=url,
         published_at=raw.published_at,
         fetched_at=raw.fetched_at,
         summary=raw.summary.strip(),
-        content_sha256=content_digest,
+        content_sha256="",
         source=raw.source.strip(),
         source_type=raw.source_type,
         sector=raw.sector,
         related_symbols=tuple(sorted({_symbol(item) for item in raw.related_symbols})),
+        ledger_source=snapshot.source,
+        authorization_snapshot_id=snapshot.authorization_snapshot_id,
+        persistence=snapshot.persistence,
+        allowed_purposes=snapshot.allowed_purposes,
     )
+    return _with_event_identity(event)
 
 
 def _relation_evidence_view(record: _EvidenceRecord) -> dict[str, Any]:
@@ -948,89 +1073,99 @@ def _relation_evidence_view(record: _EvidenceRecord) -> dict[str, Any]:
     }
 
 
-def _fact_evidence_view(event: _FactNewsEvent) -> dict[str, Any]:
+def _fact_evidence_view(record: _EvidenceRecord) -> dict[str, Any]:
     return {
-        "evidence_id": event.evidence_id,
-        "title": event.title,
-        "summary": event.summary,
-        "source": event.source,
-        "as_of": event.published_at.isoformat(),
-        "url": event.url,
+        "evidence_id": record.envelope.evidence_id,
+        "title": record.data["title"],
+        "summary": record.data["summary"],
+        "source": record.data["source"],
+        "as_of": record.data["published_at"],
+        "url": record.data["url"],
     }
 
 
-_SYMBOL_TERMS: Mapping[str, tuple[str, ...]] = {
-    "NVDA": ("nvda", "nvidia", "英伟达"),
-    "AMD": ("amd", "advanced micro devices", "超威"),
-    "TSM": ("tsm", "tsmc", "台积电"),
-    "ASML": ("asml", "阿斯麦"),
-    "MSFT": ("msft", "microsoft", "微软"),
-    "GOOGL": ("googl", "google", "alphabet", "谷歌"),
-    "META": ("meta", "facebook", "脸书"),
-    "AMZN": ("amzn", "amazon", "亚马逊"),
-    "AAPL": ("aapl", "apple", "苹果"),
-    "TSLA": ("tsla", "tesla", "特斯拉"),
-}
-
-
-def _raw_investment_news_item(
-    item: Any, *, sector: str, fetched_at: datetime
-) -> RawFactNews | None:
-    if not isinstance(item, Mapping):
-        return None
-    timestamp = item.get("ts")
-    if not isinstance(timestamp, (int, float)):
-        return None
-    title = str(item.get("title", "")).strip()
-    summary = str(item.get("summary", "")).strip()
-    source = str(item.get("source", "")).strip()
-    url = str(item.get("url", "")).strip()
-    if not title or not summary or not source or not url:
-        return None
-    haystack = " ".join(
-        (title, summary, str(item.get("zh", "")))
-    ).lower()
-    explicit = item.get("symbols", ())
-    symbols: set[str] = set()
-    if isinstance(explicit, (list, tuple)):
-        for value in explicit:
-            try:
-                symbols.add(_symbol(str(value)))
-            except ValueError:
-                continue
-    for symbol, terms in _SYMBOL_TERMS.items():
-        if any(term in haystack for term in terms):
-            symbols.add(symbol)
-    return RawFactNews(
-        title=title,
-        url=url,
-        published_at=datetime.fromtimestamp(timestamp, tz=timezone.utc),
-        fetched_at=fetched_at,
-        summary=summary,
-        source=source,
-        source_type="structured_news",
-        sector=sector,
-        related_symbols=tuple(sorted(symbols)),
-    )
-
-
 def _merge_event(left: _FactNewsEvent, right: _FactNewsEvent) -> _FactNewsEvent:
-    return _FactNewsEvent(
-        event_id=left.event_id,
-        evidence_id=left.evidence_id,
-        title=left.title,
-        url=left.url,
-        published_at=min(left.published_at, right.published_at),
-        fetched_at=max(left.fetched_at, right.fetched_at),
-        summary=left.summary,
-        content_sha256=left.content_sha256,
-        source=left.source,
-        source_type=left.source_type,
-        sector=left.sector,
-        related_symbols=tuple(
-            sorted(set(left.related_symbols) | set(right.related_symbols))
+    primary = min(
+        (left, right),
+        key=lambda item: (
+            item.title,
+            item.summary,
+            item.source,
+            item.sector,
+            item.published_at,
         ),
     )
+    return _with_event_identity(
+        _FactNewsEvent(
+            event_id=left.event_id,
+            evidence_id="",
+            title=primary.title,
+            url=primary.url,
+            published_at=min(left.published_at, right.published_at),
+            fetched_at=max(left.fetched_at, right.fetched_at),
+            summary=primary.summary,
+            content_sha256="",
+            source=primary.source,
+            source_type=primary.source_type,
+            sector=primary.sector,
+            related_symbols=tuple(
+                sorted(set(left.related_symbols) | set(right.related_symbols))
+            ),
+            ledger_source=primary.ledger_source,
+            authorization_snapshot_id=primary.authorization_snapshot_id,
+            persistence=primary.persistence,
+            allowed_purposes=primary.allowed_purposes,
+        )
+    )
+
+
+def _event_payload(event: _FactNewsEvent) -> dict[str, Any]:
+    return {
+        "title": event.title,
+        "url": event.url,
+        "published_at": event.published_at.isoformat(),
+        "summary": event.summary,
+        "source": event.source,
+        "source_type": event.source_type,
+        "sector": event.sector,
+        "related_symbols": list(event.related_symbols),
+        "confirmation_state": event.confirmation_state,
+    }
+
+
+def _with_event_identity(event: _FactNewsEvent) -> _FactNewsEvent:
+    content_sha256 = _sha256(_event_payload(event))
+    return replace(
+        event,
+        evidence_id=f"news:{content_sha256[:24]}",
+        content_sha256=content_sha256,
+    )
+
+
+def _persisted_evidence_data(record: EvidenceRecord) -> dict[str, Any]:
+    payload = dict(record.payload or {})
+    if not record.evidence_id.startswith("news:"):
+        return payload
+    metadata = dict(
+        zip(
+            _NEWS_EVIDENCE_METADATA_FIELDS,
+            (
+                record.logical_identity,
+                record.evidence_id,
+                record.fetched_at.isoformat(),
+                record.content_sha256,
+            ),
+            strict=True,
+        )
+    )
+    return {**payload, **metadata}
+
+
+def _evidence_gap_code(code: str) -> str:
+    return {
+        "evidence_permission_denied": "source_unauthorized",
+        "evidence_purpose_denied": "source_purpose_denied",
+    }.get(code, code)
 
 
 def _canonical_url(value: str) -> str:

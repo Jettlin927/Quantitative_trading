@@ -48,6 +48,13 @@ from .watchlist import (
     PostgresInstrumentStateStore,
 )
 from .agent.domain_tools import DomainToolMetrics, DomainToolRegistry
+from .agent.evidence import PostgresEvidenceStore
+from .agent.fact_news import (
+    FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
+    FACT_NEWS_RETENTION,
+    FACT_NEWS_SOURCE,
+    InvestmentNewsReader,
+)
 from .agent.today_tools import (
     AiContextMarketDossierReader,
     InvestmentNewsStructuredSource,
@@ -69,6 +76,7 @@ class PersonalServices:
     instruments: InstrumentWorkbench
     analysis_store: PostgresAnalysisStore
     automatic_briefing_store: PostgresAutomaticBriefingStore
+    evidence_store: PostgresEvidenceStore
     news_reader: Any | None
     domain_tools: DomainToolRegistry
     domain_tool_metrics: DomainToolMetrics
@@ -146,9 +154,14 @@ def build_personal_services(
     news_dir = os.getenv("INVESTMENT_NEWS_DIR", "").strip()
     news_reader = None
     if news_dir:
-        from .agent.tools_impl.news import InvestmentNewsReader
-
         news_reader = InvestmentNewsReader(Path(news_dir))
+    evidence_store = PostgresEvidenceStore(
+        session_factory,
+        cipher=cipher,
+        retention_by_authorization={
+            (FACT_NEWS_SOURCE, FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID): FACT_NEWS_RETENTION
+        },
+    )
     domain_tool_metrics = DomainToolMetrics()
     today_domain_tools = TodayDomainTools(
         portfolio_store=portfolio_store,
@@ -160,6 +173,7 @@ def build_personal_services(
             if news_reader is not None
             else None
         ),
+        evidence_ledger=evidence_store,
         dossier_reader=AiContextMarketDossierReader(market_readers.market),
         rule_attention_reader=lambda actor: rules.attention(actor),
     )
@@ -176,6 +190,7 @@ def build_personal_services(
         automatic_briefing_store=PostgresAutomaticBriefingStore(
             session_factory, cipher=cipher
         ),
+        evidence_store=evidence_store,
         news_reader=news_reader,
         domain_tools=today_domain_tools.registry(
             observation_recorder=domain_tool_metrics.record
