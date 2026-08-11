@@ -102,6 +102,18 @@ class DocumentationContractTest(unittest.TestCase):
         self.assertIn(str(handoff_path.relative_to(REPO_ROOT)), agents)
         self.assertIn("`quant-trading-prod` 是唯一生产服务器和数据权威", agents)
 
+    def test_personal_mcp_runbook_keeps_enablement_separate_and_reversible(self) -> None:
+        runbook = (
+            DOCS_ROOT / "operations" / "personal-mcp-stdio.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("PERSONAL_MCP_ENABLED=false", runbook)
+        self.assertIn("python -m backend.app.personal_workspace.mcp_server", runbook)
+        self.assertIn("不构成真实 MCP 启用授权", runbook)
+        self.assertIn("不执行生产 migration", runbook)
+        self.assertIn("停止 MCP 子进程", runbook)
+        self.assertIn("不删除证据或审计记录", runbook)
+
     def test_document_index_routes_every_module(self) -> None:
         index = (DOCS_ROOT / "index.md").read_text(encoding="utf-8")
         for target in [
