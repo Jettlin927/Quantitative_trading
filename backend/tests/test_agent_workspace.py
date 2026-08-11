@@ -27,6 +27,10 @@ from backend.app.personal_workspace.agent.fact_news import (
     NewsSourceSnapshot,
     RawFactNews,
 )
+from backend.app.personal_workspace.agent.fact_market import MarketFactService
+from backend.app.personal_workspace.agent.fact_private import (
+    PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
+)
 from backend.app.personal_workspace.agent.today_tools import TodayDomainTools
 from backend.app.personal_workspace.agent.workspace import AgentAnalysisWorkspace
 from backend.app.personal_workspace.agent.workspace import ANALYSIS_TOOL_PERMISSIONS
@@ -53,6 +57,11 @@ from backend.tests.agent_test_helpers import (
     claims_content,
     completed_response,
     tool_call,
+)
+from backend.tests.test_today_domain_tools import (
+    FakeAiContextMarketAdapter,
+    SyntheticNewsSource,
+    raw_news,
 )
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc)
@@ -938,6 +947,128 @@ class AgentAnalysisWorkspaceTest(unittest.TestCase):
         self.assertEqual(item_mapping, direct_mapping)
         self.assertEqual(
             set(item_mapping), set(feedback["evidence_ids"])
+        )
+
+    def test_real_three_tools_share_one_ledger_and_runtime_freezes_all(self) -> None:
+        market_retention = {
+            ("alpaca", "auth-alpaca_assets"): "encrypted_payload",
+            ("alpaca", "auth-alpaca_daily_bars"): "encrypted_payload",
+        }
+        ledger = InMemoryEvidenceStore(
+            retention_by_authorization={
+                (FACT_NEWS_SOURCE, FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID): FACT_NEWS_RETENTION,
+                **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
+                **market_retention,
+            }
+        )
+        watchlist = InstrumentStateBook(
+            store=InMemoryInstrumentStateStore(),
+            holding_states_reader=lambda _actor_id: {},
+        )
+        registry = TodayDomainTools(
+            portfolio_store=InMemoryPortfolioStore(),
+            watchlist=watchlist,
+            news_source=SyntheticNewsSource(
+                NewsSourceSnapshot(
+                    items=(
+                        raw_news(
+                            url="https://wire.example/nvda-runtime",
+                            summary="NVDA 三工具真实冻结回归。",
+                            symbols=("NVDA",),
+                        ),
+                    )
+                )
+            ),
+            evidence_ledger=ledger,
+            market_facts=MarketFactService(
+                adapter=FakeAiContextMarketAdapter(),
+                evidence_ledger=ledger,
+                retention_by_authorization=market_retention,
+            ),
+        ).registry()
+        context = DomainToolContext(
+            actor_id=ACTOR.actor_id,
+            granted_permissions=ANALYSIS_TOOL_PERMISSIONS,
+            clock=lambda: NOW,
+        )
+        direct = (
+            registry.invoke("get_holdings", context=context, arguments={}),
+            registry.invoke(
+                "get_kline",
+                context=context,
+                arguments={"symbol": "NVDA", "days": 30, "limit": 1},
+            ),
+            registry.invoke(
+                "get_news",
+                context=context,
+                arguments={"symbol": "NVDA", "limit": 1},
+            ),
+        )
+        expected_ids = tuple(
+            evidence.evidence_id
+            for result in direct
+            for evidence in result.evidence
+        )
+        provider = ScriptedAgentProvider(
+            [
+                completed_response(
+                    tool_calls=(
+                        tool_call(name="get_holdings", call_id="call-holdings"),
+                        tool_call(
+                            name="get_kline",
+                            arguments={"symbol": "NVDA", "days": 30, "limit": 1},
+                            call_id="call-kline",
+                        ),
+                        tool_call(
+                            name="get_news",
+                            arguments={"symbol": "NVDA", "limit": 1},
+                            call_id="call-news",
+                        ),
+                    )
+                ),
+                completed_response(
+                    content=claims_content(evidence_id=expected_ids[0])
+                ),
+            ]
+        )
+        workspace = AgentAnalysisWorkspace(
+            store=InMemoryAnalysisStore(),
+            runtime=DeepSeekCompletionRuntime(provider=provider, clock=lambda: NOW),
+            domain_tools=registry,
+            evidence_ledger=ledger,
+            tools=registry.projected_definitions(
+                permissions=ANALYSIS_TOOL_PERMISSIONS,
+                names=("get_holdings", "get_kline", "get_news"),
+            ),
+            skills=(),
+            model=DEEPSEEK_MODEL,
+            clock=lambda: NOW,
+            monthly_soft_budget_usd=Decimal("25"),
+            monthly_spend_reader=lambda _actor, _now: Decimal("0"),
+        )
+        receipt = workspace.prepare(
+            ACTOR,
+            AnalysisIntent(question="NVDA 三工具分析", subject_ids=("NVDA",)),
+            idempotency_key=str(uuid4()),
+        )
+        workspace.start(
+            ACTOR,
+            draft_id=receipt.draft_id,
+            preview_sha256=receipt.preview_sha256,
+            idempotency_key=str(uuid4()),
+        )
+
+        view = workspace.run_next(worker_id="worker-1")
+
+        self.assertEqual(tuple(result.status for result in direct), ("success",) * 3)
+        self.assertEqual(view.status, "completed")
+        self.assertNotEqual(view.failure_code, "tool_evidence_freeze_failed")
+        self.assertEqual(
+            tuple(item.evidence_id for item in view.tool_evidence), expected_ids
+        )
+        self.assertEqual(
+            {item.source for item in view.tool_evidence},
+            {"personal_portfolio", "alpaca", FACT_NEWS_SOURCE},
         )
 
     def test_cancelled_and_failed_results_keep_original_status_when_freeze_fails(self) -> None:

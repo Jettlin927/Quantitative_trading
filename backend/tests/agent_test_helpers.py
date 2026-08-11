@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 
-from backend.app.personal_workspace.agent.protocol import Tool, ToolResult
 from backend.app.personal_workspace.analysis import ProviderFailure
 
 
@@ -92,13 +91,3 @@ class ScriptedAgentProvider:
         if isinstance(response, Exception):
             raise response
         return response
-
-
-def make_tool(name: str, *, handler=None) -> Tool:
-    return Tool(
-        name=name,
-        description=f"{name} 描述",
-        input_schema={"type": "object", "properties": {}, "required": []},
-        run=handler
-        or (lambda ctx, args: ToolResult(ok=True, content=json.dumps({"value": name}))),
-    )
