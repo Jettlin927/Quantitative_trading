@@ -95,6 +95,13 @@ class PersonalAlpacaRuntimeTest(unittest.TestCase):
         self.assertEqual(readers.portfolio._adapter._request_deadline_seconds, 3.2)
         self.assertEqual(readers.instrument._provider_wait_seconds, 4.5)
         self.assertEqual(transport.requests, [])
+        self.assertEqual(
+            readers.evidence_retention_by_authorization,
+            {
+                ("alpaca", f"alpaca-{dataset}-20260803"): "encrypted_payload"
+                for dataset in DATASETS
+            },
+        )
         self.assertNotIn(self.credentials["key_id"], repr(readers))
         self.assertNotIn(self.credentials["secret_key"], repr(readers))
 
@@ -159,6 +166,9 @@ class PersonalAlpacaRuntimeTest(unittest.TestCase):
             "wrong_delay": lambda credentials, authorization: authorization.update(
                 {"delay_seconds": 0}
             ),
+            "retention_invalid": lambda credentials, authorization: authorization[
+                "snapshots"
+            ][0].update({"retention_policy": "caller_selected"}),
         }
         for name, mutate in cases.items():
             with self.subTest(name=name):

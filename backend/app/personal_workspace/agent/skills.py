@@ -2,7 +2,18 @@
 
 from __future__ import annotations
 
-from .protocol import Skill
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Skill:
+    """为分析场景注入提示，并声明推荐使用的工具子集。"""
+
+    skill_id: str
+    name: str
+    description: str
+    system_prompt: str
+    tools: tuple[str, ...]
 
 SKILL_HOLDINGS_OVERVIEW = Skill(
     skill_id="holdings_overview",

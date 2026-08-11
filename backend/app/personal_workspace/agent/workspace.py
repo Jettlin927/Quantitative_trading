@@ -53,7 +53,7 @@ from .completion_runtime import DeepSeekCompletionRuntime
 from .domain_tools import DomainToolRegistry, RuntimeToolDefinition
 from .evidence import EvidenceLedger, EvidenceReadContext
 from .evidence import FrozenEvidence as LedgerFrozenEvidence
-from .protocol import Skill
+from .skills import Skill
 
 AGENT_CONFIG_REVISION = "personal-agent-deepseek-v1"
 LEGACY_ANALYSIS_TOOL_NAMES = ("get_holdings", "get_kline", "get_news")

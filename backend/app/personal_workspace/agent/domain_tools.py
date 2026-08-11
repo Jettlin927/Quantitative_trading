@@ -661,7 +661,9 @@ def _normalize_legacy_result(
     if not isinstance(market, Mapping):
         return result
     evidence = tuple(
-        item for item in result.evidence if item.source == "market_dossier"
+        item
+        for item in result.evidence
+        if item.source == "market_dossier" or "bars" in item.authorized_fields
     )
     if not evidence:
         return DomainToolResult.unavailable("tool_contract_invalid", requested_name)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import json
@@ -14,7 +14,6 @@ from backend.app.personal_workspace.agent.domain_tools import (
     DomainToolMetrics,
 )
 from backend.app.personal_workspace.agent.today_tools import (
-    AiContextMarketDossierReader,
     InvestmentNewsStructuredSource,
     NewsSourceSnapshot,
     RawFactNews,
@@ -22,15 +21,23 @@ from backend.app.personal_workspace.agent.today_tools import (
 )
 from backend.app.personal_workspace.agent.fact_news import FactNewsReadContext
 from backend.app.personal_workspace.agent.evidence import (
+    EvidenceLedgerError,
     EvidenceReadContext,
     InMemoryEvidenceStore,
+)
+from backend.app.personal_workspace.agent.fact_market import (
+    MarketFactService,
+)
+from backend.app.personal_workspace.agent.fact_private import (
+    ActorOwnedFactService,
+    PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
 )
 from backend.app.personal_workspace.agent.fact_news import (
     FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
     FACT_NEWS_RETENTION,
     FACT_NEWS_SOURCE,
 )
-from backend.app.personal_workspace.agent.tools_impl.news import InvestmentNewsReader
+from backend.app.personal_workspace.agent.fact_news import InvestmentNewsReader
 from backend.app.personal_workspace.contracts import PersonalActor
 from backend.app.market_observation.contracts import (
     AssetIdentity,
@@ -72,7 +79,8 @@ class CountingEvidenceStore(InMemoryEvidenceStore):
                 (
                     FACT_NEWS_SOURCE,
                     FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
-                ): FACT_NEWS_RETENTION
+                ): FACT_NEWS_RETENTION,
+                **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
             }
         )
         self.put_ids: list[str] = []
@@ -166,6 +174,33 @@ class FakeAiContextMarketAdapter:
             provenance=provenance("alpaca_daily_bars"),
         )
         return DailyBarsObservation(raw=observed, provider_adjusted=observed)
+
+
+class RawFallbackMarketAdapter(FakeAiContextMarketAdapter):
+    def observe_daily_bars(self, symbol, **kwargs):
+        observed = super().observe_daily_bars(symbol, **kwargs)
+        adjusted = replace(
+            observed.provider_adjusted,
+            availability="not_available",
+            value=None,
+            reason_code="provider_timeout",
+            source_health="unavailable",
+        )
+        return DailyBarsObservation(raw=observed.raw, provider_adjusted=adjusted)
+
+
+class StaleMarketAdapter(FakeAiContextMarketAdapter):
+    def observe_daily_bars(self, symbol, **kwargs):
+        observed = super().observe_daily_bars(symbol, **kwargs)
+        stale = replace(
+            observed.provider_adjusted,
+            source_health="stale",
+            provenance=replace(
+                observed.provider_adjusted.provenance,
+                source_health="stale",
+            ),
+        )
+        return DailyBarsObservation(raw=stale, provider_adjusted=stale)
 
 
 class TodayDomainToolsTest(unittest.TestCase):
@@ -680,16 +715,12 @@ class TodayDomainToolsTest(unittest.TestCase):
             arguments={"subject_ids": ["NVDA"]},
         )
         candidate = result.data["candidates"][0]
-        persisted_result_ids = {
-            item.evidence_id
-            for item in result.evidence
-            if item.evidence_id.startswith(("news:", "news-snapshot:"))
-        }
+        persisted_result_ids = {item.evidence_id for item in result.evidence}
 
         self.assertEqual(result.status, "success")
         self.assertEqual(len(candidate["fact_evidence_ids"]), 3)
         self.assertEqual(set(ledger.put_ids), persisted_result_ids)
-        self.assertEqual(len(ledger.put_ids), 4)
+        self.assertEqual(len(ledger.put_ids), 5)
 
     def test_empty_snapshot_uses_its_exact_authorization_retention_policy(self) -> None:
         ledger = InMemoryEvidenceStore(
@@ -813,33 +844,27 @@ class TodayDomainToolsTest(unittest.TestCase):
         self.assertEqual(expired.error_code, "evidence_expired")
 
     def test_legacy_kline_parameters_reach_market_reader_without_private_or_news(self) -> None:
-        calls = []
-
-        def dossier_reader(actor, symbol, now, bar_days, bar_limit):
-            calls.append((actor.actor_id, symbol, now, bar_days, bar_limit))
-            return {
-                "symbol": symbol,
-                "adjustment": "raw",
-                "as_of": now.isoformat(),
-                "source_health": "fresh",
-                "bars": [
-                    {
-                        "date": "2026-08-08",
-                        "open": "90",
-                        "high": "101",
-                        "low": "89",
-                        "close": "100",
-                        "volume": 1000,
-                    }
-                ],
-                "count": 1,
+        adapter = FakeAiContextMarketAdapter()
+        market_retention = {
+            ("alpaca", "auth-alpaca_assets"): "encrypted_payload",
+            ("alpaca", "auth-alpaca_daily_bars"): "encrypted_payload",
+        }
+        ledger = InMemoryEvidenceStore(
+            retention_by_authorization={
+                **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
+                **market_retention,
             }
-
+        )
         registry = TodayDomainTools(
             portfolio_store=self.portfolio,
             watchlist=self.tools.watchlist,
             news_source=self.source,
-            dossier_reader=dossier_reader,
+            evidence_ledger=ledger,
+            market_facts=MarketFactService(
+                adapter=adapter,
+                evidence_ledger=ledger,
+                retention_by_authorization=market_retention,
+            ),
         ).registry()
         result = registry.invoke(
             "get_kline",
@@ -851,7 +876,12 @@ class TodayDomainToolsTest(unittest.TestCase):
             arguments={"symbol": "NVDA", "days": 30, "limit": 1},
         )
 
-        self.assertEqual(calls, [("actor-1", "NVDA", NOW, 30, 1)])
+        self.assertEqual([call[0] for call in adapter.calls], ["bars"])
+        self.assertEqual(adapter.calls[0][0:2], ("bars", "NVDA"))
+        self.assertEqual(
+            adapter.calls[0][2]["start_date"],
+            (NOW - timedelta(days=30)).date(),
+        )
         self.assertEqual(result.data["symbol"], "NVDA")
         self.assertEqual(result.data["count"], 1)
         self.assertNotIn("states", result.data)
@@ -868,6 +898,192 @@ class TodayDomainToolsTest(unittest.TestCase):
         self.assertEqual(holdings.data["count"], 1)
         self.assertEqual(holdings.data["usd_cash"], "500")
         self.assertEqual(holdings.data["holdings"][0]["symbol"], "NVDA")
+
+    def test_legacy_kline_succeeds_without_asset_identity_io(self) -> None:
+        class AssetUnavailableAdapter(FakeAiContextMarketAdapter):
+            def observe_asset(self, symbol, **kwargs):
+                raise AssertionError("get_kline must not read asset identity")
+
+        adapter = AssetUnavailableAdapter()
+        retention = {
+            ("alpaca", "auth-alpaca_daily_bars"): "encrypted_payload",
+        }
+        ledger = InMemoryEvidenceStore(
+            retention_by_authorization={
+                **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
+                **retention,
+            }
+        )
+        result = TodayDomainTools(
+            portfolio_store=self.portfolio,
+            watchlist=self.tools.watchlist,
+            news_source=None,
+            evidence_ledger=ledger,
+            market_facts=MarketFactService(
+                adapter=adapter,
+                evidence_ledger=ledger,
+                retention_by_authorization=retention,
+            ),
+        ).registry().invoke(
+            "get_kline",
+            context=DomainToolContext(
+                actor_id="actor-1",
+                granted_permissions=frozenset({"market:read"}),
+                clock=lambda: NOW,
+            ),
+            arguments={"symbol": "NVDA", "days": 30, "limit": 1},
+        )
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual([call[0] for call in adapter.calls], ["bars"])
+        self.assertEqual(len(result.evidence), 1)
+        self.assertIn("bars", result.evidence[0].authorized_fields)
+
+    def test_private_fact_identity_tracks_revision_and_payload_not_read_time(self) -> None:
+        ledger = InMemoryEvidenceStore(
+            retention_by_authorization=PRIVATE_FACT_RETENTION_BY_AUTHORIZATION
+        )
+        service = ActorOwnedFactService(ledger)
+        first_context = EvidenceReadContext(
+            actor_id="actor-1",
+            permissions=frozenset({"portfolio:read"}),
+            purpose="domain_tool",
+            now=NOW,
+        )
+        later_context = replace(first_context, now=NOW + timedelta(hours=1))
+        first = service.record(
+            context=first_context,
+            source="personal_portfolio",
+            logical_identity="holdings:3",
+            payload={"holdings": [], "count": 0},
+            observed_at=NOW,
+        )
+        same = service.record(
+            context=later_context,
+            source="personal_portfolio",
+            logical_identity="holdings:3",
+            payload={"holdings": [], "count": 0},
+            observed_at=later_context.now,
+        )
+        changed_revision = service.record(
+            context=later_context,
+            source="personal_portfolio",
+            logical_identity="holdings:4",
+            payload={"holdings": [], "count": 0},
+            observed_at=later_context.now,
+        )
+        changed_payload = service.record(
+            context=later_context,
+            source="personal_portfolio",
+            logical_identity="holdings:3",
+            payload={"holdings": [], "count": 1},
+            observed_at=later_context.now,
+        )
+
+        self.assertEqual(same.evidence_id, first.evidence_id)
+        self.assertEqual(same.fetched_at, first.fetched_at)
+        self.assertNotEqual(changed_revision.evidence_id, first.evidence_id)
+        self.assertNotEqual(changed_payload.evidence_id, first.evidence_id)
+        with self.assertRaisesRegex(EvidenceLedgerError, "evidence_not_found"):
+            ledger.read(
+                replace(later_context, actor_id="actor-2"), first.evidence_id
+            )
+
+    def test_holdings_and_kline_use_the_same_ledger_and_can_freeze(self) -> None:
+        market_retention = {
+            ("alpaca", "auth-alpaca_assets"): "encrypted_payload",
+            ("alpaca", "auth-alpaca_daily_bars"): "encrypted_payload",
+        }
+        ledger = InMemoryEvidenceStore(
+            retention_by_authorization={
+                **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
+                **market_retention,
+            }
+        )
+        registry = TodayDomainTools(
+            portfolio_store=self.portfolio,
+            watchlist=self.tools.watchlist,
+            news_source=None,
+            evidence_ledger=ledger,
+            market_facts=MarketFactService(
+                adapter=FakeAiContextMarketAdapter(),
+                evidence_ledger=ledger,
+                retention_by_authorization=market_retention,
+            ),
+        ).registry()
+        context = DomainToolContext(
+            actor_id="actor-1",
+            granted_permissions=frozenset({"portfolio:read", "market:read"}),
+            clock=lambda: NOW,
+        )
+
+        holdings = registry.invoke("get_holdings", context=context, arguments={})
+        kline = registry.invoke(
+            "get_kline",
+            context=context,
+            arguments={"symbol": "NVDA", "days": 30, "limit": 1},
+        )
+        evidence_ids = tuple(
+            item.evidence_id for item in (*holdings.evidence, *kline.evidence)
+        )
+        frozen = ledger.freeze(
+            EvidenceReadContext(
+                actor_id="actor-1",
+                permissions=context.granted_permissions,
+                purpose="domain_tool",
+                now=NOW,
+            ),
+            evidence_ids,
+        )
+
+        self.assertEqual(holdings.status, "success")
+        self.assertEqual(kline.status, "success")
+        self.assertEqual(
+            tuple(item.evidence_id for item in frozen), evidence_ids
+        )
+        self.assertTrue(all(item.payload is not None for item in frozen))
+
+    def test_market_fact_partial_and_stale_status_keep_ledger_evidence(self) -> None:
+        retention = {
+            ("alpaca", "auth-alpaca_assets"): "encrypted_payload",
+            ("alpaca", "auth-alpaca_daily_bars"): "encrypted_payload",
+        }
+        context = DomainToolContext(
+            actor_id="actor-1",
+            granted_permissions=frozenset({"market:read"}),
+            clock=lambda: NOW,
+        )
+
+        def invoke(adapter):
+            ledger = InMemoryEvidenceStore(
+                retention_by_authorization=retention
+            )
+            registry = TodayDomainTools(
+                portfolio_store=self.portfolio,
+                watchlist=self.tools.watchlist,
+                news_source=None,
+                evidence_ledger=ledger,
+                market_facts=MarketFactService(
+                    adapter=adapter,
+                    evidence_ledger=ledger,
+                    retention_by_authorization=retention,
+                ),
+            ).registry()
+            return registry.invoke(
+                "get_kline",
+                context=context,
+                arguments={"symbol": "NVDA", "days": 30, "limit": 1},
+            )
+
+        partial = invoke(RawFallbackMarketAdapter())
+        stale = invoke(StaleMarketAdapter())
+
+        self.assertEqual(partial.status, "partial")
+        self.assertEqual(partial.gaps[0].code, "provider_timeout")
+        self.assertTrue(partial.evidence)
+        self.assertEqual(stale.status, "stale")
+        self.assertIn("source_stale", {gap.code for gap in stale.gaps})
+        self.assertTrue(stale.evidence)
 
     def test_unauthorized_stale_and_unavailable_news_keep_portfolio_facts_working(self) -> None:
         source = SyntheticNewsSource(
@@ -994,14 +1210,33 @@ class TodayDomainToolsTest(unittest.TestCase):
 
     def test_market_dossier_uses_ai_context_authorization_and_bounds(self) -> None:
         adapter = FakeAiContextMarketAdapter()
-        reader = AiContextMarketDossierReader(adapter)
-
-        result = reader(
-            PersonalActor("actor-1"), "NVDA", NOW, 30, 1
+        retention = {
+            ("alpaca", "auth-alpaca_assets"): "encrypted_payload",
+            ("alpaca", "auth-alpaca_daily_bars"): "encrypted_payload",
+        }
+        ledger = InMemoryEvidenceStore(
+            retention_by_authorization=retention
+        )
+        reader = MarketFactService(
+            adapter=adapter,
+            evidence_ledger=ledger,
+            retention_by_authorization=retention,
         )
 
-        self.assertEqual(result["count"], 1)
-        self.assertEqual(result["bars"][0]["close"], "100")
+        result = reader.read_dossier(
+            context=EvidenceReadContext(
+                actor_id="actor-1",
+                permissions=frozenset({"market:read"}),
+                purpose="domain_tool",
+                now=NOW,
+            ),
+            symbol="NVDA",
+            bar_days=30,
+            bar_limit=1,
+        )
+
+        self.assertEqual(result.data["count"], 1)
+        self.assertEqual(result.data["bars"][0]["close"], "100")
         self.assertEqual(adapter.calls[0][2]["purpose"], "ai_context")
         self.assertEqual(adapter.calls[1][2]["purpose"], "ai_context")
         self.assertEqual(

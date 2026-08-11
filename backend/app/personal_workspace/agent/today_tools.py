@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta
 from decimal import Decimal
 from hashlib import sha256
 import json
 import re
-from threading import Lock
 from typing import Any, Callable, Mapping
 from urllib.parse import urlsplit, urlunsplit
-
-from backend.app.market_observation.alpaca import AlpacaMarketObservationAdapter
 
 from ..contracts import PersonalActor
 from ..rule_automation import personal_rule_evaluation_slot
@@ -31,6 +27,7 @@ from .evidence import (
     EvidenceRecord,
     InMemoryEvidenceStore,
 )
+from .fact_market import MarketFactService
 from .fact_news import (
     FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID,
     FACT_NEWS_RETENTION,
@@ -42,74 +39,10 @@ from .fact_news import (
     StructuredNewsSource,
     SYMBOL_SECTORS,
 )
-
-
-class AiContextMarketDossierReader:
-    """通过专用 ai_context 授权读取身份与日线，不复用 display 链路。"""
-
-    def __init__(self, adapter: AlpacaMarketObservationAdapter | None) -> None:
-        self._adapter = adapter
-
-    def __call__(
-        self,
-        actor: PersonalActor,
-        symbol: str,
-        now: datetime,
-        bar_days: int,
-        bar_limit: int,
-    ) -> Mapping[str, Any]:
-        if self._adapter is None:
-            raise RuntimeError("market_dossier_unavailable")
-        identity = self._adapter.observe_asset(
-            symbol, purpose="ai_context", fetched_at=now
-        )
-        bars = self._adapter.observe_daily_bars(
-            symbol,
-            start_date=now.date() - timedelta(days=bar_days),
-            end_date=now.date(),
-            fetched_at=now,
-            purpose="ai_context",
-        )
-        selected = (
-            bars.provider_adjusted
-            if bars.provider_adjusted.availability == "available"
-            else bars.raw
-        )
-        if identity.availability != "available" or identity.value is None:
-            raise RuntimeError(identity.reason_code or "asset_identity_unavailable")
-        if selected.availability != "available" or selected.value is None:
-            raise RuntimeError(selected.reason_code or "daily_bars_unavailable")
-        selected_bars = selected.value[-bar_limit:]
-        return {
-            "symbol": symbol,
-            "name": identity.value.name,
-            "asset_class": identity.value.asset_class,
-            "adjustment": (
-                "provider_adjusted"
-                if selected is bars.provider_adjusted
-                else "raw"
-            ),
-            "as_of": selected.as_of.isoformat() if selected.as_of else None,
-            "source_health": selected.source_health,
-            "bars": [
-                {
-                    "date": bar.trade_date.isoformat(),
-                    "open": str(bar.open),
-                    "high": str(bar.high),
-                    "low": str(bar.low),
-                    "close": str(bar.close),
-                    "volume": bar.volume,
-                }
-                for bar in selected_bars
-            ],
-            "count": len(selected_bars),
-            "authorization_snapshot_ids": sorted(
-                {
-                    identity.provenance.authorization_snapshot_id,
-                    selected.provenance.authorization_snapshot_id,
-                }
-            ),
-        }
+from .fact_private import (
+    ActorOwnedFactService,
+    PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
+)
 
 
 @dataclass(frozen=True)
@@ -163,34 +96,8 @@ _NEWS_EVIDENCE_METADATA_FIELDS = (
 class _EvidenceRecord:
     envelope: EvidenceEnvelope
     data: Mapping[str, Any]
-    owner_actor_id: str | None = None
     expires_at: datetime | None = None
     required_permissions: frozenset[str] = frozenset()
-
-
-class _EvidenceCatalog:
-    def __init__(self, *, maximum_records: int = 10_000) -> None:
-        self._lock = Lock()
-        self._maximum_records = maximum_records
-        self._records: OrderedDict[
-            tuple[str | None, str], _EvidenceRecord
-        ] = OrderedDict()
-
-    def put(self, record: _EvidenceRecord) -> None:
-        key = (record.owner_actor_id, record.envelope.evidence_id)
-        with self._lock:
-            self._records[key] = record
-            self._records.move_to_end(key)
-            while len(self._records) > self._maximum_records:
-                self._records.popitem(last=False)
-
-    def get(
-        self, evidence_id: str, *, actor_id: str
-    ) -> _EvidenceRecord | None:
-        with self._lock:
-            return self._records.get(
-                (actor_id, evidence_id)
-            ) or self._records.get((None, evidence_id))
 
 
 class TodayDomainTools:
@@ -205,10 +112,7 @@ class TodayDomainTools:
         evidence_ledger: EvidenceLedger | None = None,
         evidence_purpose: str = "domain_tool",
         relation_map: Mapping[str, tuple[str, ...]] | None = None,
-        dossier_reader: Callable[
-            [PersonalActor, str, datetime, int, int], Any
-        ]
-        | None = None,
+        market_facts: MarketFactService | None = None,
         rule_attention_reader: Callable[[PersonalActor], tuple[Any, ...]]
         | None = None,
         allowed_news_source_types: frozenset[str] = frozenset(
@@ -222,20 +126,21 @@ class TodayDomainTools:
         self._news_source = news_source
         self._evidence_ledger = evidence_ledger or InMemoryEvidenceStore(
             retention_by_authorization={
-                (FACT_NEWS_SOURCE, FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID): FACT_NEWS_RETENTION
+                (FACT_NEWS_SOURCE, FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID): FACT_NEWS_RETENTION,
+                **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
             }
         )
+        self._private_facts = ActorOwnedFactService(self._evidence_ledger)
         self._evidence_purpose = evidence_purpose
         self._relation_map = {
             _symbol(symbol): tuple(_symbol(item) for item in related)
             for symbol, related in (relation_map or _default_relation_map()).items()
         }
-        self._dossier_reader = dossier_reader
+        self._market_facts = market_facts
         self._rule_attention_reader = rule_attention_reader or (lambda _actor: ())
         self._allowed_news_source_types = allowed_news_source_types
         self._maximum_event_age = maximum_event_age
         self._maximum_fetch_age = maximum_fetch_age
-        self._catalog = _EvidenceCatalog()
 
     def registry(
         self,
@@ -289,6 +194,7 @@ class TodayDomainTools:
             if set(event.related_symbols) & set((*active_holdings, *followed))
         )
         portfolio_record = self._record_evidence(
+            context=context,
             source="personal_portfolio",
             as_of=now,
             data={
@@ -297,34 +203,17 @@ class TodayDomainTools:
                 "active_holding_symbols": list(active_holdings),
                 "followed_symbols": list(followed),
             },
-            authorized_fields=(
-                "portfolio_revision",
-                "instrument_revision",
-                "active_holding_symbols",
-                "followed_symbols",
+            logical_identity=(
+                f"today:{portfolio.revision}:{watchlist.revision}"
             ),
-            prefix="today",
-            owner_actor_id=context.actor_id,
-            required_permissions=frozenset({"portfolio:read"}),
         )
         attention_evidence = tuple(
             self._record_evidence(
+                context=context,
                 source="observation_rule_attention",
                 as_of=item.as_of,
                 data=_attention_data(item),
-                authorized_fields=(
-                    "attention_id",
-                    "kind",
-                    "symbol",
-                    "label",
-                    "result",
-                    "as_of",
-                    "reason_code",
-                    "priority",
-                ),
-                prefix="rule-attention",
-                owner_actor_id=context.actor_id,
-                required_permissions=frozenset({"portfolio:read"}),
+                logical_identity=item.attention_id,
             ).envelope
             for item in attention_items
         )
@@ -380,13 +269,11 @@ class TodayDomainTools:
             "usd_cash": str(portfolio.usd_cash),
         }
         record = self._record_evidence(
+            context=context,
             source="personal_portfolio",
             as_of=now,
             data=data,
-            authorized_fields=("holdings", "count", "usd_cash"),
-            prefix="legacy-holdings",
-            owner_actor_id=context.actor_id,
-            required_permissions=frozenset({"portfolio:read"}),
+            logical_identity=f"holdings:{portfolio.revision}",
         )
         return DomainToolResult.success(
             data=data,
@@ -427,23 +314,33 @@ class TodayDomainTools:
         else:
             news_events, news_gaps = (), ("source_unauthorized",)
         dossier = None
+        market_records: tuple[_EvidenceRecord, ...] = ()
+        market_source_health: str | None = None
         gaps = list(news_gaps)
         bar_days = int(arguments.get("bar_days", 90))
         bar_limit = int(arguments.get("bar_limit", 120))
-        if self._dossier_reader is not None:
+        if self._market_facts is not None:
             try:
-                dossier = _plain_data(
-                    self._dossier_reader(
-                        PersonalActor(context.actor_id),
-                        symbol,
-                        now,
-                        bar_days,
-                        bar_limit,
-                    )
+                read_market = (
+                    self._market_facts.read_bars
+                    if context.requested_name == "get_kline"
+                    else self._market_facts.read_dossier
                 )
+                market_fact = read_market(
+                    context=self._ledger_context(context, now),
+                    symbol=symbol,
+                    bar_days=bar_days,
+                    bar_limit=bar_limit,
+                )
+                dossier = _plain_data(market_fact.data)
+                market_records = tuple(
+                    _ledger_evidence_record(record) for record in market_fact.records
+                )
+                market_source_health = market_fact.source_health
+                gaps.extend(market_fact.gaps)
             except PermissionError:
                 gaps.append("source_unauthorized")
-            except (RuntimeError, ValueError, OSError):
+            except (EvidenceLedgerError, RuntimeError, ValueError, OSError):
                 gaps.append("market_dossier_unavailable")
         else:
             gaps.append("market_dossier_unavailable")
@@ -468,26 +365,14 @@ class TodayDomainTools:
         if can_read_private:
             evidence_items.append(
                 self._record_evidence(
+                    context=context,
                     source="personal_instrument_state",
                     as_of=now,
                     data={"symbol": symbol, "states": state_data},
-                    authorized_fields=("symbol", "states"),
-                    prefix="dossier",
-                    owner_actor_id=context.actor_id,
-                    required_permissions=frozenset({"portfolio:read"}),
+                    logical_identity=f"instrument:{symbol}:{portfolio.revision}",
                 ).envelope
             )
-        if dossier is not None:
-            evidence_items.append(
-                self._record_evidence(
-                    source="market_dossier",
-                    as_of=now,
-                    data=dossier,
-                    authorized_fields=tuple(sorted(dossier)),
-                    prefix="market-dossier",
-                    required_permissions=frozenset({"market:read"}),
-                ).envelope
-            )
+        evidence_items.extend(record.envelope for record in market_records)
         event_records = tuple(
             self._event_evidence(context, event) for event in news_events
         )
@@ -502,6 +387,14 @@ class TodayDomainTools:
         if not evidence:
             return DomainToolResult.unavailable(
                 gaps[0] if gaps else "tool_unavailable", symbol
+            )
+        if market_source_health == "stale":
+            return DomainToolResult.stale(
+                data=data,
+                gaps=_tool_gaps((*gaps, "source_stale")),
+                evidence=evidence,
+                field_coverage=Decimal("0.9"),
+                freshness_seconds=_freshness_seconds(news_events, now),
             )
         if gaps:
             return DomainToolResult.partial(
@@ -610,7 +503,7 @@ class TodayDomainTools:
                 if candidate in subjects:
                     continue
                 relation_records.setdefault(candidate, []).append(
-                    self._relation_evidence(subject, candidate, now)
+                    self._relation_evidence(context, subject, candidate, now)
                 )
         candidates = []
         evidence_records: list[_EvidenceRecord] = []
@@ -716,30 +609,7 @@ class TodayDomainTools:
                     0, int((now - persisted.fetched_at).total_seconds())
                 ),
             )
-        record = self._catalog.get(evidence_id, actor_id=context.actor_id)
-        if record is None:
-            return DomainToolResult.unavailable("evidence_not_found", evidence_id)
-        missing_permissions = (
-            record.required_permissions - context.granted_permissions
-        )
-        if missing_permissions:
-            return DomainToolResult.unavailable(
-                "source_unauthorized", ",".join(sorted(missing_permissions))
-            )
-        if record.expires_at is not None and now >= record.expires_at:
-            return DomainToolResult.unavailable("evidence_expired", evidence_id)
-        result_kwargs = {
-            "data": record.data,
-            "evidence": (record.envelope,),
-            "field_coverage": Decimal("1"),
-            "freshness_seconds": max(
-                0,
-                int((now - record.envelope.as_of).total_seconds()),
-            ),
-        }
-        return DomainToolResult.success(
-            **result_kwargs,
-        )
+        return DomainToolResult.unavailable("evidence_not_found", evidence_id)
 
     def _read_news(
         self,
@@ -930,9 +800,14 @@ class TodayDomainTools:
         )
 
     def _relation_evidence(
-        self, subject: str, candidate: str, now: datetime
+        self,
+        context: DomainToolContext,
+        subject: str,
+        candidate: str,
+        now: datetime,
     ) -> _EvidenceRecord:
         return self._record_evidence(
+            context=context,
             source="instrument_relation_map",
             as_of=now,
             data={
@@ -940,13 +815,7 @@ class TodayDomainTools:
                 "candidate_symbol": candidate,
                 "relation": "configured_market_relation",
             },
-            authorized_fields=(
-                "subject_symbol",
-                "candidate_symbol",
-                "relation",
-            ),
-            prefix="relation",
-            required_permissions=frozenset({"market:read"}),
+            logical_identity=f"{subject}:{candidate}",
         )
 
     def _news_snapshot_evidence(
@@ -1006,32 +875,20 @@ class TodayDomainTools:
     def _record_evidence(
         self,
         *,
+        context: DomainToolContext,
         source: str,
         as_of: datetime,
         data: Mapping[str, Any],
-        authorized_fields: tuple[str, ...],
-        prefix: str,
-        owner_actor_id: str | None = None,
-        expires_at: datetime | None = None,
-        required_permissions: frozenset[str] = frozenset(),
+        logical_identity: str,
     ) -> _EvidenceRecord:
-        digest = _sha256(data)
-        evidence_id = f"{prefix}:{digest[:24]}"
-        record = _EvidenceRecord(
-            envelope=EvidenceEnvelope(
-                evidence_id=evidence_id,
-                source=source,
-                as_of=as_of,
-                content_sha256=digest,
-                authorized_fields=authorized_fields,
-            ),
-            data=dict(data),
-            owner_actor_id=owner_actor_id,
-            expires_at=expires_at,
-            required_permissions=required_permissions,
+        stored = self._private_facts.record(
+            context=self._ledger_context(context, context.clock()),
+            source=source,
+            logical_identity=logical_identity,
+            payload=data,
+            observed_at=as_of,
         )
-        self._catalog.put(record)
-        return record
+        return _ledger_evidence_record(stored)
 
 
 def _normalize_event(
@@ -1058,6 +915,31 @@ def _normalize_event(
         allowed_purposes=snapshot.allowed_purposes,
     )
     return _with_event_identity(event)
+
+
+def _ledger_evidence_record(record: EvidenceRecord) -> _EvidenceRecord:
+    if record.payload is None:
+        raise EvidenceLedgerError("evidence_payload_not_retained")
+    data = _plain_data(record.payload)
+    as_of = (
+        record.observed_at
+        or record.published_at
+        or record.effective_at
+        or record.available_from
+        or record.fetched_at
+    )
+    return _EvidenceRecord(
+        envelope=EvidenceEnvelope(
+            evidence_id=record.evidence_id,
+            source=record.source,
+            as_of=as_of,
+            content_sha256=record.content_sha256,
+            authorized_fields=tuple(data),
+        ),
+        data=data,
+        expires_at=record.expires_at,
+        required_permissions=record.required_permissions,
+    )
 
 
 def _relation_evidence_view(record: _EvidenceRecord) -> dict[str, Any]:
