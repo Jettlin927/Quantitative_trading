@@ -1,8 +1,8 @@
 # 远端个人 MCP loopback 与 SSH 隧道运维合同
 
-本页定义 `quant-trading-prod` 上远端个人 MCP 的目标操作边界。当前票不实现 Streamable
-HTTP transport、Compose、部署脚本或真实客户端配置；本文不构成生产授权，也不表示远端
-MCP 已配置、已部署或已启用。稳定安全决定见
+本页定义 `quant-trading-prod` 上远端个人 MCP 的目标操作边界。受认证的 Streamable HTTP
+ASGI adapter 已在代码中实现；当前仍不接 Compose、部署脚本或真实客户端配置。本文
+不构成生产授权，也不表示远端 MCP 已配置、已部署或已启用。稳定安全决定见
 [ADR 0014](../adr/0014-remote-loopback-personal-mcp.md)。
 
 ## 目标拓扑与职责
@@ -36,8 +36,8 @@ HTTP adapter 只把官方协议请求翻译给既有 `PersonalMcpGateway`，再�
 
 后续交付必须分别读回，不得互相替代：
 
-1. HTTP adapter：官方 ClientSession 的 initialize/list/call/shutdown、401、403、限额、
-   脱敏和删除边界测试通过。
+1. HTTP adapter：已由本地与隔离测试证明官方 ClientSession 的
+   initialize/list/call/shutdown、401、403、限额、脱敏和删除边界；这不表示已装配或启用。
 2. Compose 与本机入口：默认 profile 不启动；启用时只发布服务器 loopback；token、
    keyring 和来源文件只读挂载，容器不接收 DeepSeek secret；SSH 隧道与项目客户端模板
    不含真实 secret。

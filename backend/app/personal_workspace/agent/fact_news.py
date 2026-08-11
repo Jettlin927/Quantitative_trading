@@ -18,13 +18,21 @@ DEFAULT_CACHE_TTL_SECONDS = 1800
 DEFAULT_FETCH_TIMEOUT_SECONDS = 240
 FACT_NEWS_SOURCE = "investment_news"
 FACT_NEWS_AUTHORIZATION_SNAPSHOT_V1 = "investment-news-local-v1"
-FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID = "investment-news-local-v2"
-FACT_NEWS_ALLOWED_PURPOSES = frozenset({"domain_tool", "mcp_stdio"})
+FACT_NEWS_AUTHORIZATION_SNAPSHOT_V2 = "investment-news-local-v2"
+FACT_NEWS_AUTHORIZATION_SNAPSHOT_ID = "investment-news-local-v3"
+FACT_NEWS_ALLOWED_PURPOSES = frozenset(
+    {"domain_tool", "mcp_stdio", "mcp_remote_read"}
+)
 FACT_NEWS_RETENTION: Literal["encrypted_payload"] = "encrypted_payload"
 FACT_NEWS_POLICY_HISTORY = (
     (
         FACT_NEWS_AUTHORIZATION_SNAPSHOT_V1,
         frozenset({"domain_tool"}),
+        FACT_NEWS_RETENTION,
+    ),
+    (
+        FACT_NEWS_AUTHORIZATION_SNAPSHOT_V2,
+        frozenset({"domain_tool", "mcp_stdio"}),
         FACT_NEWS_RETENTION,
     ),
     (
