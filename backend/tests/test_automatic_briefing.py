@@ -171,6 +171,18 @@ class AutomaticBriefingTest(unittest.TestCase):
         self.assertEqual(self.runtime.requests[0].tools, ())
         self.assertEqual(self.runtime.requests[0].hosted_tools, ())
         self.assertEqual(
+            [event["sequence"] for event in result.private_payload["tool_events"]],
+            list(range(1, 7)),
+        )
+        self.assertTrue(
+            all(
+                event["event_type"] == "tool_completed"
+                and event["status"] == "success"
+                and event["evidence_ids"]
+                for event in result.private_payload["tool_events"]
+            )
+        )
+        self.assertEqual(
             {
                 claim["kind"]
                 for claim in result.private_payload["claims"]
@@ -178,6 +190,8 @@ class AutomaticBriefingTest(unittest.TestCase):
             {"confirmed_fact", "inference", "conditional_scenario", "unknown"},
         )
         self.assertEqual(result.private_payload["usage"]["cache_hit_tokens"], 20)
+        self.assertEqual(result.actual_cost_usd, Decimal("0.001"))
+        self.assertEqual(result.accounted_cost_usd, Decimal("0.001"))
 
     def test_same_event_is_charged_once_across_symbol_order_and_refresh(self) -> None:
         first = BriefingTrigger(
@@ -230,6 +244,17 @@ class AutomaticBriefingTest(unittest.TestCase):
         self.assertEqual(result.provider_state, BriefingProviderState.COMPLETED)
         self.assertEqual(result.failure_code, "evidence_insufficient")
         self.assertEqual(self.runtime.requests, [])
+        self.assertEqual(
+            [
+                (
+                    event["event_type"],
+                    event["status"],
+                    event["evidence_ids"],
+                )
+                for event in result.private_payload["tool_events"]
+            ],
+            [("tool_failed", "unavailable", ())],
+        )
         self.assertEqual(
             result.private_payload["gaps"][0]["code"], "source_unavailable"
         )

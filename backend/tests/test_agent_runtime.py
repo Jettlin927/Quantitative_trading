@@ -127,14 +127,37 @@ class AgentRuntimeTest(unittest.TestCase):
             ]
         )
         runtime = make_runtime(provider, (make_tool("get_holdings"),))
-        result = runtime.run(actor_id="actor-1", intent=make_intent())
+        audited = []
+        result = runtime.run(
+            actor_id="actor-1",
+            intent=make_intent(),
+            audit=lambda event, evidence: audited.append((event, evidence)),
+        )
         self.assertEqual(len(result.claims), 4)
         self.assertEqual(result.rounds, 2)
         self.assertEqual(result.cost_usd, "0.0004")
         self.assertEqual(result.usage.input_tokens, 1600)
+        self.assertEqual(result.usage.output_tokens, 800)
+        self.assertEqual(result.usage.cache_hit_tokens, 600)
+        self.assertEqual(result.usage.cache_miss_tokens, 1000)
         self.assertEqual(len(result.tool_evidence), 1)
         self.assertEqual(result.tool_evidence[0].evidence_id, "tool:get_holdings:0")
         self.assertEqual(result.tool_evidence[0].kind, "tool_output")
+        self.assertEqual(
+            [
+                (
+                    event.sequence,
+                    event.tool_name,
+                    event.tool_call_id,
+                    event.status,
+                    event.evidence_ids,
+                    event.error_code,
+                )
+                for event in result.tool_events
+            ],
+            [(1, "get_holdings", "call-1", "completed", ("tool:get_holdings:0",), None)],
+        )
+        self.assertEqual(audited, [(result.tool_events[0], result.tool_evidence)])
         # 请求里必须带 tools schema 与多轮消息
         first_request = provider.captured_requests[0]
         self.assertEqual(first_request["model"], DEEPSEEK_MODEL)
@@ -193,6 +216,16 @@ class AgentRuntimeTest(unittest.TestCase):
         )
         result = runtime.run(actor_id="actor-1", intent=make_intent())
         self.assertEqual(result.rounds, 3)
+        self.assertEqual(
+            [
+                (event.tool_call_id, event.status, event.evidence_ids, event.error_code)
+                for event in result.tool_events
+            ],
+            [
+                ("call-1", "failed", (), "RuntimeError"),
+                ("call-2", "completed", ("tool:get_news:0",), None),
+            ],
+        )
         failure_message = provider.captured_requests[1]["messages"][3]
         self.assertEqual(json.loads(failure_message["content"])["ok"], False)
         self.assertIn("RuntimeError", json.loads(failure_message["content"])["error"])

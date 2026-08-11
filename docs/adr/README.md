@@ -9,6 +9,7 @@
 - [个人 AI 分析 agent 化：通过工具访问持仓、行情与新闻](0009-personal-ai-analysis-agent-tools.md)
 - [美股优先工作台与旧数据链路退役](0010-us-first-workbench-and-retired-legacy-data-paths.md)
 - [个人投资工作台不再包含研究系统](0011-personal-investment-workbench-without-research.md)
+- [本机私有只读 MCP 使用固定 actor 与确定性工具白名单](0013-local-read-only-personal-mcp.md)
 
 ## 已被当前方向取代
 
