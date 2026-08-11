@@ -6,46 +6,18 @@ import asyncio
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from hashlib import sha256
-import logging
 import os
 from pathlib import Path
 import sys
-from typing import Any
 
 from .mcp_gateway import (
-    PERSONAL_MCP_TOOL_ALLOWLIST,
     PersonalMcpGateway,
     PersonalMcpGatewayStopped,
-    bounded_audit_tool_name,
-    call_tool_result,
+    PersonalMcpTransportPolicy,
+    PERSONAL_MCP_STDIO_POLICY,
     normalize_actor_id,
 )
-
-
-_MCP_LOWLEVEL_LOGGER = "mcp.server.lowlevel.server"
-_UNKNOWN_TOOL_WARNING = (
-    "Tool '%s' not listed, no validation will be performed"
-)
-
-
-class _UnknownToolWarningRedactionFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        try:
-            if (
-                record.name == _MCP_LOWLEVEL_LOGGER
-                and record.msg == _UNKNOWN_TOOL_WARNING
-            ):
-                if isinstance(record.args, tuple) and record.args:
-                    record.args = (bounded_audit_tool_name(record.args[0]),)
-                else:
-                    record.args = ("rejected_tool:0000000000000000",)
-        except BaseException:
-            try:
-                record.msg = _UNKNOWN_TOOL_WARNING
-                record.args = ("rejected_tool:0000000000000000",)
-            except BaseException:
-                pass
-        return True
+from .mcp_protocol import create_mcp_protocol_server, redact_mcp_protocol_logs
 
 
 class PersonalMcpConfigurationError(RuntimeError):
@@ -106,54 +78,32 @@ def _normalize_database_url(value: str) -> str:
         ) from exc
 
 
-def create_mcp_protocol_server(gateway: PersonalMcpGateway):
-    """只注册 tools；initialize、生命周期和 framing 全交给官方 SDK。"""
-
-    from mcp import types
-    from mcp.server.lowlevel import Server
-
-    server = Server("personal-investment-workbench", version="1")
-
-    @server.list_tools()
-    async def list_tools() -> list[types.Tool]:
-        return [
-            types.Tool(
-                name=item.name,
-                description=item.description,
-                inputSchema=dict(item.input_schema),
-            )
-            for item in gateway.tool_definitions()
-        ]
-
-    @server.call_tool(validate_input=False)
-    async def call_tool(name: str, arguments: dict[str, Any]):
-        return call_tool_result(await gateway.call_tool(name, arguments))
-
-    return server
-
-
 async def serve_stdio_gateway(gateway: PersonalMcpGateway) -> None:
     """只运行官方逐行 UTF-8 stdio transport，不创建网络 transport。"""
 
     import mcp.server.stdio
 
     server = create_mcp_protocol_server(gateway)
-    sdk_logger = logging.getLogger(_MCP_LOWLEVEL_LOGGER)
-    redaction_filter = _UnknownToolWarningRedactionFilter()
-    sdk_logger.addFilter(redaction_filter)
     try:
-        async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
-            await server.run(
+        with redact_mcp_protocol_logs():
+            async with mcp.server.stdio.stdio_server() as (
                 read_stream,
                 write_stream,
-                server.create_initialization_options(),
-            )
+            ):
+                await server.run(
+                    read_stream,
+                    write_stream,
+                    server.create_initialization_options(),
+                )
     finally:
-        sdk_logger.removeFilter(redaction_filter)
         gateway.close()
 
 
-def build_personal_mcp_gateway(config: PersonalMcpConfig) -> PersonalMcpGateway:
+def build_personal_mcp_gateway(
+    config: PersonalMcpConfig,
+    *,
+    transport_policy: PersonalMcpTransportPolicy = PERSONAL_MCP_STDIO_POLICY,
+) -> PersonalMcpGateway:
     """通过现有 composition 装配唯一 registry 与共享 capability audit。"""
 
     from .composition import build_personal_services
@@ -193,6 +143,7 @@ def build_personal_mcp_gateway(config: PersonalMcpConfig) -> PersonalMcpGateway:
             registry=services.domain_tools,
             audit_store=services.evidence_store,
             actor_id=config.actor_id,
+            transport_policy=transport_policy,
         )
     except PersonalMcpConfigurationError:
         raise

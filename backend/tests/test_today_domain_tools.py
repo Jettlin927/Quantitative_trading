@@ -326,13 +326,15 @@ class TodayDomainToolsTest(unittest.TestCase):
         )
 
     def test_invocation_purpose_reaches_fact_source_without_adapter_override(self) -> None:
-        mcp_context = replace(self.context, purpose="mcp_stdio")
-
-        self.registry.invoke(
-            "search_market_news", context=mcp_context, arguments={"limit": 1}
-        )
-
-        self.assertEqual(self.source.purposes[-1], "mcp_stdio")
+        for purpose in ("mcp_stdio", "mcp_remote_read"):
+            with self.subTest(purpose=purpose):
+                mcp_context = replace(self.context, purpose=purpose)
+                self.registry.invoke(
+                    "search_market_news",
+                    context=mcp_context,
+                    arguments={"limit": 1},
+                )
+                self.assertEqual(self.source.purposes[-1], purpose)
 
     def _invoke_legacy_kline(self, adapter):
         retention = {
@@ -1085,7 +1087,7 @@ class TodayDomainToolsTest(unittest.TestCase):
                 replace(later_context, actor_id="actor-2"), first.evidence_id
             )
 
-    def test_each_fact_source_explicitly_allows_mcp_stdio_and_ledger_enforces_it(self) -> None:
+    def test_each_fact_source_explicitly_allows_both_mcp_purposes(self) -> None:
         retention = {
             **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
             ("alpaca", "auth-alpaca_daily_bars"): "encrypted_payload",
@@ -1122,8 +1124,13 @@ class TodayDomainToolsTest(unittest.TestCase):
         )
 
         self.assertIn("mcp_stdio", FACT_NEWS_ALLOWED_PURPOSES)
+        self.assertIn("mcp_remote_read", FACT_NEWS_ALLOWED_PURPOSES)
         self.assertIn(
             "mcp_stdio",
+            PRIVATE_FACT_POLICIES["personal_portfolio"].allowed_purposes,
+        )
+        self.assertIn(
+            "mcp_remote_read",
             PRIVATE_FACT_POLICIES["personal_portfolio"].allowed_purposes,
         )
         self.assertEqual(
@@ -1132,6 +1139,13 @@ class TodayDomainToolsTest(unittest.TestCase):
         )
         self.assertEqual(
             ledger.freeze(market_context, (market.records[0].evidence_id,))[0].evidence_id,
+            market.records[0].evidence_id,
+        )
+        remote_market_context = replace(market_context, purpose="mcp_remote_read")
+        self.assertEqual(
+            ledger.freeze(
+                remote_market_context, (market.records[0].evidence_id,)
+            )[0].evidence_id,
             market.records[0].evidence_id,
         )
         with self.assertRaisesRegex(EvidenceLedgerError, "evidence_purpose_denied"):
@@ -1199,11 +1213,11 @@ class TodayDomainToolsTest(unittest.TestCase):
 
     def test_private_policy_rotation_changes_identity_without_phantom_current(self) -> None:
         self.assertTrue(
-            all(len(history) == 2 for history in PRIVATE_FACT_POLICY_HISTORY.values())
+            all(len(history) == 3 for history in PRIVATE_FACT_POLICY_HISTORY.values())
         )
-        v1 = PRIVATE_FACT_POLICY_HISTORY["personal_portfolio"][0]
         v2 = PRIVATE_FACT_POLICY_HISTORY["personal_portfolio"][1]
-        self.assertIs(PRIVATE_FACT_POLICIES["personal_portfolio"], v2)
+        v3 = PRIVATE_FACT_POLICY_HISTORY["personal_portfolio"][2]
+        self.assertIs(PRIVATE_FACT_POLICIES["personal_portfolio"], v3)
         retention = dict(PRIVATE_FACT_RETENTION_BY_AUTHORIZATION)
         ledger = InMemoryEvidenceStore(
             retention_by_authorization=retention
@@ -1221,21 +1235,21 @@ class TodayDomainToolsTest(unittest.TestCase):
             "observed_at": NOW,
         }
         old = ledger.put(
-            context, _actor_owned_record(policy=v1, **arguments)
+            context, _actor_owned_record(policy=v2, **arguments)
         )
         new = ledger.put(
-            context, _actor_owned_record(policy=v2, **arguments)
+            context, _actor_owned_record(policy=v3, **arguments)
         )
 
         self.assertNotEqual(old.evidence_id, new.evidence_id)
         self.assertNotEqual(old.logical_identity, new.logical_identity)
         self.assertEqual(old.content_sha256, new.content_sha256)
-        mcp_context = replace(context, purpose="mcp_stdio")
+        mcp_context = replace(context, purpose="mcp_remote_read")
         with self.assertRaisesRegex(EvidenceLedgerError, "evidence_purpose_denied"):
             ledger.read(mcp_context, old.evidence_id)
         self.assertEqual(ledger.read(mcp_context, new.evidence_id).evidence_id, new.evidence_id)
         unknown = replace(
-            v2, authorization_snapshot_id="actor-owned-unknown"
+            v3, authorization_snapshot_id="actor-owned-unknown"
         )
         with self.assertRaisesRegex(
             EvidenceLedgerError, "source_retention_unknown"

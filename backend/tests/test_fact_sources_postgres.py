@@ -107,7 +107,7 @@ class FactSourcesPostgresTest(unittest.TestCase):
         )
         self.assertEqual(
             frozen[0].authorization_snapshot_id,
-            "actor-owned-personal-portfolio-v2",
+            "actor-owned-personal-portfolio-v3",
         )
         self.assertEqual(
             {record.authorization_snapshot_id for record in frozen[1:]},
@@ -198,6 +198,7 @@ class FactSourcesPostgresTest(unittest.TestCase):
     def test_historical_private_policy_survives_restart_and_rotation(self) -> None:
         v1 = PRIVATE_FACT_POLICY_HISTORY["personal_portfolio"][0]
         v2 = PRIVATE_FACT_POLICY_HISTORY["personal_portfolio"][1]
+        v3 = PRIVATE_FACT_POLICY_HISTORY["personal_portfolio"][2]
         retention = RETENTION
         actor = f"fact-private-history-{uuid4()}"
         context = EvidenceReadContext(
@@ -219,9 +220,12 @@ class FactSourcesPostgresTest(unittest.TestCase):
         new = store.put(
             context, _actor_owned_record(policy=v2, **arguments)
         )
+        remote = store.put(
+            context, _actor_owned_record(policy=v3, **arguments)
+        )
 
         frozen = self._store(retention).freeze(
-            context, (old.evidence_id, new.evidence_id)
+            context, (old.evidence_id, new.evidence_id, remote.evidence_id)
         )
 
         self.assertNotEqual(old.evidence_id, new.evidence_id)
@@ -231,6 +235,7 @@ class FactSourcesPostgresTest(unittest.TestCase):
             (
                 "actor-owned-personal-portfolio-v1",
                 "actor-owned-personal-portfolio-v2",
+                "actor-owned-personal-portfolio-v3",
             ),
         )
         mcp_context = replace(context, purpose="mcp_stdio")
@@ -241,6 +246,15 @@ class FactSourcesPostgresTest(unittest.TestCase):
         self.assertEqual(
             self._store().read(mcp_context, new.evidence_id).evidence_id,
             new.evidence_id,
+        )
+        remote_context = replace(context, purpose="mcp_remote_read")
+        with self.assertRaisesRegex(
+            EvidenceLedgerError, "evidence_purpose_denied"
+        ):
+            self._store().read(remote_context, new.evidence_id)
+        self.assertEqual(
+            self._store().read(remote_context, remote.evidence_id).evidence_id,
+            remote.evidence_id,
         )
         without_v1_retention = {
             key: value

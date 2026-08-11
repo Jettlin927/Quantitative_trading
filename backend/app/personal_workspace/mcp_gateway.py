@@ -7,6 +7,7 @@ from collections import deque
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -43,13 +44,31 @@ PERSONAL_MCP_TOOL_ALLOWLIST = frozenset(
 PERSONAL_MCP_PERMISSIONS = frozenset(
     {"portfolio:read", "market:read", "news:read", "evidence:read"}
 )
-PERSONAL_MCP_PURPOSE = "mcp_stdio"
 PERSONAL_MCP_POLICY_REVISION = "personal-mcp-v1"
 PERSONAL_MCP_DEADLINE_SECONDS = 20.0
 PERSONAL_MCP_MAX_OUTPUT_BYTES = 256 * 1024
 PERSONAL_MCP_MAX_CALLS_PER_MINUTE = 30
 PERSONAL_MCP_MAX_CONCURRENCY = 2
 _ACTOR_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}")
+
+
+@dataclass(frozen=True)
+class PersonalMcpTransportPolicy:
+    channel: str
+    purpose: str
+    policy_revision: str
+
+
+PERSONAL_MCP_STDIO_POLICY = PersonalMcpTransportPolicy(
+    channel="mcp_stdio",
+    purpose="mcp_stdio",
+    policy_revision=PERSONAL_MCP_POLICY_REVISION,
+)
+PERSONAL_MCP_HTTP_POLICY = PersonalMcpTransportPolicy(
+    channel="mcp_streamable_http",
+    purpose="mcp_remote_read",
+    policy_revision="personal-mcp-remote-v1",
+)
 
 
 class PersonalMcpGatewayStopped(RuntimeError):
@@ -72,11 +91,18 @@ class PersonalMcpGateway:
         registry: DomainToolRegistry,
         audit_store: CapabilityAuditStore,
         actor_id: str,
+        transport_policy: PersonalMcpTransportPolicy = PERSONAL_MCP_STDIO_POLICY,
         clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
         monotonic: Callable[[], float] = time.monotonic,
         deadline_seconds: float = PERSONAL_MCP_DEADLINE_SECONDS,
     ) -> None:
         self._actor_id = normalize_actor_id(actor_id)
+        if transport_policy not in {
+            PERSONAL_MCP_STDIO_POLICY,
+            PERSONAL_MCP_HTTP_POLICY,
+        }:
+            raise ValueError("personal_mcp_transport_policy_invalid")
+        self._transport_policy = transport_policy
         if not 0 < deadline_seconds <= PERSONAL_MCP_DEADLINE_SECONDS:
             raise ValueError("personal_mcp_deadline_invalid")
         self._registry = registry
@@ -111,6 +137,10 @@ class PersonalMcpGateway:
 
     def tool_definitions(self) -> tuple[RuntimeToolDefinition, ...]:
         return deepcopy(self._definitions)
+
+    @property
+    def transport_policy(self) -> PersonalMcpTransportPolicy:
+        return self._transport_policy
 
     async def call_tool(
         self, name: str, arguments: Mapping[str, Any]
@@ -211,7 +241,7 @@ class PersonalMcpGateway:
         context = DomainToolContext(
             actor_id=self._actor_id,
             granted_permissions=PERSONAL_MCP_PERMISSIONS,
-            purpose=PERSONAL_MCP_PURPOSE,
+            purpose=self._transport_policy.purpose,
             clock=self._clock,
         )
         loop = asyncio.get_running_loop()
@@ -278,7 +308,7 @@ class PersonalMcpGateway:
         completed_at = self._clock()
         event = CapabilityAuditEvent(
             request_id=str(uuid4()),
-            channel=PERSONAL_MCP_PURPOSE,
+            channel=self._transport_policy.channel,
             canonical_tool=bounded_audit_tool_name(requested_name),
             arguments_sha256=arguments_sha256,
             status=result.status,
@@ -287,14 +317,14 @@ class PersonalMcpGateway:
             field_coverage=result.field_coverage,
             freshness_seconds=result.freshness_seconds,
             cost_usd=result.cost_usd,
-            policy_revision=PERSONAL_MCP_POLICY_REVISION,
+            policy_revision=self._transport_policy.policy_revision,
             started_at=started_at,
             completed_at=completed_at,
         )
         context = EvidenceReadContext(
             actor_id=self._actor_id,
             permissions=PERSONAL_MCP_PERMISSIONS,
-            purpose=PERSONAL_MCP_PURPOSE,
+            purpose=self._transport_policy.purpose,
             now=completed_at,
         )
         loop = asyncio.get_running_loop()

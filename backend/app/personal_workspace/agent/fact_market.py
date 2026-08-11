@@ -21,10 +21,13 @@ from .evidence import (
 
 
 MARKET_FACT_TTL = timedelta(hours=2)
-MARKET_EVIDENCE_PURPOSE_POLICY_REVISION = "market-evidence-purpose-v2"
-MARKET_EVIDENCE_ALLOWED_PURPOSES = frozenset({"domain_tool", "mcp_stdio"})
+MARKET_EVIDENCE_PURPOSE_POLICY_REVISION = "market-evidence-purpose-v3"
+MARKET_EVIDENCE_ALLOWED_PURPOSES = frozenset(
+    {"domain_tool", "mcp_stdio", "mcp_remote_read"}
+)
 MARKET_EVIDENCE_PURPOSE_POLICY_HISTORY = {
     "market-evidence-purpose-v1": frozenset({"domain_tool"}),
+    "market-evidence-purpose-v2": frozenset({"domain_tool", "mcp_stdio"}),
     MARKET_EVIDENCE_PURPOSE_POLICY_REVISION: MARKET_EVIDENCE_ALLOWED_PURPOSES,
 }
 

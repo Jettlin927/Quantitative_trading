@@ -48,7 +48,8 @@
 - `personal_workspace/mcp_server.py`：现有 `stdio` 协议 adapter；只用于非生产和测试，
   不是生产拓扑。
 - 远端生产目标运行在 `quant-trading-prod`：本机客户端经 SSH 隧道访问服务器 loopback
-  上的单一 `/mcp` Streamable HTTP adapter；该 adapter 尚未实现，也未加入 Compose。
+  上的单一 `/mcp` Streamable HTTP adapter；ASGI adapter 已实现，但尚未加入 Compose、
+  部署或启用。
   它必须用不可由客户端覆盖的服务端入口上下文构造 gateway：审计 channel 为
   `mcp_streamable_http`，领域 purpose 为 `mcp_remote_read`；现有 `mcp_stdio` 硬编码只属于
   stdio 行为，不能原样复用为 HTTP 入口。
