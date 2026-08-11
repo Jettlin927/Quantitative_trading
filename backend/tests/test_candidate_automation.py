@@ -59,6 +59,14 @@ class CandidateLifecycleAutomationTest(unittest.TestCase):
                                 "symbol": "AMD",
                                 "relation_evidence_ids": ["relation:semis"],
                                 "fact_evidence_ids": ["fact:earnings"],
+                                "relation_evidence": [{
+                                    "evidence_id": "relation:semis", "title": "NVDA → AMD", "summary": "配置的市场关联",
+                                    "source": "instrument_relation_map", "as_of": NOW.isoformat(), "url": None,
+                                }],
+                                "fact_evidence": [{
+                                    "evidence_id": "fact:earnings", "title": "AMD 发布季度更新", "summary": "收入指引已更新",
+                                    "source": "Synthetic Wire", "as_of": NOW.isoformat(), "url": "https://example.com/amd",
+                                }],
                                 "latest_fact_at": NOW.isoformat(),
                             }
                         ]
@@ -78,6 +86,8 @@ class CandidateLifecycleAutomationTest(unittest.TestCase):
         tsla = next(item for item in view.items if item.symbol == "TSLA")
         self.assertEqual(amd.candidate_status, "active")
         self.assertFalse(amd.is_followed)
+        self.assertEqual(amd.relation_evidence[0].title, "NVDA → AMD")
+        self.assertEqual(amd.fact_evidence[0].summary, "收入指引已更新")
         self.assertEqual(tsla.candidate_status, "archived")
 
 

@@ -209,6 +209,12 @@ for target, source in expected_secrets.items():
     assert mount["read_only"] is True, mount
     assert mount.get("bind", {}).get("create_host_path") in (None, False), mount
 
+api_news_mount = mounts["/run/disabled/news"]
+assert api_news_mount["type"] == "bind", api_news_mount
+assert Path(api_news_mount["source"]).resolve() == Path("/run/disabled/news"), api_news_mount
+assert api_news_mount["read_only"] is True, api_news_mount
+assert api_news_mount.get("bind", {}).get("create_host_path") in (None, False), api_news_mount
+
 alpaca_environment = {"ALPACA_CREDENTIALS_FILE", "ALPACA_AUTHORIZATION_FILE"}
 alpaca_targets = {
     "/run/secrets/alpaca-credentials.json",

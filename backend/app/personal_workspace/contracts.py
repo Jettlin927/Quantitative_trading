@@ -95,6 +95,16 @@ class SyntheticTraceView:
 
 
 @dataclass(frozen=True)
+class CandidateEvidenceView:
+    evidence_id: str
+    title: str
+    summary: str
+    source: str
+    as_of: datetime
+    url: str | None = None
+
+
+@dataclass(frozen=True)
 class InstrumentStateView:
     symbol: str
     is_holding: bool
@@ -105,6 +115,8 @@ class InstrumentStateView:
     candidate_status: str | None
     relation_evidence_ids: tuple[str, ...]
     fact_evidence_ids: tuple[str, ...]
+    relation_evidence: tuple[CandidateEvidenceView, ...]
+    fact_evidence: tuple[CandidateEvidenceView, ...]
     candidate_refreshed_at: datetime | None
     candidate_archived_at: datetime | None
 

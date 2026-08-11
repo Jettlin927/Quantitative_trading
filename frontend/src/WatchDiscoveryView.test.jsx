@@ -9,7 +9,12 @@ afterEach(() => cleanup())
 const projection = {
   revision: 3,
   items: [
-    { symbol: 'NVDA', is_holding: true, is_followed: true, candidate_status: 'active', preset_reasons: ['财报观察'], relation_evidence_ids: ['r1'], fact_evidence_ids: ['f1'] },
+    {
+      symbol: 'NVDA', is_holding: true, is_followed: true, candidate_status: 'active', preset_reasons: ['财报观察'],
+      relation_evidence_ids: ['r1'], fact_evidence_ids: ['f1'],
+      relation_evidence: [{ evidence_id: 'r1', title: 'AMD → NVDA', summary: '配置的市场关联', source: 'instrument_relation_map', as_of: '2026-08-10T12:00:00Z', url: null }],
+      fact_evidence: [{ evidence_id: 'f1', title: 'NVDA 发布最新产品进展', summary: '新产品将在本季度开始交付。', source: '公司投资者关系', as_of: '2026-08-10T11:00:00Z', url: 'https://example.com/nvda-update' }],
+    },
     { symbol: 'AMD', is_holding: false, is_followed: true, candidate_status: null, preset_reasons: ['行业映射'], custom_reason: '等待新品', relation_evidence_ids: [], fact_evidence_ids: [] },
     { symbol: 'INTC', is_holding: false, is_followed: false, candidate_status: 'archived', relation_evidence_ids: ['r2'], fact_evidence_ids: ['f2'], candidate_archived_at: '2026-08-01T00:00:00Z' },
   ],
@@ -38,6 +43,19 @@ describe('关注与发现', () => {
     fireEvent.click(screen.getByRole('tab', { name: '已归档' }))
     expect(screen.getByText('INTC')).toBeInTheDocument()
     expect(screen.getByLabelText('INTC 状态')).toHaveTextContent('已归档')
+  })
+
+  it('候选直接展示关系证据和事实证据内容，而不是只显示数量', async () => {
+    const client = { openWatchlist: vi.fn().mockResolvedValue(projection) }
+    render(<WatchDiscoveryView client={client} />)
+
+    await screen.findByText('NVDA')
+    expect(screen.getByText('AMD → NVDA')).toBeInTheDocument()
+    expect(screen.getByText('配置的市场关联')).toBeInTheDocument()
+    expect(screen.getByText('NVDA 发布最新产品进展')).toBeInTheDocument()
+    expect(screen.getByText('新产品将在本季度开始交付。')).toBeInTheDocument()
+    expect(screen.getByText(/公司投资者关系/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '查看原文' })).toHaveAttribute('href', 'https://example.com/nvda-update')
   })
 
   it('页签使用 roving focus，并支持方向键与 Home/End', async () => {

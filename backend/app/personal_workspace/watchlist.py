@@ -22,6 +22,7 @@ from backend.app.models import (
 )
 
 from .contracts import (
+    CandidateEvidenceView,
     InstrumentStatesView,
     InstrumentStateView,
     PersonalActor,
@@ -56,6 +57,8 @@ class CandidateEvidence:
     fact_evidence_ids: tuple[str, ...]
     observed_at: datetime
     expected_revision: int
+    relation_evidence: tuple[CandidateEvidenceView, ...] = ()
+    fact_evidence: tuple[CandidateEvidenceView, ...] = ()
 
 
 @dataclass
@@ -69,6 +72,8 @@ class StoredInstrumentState:
     candidate_status: str | None = None
     relation_evidence_ids: tuple[str, ...] = ()
     fact_evidence_ids: tuple[str, ...] = ()
+    relation_evidence: tuple[CandidateEvidenceView, ...] = ()
+    fact_evidence: tuple[CandidateEvidenceView, ...] = ()
     candidate_refreshed_at: datetime | None = None
     candidate_archived_at: datetime | None = None
 
@@ -466,6 +471,8 @@ class InstrumentStateBook:
         symbol = _normalize_symbol(evidence.symbol)
         relation_ids = _evidence_ids(evidence.relation_evidence_ids)
         fact_ids = _evidence_ids(evidence.fact_evidence_ids)
+        relation_evidence = _candidate_evidence(evidence.relation_evidence, relation_ids)
+        fact_evidence = _candidate_evidence(evidence.fact_evidence, fact_ids)
         now = self._clock()
         if (
             not relation_ids
@@ -482,9 +489,17 @@ class InstrumentStateBook:
                 current.relation_evidence_ids, relation_ids
             )
             merged_fact_ids = _merge_ids(current.fact_evidence_ids, fact_ids)
+            merged_relation_evidence = _merge_evidence(
+                current.relation_evidence, relation_evidence, limit=3
+            )
+            merged_fact_evidence = _merge_evidence(
+                current.fact_evidence, fact_evidence, limit=3
+            )
             if (
                 merged_relation_ids == current.relation_evidence_ids
                 and merged_fact_ids == current.fact_evidence_ids
+                and merged_relation_evidence == current.relation_evidence
+                and merged_fact_evidence == current.fact_evidence
             ):
                 return
             refreshed_at = max(
@@ -495,6 +510,8 @@ class InstrumentStateBook:
                 candidate_status="active",
                 relation_evidence_ids=merged_relation_ids,
                 fact_evidence_ids=merged_fact_ids,
+                relation_evidence=merged_relation_evidence,
+                fact_evidence=merged_fact_evidence,
                 candidate_refreshed_at=refreshed_at,
                 candidate_archived_at=None,
             )
@@ -590,6 +607,8 @@ class InstrumentStateBook:
                     candidate_status=stored.candidate_status,
                     relation_evidence_ids=stored.relation_evidence_ids,
                     fact_evidence_ids=stored.fact_evidence_ids,
+                    relation_evidence=stored.relation_evidence,
+                    fact_evidence=stored.fact_evidence,
                     candidate_refreshed_at=stored.candidate_refreshed_at,
                     candidate_archived_at=stored.candidate_archived_at,
                 )
@@ -647,6 +666,37 @@ def _merge_ids(existing: tuple[str, ...], incoming: tuple[str, ...]) -> tuple[st
     return tuple(dict.fromkeys((*existing, *incoming)))
 
 
+def _candidate_evidence(
+    values: tuple[CandidateEvidenceView, ...], evidence_ids: tuple[str, ...]
+) -> tuple[CandidateEvidenceView, ...]:
+    allowed_ids = set(evidence_ids)
+    normalized = tuple(
+        item
+        for item in values
+        if item.evidence_id in allowed_ids
+        and item.title.strip()
+        and item.summary.strip()
+        and item.source.strip()
+        and item.as_of.tzinfo is not None
+    )
+    if len({item.evidence_id for item in normalized}) != len(normalized):
+        raise ValueError("candidate_evidence_insufficient")
+    return normalized
+
+
+def _merge_evidence(
+    existing: tuple[CandidateEvidenceView, ...],
+    incoming: tuple[CandidateEvidenceView, ...],
+    *,
+    limit: int,
+) -> tuple[CandidateEvidenceView, ...]:
+    merged = {item.evidence_id: item for item in existing}
+    merged.update({item.evidence_id: item for item in incoming})
+    return tuple(
+        sorted(merged.values(), key=lambda item: item.as_of, reverse=True)[:limit]
+    )
+
+
 def _instrument_idempotency_hash(actor_id: str, idempotency_key: str) -> str:
     return sha256(f"{actor_id}|instrument|{idempotency_key}".encode()).hexdigest()
 
@@ -662,6 +712,12 @@ def _stored_instrument_payload(item: StoredInstrumentState) -> dict:
         "candidate_status": item.candidate_status,
         "relation_evidence_ids": list(item.relation_evidence_ids),
         "fact_evidence_ids": list(item.fact_evidence_ids),
+        "relation_evidence": [
+            _candidate_evidence_payload(value) for value in item.relation_evidence
+        ],
+        "fact_evidence": [
+            _candidate_evidence_payload(value) for value in item.fact_evidence
+        ],
         "candidate_refreshed_at": _optional_datetime_payload(
             item.candidate_refreshed_at
         ),
@@ -688,6 +744,14 @@ def _stored_instrument_state(payload: dict) -> StoredInstrumentState:
         fact_evidence_ids=tuple(
             str(item) for item in payload.get("fact_evidence_ids", ())
         ),
+        relation_evidence=tuple(
+            _stored_candidate_evidence(item)
+            for item in payload.get("relation_evidence", ())
+        ),
+        fact_evidence=tuple(
+            _stored_candidate_evidence(item)
+            for item in payload.get("fact_evidence", ())
+        ),
         candidate_refreshed_at=_optional_datetime(
             payload.get("candidate_refreshed_at")
         ),
@@ -709,6 +773,31 @@ def _instrument_state_payload(state: InstrumentStateSnapshot) -> dict:
 
 def _optional_datetime_payload(value: datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
+
+
+def _candidate_evidence_payload(value: CandidateEvidenceView) -> dict:
+    return {
+        "evidence_id": value.evidence_id,
+        "title": value.title,
+        "summary": value.summary,
+        "source": value.source,
+        "as_of": value.as_of.isoformat(),
+        "url": value.url,
+    }
+
+
+def _stored_candidate_evidence(payload: dict) -> CandidateEvidenceView:
+    as_of = _optional_datetime(payload["as_of"])
+    if as_of is None:
+        raise ValueError("invalid_instrument_state")
+    return CandidateEvidenceView(
+        evidence_id=str(payload["evidence_id"]),
+        title=str(payload["title"]),
+        summary=str(payload["summary"]),
+        source=str(payload["source"]),
+        as_of=as_of,
+        url=str(payload["url"]) if payload.get("url") else None,
+    )
 
 
 def _optional_datetime(value: object) -> datetime | None:

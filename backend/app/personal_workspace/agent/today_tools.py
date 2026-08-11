@@ -648,6 +648,12 @@ class TodayDomainTools:
                     "fact_evidence_ids": [
                         record.envelope.evidence_id for record in fact_records
                     ],
+                    "relation_evidence": [
+                        _relation_evidence_view(record) for record in relations
+                    ],
+                    "fact_evidence": [
+                        _fact_evidence_view(event) for event in facts[:3]
+                    ],
                     "latest_fact_at": max(
                         event.published_at for event in facts
                     ).isoformat(),
@@ -927,6 +933,30 @@ def _normalize_event(raw: RawFactNews) -> _FactNewsEvent:
         sector=raw.sector,
         related_symbols=tuple(sorted({_symbol(item) for item in raw.related_symbols})),
     )
+
+
+def _relation_evidence_view(record: _EvidenceRecord) -> dict[str, Any]:
+    subject = str(record.data["subject_symbol"])
+    candidate = str(record.data["candidate_symbol"])
+    return {
+        "evidence_id": record.envelope.evidence_id,
+        "title": f"{subject} → {candidate}",
+        "summary": "系统关系图谱中配置的市场关联；它是候选发现线索，不代表因果结论。",
+        "source": record.envelope.source,
+        "as_of": record.envelope.as_of.isoformat(),
+        "url": None,
+    }
+
+
+def _fact_evidence_view(event: _FactNewsEvent) -> dict[str, Any]:
+    return {
+        "evidence_id": event.evidence_id,
+        "title": event.title,
+        "summary": event.summary,
+        "source": event.source,
+        "as_of": event.published_at.isoformat(),
+        "url": event.url,
+    }
 
 
 _SYMBOL_TERMS: Mapping[str, tuple[str, ...]] = {
