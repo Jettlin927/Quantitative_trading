@@ -692,4 +692,3 @@ def _tool_failure_code(exc: Exception) -> str:
     if isinstance(exc, PermissionError):
         return "authorization_denied"
     return "tool_failed"
-    FrozenEvidence,
