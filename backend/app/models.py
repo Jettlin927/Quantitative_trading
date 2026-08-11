@@ -617,6 +617,86 @@ class PersonalEvidenceRef(PrivateBase):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class PersonalToolEvidenceRecord(PrivateBase):
+    __tablename__ = "personal_tool_evidence_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "evidence_id_hmac",
+            name="uq_personal_tool_evidence_identity",
+        ),
+        SqlIndex(
+            "ix_personal_tool_evidence_logical_identity",
+            "workspace_id",
+            "logical_identity_hmac",
+        ),
+        SqlIndex("ix_personal_tool_evidence_expires_at", "expires_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    evidence_id_hmac: Mapped[str] = mapped_column(String(64), nullable=False)
+    logical_identity_hmac: Mapped[str] = mapped_column(String(64), nullable=False)
+    source: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    persistence: Mapped[str] = mapped_column(String(24), nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    authorization_snapshot_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    effective_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    available_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PersonalCapabilityAuditEvent(PrivateBase):
+    __tablename__ = "personal_capability_audit_events"
+    __table_args__ = (
+        SqlIndex(
+            "ix_personal_capability_audit_request",
+            "workspace_id",
+            "request_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    request_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("private_workbench.personal_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    channel: Mapped[str] = mapped_column(String(32), nullable=False)
+    canonical_tool: Mapped[str] = mapped_column(String(100), nullable=False)
+    arguments_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    evidence_id_hmacs: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    field_coverage: Mapped[Decimal | None] = mapped_column(Numeric(8, 6))
+    freshness_seconds: Mapped[int | None] = mapped_column(Integer)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(16, 8))
+    policy_revision: Mapped[str] = mapped_column(String(64), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class PersonalAnalysisRun(PrivateBase):
     __tablename__ = "personal_analysis_runs"
     __table_args__ = (
