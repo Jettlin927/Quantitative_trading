@@ -129,7 +129,19 @@ def _normalize_agent_response(raw: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(message, dict):
         raise ProviderFailure("provider_response_envelope_invalid", retryable=False)
     if finish_reason == "content_filter" or message.get("refusal"):
-        return {"status": "refusal", "message": {"content": None, "tool_calls": ()}}
+        refusal = {
+            "status": "refusal",
+            "message": {"content": None, "tool_calls": ()},
+        }
+        try:
+            usage = _normalize_deepseek_usage(raw.get("usage"))
+        except ProviderFailure:
+            return refusal
+        return {
+            **refusal,
+            "usage": usage,
+            "cost_usd": _deepseek_cost_usd(usage),
+        }
     tool_calls = _normalize_tool_calls(message.get("tool_calls"))
     content = message.get("content")
     if content is not None and not isinstance(content, str):

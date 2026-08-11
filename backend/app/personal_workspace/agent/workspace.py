@@ -1,7 +1,7 @@
 """AgentAnalysisWorkspace：把 AnalysisWorkspace 的 provider 执行替换为 tool-use agent 循环。
 
 复用基类的生命周期/存储/事件/租约机制；prepare/start 不再依赖冻结证据门禁，
-改为工具与技能预览；run 走 AgentRuntime 多轮循环。与单发路径并行共存，部署时通过
+改为工具与技能预览；run 走统一 Completion Runtime 多轮循环。与单发路径并行共存，部署时通过
 PERSONAL_ANALYSIS_MODE=agent 显式选择。
 """
 
@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import json
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -23,6 +24,7 @@ from ..analysis import (
     AnalysisRunView,
     AnalysisStore,
     AnalysisToolEvent,
+    AnalysisUsage,
     FrozenEvidence,
     AnalysisWorkspace,
     ProviderFailure,
@@ -32,10 +34,29 @@ from ..analysis import (
     _json_sha256,
 )
 from ..contracts import PersonalActor
-from .protocol import Skill, Tool
-from .runtime import AgentRuntime
+from .ai_runtime import (
+    RuntimeBudget,
+    RuntimeEvent,
+    RuntimeExecutionContext,
+    RuntimeRequest,
+    RuntimeResult,
+    RuntimeUsage,
+    run_runtime,
+)
+from .client_tool_runtime import (
+    CLIENT_TOOL_BASE_SYSTEM_PROMPT,
+    RegistryToolExecutor,
+    finalize_claims,
+)
+from .completion_runtime import DeepSeekCompletionRuntime
+from .domain_tools import DomainToolRegistry, RuntimeToolDefinition
+from .protocol import Skill
 
 AGENT_CONFIG_REVISION = "personal-agent-deepseek-v1"
+LEGACY_ANALYSIS_TOOL_NAMES = ("get_holdings", "get_kline", "get_news")
+ANALYSIS_TOOL_PERMISSIONS = frozenset(
+    {"portfolio:read", "market:read", "news:read", "evidence:read"}
+)
 
 
 class _AgentProviderShim:
@@ -56,8 +77,9 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
         self,
         *,
         store: AnalysisStore,
-        runtime: AgentRuntime,
-        tools: tuple[Tool, ...],
+        runtime: DeepSeekCompletionRuntime,
+        domain_tools: DomainToolRegistry,
+        tools: tuple[RuntimeToolDefinition, ...],
         skills: tuple[Skill, ...],
         model: str = DEEPSEEK_MODEL,
         config_revision: str = AGENT_CONFIG_REVISION,
@@ -85,6 +107,7 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
             daily_budget_guard=daily_budget_guard,
         )
         self._runtime = runtime
+        self._domain_tools = domain_tools
         self._tools = tuple(tools)
         self._skills = tuple(skills)
 
@@ -103,7 +126,18 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
         tool_names = tuple(tool.name for tool in self._tools)
         skill_ids = tuple(skill.skill_id for skill in self._skills)
         normalized_intent = replace(intent, question=question)
-        estimated_cost = self._runtime.maximum_cost_usd(normalized_intent)
+        context = self._execution_context(
+            actor_id=actor.actor_id,
+            heartbeat=lambda: None,
+            deadline=now + timedelta(seconds=self._lease_seconds),
+        )
+        estimated_cost = self._runtime.maximum_cost_usd(
+            self._runtime_request(
+                normalized_intent,
+                remaining_usd=self._monthly_soft_budget_usd,
+            ),
+            context,
+        )
         included_fields = ("user_question", *tool_names)
         preview_payload = {
             "question": question,
@@ -195,7 +229,11 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
                 ),
             ),
         )
-        self._store.save_run(current_run)
+        latest = self._store.get_run(draft.actor_id, run.view.run_id)
+        if latest is not None and latest.view.status == "cancelled":
+            current_run = latest
+        else:
+            self._store.save_run(current_run)
 
         def heartbeat() -> None:
             nonlocal current_run
@@ -211,99 +249,143 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
                     now=now,
                 )
 
-        def audit(
-            event: AnalysisToolEvent, evidence: tuple[FrozenEvidence, ...]
-        ) -> None:
-            nonlocal current_run
-            current_run = replace(
+        remaining = max(
+            Decimal("0"),
+            self._monthly_soft_budget_usd
+            - self._monthly_spend_reader(
+                PersonalActor(actor_id=draft.actor_id), self._clock()
+            ),
+        )
+        context = self._execution_context(
+            actor_id=draft.actor_id,
+            heartbeat=heartbeat,
+            deadline=self._clock() + timedelta(seconds=self._lease_seconds),
+            run_id=run.view.run_id,
+        )
+        result = run_runtime(
+            self._runtime,
+            self._runtime_request(draft.intent, remaining_usd=remaining),
+            context,
+        )
+        tool_evidence = _analysis_evidence(result)
+        tool_events = _analysis_tool_events(result.events)
+        current_run = replace(
+            current_run,
+            view=replace(
+                current_run.view,
+                tool_events=tool_events,
+                tool_evidence=tool_evidence,
+            ),
+        )
+        usage = _analysis_runtime_usage(result.usage)
+        cost_usd = format(result.usage.cost_usd, "f") if result.usage else None
+
+        if result.status == "cancelled":
+            failure = result.failure
+            outcome_unknown = failure.outcome_unknown if failure is not None else True
+            self._settle_runtime_budget(
+                budget_reservation,
+                run_id=run.view.run_id,
+                usage=result.usage,
+                failure_code="cancelled",
+                outcome_unknown=outcome_unknown,
+            )
+            latest = self._store.get_run(draft.actor_id, run.view.run_id)
+            if latest is not None and latest.view.status == "cancelled":
+                known_cost = cost_usd or ("0" if not outcome_unknown else None)
+                cancelled = replace(
+                    latest,
+                    view=replace(
+                        latest.view,
+                        provider_call_state=(
+                            "outcome_unknown"
+                            if outcome_unknown
+                            else "not_started"
+                            if result.usage is None
+                            else "completed"
+                        ),
+                        actual_cost_usd=known_cost,
+                        accounted_cost_usd=(
+                            latest.view.accounted_cost_usd
+                            if outcome_unknown
+                            else known_cost
+                        ),
+                        usage=usage,
+                        tool_events=tool_events,
+                        tool_evidence=tool_evidence,
+                    ),
+                )
+                return self._store.save_run(cancelled).view
+            return self._fail_run(current_run, "cancelled")
+
+        self._store.save_run(current_run)
+
+        if result.status != "completed" or result.usage is None:
+            failure = result.failure
+            code = failure.code if failure is not None else "runtime_failed"
+            outcome_unknown = failure.outcome_unknown if failure is not None else True
+            self._settle_runtime_budget(
+                budget_reservation,
+                run_id=run.view.run_id,
+                usage=result.usage,
+                failure_code=code,
+                outcome_unknown=outcome_unknown,
+            )
+            failed = replace(
                 current_run,
                 view=replace(
                     current_run.view,
-                    tool_events=(*current_run.view.tool_events, event),
-                    tool_evidence=(*current_run.view.tool_evidence, *evidence),
+                    provider_call_state=(
+                        "outcome_unknown" if outcome_unknown else "completed"
+                    ),
+                    actual_cost_usd=cost_usd or (
+                        "0" if not outcome_unknown else None
+                    ),
+                    accounted_cost_usd=(
+                        cost_usd or "0"
+                        if not outcome_unknown
+                        else current_run.view.accounted_cost_usd
+                    ),
+                    usage=usage,
                 ),
             )
-            self._store.save_run(current_run)
+            return self._fail_run(failed, code)
 
+        output = next(
+            event.text
+            for event in reversed(result.events)
+            if event.type == "output_completed"
+        )
         try:
-            result = self._runtime.run(
-                actor_id=draft.actor_id,
-                intent=draft.intent,
-                heartbeat=heartbeat,
-                audit=audit,
-            )
-        except ProviderFailure as exc:
-            if exc.response_completed and exc.cost_usd is not None:
-                if budget_reservation is not None:
-                    from ..automatic_briefing_store import BriefingCost
-
-                    usage = exc.usage
-                    self._daily_budget_guard.complete_call(
-                        budget_reservation,
-                        run_id=run.view.run_id,
-                        cost=BriefingCost(
-                            input_tokens=usage.input_tokens if usage else 0,
-                            output_tokens=usage.output_tokens if usage else 0,
-                            cache_hit_tokens=usage.cache_hit_tokens if usage else 0,
-                            cache_miss_tokens=usage.cache_miss_tokens if usage else 0,
-                            cost_usd=Decimal(exc.cost_usd),
-                        ),
-                        failure_code=exc.code,
-                        now=self._clock(),
-                    )
-                failed = replace(
-                    current_run,
-                    view=replace(
-                        current_run.view,
-                        provider_call_state="completed",
-                        actual_cost_usd=exc.cost_usd,
-                        accounted_cost_usd=exc.cost_usd,
-                        usage=exc.usage,
-                    ),
-                )
-            else:
-                if budget_reservation is not None:
-                    self._daily_budget_guard.mark_outcome_unknown(
-                        budget_reservation,
-                        run_id=run.view.run_id,
-                        failure_code=exc.code,
-                        now=self._clock(),
-                    )
-                failed = replace(
-                    current_run,
-                    view=replace(
-                        current_run.view, provider_call_state="outcome_unknown"
-                    ),
-                )
-            return self._fail_run(failed, exc.code)
-        except ValueError as exc:
-            if budget_reservation is not None:
-                self._daily_budget_guard.mark_outcome_unknown(
-                    budget_reservation,
-                    run_id=run.view.run_id,
-                    failure_code=str(exc),
-                    now=self._clock(),
-                )
-            failed = replace(
-                current_run,
-                view=replace(current_run.view, provider_call_state="outcome_unknown"),
-            )
-            return self._fail_run(failed, str(exc))
-        if budget_reservation is not None:
-            from ..automatic_briefing_store import BriefingCost
-
-            self._daily_budget_guard.complete_call(
+            claims = finalize_claims(output, tool_evidence)
+        except (ProviderFailure, ValueError) as exc:
+            code = exc.code if isinstance(exc, ProviderFailure) else str(exc)
+            self._settle_runtime_budget(
                 budget_reservation,
                 run_id=run.view.run_id,
-                cost=BriefingCost(
-                    input_tokens=result.usage.input_tokens,
-                    output_tokens=result.usage.output_tokens,
-                    cache_hit_tokens=result.usage.cache_hit_tokens,
-                    cache_miss_tokens=result.usage.cache_miss_tokens,
-                    cost_usd=Decimal(result.cost_usd),
-                ),
-                now=self._clock(),
+                usage=result.usage,
+                failure_code=code,
+                outcome_unknown=False,
             )
+            failed = replace(
+                current_run,
+                view=replace(
+                    current_run.view,
+                    provider_call_state="completed",
+                    actual_cost_usd=cost_usd,
+                    accounted_cost_usd=cost_usd,
+                    usage=usage,
+                ),
+            )
+            return self._fail_run(failed, code)
+
+        self._settle_runtime_budget(
+            budget_reservation,
+            run_id=run.view.run_id,
+            usage=result.usage,
+            failure_code=None,
+            outcome_unknown=False,
+        )
         completed = _append_event(current_run, "completed", "completed", self._clock())
         completed = replace(
             completed,
@@ -311,15 +393,15 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
             lease_expires_at=None,
             view=replace(
                 completed.view,
-                claims=result.claims,
-                actual_cost_usd=result.cost_usd,
-                usage=result.usage,
+                claims=claims,
+                actual_cost_usd=cost_usd,
+                usage=usage,
                 failure_code=None,
                 cancellable=False,
                 provider_call_state="completed",
-                accounted_cost_usd=result.cost_usd,
-                tool_events=result.tool_events,
-                tool_evidence=result.tool_evidence,
+                accounted_cost_usd=cost_usd,
+                tool_events=tool_events,
+                tool_evidence=tool_evidence,
             ),
         )
         return self._store.save_run(completed).view
@@ -327,21 +409,162 @@ class AgentAnalysisWorkspace(AnalysisWorkspace):
     def _preflight_provider(
         self, draft: StoredAnalysisDraft, run: StoredAnalysisRun
     ) -> None:
-        self._runtime.validate(
-            intent=draft.intent,
-            spend_before=self._monthly_spend_reader(
-                PersonalActor(actor_id=draft.actor_id), self._clock()
+        remaining = self._monthly_soft_budget_usd - self._monthly_spend_reader(
+            PersonalActor(actor_id=draft.actor_id), self._clock()
+        )
+        request = self._runtime_request(draft.intent, remaining_usd=remaining)
+        context = self._execution_context(
+            actor_id=draft.actor_id,
+            heartbeat=lambda: None,
+            deadline=self._clock() + timedelta(seconds=self._lease_seconds),
+        )
+        if self._runtime.maximum_cost_usd(request, context) > remaining:
+            raise ProviderFailure("budget_blocked", retryable=False)
+        self._runtime.validate_request(request, context)
+
+    def _runtime_request(
+        self, intent: AnalysisIntent, *, remaining_usd: Decimal
+    ) -> RuntimeRequest:
+        return RuntimeRequest(
+            model=self._model,
+            instructions=self._system_prompt(),
+            input_text=json.dumps(
+                {
+                    "question": intent.question,
+                    "subject_ids": list(intent.subject_ids),
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+            budget=RuntimeBudget(remaining_usd=remaining_usd),
+            tools=tuple(item.name for item in self._tools),
+        )
+
+    def _execution_context(
+        self,
+        *,
+        actor_id: str,
+        heartbeat: Callable[[], None],
+        deadline: datetime,
+        run_id: str | None = None,
+    ) -> RuntimeExecutionContext:
+        return RuntimeExecutionContext(
+            tools=self._tools,
+            executor=RegistryToolExecutor(
+                registry=self._domain_tools,
+                actor_id=actor_id,
+                permissions=ANALYSIS_TOOL_PERMISSIONS,
+                clock=self._clock,
+            ),
+            deadline=deadline,
+            heartbeat=heartbeat,
+            cancel_requested=(
+                (lambda: _cancel_requested(self._store, actor_id, run_id))
+                if run_id is not None
+                else (lambda: False)
             ),
         )
+
+    def _system_prompt(self) -> str:
+        parts = [CLIENT_TOOL_BASE_SYSTEM_PROMPT]
+        for skill in self._skills:
+            parts.append(f"[技能：{skill.name}]\n{skill.system_prompt}")
+        return "\n\n".join(parts)
+
+    def _settle_runtime_budget(
+        self,
+        budget_reservation: Any | None,
+        *,
+        run_id: str,
+        usage: RuntimeUsage | None,
+        failure_code: str | None,
+        outcome_unknown: bool,
+    ) -> None:
+        if budget_reservation is None:
+            return
+        if outcome_unknown:
+            self._daily_budget_guard.mark_outcome_unknown(
+                budget_reservation,
+                run_id=run_id,
+                failure_code=failure_code or "provider_cost_unknown",
+                now=self._clock(),
+            )
+            return
+        from ..automatic_briefing_store import BriefingCost
+
+        self._daily_budget_guard.complete_call(
+            budget_reservation,
+            run_id=run_id,
+            cost=BriefingCost(
+                input_tokens=usage.input_tokens if usage is not None else 0,
+                output_tokens=usage.output_tokens if usage is not None else 0,
+                cache_hit_tokens=usage.cache_hit_tokens if usage is not None else 0,
+                cache_miss_tokens=usage.cache_miss_tokens if usage is not None else 0,
+                cost_usd=usage.cost_usd if usage is not None else Decimal("0"),
+            ),
+            failure_code=failure_code,
+            now=self._clock(),
+        )
+
+
+def _analysis_evidence(result: RuntimeResult) -> tuple[FrozenEvidence, ...]:
+    evidence_by_id: dict[str, FrozenEvidence] = {}
+    for item in result.tool_evidence:
+        evidence_by_id.setdefault(
+            item.evidence_id,
+            FrozenEvidence(
+                evidence_id=item.evidence_id,
+                kind="tool_output",
+                source=item.source,
+                field=(item.authorized_fields[0] if item.authorized_fields else "tool_output"),
+                excerpt=item.excerpt,
+                content_sha256=item.content_sha256,
+                as_of=item.as_of,
+            ),
+        )
+    return tuple(evidence_by_id.values())
+
+
+def _analysis_tool_events(
+    events: tuple[RuntimeEvent, ...],
+) -> tuple[AnalysisToolEvent, ...]:
+    projected: list[AnalysisToolEvent] = []
+    for event in events:
+        if event.type not in {"tool_completed", "tool_failed"}:
+            continue
+        projected.append(
+            AnalysisToolEvent(
+                sequence=len(projected) + 1,
+                tool_name=event.tool_name or "unknown",
+                tool_call_id=event.tool_call_id or "unknown",
+                status="completed" if event.type == "tool_completed" else "failed",
+                evidence_ids=event.evidence_ids,
+                error_code=event.error_code,
+            )
+        )
+    return tuple(projected)
+
+
+def _analysis_runtime_usage(usage: RuntimeUsage | None) -> AnalysisUsage | None:
+    if usage is None:
+        return None
+    return AnalysisUsage(
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        cache_hit_tokens=usage.cache_hit_tokens,
+        cache_miss_tokens=usage.cache_miss_tokens,
+    )
+
+
+def _cancel_requested(store: AnalysisStore, actor_id: str, run_id: str) -> bool:
+    current = store.get_run(actor_id, run_id)
+    return current is not None and current.view.status == "cancelled"
 
 
 def build_agent_workspace(
     *,
     store: AnalysisStore,
-    portfolio_store: Any,
-    price_reader: Any | None,
-    market_adapter: Any | None,
-    news_reader: Any | None,
+    domain_tools: DomainToolRegistry,
     provider: Any,
     monthly_soft_budget_usd: Decimal,
     monthly_spend_reader: Callable[[PersonalActor, datetime], Decimal],
@@ -350,34 +573,22 @@ def build_agent_workspace(
 ) -> AgentAnalysisWorkspace:
     """装配 agent 模式的完整工作区（worker/API runtime 共用）。
 
-    数据源由调用方注入（组合根已装配）：alpaca 未配置时 K 线/现价工具降级，
-    INVESTMENT_NEWS_DIR 未配置时新闻工具降级。provider 由调用方注入：worker 传
+    领域能力只复用组合根已装配的唯一 registry。provider 由调用方注入：worker 传
     DeepSeekAgentChatAdapter，API 进程传可用性 shim（不持有密钥）。
     """
-    from .runtime import AgentRuntime
     from .skills import DEFAULT_ACTIVE_SKILLS
-    from .tools import build_agent_tools
 
-    tools = build_agent_tools(
-        portfolio_store=portfolio_store,
-        price_reader=price_reader,
-        market_adapter=market_adapter,
-        news_reader=news_reader,
+    tools = domain_tools.projected_definitions(
+        permissions=ANALYSIS_TOOL_PERMISSIONS,
+        names=LEGACY_ANALYSIS_TOOL_NAMES,
     )
-    runtime = AgentRuntime(
-        provider=provider,
-        tools=tools,
-        skills=DEFAULT_ACTIVE_SKILLS,
-        model=DEEPSEEK_MODEL,
-        clock=clock,
-        monthly_soft_budget_usd=monthly_soft_budget_usd,
-        monthly_spend_reader=lambda actor_id, now: monthly_spend_reader(
-            PersonalActor(actor_id=actor_id), now
-        ),
-    )
+    if tuple(item.name for item in tools) != LEGACY_ANALYSIS_TOOL_NAMES:
+        raise ValueError("analysis_tools_unavailable")
+    runtime = DeepSeekCompletionRuntime(provider=provider, clock=clock)
     return AgentAnalysisWorkspace(
         store=store,
         runtime=runtime,
+        domain_tools=domain_tools,
         tools=tools,
         skills=DEFAULT_ACTIVE_SKILLS,
         model=DEEPSEEK_MODEL,

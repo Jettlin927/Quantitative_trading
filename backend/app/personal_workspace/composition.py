@@ -220,10 +220,7 @@ def build_analysis_workspace(
 
         kwargs: dict[str, Any] = {
             "store": services.analysis_store,
-            "portfolio_store": services.portfolio_store,
-            "price_reader": services.market_readers.portfolio,
-            "market_adapter": services.market_readers.market,
-            "news_reader": services.news_reader,
+            "domain_tools": services.domain_tools,
             "provider": provider,
             "monthly_soft_budget_usd": monthly_soft_budget_usd,
             "monthly_spend_reader": monthly_spend_reader
