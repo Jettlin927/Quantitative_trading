@@ -48,7 +48,7 @@ from .watchlist import (
     PostgresInstrumentStateStore,
 )
 from .agent.domain_tools import DomainToolMetrics, DomainToolRegistry
-from .agent.evidence import PostgresEvidenceStore
+from .agent.evidence import EvidenceWorkspaceMode, PostgresEvidenceStore
 from .agent.fact_news import (
     FACT_NEWS_RETENTION_BY_AUTHORIZATION,
     InvestmentNewsReader,
@@ -90,6 +90,7 @@ def build_personal_services(
     alpaca_authorization_file: str | None = None,
     investment_news_dir: str | None = None,
     market_readers: PersonalMarketReaders | None = None,
+    evidence_workspace_mode: EvidenceWorkspaceMode = "create_if_missing",
 ) -> PersonalServices:
     """从数据库 URL 与 keyring 装配服务骨架；Alpaca/新闻配置缺失时整体降级。
 
@@ -178,6 +179,7 @@ def build_personal_services(
             **PRIVATE_FACT_RETENTION_BY_AUTHORIZATION,
             **market_readers.evidence_retention_by_authorization,
         },
+        workspace_mode=evidence_workspace_mode,
     )
     domain_tool_metrics = DomainToolMetrics()
     today_domain_tools = TodayDomainTools(
