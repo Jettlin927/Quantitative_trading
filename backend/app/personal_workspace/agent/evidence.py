@@ -26,6 +26,7 @@ from ..crypto import EncryptedEnvelope, PersonalDataCipher
 
 
 Persistence = Literal["encrypted_payload", "metadata_only"]
+EvidenceWorkspaceMode = Literal["create_if_missing", "existing_only"]
 
 
 class EvidenceLedgerError(ValueError):
@@ -277,12 +278,16 @@ class PostgresEvidenceStore:
         *,
         cipher: PersonalDataCipher,
         retention_by_authorization: Mapping[tuple[str, str], Persistence],
+        workspace_mode: EvidenceWorkspaceMode = "create_if_missing",
     ) -> None:
+        if workspace_mode not in {"create_if_missing", "existing_only"}:
+            raise EvidenceLedgerError("invalid_evidence_workspace_mode")
         self._session_factory = session_factory
         self._cipher = cipher
         self._retention_by_authorization = _retention_policy(
             retention_by_authorization
         )
+        self._workspace_mode = workspace_mode
 
     def put(
         self, context: EvidenceReadContext, record: EvidenceRecord
@@ -290,18 +295,17 @@ class PostgresEvidenceStore:
         retained = _incoming_record(record, self._retention_by_authorization)
         _authorize(context, retained)
         with self._session_factory() as session:
-            workspace = self._workspace_or_create(session, context.actor_id)
+            workspace = self._workspace_for_write(session, context.actor_id)
             evidence_hmac = self._cipher.scoped_lookup(
                 workspace_id=workspace.id, value=retained.evidence_id
             )
-            row = session.scalar(
-                select(PersonalToolEvidenceRecord)
-                .where(
-                    PersonalToolEvidenceRecord.workspace_id == workspace.id,
-                    PersonalToolEvidenceRecord.evidence_id_hmac == evidence_hmac,
-                )
-                .with_for_update()
+            statement = select(PersonalToolEvidenceRecord).where(
+                PersonalToolEvidenceRecord.workspace_id == workspace.id,
+                PersonalToolEvidenceRecord.evidence_id_hmac == evidence_hmac,
             )
+            if self._workspace_mode == "create_if_missing":
+                statement = statement.with_for_update()
+            row = session.scalar(statement)
             if row is not None:
                 existing = self._decode(workspace.id, row)
                 _authorize(context, existing)
@@ -376,7 +380,7 @@ class PostgresEvidenceStore:
         self, context: EvidenceReadContext, event: CapabilityAuditEvent
     ) -> None:
         with self._session_factory() as session:
-            workspace = self._workspace_or_create(session, context.actor_id)
+            workspace = self._workspace_for_write(session, context.actor_id)
             session.add(
                 PersonalCapabilityAuditEvent(
                     id=str(uuid4()),
@@ -432,7 +436,7 @@ class PostgresEvidenceStore:
             raise EvidenceLedgerError("evidence_envelope_mismatch")
         return record
 
-    def _workspace_or_create(
+    def _workspace_for_write(
         self, session: Session, actor_id: str
     ) -> PersonalWorkspace:
         if session.bind is not None and session.bind.dialect.name == "postgresql":
@@ -440,9 +444,15 @@ class PostgresEvidenceStore:
                 text("select pg_advisory_xact_lock(hashtextextended(:actor_hash, 0))"),
                 {"actor_hash": _identity_hash(actor_id)},
             )
-        workspace = self._workspace(session, actor_id, lock=True)
+        workspace = self._workspace(
+            session,
+            actor_id,
+            lock=self._workspace_mode == "create_if_missing",
+        )
         if workspace is not None:
             return workspace
+        if self._workspace_mode == "existing_only":
+            raise EvidenceLedgerError("evidence_workspace_not_found")
         workspace_id = str(uuid4())
         envelope = self._cipher.encrypt_json(
             {"usd_cash": "0"}, aad=_aad("personal_workspaces", workspace_id)

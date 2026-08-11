@@ -478,6 +478,10 @@ class PersonalMcpServerTest(unittest.TestCase):
                 services_builder.call_args.kwargs["market_readers"],
                 market_readers,
             )
+            self.assertEqual(
+                services_builder.call_args.kwargs["evidence_workspace_mode"],
+                "existing_only",
+            )
 
 
 class PersonalMcpAdapterAsyncTest(unittest.IsolatedAsyncioTestCase):

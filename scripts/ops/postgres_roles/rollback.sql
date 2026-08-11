@@ -23,32 +23,38 @@ REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA private_workbench FROM
     quant_api_runtime,
     quant_research_runtime,
     quant_personal_api,
-    quant_personal_analysis;
+    quant_personal_analysis,
+    quant_personal_mcp;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA private_workbench FROM
     quant_api_runtime,
     quant_research_runtime,
     quant_personal_api,
-    quant_personal_analysis;
+    quant_personal_analysis,
+    quant_personal_mcp;
 REVOKE ALL PRIVILEGES ON SCHEMA private_workbench FROM
     quant_api_runtime,
     quant_research_runtime,
     quant_personal_api,
-    quant_personal_analysis;
+    quant_personal_analysis,
+    quant_personal_mcp;
 REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM
     quant_api_runtime,
     quant_research_runtime,
     quant_personal_api,
-    quant_personal_analysis;
+    quant_personal_analysis,
+    quant_personal_mcp;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM
     quant_api_runtime,
     quant_research_runtime,
     quant_personal_api,
-    quant_personal_analysis;
+    quant_personal_analysis,
+    quant_personal_mcp;
 REVOKE ALL PRIVILEGES ON SCHEMA public FROM
     quant_api_runtime,
     quant_research_runtime,
     quant_personal_api,
-    quant_personal_analysis;
+    quant_personal_analysis,
+    quant_personal_mcp;
 
 DO $database_revokes$
 DECLARE
@@ -58,7 +64,8 @@ BEGIN
         'quant_api_runtime',
         'quant_research_runtime',
         'quant_personal_api',
-        'quant_personal_analysis'
+        'quant_personal_analysis',
+        'quant_personal_mcp'
     ]
     LOOP
         EXECUTE format('REVOKE CONNECT ON DATABASE %I FROM %I', current_database(), role_name);
@@ -66,6 +73,7 @@ BEGIN
 END
 $database_revokes$;
 
+DROP ROLE IF EXISTS quant_personal_mcp;
 DROP ROLE IF EXISTS quant_personal_analysis;
 DROP ROLE IF EXISTS quant_personal_api;
 DROP ROLE IF EXISTS quant_research_runtime;

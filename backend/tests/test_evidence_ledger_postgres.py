@@ -9,10 +9,11 @@ import unittest
 from uuid import uuid4
 
 from alembic import command
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, func, inspect, select, text
 from sqlalchemy.orm import sessionmaker
 
 from backend.app.database import alembic_config, current_schema_heads, expected_schema_heads
+from backend.app.models import PersonalWorkspace
 from backend.app.personal_workspace.agent.evidence import (
     CapabilityAuditEvent,
     EvidenceLedgerError,
@@ -315,6 +316,75 @@ class PostgresEvidenceLedgerContractTest(unittest.TestCase):
                 )
             ],
         )
+
+    def test_existing_only_put_and_audit_require_a_preexisting_workspace(self) -> None:
+        suffix = str(uuid4())
+        actor = f"existing-only-{suffix}"
+        unknown_actor = f"existing-only-unknown-{suffix}"
+        context = self._context(actor)
+        default_store = PostgresEvidenceStore(
+            self.Session,
+            cipher=self.cipher,
+            retention_by_authorization=RETENTION_BY_AUTHORIZATION,
+        )
+        default_store.put(context, self._record(f"seed:{suffix}"))
+        existing_only_store = PostgresEvidenceStore(
+            self.Session,
+            cipher=self.cipher,
+            retention_by_authorization=RETENTION_BY_AUTHORIZATION,
+            workspace_mode="existing_only",
+        )
+
+        stored = existing_only_store.put(
+            context, self._record(f"existing:{suffix}")
+        )
+        existing_only_store.append_audit(
+            context,
+            CapabilityAuditEvent(
+                request_id=f"existing-only-request-{suffix}",
+                channel="mcp_streamable_http",
+                canonical_tool="get_today_context",
+                arguments_sha256="0" * 64,
+                status="success",
+                evidence_ids=(),
+                policy_revision="mcp-remote-v1",
+                started_at=NOW,
+                completed_at=NOW,
+            ),
+        )
+        with self.Session() as session:
+            before = int(session.scalar(select(func.count(PersonalWorkspace.id))) or 0)
+
+        unknown_context = self._context(unknown_actor)
+        for operation in (
+            lambda: existing_only_store.put(
+                unknown_context, self._record(f"unknown:{suffix}")
+            ),
+            lambda: existing_only_store.append_audit(
+                unknown_context,
+                CapabilityAuditEvent(
+                    request_id=f"unknown-request-{suffix}",
+                    channel="mcp_streamable_http",
+                    canonical_tool="get_today_context",
+                    arguments_sha256="0" * 64,
+                    status="failed",
+                    evidence_ids=(),
+                    policy_revision="mcp-remote-v1",
+                    started_at=NOW,
+                    completed_at=NOW,
+                ),
+            ),
+        ):
+            with self.subTest(operation=operation):
+                with self.assertRaisesRegex(
+                    EvidenceLedgerError, "^evidence_workspace_not_found$"
+                ):
+                    operation()
+
+        with self.Session() as session:
+            after = int(session.scalar(select(func.count(PersonalWorkspace.id))) or 0)
+        self.assertEqual(existing_only_store.read(context, stored.evidence_id), stored)
+        self.assertEqual(after, before)
 
     def _workspace_id(self, actor_id: str) -> str:
         with self.engine.connect() as connection:

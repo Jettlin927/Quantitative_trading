@@ -32,7 +32,7 @@
 
 | 键 | 内容 |
 | --- | --- |
-| `PERSONAL_MCP_DATABASE_URL_HOST_FILE` | 仅一行 `postgresql+psycopg` 只读角色 URL |
+| `PERSONAL_MCP_DATABASE_URL_HOST_FILE` | 仅一行 `postgresql+psycopg` 的 `quant_personal_mcp` 最小权限角色 URL |
 | `PERSONAL_MCP_TOKEN_HOST_FILE` | 独立 MCP bearer token |
 | `PERSONAL_DATA_KEYRING_HOST_FILE` | 既有 keyring JSON |
 | `ALPACA_CREDENTIALS_HOST_FILE` | 既有 Alpaca 凭据 JSON |

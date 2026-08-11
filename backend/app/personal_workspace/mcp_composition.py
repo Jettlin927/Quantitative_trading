@@ -108,6 +108,7 @@ def build_personal_mcp_gateway(
             ).digest(),
             investment_news_dir=config.investment_news_dir,
             market_readers=market_readers,
+            evidence_workspace_mode="existing_only",
         )
         if services.portfolio_store.load(
             actor_id=config.actor_id
