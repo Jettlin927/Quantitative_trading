@@ -9,7 +9,7 @@
 | 理解系统流程或寻找代码职责 | [系统流程](architecture/system-flow.md)、[架构与代码地图](architecture/) |
 | 修改领域语言或系统决定 | [统一领域语言](../CONTEXT.md)、[架构决策](adr/) |
 | 处理美股行情、来源授权或数据质量 | [美股数据边界](data/us/) |
-| 处理私有持仓、规则、AI 分析或本机 MCP | [产品范围](product/)、[个人工作台安全配置](operations/personal-workbench-secrets.md)、[本机只读 MCP](operations/personal-mcp-stdio.md) |
+| 处理私有持仓、规则、AI 分析或 MCP | [产品范围](product/)、[个人工作台安全配置](operations/personal-workbench-secrets.md)、[远端 MCP 运维合同](operations/personal-mcp-remote.md)、[非生产 stdio MCP](operations/personal-mcp-stdio.md) |
 | 部署、迁移、巡检或访问生产 | [运维手册](operations/) |
 | 执行 Agent、Issue 或验证流程 | [Agent 工作参考](agents/) |
 | 查阅已失效的计划、交接或快照 | [历史归档](archive/) |

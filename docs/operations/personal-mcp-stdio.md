@@ -1,11 +1,13 @@
-# 本机只读 MCP stdio 启用与关闭
+# 非生产只读 MCP stdio 启用与关闭
 
-本页只定义本机 `stdio` adapter 的稳定操作边界，不构成真实 MCP 启用授权，也不授权
+本页只定义非生产/测试 `stdio` adapter 的稳定操作边界，不构成真实 MCP 启用授权，也不授权
 生产部署、生产配置变更或生产数据操作。仓库不保存 MCP 客户端配置、actor、数据库连接串、
 keyring、来源凭据或其他 secret。
 
-安全合同以 [ADR 0013](../adr/0013-local-read-only-personal-mcp.md) 为准。首版只允许本机
-子进程 stdin/stdout，不监听 TCP，不提供 HTTP、SSE 或远程转发。
+共同安全合同以 [ADR 0013](../adr/0013-local-read-only-personal-mcp.md) 为准；生产拓扑已由
+[ADR 0014](../adr/0014-remote-loopback-personal-mcp.md)改为 `quant-trading-prod` loopback
+Streamable HTTP + SSH 隧道。`stdio` 仍只运行本机子进程 stdin/stdout，不监听 TCP，
+不提供 HTTP、SSE 或远程转发，也不能冒充生产验收。
 
 ## 默认关闭验收
 

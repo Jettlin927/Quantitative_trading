@@ -10,6 +10,7 @@
 - [美股优先工作台与旧数据链路退役](0010-us-first-workbench-and-retired-legacy-data-paths.md)
 - [个人投资工作台不再包含研究系统](0011-personal-investment-workbench-without-research.md)
 - [本机私有只读 MCP 使用固定 actor 与确定性工具白名单](0013-local-read-only-personal-mcp.md)
+- [远端个人 MCP 运行在生产服务器 loopback 并通过 SSH 隧道访问](0014-remote-loopback-personal-mcp.md)
 
 ## 已被当前方向取代
 

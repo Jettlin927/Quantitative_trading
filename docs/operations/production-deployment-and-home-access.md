@@ -126,6 +126,19 @@ Windows 任务计划程序如需登录后自动启动，只运行当前用户权
 `-o BatchMode=yes`；失败可重试，但禁止并发启动多个实例。口令密钥交由当前用户的
 `ssh-agent` 管理，不把私钥或口令写进脚本。
 
+## 远端 MCP 目标合同（尚未实现或部署）
+
+远端个人 MCP 的生产目标同样位于 `quant-trading-prod`，只在宿主 `127.0.0.1` 发布单一
+`/mcp` Streamable HTTP endpoint，由本机客户端经独立 SSH 隧道访问；不得开放公网端口、
+域名或公共反向代理。协议 adapter 只调用唯一 `DomainToolRegistry`，审计 channel 固定为
+`mcp_streamable_http`，领域 purpose 固定为 `mcp_remote_read`。DeepSeek Worker 继续通过
+Chat Completions `tool_calls` 的内部 adapter 直接调用 registry，不导入 MCP。
+
+该目标的 bearer token、Origin、历史证据不扩权、默认关闭和 kill switch 见
+[远端 MCP 运维合同](personal-mcp-remote.md)。当前决定不实现 HTTP transport 或 Compose，
+也不授权创建凭据、修改服务器配置、启动容器或真实启用；后续生产切换仍须针对精确 SHA、
+维护窗口和回滚动作取得当次授权并现场读回。
+
 ## 家庭电脑上的 Codex 交接规则
 
 1. 读取仓库规则和本页，只做本机与 `quant-trading-prod` 的只读预检。
