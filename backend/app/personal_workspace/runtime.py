@@ -107,6 +107,7 @@ def get_personal_runtime() -> PersonalRuntime:
                         granted_permissions=frozenset(
                             {"portfolio:read", "market:read", "news:read"}
                         ),
+                        purpose="domain_tool",
                         clock=lambda: datetime.now(timezone.utc),
                     ),
                     arguments={},

@@ -22,12 +22,17 @@ class ActorOwnedFactPolicy:
 
 
 def _policy(
-    *, source: str, snapshot_id: str, permission: str
+    *,
+    source: str,
+    snapshot_id: str,
+    permission: str,
+    allowed_purposes: frozenset[str] = frozenset({"domain_tool"}),
 ) -> ActorOwnedFactPolicy:
     return ActorOwnedFactPolicy(
         source=source,
         authorization_snapshot_id=snapshot_id,
         required_permissions=frozenset({permission}),
+        allowed_purposes=allowed_purposes,
     )
 
 
@@ -39,12 +44,24 @@ PRIVATE_FACT_POLICY_HISTORY = MappingProxyType(
                 snapshot_id="actor-owned-personal-portfolio-v1",
                 permission="portfolio:read",
             ),
+            _policy(
+                source="personal_portfolio",
+                snapshot_id="actor-owned-personal-portfolio-v2",
+                permission="portfolio:read",
+                allowed_purposes=frozenset({"domain_tool", "mcp_stdio"}),
+            ),
         ),
         "personal_instrument_state": (
             _policy(
                 source="personal_instrument_state",
                 snapshot_id="actor-owned-personal-instrument-state-v1",
                 permission="portfolio:read",
+            ),
+            _policy(
+                source="personal_instrument_state",
+                snapshot_id="actor-owned-personal-instrument-state-v2",
+                permission="portfolio:read",
+                allowed_purposes=frozenset({"domain_tool", "mcp_stdio"}),
             ),
         ),
         "observation_rule_attention": (
@@ -53,6 +70,12 @@ PRIVATE_FACT_POLICY_HISTORY = MappingProxyType(
                 snapshot_id="actor-owned-observation-rule-attention-v1",
                 permission="portfolio:read",
             ),
+            _policy(
+                source="observation_rule_attention",
+                snapshot_id="actor-owned-observation-rule-attention-v2",
+                permission="portfolio:read",
+                allowed_purposes=frozenset({"domain_tool", "mcp_stdio"}),
+            ),
         ),
         "instrument_relation_map": (
             _policy(
@@ -60,16 +83,22 @@ PRIVATE_FACT_POLICY_HISTORY = MappingProxyType(
                 snapshot_id="actor-owned-instrument-relation-map-v1",
                 permission="market:read",
             ),
+            _policy(
+                source="instrument_relation_map",
+                snapshot_id="actor-owned-instrument-relation-map-v2",
+                permission="market:read",
+                allowed_purposes=frozenset({"domain_tool", "mcp_stdio"}),
+            ),
         ),
     }
 )
 
 _PRIVATE_CURRENT_SNAPSHOT_BY_SOURCE = MappingProxyType(
     {
-        "personal_portfolio": "actor-owned-personal-portfolio-v1",
-        "personal_instrument_state": "actor-owned-personal-instrument-state-v1",
-        "observation_rule_attention": "actor-owned-observation-rule-attention-v1",
-        "instrument_relation_map": "actor-owned-instrument-relation-map-v1",
+        "personal_portfolio": "actor-owned-personal-portfolio-v2",
+        "personal_instrument_state": "actor-owned-personal-instrument-state-v2",
+        "observation_rule_attention": "actor-owned-observation-rule-attention-v2",
+        "instrument_relation_map": "actor-owned-instrument-relation-map-v2",
     }
 )
 

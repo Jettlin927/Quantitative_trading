@@ -199,6 +199,7 @@ class AutomaticBriefingAutomation:
             context = DomainToolContext(
                 actor_id=actor.actor_id,
                 granted_permissions=ALL_TOOL_PERMISSIONS,
+                purpose="domain_tool",
                 clock=lambda: as_of,
             )
             today = self._tools.invoke(
@@ -424,6 +425,7 @@ class AutomaticBriefingCoordinator:
         context = DomainToolContext(
             actor_id=actor.actor_id,
             granted_permissions=ALL_TOOL_PERMISSIONS,
+            purpose="domain_tool",
             clock=self._clock,
         )
         planned: list[tuple[str, dict[str, Any]]] = []
